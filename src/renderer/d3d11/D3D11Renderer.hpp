@@ -40,6 +40,7 @@ private:
         std::uint32_t startIndex{};
         std::int32_t baseVertex{};
         std::uint32_t textureIndex{};
+        bool alphaTest{};
     };
 
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
@@ -71,6 +72,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthView_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;

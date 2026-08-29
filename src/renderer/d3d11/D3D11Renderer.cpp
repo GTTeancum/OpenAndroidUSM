@@ -69,6 +69,29 @@ float4 main(PixelInput input) : SV_TARGET {
 }
 )hlsl";
 
+constexpr std::string_view kAlphaTestPixelShader = R"hlsl(
+Texture2D DiffuseTexture : register(t0);
+SamplerState DiffuseSampler : register(s0);
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    float4 diffuse = DiffuseTexture.Sample(DiffuseSampler, input.textureCoordinate) *
+                     input.color;
+    // Original CCommonGLMaterialRenderer_ALPHA_TEST_NONTRANSPARENT uses
+    // GL_GREATER with a 0.5 alpha reference (Ghidra image 0x00397864).
+    clip(diffuse.a - 0.5);
+    float3 normal = normalize(input.normal);
+    float lighting = 0.35 + 0.65 * abs(dot(normal, normalize(float3(0.3, 0.5, -0.8))));
+    return diffuse * float4(lighting, lighting, lighting, 1.0);
+}
+)hlsl";
+
 Result hresultFailure(std::string_view operation, HRESULT value) {
     std::ostringstream message;
     message << operation << " failed: 0x" << std::hex
@@ -314,6 +337,20 @@ Result D3D11Renderer::createPipeline() {
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreatePixelShader", callResult);
     }
+    ComPtr<ID3DBlob> alphaTestPixelBytecode;
+    result = compileShader(kAlphaTestPixelShader, "ps_5_0",
+                           alphaTestPixelBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreatePixelShader(
+        alphaTestPixelBytecode->GetBufferPointer(),
+        alphaTestPixelBytecode->GetBufferSize(), nullptr,
+        &alphaTestPixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure(
+            "ID3D11Device::CreatePixelShader(alpha test)", callResult);
+    }
 
     constexpr std::array inputElements{
         D3D11_INPUT_ELEMENT_DESC{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
@@ -461,6 +498,10 @@ Result D3D11Renderer::uploadGeometrySet(
                     batch.textureIndex = *material->diffuseImageIndex;
                 } else {
                     batch.textureIndex = static_cast<std::uint32_t>(textures.size());
+                }
+                if (material != nullptr) {
+                    batch.alphaTest = material->id.starts_with("alphatest") ||
+                                      material->name.starts_with("alphatest");
                 }
             }
             drawBatches_.push_back(batch);
@@ -615,10 +656,12 @@ void D3D11Renderer::renderFrame() {
         context_->IASetIndexBuffer(indexBuffer_.Get(), DXGI_FORMAT_R16_UINT, 0);
         context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
         context_->VSSetConstantBuffers(0, 1, transformBuffer_.GetAddressOf());
-        context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
         context_->RSSetState(rasterizerState_.Get());
         for (const DrawBatch& batch : drawBatches_) {
+            context_->PSSetShader(batch.alphaTest ? alphaTestPixelShader_.Get()
+                                                  : pixelShader_.Get(),
+                                  nullptr, 0);
             context_->PSSetShaderResources(
                 0, 1, textureViews_[batch.textureIndex].GetAddressOf());
             context_->IASetPrimitiveTopology(batch.topology);

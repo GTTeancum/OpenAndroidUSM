@@ -69,6 +69,12 @@ image library. The image's source path is the archive-facing texture name;
 for example, Room 1 maps `alphatest` to `level01_alphatest.tga` and
 `Material__54` to `041_building.tga`.
 
+The original
+`CCommonGLMaterialRenderer_ALPHA_TEST_NONTRANSPARENT::onSetMaterial` at Ghidra
+image address `0x00397864` enables alpha testing with `GL_GREATER` and a 0.5
+reference. The D3D11 material path preserves that behavior with an HLSL
+`clip` shader variant for the recovered `alphatest` materials.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a
