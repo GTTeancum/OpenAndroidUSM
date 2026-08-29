@@ -13,13 +13,24 @@ FetchContent_Declare(zlib
 )
 FetchContent_MakeAvailable(zlib)
 
+set(PUGIXML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(PUGIXML_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(pugixml
+    GIT_REPOSITORY https://github.com/zeux/pugixml.git
+    GIT_TAG v1.14
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(pugixml)
+
 add_library(OpenAndroidUSM.Core STATIC
+    src/assets/BresFile.cpp
+    src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
 target_include_directories(OpenAndroidUSM.Core PUBLIC src)
-target_link_libraries(OpenAndroidUSM.Core PRIVATE zlibstatic)
+target_link_libraries(OpenAndroidUSM.Core PRIVATE zlibstatic pugixml::pugixml)
 if(MSVC)
     target_compile_options(OpenAndroidUSM.Core PRIVATE /W4 /permissive- /EHsc /utf-8)
 endif()

@@ -33,3 +33,21 @@ image address `0x00439124`). `filesystem::GbmpArchive` is the native C++ reader.
 Observed shipped archives use flags `0`, compression method `8`, and include
 sizes in every local header. The reader intentionally rejects encryption and
 data descriptors until an actual resource requires those variants.
+
+## BRES/BDAE resources
+
+The `.bdae` meshes are `BRES` resource files. Their 32-byte header identifies
+the byte order, complete file size, and a table containing the file offsets of
+every serialized pointer field. `irr::res::File::Init` rebases those 32-bit
+offsets in place on ARM. `assets::BresFile` instead records field-to-target
+offset mappings without mutating the input, which is safe on x64 and keeps the
+serialized layout available for validation.
+
+## Irrlicht scenes
+
+Level and room `.irr` resources are UTF-16 XML. The main scene has one
+`irr_scene` root; room resources intentionally contain a sequence of top-level
+`node` fragments. `assets::IrrScene` accepts both layouts and recovers stable
+node IDs, hierarchy, transforms, visibility, semantic game type, and referenced
+mesh path. Level 1 currently validates as 154 main-scene nodes and 60 nodes in
+Room 1.
