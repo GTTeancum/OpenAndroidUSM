@@ -80,6 +80,7 @@ if(MSVC)
 endif()
 
 add_library(OpenAndroidUSM.Core STATIC
+    src/audio/CinematicSoundBank.cpp
     src/audio/OggAudio.cpp
     src/audio/SoundEventCatalog.cpp
     src/assets/BresFile.cpp

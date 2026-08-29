@@ -129,6 +129,14 @@ stems, and records aliases only when asset evidence is exact. The Level 1 CFF
 typo `SPIDY` maps to the shipped `SPIDEY` filename; missing event aliases stay
 unresolved and test-visible instead of being replaced with guessed sounds.
 
+`audio::CinematicSoundBank` scans the typed CFF before playback and decodes
+each unique resolvable event once, keeping Vorbis work off its scheduled frame.
+The application advances `CinematicPlayer` from the same monotonic clock as
+the camera and dispatches 2D/loop flags to XAudio2. The level-one intro has 19
+unique event names: 17 resolve to supplied Ogg files, while
+`SFX_THUG_KNIFE_HURT_1` and `SFX_VERTICAL_IMPACT` remain explicit evidence
+gaps because the absent VoxSound table is the only authoritative alias map.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

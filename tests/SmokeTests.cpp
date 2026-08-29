@@ -4,6 +4,7 @@
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "audio/OggAudio.hpp"
+#include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
@@ -279,6 +280,27 @@ int main() {
         assert(cinematicPlayer.advanceTo(41800, collectCommand));
         assert(dispatchedCommands.size() == 38);
         assert(cinematicPlayer.finished());
+
+        usm::audio::CinematicSoundBank introSounds;
+        assert(introSounds.preload(bootstrap.introScript(), soundCatalog));
+        assert(introSounds.loadedEventCount() == 17);
+        assert(introSounds.unresolvedEvents().size() == 2);
+        assert(std::find(introSounds.unresolvedEvents().begin(),
+                         introSounds.unresolvedEvents().end(),
+                         "SFX_THUG_KNIFE_HURT_1") !=
+               introSounds.unresolvedEvents().end());
+        assert(std::find(introSounds.unresolvedEvents().begin(),
+                         introSounds.unresolvedEvents().end(),
+                         "SFX_VERTICAL_IMPACT") !=
+               introSounds.unresolvedEvents().end());
+        std::size_t playedSoundCount = 0;
+        assert(introSounds.dispatch(
+            bootstrap.introScript().threads().front().commands.back(),
+            [&playedSoundCount](const usm::audio::PcmAudio&, bool) {
+                ++playedSoundCount;
+                return usm::Result::success();
+            }));
+        assert(playedSoundCount == 1);
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

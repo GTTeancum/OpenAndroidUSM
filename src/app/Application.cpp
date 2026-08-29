@@ -47,6 +47,18 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = soundCatalog_.index(gameDataRoot / "sound");
+    if (!result) {
+        return fail(result.message());
+    }
+    result = introSounds_.preload(levelOne_.introScript(), soundCatalog_);
+    if (!result) {
+        return fail(result.message());
+    }
+    result = introPlayer_.start(levelOne_.introScript());
+    if (!result) {
+        return fail(result.message());
+    }
     result = renderer_.uploadSceneGeometry(levelOne_.roomGeometry(),
                                            levelOne_.roomTextures());
     if (!result) {
@@ -69,6 +81,25 @@ int Application::run(HINSTANCE instance) {
         const auto timestamp = static_cast<std::uint32_t>(std::min<std::int64_t>(
             elapsed.count(),
             levelOne_.introCameraAnimation().durationMilliseconds()));
+        Result soundResult = Result::success();
+        result = introPlayer_.advanceTo(
+            timestamp,
+            [this, &soundResult](const game::CinematicThread&,
+                                 const game::CinematicCommand& command) {
+                if (!soundResult) {
+                    return;
+                }
+                soundResult = introSounds_.dispatch(
+                    command, [this](const audio::PcmAudio& clip, bool loop) {
+                        return audio_.play(clip, loop);
+                    });
+            });
+        if (!result) {
+            return fail(result.message());
+        }
+        if (!soundResult) {
+            return fail(soundResult.message());
+        }
         result = renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
         if (!result) {
             return fail(result.message());

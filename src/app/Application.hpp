@@ -1,6 +1,9 @@
 #pragma once
 
 #include "audio/xaudio2/XAudio2System.hpp"
+#include "audio/CinematicSoundBank.hpp"
+#include "audio/SoundEventCatalog.hpp"
+#include "game/CinematicPlayer.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
@@ -22,6 +25,9 @@ private:
     game::LevelOneBootstrap levelOne_;
     renderer::D3D11Renderer renderer_;
     audio::XAudio2System audio_;
+    audio::SoundEventCatalog soundCatalog_;
+    audio::CinematicSoundBank introSounds_;
+    game::CinematicPlayer introPlayer_;
 };
 
 } // namespace usm
