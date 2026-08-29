@@ -3,6 +3,7 @@
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "audio/OggAudio.hpp"
+#include "audio/SoundEventCatalog.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
@@ -66,6 +67,20 @@ int main() {
         assert(decodedAudio.sampleRate > 0);
         assert(decodedAudio.channelCount > 0);
         assert(decodedAudio.frameCount() > 0);
+
+        usm::audio::SoundEventCatalog soundCatalog;
+        assert(soundCatalog.index(dataRoot / "sound"));
+        assert(soundCatalog.eventCount() == 510);
+        assert(soundCatalog.ambiguousEventCount() == 5);
+        assert(soundCatalog.resolve("SFX_WEB_SWING_START") != nullptr);
+        assert(soundCatalog.resolve("VFX_PROLOGUE_SPIDY_01") != nullptr);
+        assert(soundCatalog.resolve("SFX_CUTSCENE_LV3_SPIDY_ARRIVES") !=
+               nullptr);
+        assert(soundCatalog.resolve("SFX_THUG_KNIFE_HURT_1") == nullptr);
+        assert(soundCatalog.resolve("SFX_VERTICAL_IMPACT") == nullptr);
+        usm::audio::PcmAudio catalogAudio;
+        assert(soundCatalog.decode("SFX_WEB_SWING_START", catalogAudio));
+        assert(catalogAudio.frameCount() > 0);
 
         usm::filesystem::GbmpArchive archive;
         assert(archive.open(configArchive));

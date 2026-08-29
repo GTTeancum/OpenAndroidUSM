@@ -86,6 +86,17 @@ chain is cinematic 1264 (start 1265 and disable trigger 1263), the 38-command
 camera/character animations, 15 sound events, message strings, and visible
 rooms.
 
+## Vox sound events
+
+The preserved `VoxSoundFile::LoadRecordFromFile` and `ReadBasicRecord`
+functions (Ghidra `0x003da650` and `0x003da570`) load `/VoxSound.bin` or
+`/VoxSounds.bin` into 0x30-byte event records. Those record-table assets are
+not present in the supplied archive. `audio::SoundEventCatalog` therefore
+indexes the 515 supplied Ogg files by event stem, rejects the five ambiguous
+stems, and records aliases only when asset evidence is exact. The Level 1 CFF
+typo `SPIDY` maps to the shipped `SPIDEY` filename; missing event aliases stay
+unresolved and test-visible instead of being replaced with guessed sounds.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a
