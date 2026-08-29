@@ -22,8 +22,45 @@ FetchContent_Declare(pugixml
 )
 FetchContent_MakeAvailable(pugixml)
 
+function(usm_download_verified url output sha256)
+    if(EXISTS "${output}")
+        file(SHA256 "${output}" existing_sha256)
+        if(existing_sha256 STREQUAL sha256)
+            return()
+        endif()
+    endif()
+    file(DOWNLOAD "${url}" "${output}"
+        TLS_VERIFY ON
+        EXPECTED_HASH "SHA256=${sha256}"
+    )
+endfunction()
+
+set(POWERVR_DECOMPRESS_DIR "${CMAKE_BINARY_DIR}/_deps/powervr-decompress")
+file(MAKE_DIRECTORY "${POWERVR_DECOMPRESS_DIR}")
+set(POWERVR_SOURCE_BASE
+    "https://raw.githubusercontent.com/powervr-graphics/Native_SDK/2b1bf2f14d3365d0bb801e2a6a131a319d3a2e48/framework/PVRCore/texture"
+)
+usm_download_verified(
+    "${POWERVR_SOURCE_BASE}/PVRTDecompress.cpp"
+    "${POWERVR_DECOMPRESS_DIR}/PVRTDecompress.cpp"
+    "74559c5a4b8161aafce1ebe984bf8060896feaa81276b614491dbee755d6e4c7"
+)
+usm_download_verified(
+    "${POWERVR_SOURCE_BASE}/PVRTDecompress.h"
+    "${POWERVR_DECOMPRESS_DIR}/PVRTDecompress.h"
+    "67123a36b99df380af76a65f3dfa3a7f368a153f5401b36a9ff1ed233cee6f5f"
+)
+add_library(OpenAndroidUSM.PVRTC STATIC
+    ${POWERVR_DECOMPRESS_DIR}/PVRTDecompress.cpp
+)
+target_compile_features(OpenAndroidUSM.PVRTC PUBLIC cxx_std_20)
+target_include_directories(OpenAndroidUSM.PVRTC PUBLIC
+    ${POWERVR_DECOMPRESS_DIR}
+)
+
 add_library(OpenAndroidUSM.Core STATIC
     src/assets/BresFile.cpp
+    src/assets/BtexTexture.cpp
     src/assets/ColladaMesh.cpp
     src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp
@@ -31,7 +68,11 @@ add_library(OpenAndroidUSM.Core STATIC
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
 target_include_directories(OpenAndroidUSM.Core PUBLIC src)
-target_link_libraries(OpenAndroidUSM.Core PRIVATE zlibstatic pugixml::pugixml)
+target_link_libraries(OpenAndroidUSM.Core PRIVATE
+    OpenAndroidUSM.PVRTC
+    zlibstatic
+    pugixml::pugixml
+)
 if(MSVC)
     target_compile_options(OpenAndroidUSM.Core PRIVATE /W4 /permissive- /EHsc /utf-8)
 endif()

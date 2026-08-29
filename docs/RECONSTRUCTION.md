@@ -61,3 +61,13 @@ component slots for float3 positions/normals, float2 UVs, and packed vertex
 color. `assets::ColladaMeshFile` resolves these into typed vertices, primitive
 groups, material names, and bounds. Its source comments retain the matching
 original class and member names rather than anonymous address labels.
+
+## BTEX/PVRTC textures
+
+Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a
+52-byte PVR v2 header and PVRTC4 data. This matches the preserved
+`loadPVRTexture` routine at original address `0x003dc120` (Ghidra
+`0x003ec120`). `assets::BtexTexture` validates the header and all mip bounds,
+then uses the official MIT-licensed PowerVR decoder to produce RGBA8 pixels
+suitable for a D3D11 shader-resource view. RGB-only PVR flags force opaque
+alpha, matching the original GL compressed-RGB upload.

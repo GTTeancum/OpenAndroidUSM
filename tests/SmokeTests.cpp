@@ -1,4 +1,5 @@
 #include "assets/BresFile.hpp"
+#include "assets/BtexTexture.hpp"
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
@@ -97,6 +98,16 @@ int main() {
         assert(meshFileCount == 113);
         assert(geometryCount == 1178);
         assert(meshBufferCount == 1612);
+
+        std::vector<std::byte> textureBytes;
+        assert(levelOne.read("textures_bin/levelnew_01_02.tga", textureBytes));
+        usm::assets::BtexTexture levelTexture;
+        assert(levelTexture.load(textureBytes));
+        assert(levelTexture.mipLevels().size() == 1);
+        assert(levelTexture.mipLevels().front().width == 512);
+        assert(levelTexture.mipLevels().front().height == 512);
+        assert(levelTexture.mipLevels().front().pixels.size() == 512 * 512 * 4);
+        assert(!levelTexture.containsAlpha());
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));
