@@ -47,6 +47,7 @@ int main() {
         assert(gameRenderer.initializeOffscreen(256, 256));
         assert(gameRenderer.uploadSceneGeometry(levelOne.roomGeometry(),
                                                 levelOne.roomTextures()));
+        assert(gameRenderer.setCamera(levelOne.introCamera().sample(0)));
         gameRenderer.renderFrame();
 
         RgbaImage rendered;
@@ -59,6 +60,23 @@ int main() {
             changedPixels += !isBackground;
         }
         assert(changedPixels > 100);
+
+        assert(gameRenderer.setCamera(levelOne.introCamera().sample(10000)));
+        gameRenderer.renderFrame();
+        RgbaImage laterFrame;
+        assert(gameRenderer.readBackImage(laterFrame));
+        assert(laterFrame.pixels.size() == rendered.pixels.size());
+        std::size_t changedBetweenFrames = 0;
+        for (std::size_t component = 0; component < rendered.pixels.size();
+             component += 4) {
+            changedBetweenFrames +=
+                rendered.pixels[component] != laterFrame.pixels[component] ||
+                rendered.pixels[component + 1] !=
+                    laterFrame.pixels[component + 1] ||
+                rendered.pixels[component + 2] !=
+                    laterFrame.pixels[component + 2];
+        }
+        assert(changedBetweenFrames > 100);
     }
     return 0;
 }

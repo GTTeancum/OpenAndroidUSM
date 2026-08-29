@@ -4,6 +4,8 @@
 
 #include <Windows.h>
 
+#include <algorithm>
+#include <chrono>
 #include <string>
 #include <filesystem>
 
@@ -50,13 +52,27 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = renderer_.setCamera(levelOne_.introCamera().sample(0));
+    if (!result) {
+        return fail(result.message());
+    }
 
+    const auto introStart = std::chrono::steady_clock::now();
     while (window_.pumpMessages()) {
         audio_.update();
         keyRouter_.beginFrame();
         controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
             keyRouter_.route(event, reconstructed::InputContext::Gameplay);
         });
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - introStart);
+        const auto timestamp = static_cast<std::uint32_t>(std::min<std::int64_t>(
+            elapsed.count(),
+            levelOne_.introCameraAnimation().durationMilliseconds()));
+        result = renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
+        if (!result) {
+            return fail(result.message());
+        }
         renderer_.renderFrame();
     }
     return EXIT_SUCCESS;

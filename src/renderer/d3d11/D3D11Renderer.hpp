@@ -2,6 +2,7 @@
 
 #include "assets/ColladaMesh.hpp"
 #include "assets/BtexTexture.hpp"
+#include "game/CinematicCamera.hpp"
 #include "renderer/IRenderer.hpp"
 
 #include <DirectXMath.h>
@@ -27,6 +28,7 @@ public:
     [[nodiscard]] Result uploadSceneGeometry(
         const assets::ColladaMeshFile& mesh,
         std::span<const assets::BtexTexture> textures);
+    [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
         std::array<std::uint8_t, 4>& rgba) const;

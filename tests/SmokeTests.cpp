@@ -13,6 +13,7 @@
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -110,12 +111,21 @@ int main() {
         usm::assets::ColladaMeshFile colladaMesh;
         assert(colladaMesh.load(meshResource));
         assert(colladaMesh.geometries().size() == 152);
+        if (colladaMesh.sceneGeometries().size() != 152) {
+            std::cerr << "Unexpected scene geometry count: "
+                      << colladaMesh.sceneGeometries().size() << '\n';
+            return 1;
+        }
         const auto& firstGeometry = colladaMesh.geometries().front();
         assert(firstGeometry.id == "Object211420-mesh");
         assert(firstGeometry.name == "Object211420");
         assert(firstGeometry.vertices.size() == 16);
         assert(firstGeometry.meshBuffers.size() == 1);
         assert(firstGeometry.meshBuffers.front().indices.size() == 24);
+        if (colladaMesh.sceneGeometries().front().name == firstGeometry.name) {
+            std::cerr << "Visual-scene geometry transform was not selected\n";
+            return 1;
+        }
         assert(colladaMesh.images().size() == 18);
         assert(colladaMesh.materials().size() == 64);
         const auto* alphaMaterial = colladaMesh.findMaterial("alphatest");
@@ -219,6 +229,30 @@ int main() {
         assert(cameraAnimation.tracks()[1].componentCount == 3);
         assert(cameraAnimation.tracks()[2].id ==
                "Camera01.Target-node-translation");
+        if (!cameraAnimation.camera() || !bootstrap.introCamera().valid()) {
+            std::cerr << "Intro camera metadata was not reconstructed\n";
+            return 1;
+        }
+        if (cameraAnimation.camera()->id != "Camera01-camera" ||
+            cameraAnimation.camera()->targetNode != "#Camera01.Target-node" ||
+            cameraAnimation.camera()->verticalFieldOfViewDegrees != 45.0F) {
+            std::cerr << "Unexpected camera metadata: "
+                      << cameraAnimation.camera()->id << ' '
+                      << cameraAnimation.camera()->targetNode << ' '
+                      << cameraAnimation.camera()->verticalFieldOfViewDegrees
+                      << '\n';
+            return 1;
+        }
+        const auto introPose = bootstrap.introCamera().sample(0);
+        if (std::abs(introPose.position.x - 16014.4F) > 0.01F ||
+            std::abs(introPose.target.x - 15381.5F) > 0.01F ||
+            introPose.up.z != 1.0F || introPose.farPlane != 10000.0F) {
+            std::cerr << "Unexpected intro camera pose: "
+                      << introPose.position.x << ' ' << introPose.target.x
+                      << ' ' << introPose.up.z << ' ' << introPose.farPlane
+                      << '\n';
+            return 1;
+        }
         const auto cameraStart = cameraAnimation.tracks()[1].sample(0);
         const auto cameraMiddle = cameraAnimation.tracks()[1].sample(1000);
         assert(cameraStart.componentCount == 3);

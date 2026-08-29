@@ -72,6 +72,12 @@ public:
     [[nodiscard]] const std::vector<ColladaGeometry>& geometries() const noexcept {
         return geometries_;
     }
+    // Geometry instances after applying the SVisualScene/SNode hierarchy.
+    // The raw geometry library remains available through geometries().
+    [[nodiscard]] const std::vector<ColladaGeometry>& sceneGeometries() const
+        noexcept {
+        return sceneGeometries_;
+    }
     [[nodiscard]] const std::vector<ColladaImage>& images() const noexcept {
         return images_;
     }
@@ -86,6 +92,7 @@ private:
     std::vector<ColladaImage> images_;
     std::vector<ColladaMaterial> materials_;
     std::vector<ColladaGeometry> geometries_;
+    std::vector<ColladaGeometry> sceneGeometries_;
 };
 
 } // namespace usm::assets

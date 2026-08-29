@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <sstream>
 #include <string_view>
 
@@ -429,7 +430,43 @@ Result D3D11Renderer::uploadSceneGeometry(
         return Result::failure(
             "Scene texture count does not match the BDAE image library");
     }
-    return uploadGeometrySet(mesh.geometries(), &mesh, textures, {});
+    return uploadGeometrySet(mesh.sceneGeometries(), &mesh, textures, {});
+}
+
+Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
+    if (!context_ || !transformBuffer_ || width_ == 0 || height_ == 0 ||
+        !std::isfinite(camera.verticalFieldOfViewDegrees) ||
+        camera.verticalFieldOfViewDegrees <= 0.0F ||
+        camera.verticalFieldOfViewDegrees >= 180.0F ||
+        camera.nearPlane <= 0.0F || camera.farPlane <= camera.nearPlane) {
+        return Result::failure("Perspective camera values are invalid");
+    }
+    const DirectX::XMVECTOR position = DirectX::XMVectorSet(
+        camera.position.x, camera.position.y, camera.position.z, 1.0F);
+    const DirectX::XMVECTOR target = DirectX::XMVectorSet(
+        camera.target.x, camera.target.y, camera.target.z, 1.0F);
+    const DirectX::XMVECTOR up = DirectX::XMVectorSet(
+        camera.up.x, camera.up.y, camera.up.z, 0.0F);
+    const DirectX::XMVECTOR direction =
+        DirectX::XMVectorSubtract(target, position);
+    if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(direction)) <=
+            std::numeric_limits<float>::epsilon() ||
+        DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(up)) <=
+            std::numeric_limits<float>::epsilon()) {
+        return Result::failure("Perspective camera direction is invalid");
+    }
+    const DirectX::XMMATRIX view =
+        DirectX::XMMatrixLookAtLH(position, target, up);
+    const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
+        DirectX::XMConvertToRadians(camera.verticalFieldOfViewDegrees),
+        static_cast<float>(width_) / static_cast<float>(height_),
+        camera.nearPlane, camera.farPlane);
+    DirectX::XMStoreFloat4x4(
+        &worldViewProjection_,
+        DirectX::XMMatrixTranspose(view * projection));
+    context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                &worldViewProjection_, 0, 0);
+    return Result::success();
 }
 
 Result D3D11Renderer::uploadGeometrySet(

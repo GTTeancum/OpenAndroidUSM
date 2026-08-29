@@ -6,6 +6,7 @@
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
+#include "game/CinematicCamera.hpp"
 
 #include <filesystem>
 #include <vector>
@@ -48,6 +49,9 @@ public:
         const noexcept {
         return introCameraAnimation_;
     }
+    [[nodiscard]] const CinematicCamera& introCamera() const noexcept {
+        return introCamera_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -58,6 +62,7 @@ private:
     CinematicScript introScript_;
     CinematicScript introEndScript_;
     assets::ColladaAnimationFile introCameraAnimation_;
+    CinematicCamera introCamera_;
 };
 
 } // namespace usm::game

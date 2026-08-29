@@ -75,6 +75,16 @@ image address `0x00397864` enables alpha testing with `GL_GREATER` and a 0.5
 reference. The D3D11 material path preserves that behavior with an HLSL
 `clip` shader variant for the recovered `alphatest` materials.
 
+Geometry-library coordinates are object-local. The adjacent `SVisualScene`
+library begins at `SCollada` offsets `0x6c/0x70`; each visual scene owns
+0x50-byte `SNode` records. A node supplies position, quaternion rotation,
+scale, child nodes, and typed eight-byte instance records. Instance type 3 is
+an `SInstanceGeometry`, whose local `#id` selects an `SGeometry`. This layout
+matches the preserved `CColladaDatabase::constructNode` at Ghidra image
+address `0x00419e80`. `ColladaMeshFile::sceneGeometries` now evaluates that
+hierarchy, transforms positions and normals, and preserves a separate raw
+geometry library. Room 1 resolves to 152 world-space geometry instances.
+
 ## Cinematic command files
 
 The `.cff` resources are UTF-16 XML fragments, not opaque bytecode. Each
@@ -98,6 +108,15 @@ camera rotation, camera translation, and camera-target translation. Each has
 `assets::ColladaAnimationFile` resolves the 0x24-byte animation records and
 0x0c-byte source descriptors, validates their integer-time/float-value
 streams, and provides normalized interpolated samples.
+
+The same resource contains one 0x1c-byte `SCamera`: `Camera01-camera`, a
+perspective camera with a 45-degree vertical field of view, 1.5 authored
+aspect ratio, 1-unit near plane, 1000-unit far plane, and target reference
+`#Camera01.Target-node`. The intro CFF overrides the far plane to 10000.
+`game::CinematicCamera` binds the named position/target tracks, retains the
+level's Collada Z-up convention, and feeds sampled world-space poses to the
+D3D11 view/projection path. WARP regression coverage renders Room 1 from the
+actual time-zero intro camera rather than the earlier normalized overview.
 
 ## Vox sound events
 

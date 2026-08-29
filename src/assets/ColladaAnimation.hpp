@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <optional>
 #include <vector>
 
 namespace usm::assets {
@@ -35,6 +36,16 @@ struct ColladaAnimationTrack {
         std::uint32_t timestampMilliseconds) const noexcept;
 };
 
+struct ColladaCamera {
+    std::string id;
+    std::string targetNode;
+    bool orthographic{};
+    float verticalFieldOfViewDegrees{45.0F};
+    float aspectRatio{1.5F};
+    float nearPlane{1.0F};
+    float farPlane{1000.0F};
+};
+
 // Typed view of the SAnimation/SSource data used by CAnimationTrackEx.
 class ColladaAnimationFile final {
 public:
@@ -44,10 +55,14 @@ public:
         return tracks_;
     }
     [[nodiscard]] std::uint32_t durationMilliseconds() const noexcept;
+    [[nodiscard]] const std::optional<ColladaCamera>& camera() const noexcept {
+        return camera_;
+    }
 
 private:
     BresFile resource_;
     std::vector<ColladaAnimationTrack> tracks_;
+    std::optional<ColladaCamera> camera_;
 };
 
 } // namespace usm::assets

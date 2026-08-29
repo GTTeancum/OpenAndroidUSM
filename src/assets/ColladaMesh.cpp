@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <optional>
+#include <unordered_map>
 #include <string_view>
 
 namespace usm::assets {
@@ -24,6 +26,12 @@ constexpr std::uint32_t kGeometryCountOffset = 0x4c;
 constexpr std::uint32_t kGeometryArrayOffset = 0x50;
 constexpr std::uint32_t kGeometrySize = 0x10;
 constexpr std::uint32_t kMeshBufferSize = 0x3c;
+constexpr std::uint32_t kVisualSceneCountOffset = 0x6c;
+constexpr std::uint32_t kVisualSceneArrayOffset = 0x70;
+constexpr std::uint32_t kVisualSceneSize = 0x10;
+constexpr std::uint32_t kSceneNodeSize = 0x50;
+constexpr std::uint32_t kSceneInstanceSize = 0x08;
+constexpr std::uint32_t kGeometryInstanceType = 3;
 
 class BinaryView final {
 public:
@@ -90,6 +98,172 @@ std::optional<AxisAlignedBounds> readBounds(const BinaryView& view,
         return std::nullopt;
     }
     return AxisAlignedBounds{*minimum, *maximum};
+}
+
+struct AffineTransform {
+    // Row-major 3x3 linear transform. Points use linear * point + translation.
+    std::array<float, 9> linear{1.0F, 0.0F, 0.0F,
+                                0.0F, 1.0F, 0.0F,
+                                0.0F, 0.0F, 1.0F};
+    Vector3 translation{};
+};
+
+Vector3 multiply(const std::array<float, 9>& matrix,
+                 const Vector3& value) noexcept {
+    return {
+        matrix[0] * value.x + matrix[1] * value.y + matrix[2] * value.z,
+        matrix[3] * value.x + matrix[4] * value.y + matrix[5] * value.z,
+        matrix[6] * value.x + matrix[7] * value.y + matrix[8] * value.z,
+    };
+}
+
+std::array<float, 9> multiply(const std::array<float, 9>& left,
+                              const std::array<float, 9>& right) noexcept {
+    std::array<float, 9> result{};
+    for (std::size_t row = 0; row < 3; ++row) {
+        for (std::size_t column = 0; column < 3; ++column) {
+            for (std::size_t component = 0; component < 3; ++component) {
+                result[row * 3 + column] +=
+                    left[row * 3 + component] *
+                    right[component * 3 + column];
+            }
+        }
+    }
+    return result;
+}
+
+AffineTransform combine(const AffineTransform& parent,
+                        const AffineTransform& local) noexcept {
+    return {
+        multiply(parent.linear, local.linear),
+        [&] {
+            const Vector3 translated = multiply(parent.linear, local.translation);
+            return Vector3{translated.x + parent.translation.x,
+                           translated.y + parent.translation.y,
+                           translated.z + parent.translation.z};
+        }(),
+    };
+}
+
+std::optional<AffineTransform> readNodeTransform(const BinaryView& view,
+                                                 std::uint32_t nodeOffset) {
+    const auto position = readVector3(view, nodeOffset + 0x0c);
+    const auto scale = readVector3(view, nodeOffset + 0x28);
+    const auto x = view.floating(nodeOffset + 0x18);
+    const auto y = view.floating(nodeOffset + 0x1c);
+    const auto z = view.floating(nodeOffset + 0x20);
+    const auto w = view.floating(nodeOffset + 0x24);
+    if (!position || !scale || !x || !y || !z || !w ||
+        !std::isfinite(position->x) || !std::isfinite(position->y) ||
+        !std::isfinite(position->z) || !std::isfinite(scale->x) ||
+        !std::isfinite(scale->y) || !std::isfinite(scale->z) ||
+        !std::isfinite(*x) || !std::isfinite(*y) || !std::isfinite(*z) ||
+        !std::isfinite(*w)) {
+        return std::nullopt;
+    }
+
+    const float length = std::sqrt(*x * *x + *y * *y + *z * *z + *w * *w);
+    if (length <= std::numeric_limits<float>::epsilon()) {
+        return std::nullopt;
+    }
+    const float qx = *x / length;
+    const float qy = *y / length;
+    const float qz = *z / length;
+    const float qw = *w / length;
+    const float xx = qx * qx;
+    const float yy = qy * qy;
+    const float zz = qz * qz;
+    const float xy = qx * qy;
+    const float xz = qx * qz;
+    const float yz = qy * qz;
+    const float wx = qw * qx;
+    const float wy = qw * qy;
+    const float wz = qw * qz;
+
+    AffineTransform result;
+    result.linear = {
+        (1.0F - 2.0F * (yy + zz)) * scale->x,
+        (2.0F * (xy - wz)) * scale->y,
+        (2.0F * (xz + wy)) * scale->z,
+        (2.0F * (xy + wz)) * scale->x,
+        (1.0F - 2.0F * (xx + zz)) * scale->y,
+        (2.0F * (yz - wx)) * scale->z,
+        (2.0F * (xz - wy)) * scale->x,
+        (2.0F * (yz + wx)) * scale->y,
+        (1.0F - 2.0F * (xx + yy)) * scale->z,
+    };
+    result.translation = *position;
+    return result;
+}
+
+std::optional<std::array<float, 9>> normalMatrix(
+    const std::array<float, 9>& matrix) noexcept {
+    const float determinant =
+        matrix[0] * (matrix[4] * matrix[8] - matrix[5] * matrix[7]) -
+        matrix[1] * (matrix[3] * matrix[8] - matrix[5] * matrix[6]) +
+        matrix[2] * (matrix[3] * matrix[7] - matrix[4] * matrix[6]);
+    if (std::abs(determinant) <= std::numeric_limits<float>::epsilon()) {
+        return std::nullopt;
+    }
+    const float inverse = 1.0F / determinant;
+    // Inverse transpose of the source matrix.
+    return std::array<float, 9>{
+        (matrix[4] * matrix[8] - matrix[5] * matrix[7]) * inverse,
+        (matrix[5] * matrix[6] - matrix[3] * matrix[8]) * inverse,
+        (matrix[3] * matrix[7] - matrix[4] * matrix[6]) * inverse,
+        (matrix[2] * matrix[7] - matrix[1] * matrix[8]) * inverse,
+        (matrix[0] * matrix[8] - matrix[2] * matrix[6]) * inverse,
+        (matrix[1] * matrix[6] - matrix[0] * matrix[7]) * inverse,
+        (matrix[1] * matrix[5] - matrix[2] * matrix[4]) * inverse,
+        (matrix[2] * matrix[3] - matrix[0] * matrix[5]) * inverse,
+        (matrix[0] * matrix[4] - matrix[1] * matrix[3]) * inverse,
+    };
+}
+
+void updateBounds(ColladaGeometry& geometry) {
+    if (geometry.vertices.empty()) {
+        geometry.bounds = {};
+        return;
+    }
+    geometry.bounds = {geometry.vertices.front().position,
+                       geometry.vertices.front().position};
+    for (const ColladaVertex& vertex : geometry.vertices) {
+        geometry.bounds.minimum.x =
+            std::min(geometry.bounds.minimum.x, vertex.position.x);
+        geometry.bounds.minimum.y =
+            std::min(geometry.bounds.minimum.y, vertex.position.y);
+        geometry.bounds.minimum.z =
+            std::min(geometry.bounds.minimum.z, vertex.position.z);
+        geometry.bounds.maximum.x =
+            std::max(geometry.bounds.maximum.x, vertex.position.x);
+        geometry.bounds.maximum.y =
+            std::max(geometry.bounds.maximum.y, vertex.position.y);
+        geometry.bounds.maximum.z =
+            std::max(geometry.bounds.maximum.z, vertex.position.z);
+    }
+}
+
+void transformGeometry(ColladaGeometry& geometry,
+                       const AffineTransform& transform) {
+    const auto normals = normalMatrix(transform.linear);
+    for (ColladaVertex& vertex : geometry.vertices) {
+        const Vector3 transformed = multiply(transform.linear, vertex.position);
+        vertex.position = {transformed.x + transform.translation.x,
+                           transformed.y + transform.translation.y,
+                           transformed.z + transform.translation.z};
+        if (normals) {
+            vertex.normal = multiply(*normals, vertex.normal);
+            const float length = std::sqrt(vertex.normal.x * vertex.normal.x +
+                                           vertex.normal.y * vertex.normal.y +
+                                           vertex.normal.z * vertex.normal.z);
+            if (length > std::numeric_limits<float>::epsilon()) {
+                vertex.normal.x /= length;
+                vertex.normal.y /= length;
+                vertex.normal.z /= length;
+            }
+        }
+    }
+    updateBounds(geometry);
 }
 
 std::optional<ColladaPrimitive> decodePrimitive(std::uint32_t value) {
@@ -365,12 +539,151 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
     return Result::success();
 }
 
+Result parseSceneNodes(
+    const BinaryView& view, std::uint32_t nodeArray, std::uint32_t nodeCount,
+    const AffineTransform& parentTransform,
+    const std::unordered_map<std::string, std::uint32_t>& geometryIndices,
+    const std::vector<ColladaGeometry>& geometries,
+    std::vector<ColladaGeometry>& output, std::uint32_t depth) {
+    if (depth > 64 ||
+        !view.contains(nodeArray,
+                       static_cast<std::uint64_t>(nodeCount) * kSceneNodeSize)) {
+        return Result::failure("BDAE visual-scene node hierarchy is invalid");
+    }
+    for (std::uint32_t nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex) {
+        const std::uint32_t nodeOffset =
+            nodeArray + nodeIndex * kSceneNodeSize;
+        const auto idOffset = view.integer<std::uint32_t>(nodeOffset);
+        const auto nameOffset = view.integer<std::uint32_t>(nodeOffset + 4);
+        const auto localTransform = readNodeTransform(view, nodeOffset);
+        const auto childCount = view.integer<std::uint32_t>(nodeOffset + 0x38);
+        const auto childArray = view.integer<std::uint32_t>(nodeOffset + 0x3c);
+        const auto instanceCount = view.integer<std::uint32_t>(nodeOffset + 0x40);
+        const auto instanceArray = view.integer<std::uint32_t>(nodeOffset + 0x44);
+        if (!idOffset || !nameOffset || !localTransform || !childCount ||
+            !childArray || !instanceCount || !instanceArray) {
+            return Result::failure("BDAE visual-scene node is truncated");
+        }
+        const auto id = view.string(*idOffset);
+        const auto name = view.string(*nameOffset);
+        if (!id || !name ||
+            (*instanceCount != 0 &&
+             !view.contains(*instanceArray,
+                            static_cast<std::uint64_t>(*instanceCount) *
+                                kSceneInstanceSize))) {
+            return Result::failure("BDAE visual-scene node metadata is invalid");
+        }
+
+        const AffineTransform worldTransform =
+            combine(parentTransform, *localTransform);
+        for (std::uint32_t instanceIndex = 0;
+             instanceIndex < *instanceCount; ++instanceIndex) {
+            const std::uint32_t instanceOffset =
+                *instanceArray + instanceIndex * kSceneInstanceSize;
+            const auto type = view.integer<std::uint32_t>(instanceOffset);
+            const auto payload = view.integer<std::uint32_t>(instanceOffset + 4);
+            if (!type || !payload) {
+                return Result::failure("BDAE scene instance is truncated");
+            }
+            if (*type != kGeometryInstanceType) {
+                continue;
+            }
+            const auto externalFile = view.integer<std::uint32_t>(*payload);
+            const auto geometryUrlOffset =
+                view.integer<std::uint32_t>(*payload + 4);
+            if (!externalFile || !geometryUrlOffset) {
+                return Result::failure("BDAE geometry instance is truncated");
+            }
+            // External geometry references are resolved by the owning level
+            // scene, not by this self-contained BDAE resource.
+            if (*externalFile != 0) {
+                continue;
+            }
+            const auto geometryUrl = view.string(*geometryUrlOffset);
+            if (!geometryUrl || geometryUrl->empty() ||
+                geometryUrl->front() != '#') {
+                return Result::failure("BDAE geometry instance URL is invalid");
+            }
+            const auto geometry = geometryIndices.find(geometryUrl->substr(1));
+            if (geometry == geometryIndices.end() ||
+                geometry->second >= geometries.size()) {
+                // Some animation-only resources retain scene instances for a
+                // geometry library stripped into another BDAE. They do not
+                // contribute renderable geometry in this file.
+                continue;
+            }
+            ColladaGeometry instance = geometries[geometry->second];
+            instance.name = *name;
+            transformGeometry(instance, worldTransform);
+            output.push_back(std::move(instance));
+        }
+
+        if (*childCount != 0) {
+            Result result = parseSceneNodes(
+                view, *childArray, *childCount, worldTransform,
+                geometryIndices, geometries, output, depth + 1);
+            if (!result) {
+                return result;
+            }
+        }
+    }
+    return Result::success();
+}
+
+Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
+                         const std::vector<ColladaGeometry>& geometries,
+                         std::vector<ColladaGeometry>& output) {
+    const auto sceneCount =
+        view.integer<std::uint32_t>(rootOffset + kVisualSceneCountOffset);
+    const auto sceneArray =
+        view.integer<std::uint32_t>(rootOffset + kVisualSceneArrayOffset);
+    if (!sceneCount || !sceneArray ||
+        (*sceneCount != 0 &&
+         !view.contains(*sceneArray,
+                        static_cast<std::uint64_t>(*sceneCount) *
+                            kVisualSceneSize))) {
+        return Result::failure("BDAE visual-scene library is invalid");
+    }
+    if (*sceneCount == 0) {
+        output = geometries;
+        return Result::success();
+    }
+
+    std::unordered_map<std::string, std::uint32_t> geometryIndices;
+    geometryIndices.reserve(geometries.size());
+    for (std::uint32_t index = 0; index < geometries.size(); ++index) {
+        geometryIndices.emplace(geometries[index].id, index);
+    }
+    const AffineTransform identity;
+    for (std::uint32_t sceneIndex = 0; sceneIndex < *sceneCount; ++sceneIndex) {
+        const std::uint32_t sceneOffset =
+            *sceneArray + sceneIndex * kVisualSceneSize;
+        const auto nodeCount = view.integer<std::uint32_t>(sceneOffset + 8);
+        const auto nodeArray = view.integer<std::uint32_t>(sceneOffset + 12);
+        if (!nodeCount || !nodeArray) {
+            return Result::failure("BDAE visual scene is truncated");
+        }
+        Result result = parseSceneNodes(
+            view, *nodeArray, *nodeCount, identity, geometryIndices,
+            geometries, output, 0);
+        if (!result) {
+            output.clear();
+            return result;
+        }
+    }
+    if (output.empty()) {
+        output = geometries;
+    }
+    return Result::success();
+}
+
 } // namespace
 
 Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
     images_.clear();
     materials_.clear();
     geometries_.clear();
+    sceneGeometries_.clear();
     Result result = resource_.load(bytes);
     if (!result) {
         return result;
@@ -412,6 +725,11 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
             return result;
         }
         geometries_.push_back(std::move(geometry));
+    }
+    result = parseVisualScenes(view, *rootOffset, geometries_, sceneGeometries_);
+    if (!result) {
+        sceneGeometries_.clear();
+        return result;
     }
     return Result::success();
 }

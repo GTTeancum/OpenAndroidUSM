@@ -90,6 +90,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/filesystem/GbmpArchive.cpp
     src/game/CinematicScript.cpp
     src/game/CinematicPlayer.cpp
+    src/game/CinematicCamera.cpp
     src/game/LevelOneBootstrap.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )

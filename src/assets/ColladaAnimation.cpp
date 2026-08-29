@@ -17,6 +17,9 @@ constexpr std::uint32_t kAnimationSize = 0x24;
 constexpr std::uint32_t kSourceSize = 0x0c;
 constexpr std::uint32_t kTimestampSourceType = 4;
 constexpr std::uint32_t kFloatingPointSourceType = 6;
+constexpr std::uint32_t kCameraCountOffset = 0x24;
+constexpr std::uint32_t kCameraArrayOffset = 0x28;
+constexpr std::uint32_t kCameraSize = 0x1c;
 
 class BinaryView final {
 public:
@@ -144,6 +147,48 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     return Result::success();
 }
 
+Result parseCamera(const BinaryView& view, std::uint32_t rootOffset,
+                   std::optional<ColladaCamera>& output) {
+    const auto count = view.integer<std::uint32_t>(rootOffset + kCameraCountOffset);
+    const auto array = view.integer<std::uint32_t>(rootOffset + kCameraArrayOffset);
+    if (!count || !array ||
+        (*count != 0 &&
+         !view.contains(*array,
+                        static_cast<std::uint64_t>(*count) * kCameraSize))) {
+        return Result::failure("BDAE camera library is invalid");
+    }
+    if (*count == 0) {
+        output.reset();
+        return Result::success();
+    }
+    if (*count != 1) {
+        return Result::failure("BDAE contains multiple cinematic cameras");
+    }
+    const auto idOffset = view.integer<std::uint32_t>(*array);
+    const auto projection = view.integer<std::uint32_t>(*array + 4);
+    const auto fieldOfView = view.floating(*array + 8);
+    const auto aspectRatio = view.floating(*array + 12);
+    const auto nearPlane = view.floating(*array + 16);
+    const auto farPlane = view.floating(*array + 20);
+    const auto targetOffset = view.integer<std::uint32_t>(*array + 24);
+    if (!idOffset || !projection || !fieldOfView || !aspectRatio ||
+        !nearPlane || !farPlane || !targetOffset) {
+        return Result::failure("BDAE camera record is truncated");
+    }
+    const auto id = view.string(*idOffset);
+    const auto target = view.string(*targetOffset);
+    if (!id || !target || !std::isfinite(*fieldOfView) ||
+        !std::isfinite(*aspectRatio) || !std::isfinite(*nearPlane) ||
+        !std::isfinite(*farPlane) || *fieldOfView <= 0.0F ||
+        *aspectRatio <= 0.0F || *nearPlane <= 0.0F ||
+        *farPlane <= *nearPlane) {
+        return Result::failure("BDAE camera values are invalid");
+    }
+    output = ColladaCamera{*id, *target, *projection != 0, *fieldOfView,
+                           *aspectRatio, *nearPlane, *farPlane};
+    return Result::success();
+}
+
 } // namespace
 
 ColladaAnimationSample ColladaAnimationTrack::sample(
@@ -171,9 +216,21 @@ ColladaAnimationSample ColladaAnimationTrack::sample(
                                           timestampsMilliseconds[left]) /
                            static_cast<float>(interval);
     }
+    float rotationSign = 1.0F;
+    if (property == ColladaAnimationProperty::Rotation &&
+        componentCount == 4 && left != right) {
+        float dot = 0.0F;
+        for (std::uint32_t component = 0; component < componentCount;
+             ++component) {
+            dot += values[left * componentCount + component] *
+                   values[right * componentCount + component];
+        }
+        rotationSign = dot < 0.0F ? -1.0F : 1.0F;
+    }
     for (std::uint32_t component = 0; component < componentCount; ++component) {
         const float first = values[left * componentCount + component];
-        const float second = values[right * componentCount + component];
+        const float second =
+            values[right * componentCount + component] * rotationSign;
         result.value[component] = first + (second - first) * factor;
     }
     if (property == ColladaAnimationProperty::Rotation && componentCount == 4) {
@@ -193,6 +250,7 @@ ColladaAnimationSample ColladaAnimationTrack::sample(
 
 Result ColladaAnimationFile::load(std::span<const std::byte> bytes) {
     tracks_.clear();
+    camera_.reset();
     Result result = resource_.load(bytes);
     if (!result) {
         return result;
@@ -220,6 +278,11 @@ Result ColladaAnimationFile::load(std::span<const std::byte> bytes) {
             return result;
         }
         tracks_.push_back(std::move(track));
+    }
+    result = parseCamera(view, *rootOffset, camera_);
+    if (!result) {
+        tracks_.clear();
+        return result;
     }
     return Result::success();
 }

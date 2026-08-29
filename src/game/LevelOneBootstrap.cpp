@@ -111,6 +111,12 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     if (!result) {
         return result;
     }
+    // PlayDAECamera in levelnew_01_1265_cinematic.cff overrides the BDAE's
+    // 1000-unit far plane with 10000 units.
+    result = introCamera_.bind(introCameraAnimation_, 10000.0F);
+    if (!result) {
+        return result;
+    }
     return Result::success();
 }
 
