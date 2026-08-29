@@ -2,6 +2,8 @@
 
 #include "audio/xaudio2/XAudio2System.hpp"
 #include "platform/windows/Window.hpp"
+#include "platform/windows/XInputController.hpp"
+#include "reconstructed/input/XperiaKeyRouter.hpp"
 #include "renderer/d3d11/D3D11Renderer.hpp"
 
 #include <Windows.h>
@@ -14,9 +16,10 @@ public:
 
 private:
     platform::Window window_;
+    platform::XInputController controller_;
+    reconstructed::XperiaKeyRouter keyRouter_;
     renderer::D3D11Renderer renderer_;
     audio::XAudio2System audio_;
 };
 
 } // namespace usm
-

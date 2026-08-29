@@ -34,10 +34,13 @@ int Application::run(HINSTANCE instance) {
     }
 
     while (window_.pumpMessages()) {
+        keyRouter_.beginFrame();
+        controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
+            keyRouter_.route(event, reconstructed::InputContext::Gameplay);
+        });
         renderer_.renderFrame();
     }
     return EXIT_SUCCESS;
 }
 
 } // namespace usm
-
