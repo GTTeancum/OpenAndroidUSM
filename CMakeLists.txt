@@ -84,6 +84,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/audio/SoundEventCatalog.cpp
     src/assets/BresFile.cpp
     src/assets/BtexTexture.cpp
+    src/assets/ColladaAnimation.cpp
     src/assets/ColladaMesh.cpp
     src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp

@@ -1,5 +1,6 @@
 #include "assets/BresFile.hpp"
 #include "assets/BtexTexture.hpp"
+#include "assets/ColladaAnimation.hpp"
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "audio/OggAudio.hpp"
@@ -205,6 +206,24 @@ int main() {
             });
         assert(cameraCommand != bootstrap.introScript().threads().end());
         assert(bootstrap.introEndScript().commandCount() == 1);
+        const auto& cameraAnimation = bootstrap.introCameraAnimation();
+        assert(cameraAnimation.tracks().size() == 3);
+        assert(cameraAnimation.durationMilliseconds() == 53033);
+        assert(cameraAnimation.tracks()[0].id == "Camera01-node-rotation");
+        assert(cameraAnimation.tracks()[0].property ==
+               usm::assets::ColladaAnimationProperty::Rotation);
+        assert(cameraAnimation.tracks()[0].componentCount == 4);
+        assert(cameraAnimation.tracks()[0].timestampsMilliseconds.size() == 823);
+        assert(cameraAnimation.tracks()[1].id ==
+               "Camera01-node-translation");
+        assert(cameraAnimation.tracks()[1].componentCount == 3);
+        assert(cameraAnimation.tracks()[2].id ==
+               "Camera01.Target-node-translation");
+        const auto cameraStart = cameraAnimation.tracks()[1].sample(0);
+        const auto cameraMiddle = cameraAnimation.tracks()[1].sample(1000);
+        assert(cameraStart.componentCount == 3);
+        assert(cameraMiddle.componentCount == 3);
+        assert(cameraStart.value != cameraMiddle.value);
 
         usm::game::CinematicPlayer cinematicPlayer;
         assert(cinematicPlayer.start(bootstrap.introScript()));

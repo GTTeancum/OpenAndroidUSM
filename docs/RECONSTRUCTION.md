@@ -92,6 +92,13 @@ commands sharing a timestamp retain serialized thread order. The caller owns
 the clock and command handlers; tests currently verify all 38 intro commands,
 including the five events at time zero and the 41.8-second final event.
 
+The intro's `camera_lv1_start.bdae` contains three typed `SAnimation` tracks:
+camera rotation, camera translation, and camera-target translation. Each has
+823 monotonic millisecond keys spanning 0 through 53,033 ms. The native
+`assets::ColladaAnimationFile` resolves the 0x24-byte animation records and
+0x0c-byte source descriptors, validates their integer-time/float-value
+streams, and provides normalized interpolated samples.
+
 ## Vox sound events
 
 The preserved `VoxSoundFile::LoadRecordFromFile` and `ReadBasicRecord`

@@ -103,6 +103,14 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     if (!result) {
         return result;
     }
+    result = levelArchive.read("meshes_bin/camera_lv1_start.bdae", resource);
+    if (!result) {
+        return result;
+    }
+    result = introCameraAnimation_.load(resource);
+    if (!result) {
+        return result;
+    }
     return Result::success();
 }
 

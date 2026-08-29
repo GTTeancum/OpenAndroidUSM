@@ -1,6 +1,7 @@
 #pragma once
 
 #include "assets/BtexTexture.hpp"
+#include "assets/ColladaAnimation.hpp"
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
@@ -43,6 +44,10 @@ public:
     [[nodiscard]] const CinematicScript& introEndScript() const noexcept {
         return introEndScript_;
     }
+    [[nodiscard]] const assets::ColladaAnimationFile& introCameraAnimation()
+        const noexcept {
+        return introCameraAnimation_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -52,6 +57,7 @@ private:
     CinematicScript introStartScript_;
     CinematicScript introScript_;
     CinematicScript introEndScript_;
+    assets::ColladaAnimationFile introCameraAnimation_;
 };
 
 } // namespace usm::game
