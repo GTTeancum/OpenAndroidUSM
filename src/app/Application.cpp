@@ -1,8 +1,11 @@
 #include "app/Application.hpp"
 
+#include "platform/windows/GameDataLocator.hpp"
+
 #include <Windows.h>
 
 #include <string>
+#include <filesystem>
 
 namespace usm {
 namespace {
@@ -29,6 +32,21 @@ int Application::run(HINSTANCE instance) {
     }
 
     result = audio_.initialize();
+    if (!result) {
+        return fail(result.message());
+    }
+
+    std::filesystem::path gameDataRoot;
+    result = platform::locateGameData(gameDataRoot);
+    if (!result) {
+        return fail(result.message());
+    }
+    result = levelOne_.load(gameDataRoot);
+    if (!result) {
+        return fail(result.message());
+    }
+    result = renderer_.uploadPreviewGeometry(
+        levelOne_.previewGeometry(), levelOne_.previewTexture().mipLevels());
     if (!result) {
         return fail(result.message());
     }

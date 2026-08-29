@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/xaudio2/XAudio2System.hpp"
+#include "game/LevelOneBootstrap.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -18,6 +19,7 @@ private:
     platform::Window window_;
     platform::XInputController controller_;
     reconstructed::XperiaKeyRouter keyRouter_;
+    game::LevelOneBootstrap levelOne_;
     renderer::D3D11Renderer renderer_;
     audio::XAudio2System audio_;
 };

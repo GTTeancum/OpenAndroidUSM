@@ -64,6 +64,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/assets/ColladaMesh.cpp
     src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp
+    src/game/LevelOneBootstrap.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
@@ -77,12 +78,34 @@ if(MSVC)
     target_compile_options(OpenAndroidUSM.Core PRIVATE /W4 /permissive- /EHsc /utf-8)
 endif()
 
+add_library(OpenAndroidUSM.D3D11 STATIC
+    src/renderer/d3d11/D3D11Renderer.cpp
+)
+target_compile_features(OpenAndroidUSM.D3D11 PUBLIC cxx_std_20)
+target_compile_definitions(OpenAndroidUSM.D3D11 PRIVATE
+    UNICODE
+    _UNICODE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+)
+target_include_directories(OpenAndroidUSM.D3D11 PUBLIC src)
+target_link_libraries(OpenAndroidUSM.D3D11 PUBLIC OpenAndroidUSM.Core)
+target_link_libraries(OpenAndroidUSM.D3D11 PRIVATE
+    d3d11
+    dxgi
+    dxguid
+    d3dcompiler
+)
+if(MSVC)
+    target_compile_options(OpenAndroidUSM.D3D11 PRIVATE /W4 /permissive- /EHsc /utf-8)
+endif()
+
 add_executable(OpenAndroidUSM WIN32
     src/app/Main.cpp
     src/app/Application.cpp
+    src/platform/windows/GameDataLocator.cpp
     src/platform/windows/Window.cpp
     src/platform/windows/XInputController.cpp
-    src/renderer/d3d11/D3D11Renderer.cpp
     src/audio/xaudio2/XAudio2System.cpp
 )
 
@@ -96,6 +119,7 @@ target_compile_definitions(OpenAndroidUSM PRIVATE
 target_include_directories(OpenAndroidUSM PRIVATE src)
 target_link_libraries(OpenAndroidUSM PRIVATE
     OpenAndroidUSM.Core
+    OpenAndroidUSM.D3D11
     d3d11
     dxgi
     dxguid
@@ -120,4 +144,22 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
         USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman"
     )
     add_test(NAME OpenAndroidUSM.CoreTests COMMAND OpenAndroidUSM.CoreTests)
+
+    add_executable(OpenAndroidUSM.RenderTests
+        tests/D3D11RenderTests.cpp
+    )
+    target_compile_features(OpenAndroidUSM.RenderTests PRIVATE cxx_std_20)
+    target_compile_definitions(OpenAndroidUSM.RenderTests PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman"
+    )
+    target_include_directories(OpenAndroidUSM.RenderTests PRIVATE src)
+    target_link_libraries(OpenAndroidUSM.RenderTests PRIVATE
+        OpenAndroidUSM.D3D11
+        d3d11
+        dxgi
+        d3dcompiler
+    )
+    add_test(NAME OpenAndroidUSM.RenderTests COMMAND OpenAndroidUSM.RenderTests)
 endif()

@@ -4,6 +4,7 @@
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
+#include "game/LevelOneBootstrap.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
 #include <cassert>
@@ -108,6 +109,13 @@ int main() {
         assert(levelTexture.mipLevels().front().height == 512);
         assert(levelTexture.mipLevels().front().pixels.size() == 512 * 512 * 4);
         assert(!levelTexture.containsAlpha());
+
+        usm::game::LevelOneBootstrap bootstrap;
+        assert(bootstrap.load(dataRoot));
+        assert(bootstrap.mainScene().nodes().size() == 154);
+        assert(bootstrap.firstRoom().nodes().size() == 60);
+        assert(!bootstrap.previewGeometry().vertices.empty());
+        assert(!bootstrap.previewTexture().mipLevels().empty());
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

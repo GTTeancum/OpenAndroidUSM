@@ -1,81 +1,599 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
 
+#include <d3dcompiler.h>
+
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstring>
 #include <sstream>
+#include <string_view>
 
 namespace usm::renderer {
+namespace {
+
+using Microsoft::WRL::ComPtr;
+
+struct GpuVertex {
+    DirectX::XMFLOAT3 position;
+    DirectX::XMFLOAT3 normal;
+    DirectX::XMFLOAT2 textureCoordinate;
+    std::uint32_t color;
+};
+
+constexpr std::string_view kVertexShader = R"hlsl(
+cbuffer TransformBuffer : register(b0) {
+    float4x4 WorldViewProjection;
+};
+
+struct VertexInput {
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+PixelInput main(VertexInput input) {
+    PixelInput output;
+    output.position = mul(float4(input.position, 1.0), WorldViewProjection);
+    output.normal = input.normal;
+    output.textureCoordinate = input.textureCoordinate;
+    output.color = input.color;
+    return output;
+}
+)hlsl";
+
+constexpr std::string_view kPixelShader = R"hlsl(
+Texture2D DiffuseTexture : register(t0);
+SamplerState DiffuseSampler : register(s0);
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    float3 normal = normalize(input.normal);
+    float lighting = 0.35 + 0.65 * abs(dot(normal, normalize(float3(0.3, 0.5, -0.8))));
+    return DiffuseTexture.Sample(DiffuseSampler, input.textureCoordinate) *
+           input.color * float4(lighting, lighting, lighting, 1.0);
+}
+)hlsl";
+
+Result hresultFailure(std::string_view operation, HRESULT value) {
+    std::ostringstream message;
+    message << operation << " failed: 0x" << std::hex
+            << static_cast<unsigned long>(value);
+    return Result::failure(message.str());
+}
+
+Result compileShader(std::string_view source, const char* target,
+                     ComPtr<ID3DBlob>& bytecode) {
+    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined(_DEBUG)
+    flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+    ComPtr<ID3DBlob> errors;
+    const HRESULT result = D3DCompile(
+        source.data(), source.size(), nullptr, nullptr, nullptr, "main", target,
+        flags, 0, &bytecode, &errors);
+    if (FAILED(result)) {
+        std::string message = "D3DCompile failed";
+        if (errors) {
+            message += ": ";
+            message.append(static_cast<const char*>(errors->GetBufferPointer()),
+                           errors->GetBufferSize());
+        }
+        return Result::failure(std::move(message));
+    }
+    return Result::success();
+}
+
+D3D11_PRIMITIVE_TOPOLOGY topologyFor(assets::ColladaPrimitive primitive) {
+    switch (primitive) {
+    case assets::ColladaPrimitive::Triangles:
+        return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case assets::ColladaPrimitive::TriangleStrip:
+        return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case assets::ColladaPrimitive::Lines:
+        return D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
+    case assets::ColladaPrimitive::LineStrip:
+    case assets::ColladaPrimitive::LineLoop:
+        return D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP;
+    }
+    return D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+}
+
+std::uint32_t rgbaVertexColor(std::uint32_t argb) noexcept {
+    const std::uint32_t red = (argb >> 16) & 0xff;
+    const std::uint32_t green = (argb >> 8) & 0xff;
+    const std::uint32_t blue = argb & 0xff;
+    const std::uint32_t alpha = (argb >> 24) & 0xff;
+    return red | (green << 8) | (blue << 16) | (alpha << 24);
+}
+
+} // namespace
 
 Result D3D11Renderer::initialize(HWND window, std::uint32_t width,
                                  std::uint32_t height) {
-    DXGI_SWAP_CHAIN_DESC swapChainDescription{};
-    swapChainDescription.BufferDesc.Width = width;
-    swapChainDescription.BufferDesc.Height = height;
-    swapChainDescription.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    swapChainDescription.SampleDesc.Count = 1;
-    swapChainDescription.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDescription.BufferCount = 2;
-    swapChainDescription.OutputWindow = window;
-    swapChainDescription.Windowed = TRUE;
-    swapChainDescription.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-    D3D_FEATURE_LEVEL selectedFeatureLevel{};
-    constexpr std::array requestedFeatureLevels{
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-    };
+    if (window == nullptr || width == 0 || height == 0) {
+        return Result::failure("D3D11 window target has invalid dimensions");
+    }
 
     UINT flags = 0;
 #if defined(_DEBUG)
     flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
+    Result result = createWindowRenderTarget(window, width, height, flags);
+    if (!result && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0) {
+        result = createWindowRenderTarget(
+            window, width, height, flags & ~D3D11_CREATE_DEVICE_DEBUG);
+    }
+    if (!result) {
+        return result;
+    }
+    result = createDepthTarget(width, height);
+    if (!result) {
+        return result;
+    }
+    result = createPipeline();
+    if (!result) {
+        return result;
+    }
+    bindRenderTarget(width, height);
+    return Result::success();
+}
 
+Result D3D11Renderer::initializeOffscreen(std::uint32_t width,
+                                          std::uint32_t height) {
+    if (width == 0 || height == 0) {
+        return Result::failure("D3D11 offscreen target has invalid dimensions");
+    }
+
+    UINT flags = 0;
+#if defined(_DEBUG)
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+    Result result = createDevice(D3D_DRIVER_TYPE_WARP, flags);
+    if (!result && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0) {
+        result = createDevice(D3D_DRIVER_TYPE_WARP,
+                              flags & ~D3D11_CREATE_DEVICE_DEBUG);
+    }
+    if (!result) {
+        return result;
+    }
+    result = createOffscreenRenderTarget(width, height);
+    if (!result) {
+        return result;
+    }
+    result = createDepthTarget(width, height);
+    if (!result) {
+        return result;
+    }
+    result = createPipeline();
+    if (!result) {
+        return result;
+    }
+    bindRenderTarget(width, height);
+    return Result::success();
+}
+
+Result D3D11Renderer::createDevice(D3D_DRIVER_TYPE driverType, UINT flags) {
+    device_.Reset();
+    context_.Reset();
+    constexpr std::array featureLevels{D3D_FEATURE_LEVEL_11_0};
+    D3D_FEATURE_LEVEL selectedFeatureLevel{};
+    const HRESULT result = D3D11CreateDevice(
+        nullptr, driverType, nullptr, flags, featureLevels.data(),
+        static_cast<UINT>(featureLevels.size()), D3D11_SDK_VERSION, &device_,
+        &selectedFeatureLevel, &context_);
+    return FAILED(result) ? hresultFailure("D3D11CreateDevice", result)
+                          : Result::success();
+}
+
+Result D3D11Renderer::createWindowRenderTarget(HWND window,
+                                                std::uint32_t width,
+                                                std::uint32_t height,
+                                                UINT flags) {
+    device_.Reset();
+    context_.Reset();
+    swapChain_.Reset();
+    colorTarget_.Reset();
+    renderTarget_.Reset();
+
+    DXGI_SWAP_CHAIN_DESC description{};
+    description.BufferDesc.Width = width;
+    description.BufferDesc.Height = height;
+    description.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    description.SampleDesc.Count = 1;
+    description.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    description.BufferCount = 2;
+    description.OutputWindow = window;
+    description.Windowed = TRUE;
+    description.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+    constexpr std::array featureLevels{D3D_FEATURE_LEVEL_11_0};
+    D3D_FEATURE_LEVEL selectedFeatureLevel{};
     HRESULT result = D3D11CreateDeviceAndSwapChain(
-        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
-        requestedFeatureLevels.data(),
-        static_cast<UINT>(requestedFeatureLevels.size()), D3D11_SDK_VERSION,
-        &swapChainDescription, &swapChain_, &device_, &selectedFeatureLevel,
-        &context_);
-
-    if (FAILED(result) && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0) {
-        flags &= ~D3D11_CREATE_DEVICE_DEBUG;
-        result = D3D11CreateDeviceAndSwapChain(
-            nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
-            requestedFeatureLevels.data(),
-            static_cast<UINT>(requestedFeatureLevels.size()), D3D11_SDK_VERSION,
-            &swapChainDescription, &swapChain_, &device_, &selectedFeatureLevel,
-            &context_);
-    }
+        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, featureLevels.data(),
+        static_cast<UINT>(featureLevels.size()), D3D11_SDK_VERSION, &description,
+        &swapChain_, &device_, &selectedFeatureLevel, &context_);
     if (FAILED(result)) {
-        std::ostringstream message;
-        message << "D3D11CreateDeviceAndSwapChain failed: 0x" << std::hex
-                << static_cast<unsigned long>(result);
-        return Result::failure(message.str());
+        return hresultFailure("D3D11CreateDeviceAndSwapChain", result);
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-    result = swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+    result = swapChain_->GetBuffer(0, IID_PPV_ARGS(&colorTarget_));
     if (FAILED(result)) {
-        return Result::failure("IDXGISwapChain::GetBuffer failed");
+        return hresultFailure("IDXGISwapChain::GetBuffer", result);
     }
+    result = device_->CreateRenderTargetView(colorTarget_.Get(), nullptr,
+                                              &renderTarget_);
+    return FAILED(result)
+               ? hresultFailure("ID3D11Device::CreateRenderTargetView", result)
+               : Result::success();
+}
 
-    result = device_->CreateRenderTargetView(backBuffer.Get(), nullptr,
-                                             &renderTarget_);
+Result D3D11Renderer::createOffscreenRenderTarget(std::uint32_t width,
+                                                   std::uint32_t height) {
+    D3D11_TEXTURE2D_DESC description{};
+    description.Width = width;
+    description.Height = height;
+    description.MipLevels = 1;
+    description.ArraySize = 1;
+    description.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    description.SampleDesc.Count = 1;
+    description.Usage = D3D11_USAGE_DEFAULT;
+    description.BindFlags = D3D11_BIND_RENDER_TARGET;
+
+    HRESULT result =
+        device_->CreateTexture2D(&description, nullptr, &colorTarget_);
     if (FAILED(result)) {
-        return Result::failure("ID3D11Device::CreateRenderTargetView failed");
+        return hresultFailure("ID3D11Device::CreateTexture2D(color)", result);
+    }
+    result = device_->CreateRenderTargetView(colorTarget_.Get(), nullptr,
+                                              &renderTarget_);
+    return FAILED(result)
+               ? hresultFailure("ID3D11Device::CreateRenderTargetView", result)
+               : Result::success();
+}
+
+Result D3D11Renderer::createDepthTarget(std::uint32_t width,
+                                        std::uint32_t height) {
+    D3D11_TEXTURE2D_DESC description{};
+    description.Width = width;
+    description.Height = height;
+    description.MipLevels = 1;
+    description.ArraySize = 1;
+    description.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    description.SampleDesc.Count = 1;
+    description.Usage = D3D11_USAGE_DEFAULT;
+    description.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+    HRESULT result =
+        device_->CreateTexture2D(&description, nullptr, &depthTarget_);
+    if (FAILED(result)) {
+        return hresultFailure("ID3D11Device::CreateTexture2D(depth)", result);
+    }
+    result = device_->CreateDepthStencilView(depthTarget_.Get(), nullptr,
+                                              &depthView_);
+    return FAILED(result)
+               ? hresultFailure("ID3D11Device::CreateDepthStencilView", result)
+               : Result::success();
+}
+
+Result D3D11Renderer::createPipeline() {
+    ComPtr<ID3DBlob> vertexBytecode;
+    Result result = compileShader(kVertexShader, "vs_5_0", vertexBytecode);
+    if (!result) {
+        return result;
+    }
+    ComPtr<ID3DBlob> pixelBytecode;
+    result = compileShader(kPixelShader, "ps_5_0", pixelBytecode);
+    if (!result) {
+        return result;
     }
 
-    context_->OMSetRenderTargets(1, renderTarget_.GetAddressOf(), nullptr);
+    HRESULT callResult = device_->CreateVertexShader(
+        vertexBytecode->GetBufferPointer(), vertexBytecode->GetBufferSize(),
+        nullptr, &vertexShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateVertexShader", callResult);
+    }
+    callResult = device_->CreatePixelShader(
+        pixelBytecode->GetBufferPointer(), pixelBytecode->GetBufferSize(),
+        nullptr, &pixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreatePixelShader", callResult);
+    }
+
+    constexpr std::array inputElements{
+        D3D11_INPUT_ELEMENT_DESC{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+                                 offsetof(GpuVertex, position),
+                                 D3D11_INPUT_PER_VERTEX_DATA, 0},
+        D3D11_INPUT_ELEMENT_DESC{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+                                 offsetof(GpuVertex, normal),
+                                 D3D11_INPUT_PER_VERTEX_DATA, 0},
+        D3D11_INPUT_ELEMENT_DESC{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,
+                                 offsetof(GpuVertex, textureCoordinate),
+                                 D3D11_INPUT_PER_VERTEX_DATA, 0},
+        D3D11_INPUT_ELEMENT_DESC{"COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0,
+                                 offsetof(GpuVertex, color),
+                                 D3D11_INPUT_PER_VERTEX_DATA, 0},
+    };
+    callResult = device_->CreateInputLayout(
+        inputElements.data(), static_cast<UINT>(inputElements.size()),
+        vertexBytecode->GetBufferPointer(), vertexBytecode->GetBufferSize(),
+        &inputLayout_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateInputLayout", callResult);
+    }
+
+    D3D11_BUFFER_DESC transformDescription{};
+    transformDescription.ByteWidth = sizeof(worldViewProjection_);
+    transformDescription.Usage = D3D11_USAGE_DEFAULT;
+    transformDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    callResult = device_->CreateBuffer(&transformDescription, nullptr,
+                                       &transformBuffer_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateBuffer(transform)", callResult);
+    }
+
+    D3D11_SAMPLER_DESC samplerDescription{};
+    samplerDescription.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDescription.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDescription.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDescription.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDescription.MaxLOD = D3D11_FLOAT32_MAX;
+    callResult = device_->CreateSamplerState(&samplerDescription, &sampler_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateSamplerState", callResult);
+    }
+
+    D3D11_RASTERIZER_DESC rasterizerDescription{};
+    rasterizerDescription.FillMode = D3D11_FILL_SOLID;
+    rasterizerDescription.CullMode = D3D11_CULL_NONE;
+    rasterizerDescription.DepthClipEnable = TRUE;
+    callResult = device_->CreateRasterizerState(&rasterizerDescription,
+                                                 &rasterizerState_);
+    return FAILED(callResult)
+               ? hresultFailure("ID3D11Device::CreateRasterizerState", callResult)
+               : Result::success();
+}
+
+void D3D11Renderer::bindRenderTarget(std::uint32_t width,
+                                     std::uint32_t height) {
+    width_ = width;
+    height_ = height;
+    context_->OMSetRenderTargets(1, renderTarget_.GetAddressOf(), depthView_.Get());
     const D3D11_VIEWPORT viewport{0.0F, 0.0F, static_cast<float>(width),
                                   static_cast<float>(height), 0.0F, 1.0F};
     context_->RSSetViewports(1, &viewport);
+}
+
+Result D3D11Renderer::uploadPreviewGeometry(
+    const assets::ColladaGeometry& geometry,
+    std::span<const assets::RgbaImage> mipLevels) {
+    if (!device_ || geometry.vertices.empty() || geometry.meshBuffers.empty() ||
+        mipLevels.empty()) {
+        return Result::failure("Preview geometry or texture is empty");
+    }
+
+    std::vector<GpuVertex> vertices;
+    vertices.reserve(geometry.vertices.size());
+    for (const assets::ColladaVertex& source : geometry.vertices) {
+        vertices.push_back({
+            {source.position.x, source.position.y, source.position.z},
+            {source.normal.x, source.normal.y, source.normal.z},
+            {source.textureCoordinate[0], source.textureCoordinate[1]},
+            rgbaVertexColor(source.color),
+        });
+    }
+
+    D3D11_BUFFER_DESC vertexDescription{};
+    vertexDescription.ByteWidth =
+        static_cast<UINT>(vertices.size() * sizeof(GpuVertex));
+    vertexDescription.Usage = D3D11_USAGE_IMMUTABLE;
+    vertexDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA vertexData{vertices.data(), 0, 0};
+    HRESULT result = device_->CreateBuffer(&vertexDescription, &vertexData,
+                                            &vertexBuffer_);
+    if (FAILED(result)) {
+        return hresultFailure("ID3D11Device::CreateBuffer(vertices)", result);
+    }
+
+    std::vector<std::uint16_t> indices;
+    drawBatches_.clear();
+    for (const assets::ColladaMeshBuffer& source : geometry.meshBuffers) {
+        DrawBatch batch;
+        batch.topology = topologyFor(source.primitive);
+        batch.indexCount = static_cast<std::uint32_t>(source.indices.size());
+        batch.startIndex = static_cast<std::uint32_t>(indices.size());
+        indices.insert(indices.end(), source.indices.begin(), source.indices.end());
+        if (source.primitive == assets::ColladaPrimitive::LineLoop &&
+            !source.indices.empty()) {
+            indices.push_back(source.indices.front());
+            ++batch.indexCount;
+        }
+        drawBatches_.push_back(batch);
+    }
+
+    D3D11_BUFFER_DESC indexDescription{};
+    indexDescription.ByteWidth =
+        static_cast<UINT>(indices.size() * sizeof(std::uint16_t));
+    indexDescription.Usage = D3D11_USAGE_IMMUTABLE;
+    indexDescription.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA indexData{indices.data(), 0, 0};
+    result =
+        device_->CreateBuffer(&indexDescription, &indexData, &indexBuffer_);
+    if (FAILED(result)) {
+        return hresultFailure("ID3D11Device::CreateBuffer(indices)", result);
+    }
+
+    const assets::RgbaImage& baseLevel = mipLevels.front();
+    if (baseLevel.width == 0 || baseLevel.height == 0) {
+        return Result::failure("Preview texture has invalid dimensions");
+    }
+    std::vector<D3D11_SUBRESOURCE_DATA> textureData;
+    textureData.reserve(mipLevels.size());
+    std::uint32_t expectedWidth = baseLevel.width;
+    std::uint32_t expectedHeight = baseLevel.height;
+    for (const assets::RgbaImage& mip : mipLevels) {
+        if (mip.width != expectedWidth || mip.height != expectedHeight ||
+            mip.pixels.size() !=
+                static_cast<std::size_t>(mip.width) * mip.height * 4) {
+            return Result::failure("Preview texture mip chain is invalid");
+        }
+        textureData.push_back({mip.pixels.data(), mip.width * 4, 0});
+        expectedWidth = std::max(1U, expectedWidth / 2);
+        expectedHeight = std::max(1U, expectedHeight / 2);
+    }
+
+    D3D11_TEXTURE2D_DESC textureDescription{};
+    textureDescription.Width = baseLevel.width;
+    textureDescription.Height = baseLevel.height;
+    textureDescription.MipLevels = static_cast<UINT>(mipLevels.size());
+    textureDescription.ArraySize = 1;
+    textureDescription.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDescription.SampleDesc.Count = 1;
+    textureDescription.Usage = D3D11_USAGE_IMMUTABLE;
+    textureDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    ComPtr<ID3D11Texture2D> texture;
+    result = device_->CreateTexture2D(&textureDescription, textureData.data(),
+                                      &texture);
+    if (FAILED(result)) {
+        return hresultFailure("ID3D11Device::CreateTexture2D(diffuse)", result);
+    }
+    result = device_->CreateShaderResourceView(texture.Get(), nullptr,
+                                                &textureView_);
+    if (FAILED(result)) {
+        return hresultFailure("ID3D11Device::CreateShaderResourceView", result);
+    }
+
+    const DirectX::XMVECTOR minimum = DirectX::XMVectorSet(
+        geometry.bounds.minimum.x, geometry.bounds.minimum.y,
+        geometry.bounds.minimum.z, 1.0F);
+    const DirectX::XMVECTOR maximum = DirectX::XMVectorSet(
+        geometry.bounds.maximum.x, geometry.bounds.maximum.y,
+        geometry.bounds.maximum.z, 1.0F);
+    const DirectX::XMVECTOR center = DirectX::XMVectorScale(
+        DirectX::XMVectorAdd(minimum, maximum), 0.5F);
+    const DirectX::XMVECTOR extent = DirectX::XMVectorSubtract(maximum, minimum);
+    const float largestExtent = std::max(
+        {DirectX::XMVectorGetX(extent), DirectX::XMVectorGetY(extent),
+         DirectX::XMVectorGetZ(extent), 0.001F});
+    const float scale = 2.0F / largestExtent;
+    const DirectX::XMMATRIX world =
+        DirectX::XMMatrixTranslation(-DirectX::XMVectorGetX(center),
+                                     -DirectX::XMVectorGetY(center),
+                                     -DirectX::XMVectorGetZ(center)) *
+        DirectX::XMMatrixScaling(scale, scale, scale);
+    const DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(
+        DirectX::XMVectorSet(0.0F, 0.0F, -3.0F, 1.0F),
+        DirectX::XMVectorZero(), DirectX::XMVectorSet(0.0F, 1.0F, 0.0F, 0.0F));
+    const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
+        DirectX::XMConvertToRadians(60.0F),
+        static_cast<float>(width_) / static_cast<float>(height_), 0.1F, 100.0F);
+    DirectX::XMStoreFloat4x4(
+        &worldViewProjection_,
+        DirectX::XMMatrixTranspose(world * view * projection));
+    context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                &worldViewProjection_, 0, 0);
     return Result::success();
 }
 
 void D3D11Renderer::renderFrame() {
     constexpr float clearColor[]{0.025F, 0.045F, 0.085F, 1.0F};
     context_->ClearRenderTargetView(renderTarget_.Get(), clearColor);
-    swapChain_->Present(1, 0);
+    context_->ClearDepthStencilView(depthView_.Get(),
+                                    D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+                                    1.0F, 0);
+
+    if (vertexBuffer_ && indexBuffer_ && textureView_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(0, 1, vertexBuffer_.GetAddressOf(), &stride,
+                                     &offset);
+        context_->IASetIndexBuffer(indexBuffer_.Get(), DXGI_FORMAT_R16_UINT, 0);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        context_->VSSetConstantBuffers(0, 1, transformBuffer_.GetAddressOf());
+        context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
+        context_->PSSetShaderResources(0, 1, textureView_.GetAddressOf());
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->RSSetState(rasterizerState_.Get());
+        for (const DrawBatch& batch : drawBatches_) {
+            context_->IASetPrimitiveTopology(batch.topology);
+            context_->DrawIndexed(batch.indexCount, batch.startIndex, 0);
+        }
+    }
+
+    if (swapChain_) {
+        swapChain_->Present(1, 0);
+    }
+}
+
+Result D3D11Renderer::readBackPixel(
+    std::uint32_t x, std::uint32_t y,
+    std::array<std::uint8_t, 4>& rgba) const {
+    if (x >= width_ || y >= height_) {
+        return Result::failure("D3D11 readback coordinates are invalid");
+    }
+
+    assets::RgbaImage image;
+    Result result = readBackImage(image);
+    if (!result) {
+        return result;
+    }
+    const std::size_t pixelOffset =
+        (static_cast<std::size_t>(y) * image.width + x) * 4;
+    std::copy_n(image.pixels.data() + pixelOffset, rgba.size(), rgba.begin());
+    return Result::success();
+}
+
+Result D3D11Renderer::readBackImage(assets::RgbaImage& image) const {
+    if (!device_ || !context_ || !colorTarget_) {
+        return Result::failure("D3D11 renderer has no color target to read");
+    }
+
+    D3D11_TEXTURE2D_DESC description{};
+    colorTarget_->GetDesc(&description);
+    description.Usage = D3D11_USAGE_STAGING;
+    description.BindFlags = 0;
+    description.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    description.MiscFlags = 0;
+    ComPtr<ID3D11Texture2D> staging;
+    HRESULT callResult = device_->CreateTexture2D(&description, nullptr, &staging);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateTexture2D(staging)", callResult);
+    }
+    context_->CopyResource(staging.Get(), colorTarget_.Get());
+
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    callResult = context_->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11DeviceContext::Map", callResult);
+    }
+
+    image.width = width_;
+    image.height = height_;
+    image.pixels.resize(static_cast<std::size_t>(width_) * height_ * 4);
+    const auto* source = static_cast<const std::uint8_t*>(mapped.pData);
+    for (std::uint32_t row = 0; row < height_; ++row) {
+        std::memcpy(image.pixels.data() + static_cast<std::size_t>(row) * width_ * 4,
+                    source + static_cast<std::size_t>(row) * mapped.RowPitch,
+                    static_cast<std::size_t>(width_) * 4);
+    }
+    context_->Unmap(staging.Get(), 0);
+    return Result::success();
 }
 
 } // namespace usm::renderer
-
