@@ -24,6 +24,9 @@ public:
     [[nodiscard]] Result uploadPreviewGeometry(
         const assets::ColladaGeometry& geometry,
         std::span<const assets::RgbaImage> mipLevels);
+    [[nodiscard]] Result uploadSceneGeometry(
+        const assets::ColladaMeshFile& mesh,
+        std::span<const assets::BtexTexture> textures);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
         std::array<std::uint8_t, 4>& rgba) const;
@@ -35,6 +38,8 @@ private:
         D3D11_PRIMITIVE_TOPOLOGY topology{};
         std::uint32_t indexCount{};
         std::uint32_t startIndex{};
+        std::int32_t baseVertex{};
+        std::uint32_t textureIndex{};
     };
 
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
@@ -47,6 +52,14 @@ private:
     [[nodiscard]] Result createDepthTarget(std::uint32_t width,
                                             std::uint32_t height);
     [[nodiscard]] Result createPipeline();
+    [[nodiscard]] Result uploadGeometrySet(
+        std::span<const assets::ColladaGeometry> geometries,
+        const assets::ColladaMeshFile* materialLibrary,
+        std::span<const assets::BtexTexture> textures,
+        std::span<const assets::RgbaImage> previewTexture);
+    [[nodiscard]] Result createTextureView(
+        std::span<const assets::RgbaImage> mipLevels,
+        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);
     void bindRenderTarget(std::uint32_t width, std::uint32_t height);
 
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
@@ -62,7 +75,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> textureView_;
+    std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textureViews_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
     std::vector<DrawBatch> drawBatches_;

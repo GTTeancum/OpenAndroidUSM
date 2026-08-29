@@ -62,6 +62,13 @@ color. `assets::ColladaMeshFile` resolves these into typed vertices, primitive
 groups, material names, and bounds. Its source comments retain the matching
 original class and member names rather than anonymous address labels.
 
+The adjacent Collada libraries are also typed: `SImage` records are 0x14
+bytes, `SEffect` records are 0x5c bytes, and `SMaterial` records are 0x40
+bytes. A material selects an effect, whose diffuse-image payload indexes the
+image library. The image's source path is the archive-facing texture name;
+for example, Room 1 maps `alphatest` to `level01_alphatest.tga` and
+`Material__54` to `041_building.tga`.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

@@ -382,20 +382,46 @@ void D3D11Renderer::bindRenderTarget(std::uint32_t width,
 Result D3D11Renderer::uploadPreviewGeometry(
     const assets::ColladaGeometry& geometry,
     std::span<const assets::RgbaImage> mipLevels) {
-    if (!device_ || geometry.vertices.empty() || geometry.meshBuffers.empty() ||
-        mipLevels.empty()) {
-        return Result::failure("Preview geometry or texture is empty");
+    return uploadGeometrySet({&geometry, 1}, nullptr, {}, mipLevels);
+}
+
+Result D3D11Renderer::uploadSceneGeometry(
+    const assets::ColladaMeshFile& mesh,
+    std::span<const assets::BtexTexture> textures) {
+    if (mesh.images().size() != textures.size()) {
+        return Result::failure(
+            "Scene texture count does not match the BDAE image library");
+    }
+    return uploadGeometrySet(mesh.geometries(), &mesh, textures, {});
+}
+
+Result D3D11Renderer::uploadGeometrySet(
+    std::span<const assets::ColladaGeometry> geometries,
+    const assets::ColladaMeshFile* materialLibrary,
+    std::span<const assets::BtexTexture> textures,
+    std::span<const assets::RgbaImage> previewTexture) {
+    if (!device_ || geometries.empty()) {
+        return Result::failure("Geometry set is empty or D3D11 is uninitialized");
     }
 
     std::vector<GpuVertex> vertices;
-    vertices.reserve(geometry.vertices.size());
-    for (const assets::ColladaVertex& source : geometry.vertices) {
-        vertices.push_back({
-            {source.position.x, source.position.y, source.position.z},
-            {source.normal.x, source.normal.y, source.normal.z},
-            {source.textureCoordinate[0], source.textureCoordinate[1]},
-            rgbaVertexColor(source.color),
-        });
+    std::size_t totalVertexCount = 0;
+    for (const assets::ColladaGeometry& geometry : geometries) {
+        totalVertexCount += geometry.vertices.size();
+    }
+    vertices.reserve(totalVertexCount);
+    for (const assets::ColladaGeometry& geometry : geometries) {
+        for (const assets::ColladaVertex& source : geometry.vertices) {
+            vertices.push_back({
+                {source.position.x, source.position.y, source.position.z},
+                {source.normal.x, source.normal.y, source.normal.z},
+                {source.textureCoordinate[0], source.textureCoordinate[1]},
+                rgbaVertexColor(source.color),
+            });
+        }
+    }
+    if (vertices.empty()) {
+        return Result::failure("Geometry set contains no vertices");
     }
 
     D3D11_BUFFER_DESC vertexDescription{};
@@ -412,18 +438,37 @@ Result D3D11Renderer::uploadPreviewGeometry(
 
     std::vector<std::uint16_t> indices;
     drawBatches_.clear();
-    for (const assets::ColladaMeshBuffer& source : geometry.meshBuffers) {
-        DrawBatch batch;
-        batch.topology = topologyFor(source.primitive);
-        batch.indexCount = static_cast<std::uint32_t>(source.indices.size());
-        batch.startIndex = static_cast<std::uint32_t>(indices.size());
-        indices.insert(indices.end(), source.indices.begin(), source.indices.end());
-        if (source.primitive == assets::ColladaPrimitive::LineLoop &&
-            !source.indices.empty()) {
-            indices.push_back(source.indices.front());
-            ++batch.indexCount;
+    std::uint32_t baseVertex = 0;
+    for (const assets::ColladaGeometry& geometry : geometries) {
+        for (const assets::ColladaMeshBuffer& source : geometry.meshBuffers) {
+            DrawBatch batch;
+            batch.topology = topologyFor(source.primitive);
+            batch.indexCount = static_cast<std::uint32_t>(source.indices.size());
+            batch.startIndex = static_cast<std::uint32_t>(indices.size());
+            batch.baseVertex = static_cast<std::int32_t>(baseVertex);
+            indices.insert(indices.end(), source.indices.begin(),
+                           source.indices.end());
+            if (source.primitive == assets::ColladaPrimitive::LineLoop &&
+                !source.indices.empty()) {
+                indices.push_back(source.indices.front());
+                ++batch.indexCount;
+            }
+            if (materialLibrary != nullptr) {
+                const assets::ColladaMaterial* material =
+                    materialLibrary->findMaterial(source.materialName);
+                if (material != nullptr && material->diffuseImageIndex &&
+                    *material->diffuseImageIndex < textures.size()) {
+                    batch.textureIndex = *material->diffuseImageIndex;
+                } else {
+                    batch.textureIndex = static_cast<std::uint32_t>(textures.size());
+                }
+            }
+            drawBatches_.push_back(batch);
         }
-        drawBatches_.push_back(batch);
+        baseVertex += static_cast<std::uint32_t>(geometry.vertices.size());
+    }
+    if (indices.empty()) {
+        return Result::failure("Geometry set contains no indices");
     }
 
     D3D11_BUFFER_DESC indexDescription{};
@@ -438,6 +483,81 @@ Result D3D11Renderer::uploadPreviewGeometry(
         return hresultFailure("ID3D11Device::CreateBuffer(indices)", result);
     }
 
+    textureViews_.clear();
+    if (materialLibrary == nullptr) {
+        ComPtr<ID3D11ShaderResourceView> view;
+        Result textureResult = createTextureView(previewTexture, view);
+        if (!textureResult) {
+            return textureResult;
+        }
+        textureViews_.push_back(std::move(view));
+    } else {
+        textureViews_.reserve(textures.size() + 1);
+        for (const assets::BtexTexture& texture : textures) {
+            ComPtr<ID3D11ShaderResourceView> view;
+            Result textureResult = createTextureView(texture.mipLevels(), view);
+            if (!textureResult) {
+                return textureResult;
+            }
+            textureViews_.push_back(std::move(view));
+        }
+        assets::RgbaImage white;
+        white.width = 1;
+        white.height = 1;
+        white.pixels = {255, 255, 255, 255};
+        ComPtr<ID3D11ShaderResourceView> view;
+        Result textureResult = createTextureView({&white, 1}, view);
+        if (!textureResult) {
+            return textureResult;
+        }
+        textureViews_.push_back(std::move(view));
+    }
+
+    assets::AxisAlignedBounds bounds = geometries.front().bounds;
+    for (const assets::ColladaGeometry& geometry : geometries.subspan(1)) {
+        bounds.minimum.x = std::min(bounds.minimum.x, geometry.bounds.minimum.x);
+        bounds.minimum.y = std::min(bounds.minimum.y, geometry.bounds.minimum.y);
+        bounds.minimum.z = std::min(bounds.minimum.z, geometry.bounds.minimum.z);
+        bounds.maximum.x = std::max(bounds.maximum.x, geometry.bounds.maximum.x);
+        bounds.maximum.y = std::max(bounds.maximum.y, geometry.bounds.maximum.y);
+        bounds.maximum.z = std::max(bounds.maximum.z, geometry.bounds.maximum.z);
+    }
+    const DirectX::XMVECTOR minimum = DirectX::XMVectorSet(
+        bounds.minimum.x, bounds.minimum.y, bounds.minimum.z, 1.0F);
+    const DirectX::XMVECTOR maximum = DirectX::XMVectorSet(
+        bounds.maximum.x, bounds.maximum.y, bounds.maximum.z, 1.0F);
+    const DirectX::XMVECTOR center = DirectX::XMVectorScale(
+        DirectX::XMVectorAdd(minimum, maximum), 0.5F);
+    const DirectX::XMVECTOR extent = DirectX::XMVectorSubtract(maximum, minimum);
+    const float largestExtent = std::max(
+        {DirectX::XMVectorGetX(extent), DirectX::XMVectorGetY(extent),
+         DirectX::XMVectorGetZ(extent), 0.001F});
+    const float scale = 2.0F / largestExtent;
+    const DirectX::XMMATRIX world =
+        DirectX::XMMatrixTranslation(-DirectX::XMVectorGetX(center),
+                                     -DirectX::XMVectorGetY(center),
+                                     -DirectX::XMVectorGetZ(center)) *
+        DirectX::XMMatrixScaling(scale, scale, scale);
+    const DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(
+        DirectX::XMVectorSet(0.0F, 0.0F, -3.0F, 1.0F),
+        DirectX::XMVectorZero(), DirectX::XMVectorSet(0.0F, 1.0F, 0.0F, 0.0F));
+    const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
+        DirectX::XMConvertToRadians(60.0F),
+        static_cast<float>(width_) / static_cast<float>(height_), 0.1F, 100.0F);
+    DirectX::XMStoreFloat4x4(
+        &worldViewProjection_,
+        DirectX::XMMatrixTranspose(world * view * projection));
+    context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                &worldViewProjection_, 0, 0);
+    return Result::success();
+}
+
+Result D3D11Renderer::createTextureView(
+    std::span<const assets::RgbaImage> mipLevels,
+    ComPtr<ID3D11ShaderResourceView>& view) {
+    if (mipLevels.empty()) {
+        return Result::failure("D3D11 texture has no mip levels");
+    }
     const assets::RgbaImage& baseLevel = mipLevels.front();
     if (baseLevel.width == 0 || baseLevel.height == 0) {
         return Result::failure("Preview texture has invalid dimensions");
@@ -467,46 +587,15 @@ Result D3D11Renderer::uploadPreviewGeometry(
     textureDescription.Usage = D3D11_USAGE_IMMUTABLE;
     textureDescription.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     ComPtr<ID3D11Texture2D> texture;
-    result = device_->CreateTexture2D(&textureDescription, textureData.data(),
-                                      &texture);
+    HRESULT result = device_->CreateTexture2D(
+        &textureDescription, textureData.data(), &texture);
     if (FAILED(result)) {
         return hresultFailure("ID3D11Device::CreateTexture2D(diffuse)", result);
     }
-    result = device_->CreateShaderResourceView(texture.Get(), nullptr,
-                                                &textureView_);
+    result = device_->CreateShaderResourceView(texture.Get(), nullptr, &view);
     if (FAILED(result)) {
         return hresultFailure("ID3D11Device::CreateShaderResourceView", result);
     }
-
-    const DirectX::XMVECTOR minimum = DirectX::XMVectorSet(
-        geometry.bounds.minimum.x, geometry.bounds.minimum.y,
-        geometry.bounds.minimum.z, 1.0F);
-    const DirectX::XMVECTOR maximum = DirectX::XMVectorSet(
-        geometry.bounds.maximum.x, geometry.bounds.maximum.y,
-        geometry.bounds.maximum.z, 1.0F);
-    const DirectX::XMVECTOR center = DirectX::XMVectorScale(
-        DirectX::XMVectorAdd(minimum, maximum), 0.5F);
-    const DirectX::XMVECTOR extent = DirectX::XMVectorSubtract(maximum, minimum);
-    const float largestExtent = std::max(
-        {DirectX::XMVectorGetX(extent), DirectX::XMVectorGetY(extent),
-         DirectX::XMVectorGetZ(extent), 0.001F});
-    const float scale = 2.0F / largestExtent;
-    const DirectX::XMMATRIX world =
-        DirectX::XMMatrixTranslation(-DirectX::XMVectorGetX(center),
-                                     -DirectX::XMVectorGetY(center),
-                                     -DirectX::XMVectorGetZ(center)) *
-        DirectX::XMMatrixScaling(scale, scale, scale);
-    const DirectX::XMMATRIX view = DirectX::XMMatrixLookAtLH(
-        DirectX::XMVectorSet(0.0F, 0.0F, -3.0F, 1.0F),
-        DirectX::XMVectorZero(), DirectX::XMVectorSet(0.0F, 1.0F, 0.0F, 0.0F));
-    const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
-        DirectX::XMConvertToRadians(60.0F),
-        static_cast<float>(width_) / static_cast<float>(height_), 0.1F, 100.0F);
-    DirectX::XMStoreFloat4x4(
-        &worldViewProjection_,
-        DirectX::XMMatrixTranspose(world * view * projection));
-    context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
-                                &worldViewProjection_, 0, 0);
     return Result::success();
 }
 
@@ -517,7 +606,7 @@ void D3D11Renderer::renderFrame() {
                                     D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
                                     1.0F, 0);
 
-    if (vertexBuffer_ && indexBuffer_ && textureView_) {
+    if (vertexBuffer_ && indexBuffer_ && !textureViews_.empty()) {
         constexpr UINT stride = sizeof(GpuVertex);
         constexpr UINT offset = 0;
         context_->IASetInputLayout(inputLayout_.Get());
@@ -527,12 +616,14 @@ void D3D11Renderer::renderFrame() {
         context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
         context_->VSSetConstantBuffers(0, 1, transformBuffer_.GetAddressOf());
         context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
-        context_->PSSetShaderResources(0, 1, textureView_.GetAddressOf());
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
         context_->RSSetState(rasterizerState_.Get());
         for (const DrawBatch& batch : drawBatches_) {
+            context_->PSSetShaderResources(
+                0, 1, textureViews_[batch.textureIndex].GetAddressOf());
             context_->IASetPrimitiveTopology(batch.topology);
-            context_->DrawIndexed(batch.indexCount, batch.startIndex, 0);
+            context_->DrawIndexed(batch.indexCount, batch.startIndex,
+                                  batch.baseVertex);
         }
     }
 

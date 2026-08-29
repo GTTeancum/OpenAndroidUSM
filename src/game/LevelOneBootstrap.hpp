@@ -6,6 +6,7 @@
 #include "core/Result.hpp"
 
 #include <filesystem>
+#include <vector>
 
 namespace usm::game {
 
@@ -23,14 +24,21 @@ public:
         return roomGeometry_.geometries().front();
     }
     [[nodiscard]] const assets::BtexTexture& previewTexture() const noexcept {
-        return roomTexture_;
+        return roomTextures_.front();
+    }
+    [[nodiscard]] const assets::ColladaMeshFile& roomGeometry() const noexcept {
+        return roomGeometry_;
+    }
+    [[nodiscard]] const std::vector<assets::BtexTexture>& roomTextures() const
+        noexcept {
+        return roomTextures_;
     }
 
 private:
     assets::IrrScene mainScene_;
     assets::IrrScene firstRoom_;
     assets::ColladaMeshFile roomGeometry_;
-    assets::BtexTexture roomTexture_;
+    std::vector<assets::BtexTexture> roomTextures_;
 };
 
 } // namespace usm::game

@@ -7,8 +7,14 @@
 namespace usm::game {
 
 Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
+    roomTextures_.clear();
     filesystem::GbmpArchive levelArchive;
     Result result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
+    if (!result) {
+        return result;
+    }
+    filesystem::GbmpArchive entityArchive;
+    result = entityArchive.open(gameDataRoot / "entities.pack");
     if (!result) {
         return result;
     }
@@ -44,11 +50,32 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Room 1 geometry contains no renderable meshes");
     }
 
-    result = levelArchive.read("textures_bin/level01_alphatest.tga", resource);
-    if (!result) {
-        return result;
+    roomTextures_.reserve(roomGeometry_.images().size());
+    for (const assets::ColladaImage& image : roomGeometry_.images()) {
+        result = levelArchive.read("textures_bin/" + image.sourcePath, resource);
+        if (!result) {
+            result = entityArchive.read("textures_bin/" + image.sourcePath,
+                                        resource);
+            if (!result) {
+                roomTextures_.clear();
+                return Result::failure("Could not load Room 1 texture " +
+                                       image.sourcePath + ": " +
+                                       result.message());
+            }
+        }
+        assets::BtexTexture texture;
+        result = texture.load(resource);
+        if (!result) {
+            roomTextures_.clear();
+            return Result::failure("Could not decode Room 1 texture " +
+                                   image.sourcePath + ": " + result.message());
+        }
+        roomTextures_.push_back(std::move(texture));
     }
-    return roomTexture_.load(resource);
+    if (roomTextures_.empty()) {
+        return Result::failure("Room 1 geometry has no diffuse textures");
+    }
+    return Result::success();
 }
 
 } // namespace usm::game

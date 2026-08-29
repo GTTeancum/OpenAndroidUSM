@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <iostream>
 #include <string_view>
 #include <vector>
 
@@ -97,6 +98,18 @@ int main() {
         assert(firstGeometry.vertices.size() == 16);
         assert(firstGeometry.meshBuffers.size() == 1);
         assert(firstGeometry.meshBuffers.front().indices.size() == 24);
+        assert(colladaMesh.images().size() == 18);
+        assert(colladaMesh.materials().size() == 64);
+        const auto* alphaMaterial = colladaMesh.findMaterial("alphatest");
+        assert(alphaMaterial != nullptr);
+        assert(alphaMaterial->diffuseImageIndex == 0);
+        assert(colladaMesh.images()[*alphaMaterial->diffuseImageIndex].sourcePath ==
+               "level01_alphatest.tga");
+        const auto* buildingMaterial = colladaMesh.findMaterial("Material__54");
+        assert(buildingMaterial != nullptr);
+        assert(buildingMaterial->diffuseImageIndex == 1);
+        assert(colladaMesh.images()[*buildingMaterial->diffuseImageIndex]
+                   .sourcePath == "041_building.tga");
 
         std::size_t meshFileCount = 0;
         std::size_t geometryCount = 0;
@@ -108,7 +121,12 @@ int main() {
             std::vector<std::byte> meshBytes;
             assert(levelOne.read(entry.path, meshBytes));
             usm::assets::ColladaMeshFile parsedMesh;
-            assert(parsedMesh.load(meshBytes));
+            const usm::Result meshResult = parsedMesh.load(meshBytes);
+            if (!meshResult) {
+                std::cerr << "Could not parse " << entry.path << ": "
+                          << meshResult.message() << '\n';
+                return 1;
+            }
             ++meshFileCount;
             geometryCount += parsedMesh.geometries().size();
             for (const auto& geometry : parsedMesh.geometries()) {
@@ -130,11 +148,18 @@ int main() {
         assert(!levelTexture.containsAlpha());
 
         usm::game::LevelOneBootstrap bootstrap;
-        assert(bootstrap.load(dataRoot));
+        const usm::Result bootstrapResult = bootstrap.load(dataRoot);
+        if (!bootstrapResult) {
+            std::cerr << "Level-one bootstrap failed: "
+                      << bootstrapResult.message() << '\n';
+            return 1;
+        }
         assert(bootstrap.mainScene().nodes().size() == 154);
         assert(bootstrap.firstRoom().nodes().size() == 60);
         assert(!bootstrap.previewGeometry().vertices.empty());
         assert(!bootstrap.previewTexture().mipLevels().empty());
+        assert(bootstrap.roomTextures().size() ==
+               bootstrap.roomGeometry().images().size());
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

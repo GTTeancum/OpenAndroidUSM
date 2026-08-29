@@ -11,6 +11,15 @@ namespace usm::assets {
 namespace {
 
 constexpr std::uint32_t kColladaRootPointerField = 0x1c;
+constexpr std::uint32_t kImageCountOffset = 0x34;
+constexpr std::uint32_t kImageArrayOffset = 0x38;
+constexpr std::uint32_t kImageSize = 0x14;
+constexpr std::uint32_t kEffectCountOffset = 0x3c;
+constexpr std::uint32_t kEffectArrayOffset = 0x40;
+constexpr std::uint32_t kEffectSize = 0x5c;
+constexpr std::uint32_t kMaterialCountOffset = 0x44;
+constexpr std::uint32_t kMaterialArrayOffset = 0x48;
+constexpr std::uint32_t kMaterialSize = 0x40;
 constexpr std::uint32_t kGeometryCountOffset = 0x4c;
 constexpr std::uint32_t kGeometryArrayOffset = 0x50;
 constexpr std::uint32_t kGeometrySize = 0x10;
@@ -265,9 +274,102 @@ Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
     return Result::success();
 }
 
+Result parseImageLibrary(const BinaryView& view, std::uint32_t rootOffset,
+                         std::vector<ColladaImage>& output) {
+    const auto count = view.integer<std::uint32_t>(rootOffset + kImageCountOffset);
+    const auto array = view.integer<std::uint32_t>(rootOffset + kImageArrayOffset);
+    if (!count || !array) {
+        return Result::failure("BDAE image-library fields are truncated");
+    }
+    if (*count == 0) {
+        return Result::success();
+    }
+    if (!view.contains(*array, static_cast<std::uint64_t>(*count) * kImageSize)) {
+        return Result::failure("BDAE image library is invalid");
+    }
+
+    output.reserve(*count);
+    for (std::uint32_t index = 0; index < *count; ++index) {
+        const std::uint32_t entry = *array + index * kImageSize;
+        const auto idOffset = view.integer<std::uint32_t>(entry);
+        const auto nameOffset = view.integer<std::uint32_t>(entry + 4);
+        const auto sourceOffset = view.integer<std::uint32_t>(entry + 8);
+        if (!idOffset || !nameOffset || !sourceOffset) {
+            return Result::failure("BDAE image record is truncated");
+        }
+        const auto id = view.string(*idOffset);
+        const auto name = view.string(*nameOffset);
+        const auto source = view.string(*sourceOffset);
+        if (!id || !name || !source) {
+            return Result::failure("BDAE image has an invalid string pointer");
+        }
+        output.push_back({*id, *name, *source});
+    }
+    return Result::success();
+}
+
+Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
+                            std::uint32_t imageCount,
+                            std::vector<ColladaMaterial>& output) {
+    const auto effectCount =
+        view.integer<std::uint32_t>(rootOffset + kEffectCountOffset);
+    const auto effectArray =
+        view.integer<std::uint32_t>(rootOffset + kEffectArrayOffset);
+    const auto materialCount =
+        view.integer<std::uint32_t>(rootOffset + kMaterialCountOffset);
+    const auto materialArray =
+        view.integer<std::uint32_t>(rootOffset + kMaterialArrayOffset);
+    if (!effectCount || !effectArray || !materialCount || !materialArray) {
+        return Result::failure("BDAE material-library fields are truncated");
+    }
+    if ((*effectCount != 0 &&
+         !view.contains(*effectArray,
+                        static_cast<std::uint64_t>(*effectCount) * kEffectSize)) ||
+        (*materialCount != 0 &&
+         !view.contains(*materialArray,
+                        static_cast<std::uint64_t>(*materialCount) *
+                            kMaterialSize))) {
+        return Result::failure("BDAE material library is invalid");
+    }
+
+    output.reserve(*materialCount);
+    for (std::uint32_t index = 0; index < *materialCount; ++index) {
+        const std::uint32_t entry = *materialArray + index * kMaterialSize;
+        const auto idOffset = view.integer<std::uint32_t>(entry);
+        const auto nameOffset = view.integer<std::uint32_t>(entry + 4);
+        const auto effectIdOffset = view.integer<std::uint32_t>(entry + 12);
+        const auto effectIndex = view.integer<std::uint32_t>(entry + 24);
+        if (!idOffset || !nameOffset || !effectIdOffset || !effectIndex) {
+            return Result::failure("BDAE material record is truncated");
+        }
+        const auto id = view.string(*idOffset);
+        const auto name = view.string(*nameOffset);
+        const auto effectId = view.string(*effectIdOffset);
+        if (!id || !name || !effectId || *effectIndex >= *effectCount) {
+            return Result::failure("BDAE material metadata is invalid");
+        }
+
+        ColladaMaterial material{*id, *name, *effectId, std::nullopt};
+        // SEffect's final pointer resolves to its diffuse SImage index for
+        // textured effects. Color-only effects use a different payload.
+        const std::uint32_t effect = *effectArray + *effectIndex * kEffectSize;
+        const auto imageIndexPointer = view.integer<std::uint32_t>(effect + 0x58);
+        if (imageIndexPointer) {
+            const auto imageIndex = view.integer<std::uint32_t>(*imageIndexPointer);
+            if (imageIndex && *imageIndex < imageCount) {
+                material.diffuseImageIndex = *imageIndex;
+            }
+        }
+        output.push_back(std::move(material));
+    }
+    return Result::success();
+}
+
 } // namespace
 
 Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
+    images_.clear();
+    materials_.clear();
     geometries_.clear();
     Result result = resource_.load(bytes);
     if (!result) {
@@ -279,6 +381,17 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
         return Result::failure("BDAE file has no SCollada root pointer");
     }
     const BinaryView view(resource_.bytes());
+    result = parseImageLibrary(view, *rootOffset, images_);
+    if (!result) {
+        return result;
+    }
+    result = parseMaterialLibrary(view, *rootOffset,
+                                  static_cast<std::uint32_t>(images_.size()),
+                                  materials_);
+    if (!result) {
+        images_.clear();
+        return result;
+    }
     const auto geometryCount =
         view.integer<std::uint32_t>(*rootOffset + kGeometryCountOffset);
     const auto geometryArray =
@@ -301,6 +414,16 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
         geometries_.push_back(std::move(geometry));
     }
     return Result::success();
+}
+
+const ColladaMaterial* ColladaMeshFile::findMaterial(
+    std::string_view name) const noexcept {
+    const auto iterator = std::find_if(
+        materials_.begin(), materials_.end(),
+        [name](const ColladaMaterial& material) {
+            return material.id == name || material.name == name;
+        });
+    return iterator == materials_.end() ? nullptr : &*iterator;
 }
 
 } // namespace usm::assets

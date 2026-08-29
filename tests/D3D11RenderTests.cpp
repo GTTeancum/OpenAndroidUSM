@@ -45,8 +45,8 @@ int main() {
 
         usm::renderer::D3D11Renderer gameRenderer;
         assert(gameRenderer.initializeOffscreen(256, 256));
-        assert(gameRenderer.uploadPreviewGeometry(
-            levelOne.previewGeometry(), levelOne.previewTexture().mipLevels()));
+        assert(gameRenderer.uploadSceneGeometry(levelOne.roomGeometry(),
+                                                levelOne.roomTextures()));
         gameRenderer.renderFrame();
 
         RgbaImage rendered;

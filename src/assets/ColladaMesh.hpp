@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <optional>
 #include <vector>
 
 namespace usm::assets {
@@ -50,6 +51,19 @@ struct ColladaGeometry {
     AxisAlignedBounds bounds;
 };
 
+struct ColladaImage {
+    std::string id;
+    std::string name;
+    std::string sourcePath;
+};
+
+struct ColladaMaterial {
+    std::string id;
+    std::string name;
+    std::string effectId;
+    std::optional<std::uint32_t> diffuseImageIndex;
+};
+
 // Typed native view of the SGeometry/SMesh/SMeshBuffer graph consumed by
 // CColladaMesh and CColladaMeshBuffer in the original engine.
 class ColladaMeshFile final {
@@ -58,9 +72,19 @@ public:
     [[nodiscard]] const std::vector<ColladaGeometry>& geometries() const noexcept {
         return geometries_;
     }
+    [[nodiscard]] const std::vector<ColladaImage>& images() const noexcept {
+        return images_;
+    }
+    [[nodiscard]] const std::vector<ColladaMaterial>& materials() const noexcept {
+        return materials_;
+    }
+    [[nodiscard]] const ColladaMaterial* findMaterial(
+        std::string_view name) const noexcept;
 
 private:
     BresFile resource_;
+    std::vector<ColladaImage> images_;
+    std::vector<ColladaMaterial> materials_;
     std::vector<ColladaGeometry> geometries_;
 };
 
