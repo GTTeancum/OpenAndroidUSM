@@ -6,6 +6,7 @@
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/CinematicScript.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
 #include <cassert>
@@ -160,6 +161,34 @@ int main() {
         assert(!bootstrap.previewTexture().mipLevels().empty());
         assert(bootstrap.roomTextures().size() ==
                bootstrap.roomGeometry().images().size());
+        assert(bootstrap.introStartScript().threads().size() == 1);
+        assert(bootstrap.introStartScript().commandCount() == 2);
+        const auto& startCommands =
+            bootstrap.introStartScript().threads().front().commands;
+        assert(startCommands.front().name == "StartCinematic");
+        assert(startCommands.front().findAttribute("CinematicID") != nullptr);
+        assert(startCommands.front().findAttribute("CinematicID")->value ==
+               "1265");
+        assert(bootstrap.introScript().threads().size() == 11);
+        assert(bootstrap.introScript().commandCount() == 38);
+        const auto& playerCommands =
+            bootstrap.introScript().threads().front().commands;
+        assert(playerCommands.front().name == "PlayDAEAnim");
+        assert(playerCommands.front().findAttribute("AnimFile") != nullptr);
+        assert(playerCommands.front().findAttribute("AnimFile")->value ==
+               ".\\meshes_bin\\spiderman_lv1_start.bdae");
+        const auto cameraCommand = std::find_if(
+            bootstrap.introScript().threads().begin(),
+            bootstrap.introScript().threads().end(),
+            [](const usm::game::CinematicThread& thread) {
+                return std::any_of(
+                    thread.commands.begin(), thread.commands.end(),
+                    [](const usm::game::CinematicCommand& command) {
+                        return command.name == "PlayDAECamera";
+                    });
+            });
+        assert(cameraCommand != bootstrap.introScript().threads().end());
+        assert(bootstrap.introEndScript().commandCount() == 1);
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

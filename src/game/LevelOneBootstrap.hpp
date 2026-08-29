@@ -4,6 +4,7 @@
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
+#include "game/CinematicScript.hpp"
 
 #include <filesystem>
 #include <vector>
@@ -33,12 +34,24 @@ public:
         noexcept {
         return roomTextures_;
     }
+    [[nodiscard]] const CinematicScript& introStartScript() const noexcept {
+        return introStartScript_;
+    }
+    [[nodiscard]] const CinematicScript& introScript() const noexcept {
+        return introScript_;
+    }
+    [[nodiscard]] const CinematicScript& introEndScript() const noexcept {
+        return introEndScript_;
+    }
 
 private:
     assets::IrrScene mainScene_;
     assets::IrrScene firstRoom_;
     assets::ColladaMeshFile roomGeometry_;
     std::vector<assets::BtexTexture> roomTextures_;
+    CinematicScript introStartScript_;
+    CinematicScript introScript_;
+    CinematicScript introEndScript_;
 };
 
 } // namespace usm::game

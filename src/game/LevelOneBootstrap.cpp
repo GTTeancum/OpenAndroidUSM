@@ -75,6 +75,34 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     if (roomTextures_.empty()) {
         return Result::failure("Room 1 geometry has no diffuse textures");
     }
+
+    result = levelArchive.read(
+        "cinematics/levelnew_01_1264_cinematic.cff", resource);
+    if (!result) {
+        return result;
+    }
+    result = introStartScript_.load(resource);
+    if (!result) {
+        return result;
+    }
+    result = levelArchive.read(
+        "cinematics/levelnew_01_1265_cinematic.cff", resource);
+    if (!result) {
+        return result;
+    }
+    result = introScript_.load(resource);
+    if (!result) {
+        return result;
+    }
+    result = levelArchive.read(
+        "cinematics/levelnew_01_1266_cinematic.cff", resource);
+    if (!result) {
+        return result;
+    }
+    result = introEndScript_.load(resource);
+    if (!result) {
+        return result;
+    }
     return Result::success();
 }
 

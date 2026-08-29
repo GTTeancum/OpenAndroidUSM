@@ -75,6 +75,17 @@ image address `0x00397864` enables alpha testing with `GL_GREATER` and a 0.5
 reference. The D3D11 material path preserves that behavior with an HLSL
 `clip` shader variant for the recovered `alphatest` materials.
 
+## Cinematic command files
+
+The `.cff` resources are UTF-16 XML fragments, not opaque bytecode. Each
+`cinematicThread` targets the player, a scene object, or global level state and
+contains timestamped named commands with typed attributes. The native
+`game::CinematicScript` parser preserves those names and IDs. Level 1's start
+chain is cinematic 1264 (start 1265 and disable trigger 1263), the 38-command
+1265 intro, then cleanup cinematic 1266. The intro explicitly names its DAE
+camera/character animations, 15 sound events, message strings, and visible
+rooms.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a
