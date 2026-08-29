@@ -1,0 +1,43 @@
+#include "app/Application.hpp"
+
+#include <Windows.h>
+
+#include <string>
+
+namespace usm {
+namespace {
+
+int fail(std::string_view message) {
+    const std::wstring wideMessage(message.begin(), message.end());
+    MessageBoxW(nullptr, wideMessage.c_str(), L"OpenAndroidUSM error",
+                MB_OK | MB_ICONERROR);
+    return EXIT_FAILURE;
+}
+
+} // namespace
+
+int Application::run(HINSTANCE instance) {
+    Result result = window_.create(instance, L"OpenAndroidUSM", 1280, 720);
+    if (!result) {
+        return fail(result.message());
+    }
+
+    result = renderer_.initialize(window_.nativeHandle(), window_.clientWidth(),
+                                  window_.clientHeight());
+    if (!result) {
+        return fail(result.message());
+    }
+
+    result = audio_.initialize();
+    if (!result) {
+        return fail(result.message());
+    }
+
+    while (window_.pumpMessages()) {
+        renderer_.renderFrame();
+    }
+    return EXIT_SUCCESS;
+}
+
+} // namespace usm
+

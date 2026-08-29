@@ -1,0 +1,24 @@
+# Build products
+/build/
+/out/
+/.vs/
+/.idea/
+
+# Proprietary user-supplied game material
+/game/original/
+/game/data/
+/game/staging/
+
+# Reverse-engineering databases and generated exports
+/analysis/ghidra-project/
+/analysis/generated/
+*.gpr
+*.rep/
+*.i64
+*.idb
+
+# Local tooling
+/.venv/
+__pycache__/
+*.pyc
+
