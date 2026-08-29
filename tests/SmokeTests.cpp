@@ -1,4 +1,5 @@
 #include "assets/BresFile.hpp"
+#include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
@@ -6,6 +7,7 @@
 
 #include <cassert>
 #include <filesystem>
+#include <string_view>
 #include <vector>
 
 int main() {
@@ -64,6 +66,37 @@ int main() {
         assert(meshFile.resolvePointer(0x14) == 0x20);
         assert(meshFile.resolvePointer(0x18) == 0x4154);
         assert(meshFile.resolvePointer(0x1c) == 0x8c0c);
+
+        usm::assets::ColladaMeshFile colladaMesh;
+        assert(colladaMesh.load(meshResource));
+        assert(colladaMesh.geometries().size() == 152);
+        const auto& firstGeometry = colladaMesh.geometries().front();
+        assert(firstGeometry.id == "Object211420-mesh");
+        assert(firstGeometry.name == "Object211420");
+        assert(firstGeometry.vertices.size() == 16);
+        assert(firstGeometry.meshBuffers.size() == 1);
+        assert(firstGeometry.meshBuffers.front().indices.size() == 24);
+
+        std::size_t meshFileCount = 0;
+        std::size_t geometryCount = 0;
+        std::size_t meshBufferCount = 0;
+        for (const auto& entry : levelOne.entries()) {
+            if (!std::string_view(entry.path).ends_with(".bdae")) {
+                continue;
+            }
+            std::vector<std::byte> meshBytes;
+            assert(levelOne.read(entry.path, meshBytes));
+            usm::assets::ColladaMeshFile parsedMesh;
+            assert(parsedMesh.load(meshBytes));
+            ++meshFileCount;
+            geometryCount += parsedMesh.geometries().size();
+            for (const auto& geometry : parsedMesh.geometries()) {
+                meshBufferCount += geometry.meshBuffers.size();
+            }
+        }
+        assert(meshFileCount == 113);
+        assert(geometryCount == 1178);
+        assert(meshBufferCount == 1612);
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

@@ -24,6 +24,7 @@ FetchContent_MakeAvailable(pugixml)
 
 add_library(OpenAndroidUSM.Core STATIC
     src/assets/BresFile.cpp
+    src/assets/ColladaMesh.cpp
     src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp

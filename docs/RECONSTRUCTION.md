@@ -51,3 +51,13 @@ Level and room `.irr` resources are UTF-16 XML. The main scene has one
 node IDs, hierarchy, transforms, visibility, semantic game type, and referenced
 mesh path. Level 1 currently validates as 154 main-scene nodes and 60 nodes in
 Room 1.
+
+## Collada mesh layout
+
+The BRES root points to `SCollada`; its geometry library contains named
+`SGeometry` records. `SMesh` then supplies an interleaved vertex stream and
+0x3c-byte `SMeshBuffer` records. The level-one meshes use 16-bit indices and
+component slots for float3 positions/normals, float2 UVs, and packed vertex
+color. `assets::ColladaMeshFile` resolves these into typed vertices, primitive
+groups, material names, and bounds. Its source comments retain the matching
+original class and member names rather than anonymous address labels.
