@@ -2,6 +2,7 @@
 #include "assets/BtexTexture.hpp"
 #include "assets/ColladaMesh.hpp"
 #include "assets/IrrScene.hpp"
+#include "audio/OggAudio.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
@@ -9,6 +10,8 @@
 
 #include <cassert>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string_view>
 #include <vector>
 
@@ -46,6 +49,22 @@ int main() {
     const std::filesystem::path dataRoot = USM_TEST_GAME_DATA_ROOT;
     const std::filesystem::path configArchive = dataRoot / "configs.pack";
     if (std::filesystem::exists(configArchive)) {
+        const auto audioPath = dataRoot / "sound" / "SFX" / "INTERFACE" /
+                               "sfx_point_spend.ogg";
+        std::ifstream audioStream(audioPath, std::ios::binary);
+        assert(audioStream);
+        const std::vector<char> encodedAudio(
+            (std::istreambuf_iterator<char>(audioStream)),
+            std::istreambuf_iterator<char>());
+        const auto encodedBytes = std::span<const std::byte>(
+            reinterpret_cast<const std::byte*>(encodedAudio.data()),
+            encodedAudio.size());
+        usm::audio::PcmAudio decodedAudio;
+        assert(usm::audio::decodeOggVorbis(encodedBytes, decodedAudio));
+        assert(decodedAudio.sampleRate > 0);
+        assert(decodedAudio.channelCount > 0);
+        assert(decodedAudio.frameCount() > 0);
+
         usm::filesystem::GbmpArchive archive;
         assert(archive.open(configArchive));
         assert(archive.entries().size() == 40);

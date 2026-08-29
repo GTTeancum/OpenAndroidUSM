@@ -18,3 +18,21 @@ permission notice. The software is provided "as is", without warranty of any
 kind, express or implied.
 
 Upstream: <https://github.com/powervr-graphics/Native_SDK>
+
+## stb_vorbis
+
+`OpenAndroidUSM.Vorbis` builds `stb_vorbis.c` from stb at commit
+`2c980bb59875b0d32144a71867fbdebb2f77cd20`.
+
+Copyright (c) 2017 Sean Barrett
+
+Licensed under the MIT License. Permission is hereby granted, free of charge,
+to any person obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to inclusion of the copyright and
+permission notice. The software is provided "as is", without warranty of any
+kind, express or implied.
+
+Upstream: <https://github.com/nothings/stb>

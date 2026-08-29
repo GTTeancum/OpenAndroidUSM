@@ -52,6 +52,7 @@ int Application::run(HINSTANCE instance) {
     }
 
     while (window_.pumpMessages()) {
+        audio_.update();
         keyRouter_.beginFrame();
         controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
             keyRouter_.route(event, reconstructed::InputContext::Gameplay);

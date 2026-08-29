@@ -58,7 +58,29 @@ target_include_directories(OpenAndroidUSM.PVRTC PUBLIC
     ${POWERVR_DECOMPRESS_DIR}
 )
 
+set(STB_VORBIS_DIR "${CMAKE_BINARY_DIR}/_deps/stb-vorbis")
+file(MAKE_DIRECTORY "${STB_VORBIS_DIR}")
+usm_download_verified(
+    "https://raw.githubusercontent.com/nothings/stb/2c980bb59875b0d32144a71867fbdebb2f77cd20/stb_vorbis.c"
+    "${STB_VORBIS_DIR}/stb_vorbis.c"
+    "4c7cb2ff1f7011e9d67950446b7eb9ca044f2e464d76bfbb0b84dd2e23e65636"
+)
+set_source_files_properties(${STB_VORBIS_DIR}/stb_vorbis.c PROPERTIES
+    LANGUAGE CXX
+)
+add_library(OpenAndroidUSM.Vorbis STATIC
+    ${STB_VORBIS_DIR}/stb_vorbis.c
+)
+target_compile_features(OpenAndroidUSM.Vorbis PUBLIC cxx_std_20)
+target_include_directories(OpenAndroidUSM.Vorbis PUBLIC
+    ${STB_VORBIS_DIR}
+)
+if(MSVC)
+    target_compile_options(OpenAndroidUSM.Vorbis PRIVATE /W0 /EHsc)
+endif()
+
 add_library(OpenAndroidUSM.Core STATIC
+    src/audio/OggAudio.cpp
     src/assets/BresFile.cpp
     src/assets/BtexTexture.cpp
     src/assets/ColladaMesh.cpp
@@ -71,6 +93,7 @@ target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
 target_include_directories(OpenAndroidUSM.Core PUBLIC src)
 target_link_libraries(OpenAndroidUSM.Core PRIVATE
     OpenAndroidUSM.PVRTC
+    OpenAndroidUSM.Vorbis
     zlibstatic
     pugixml::pugixml
 )
