@@ -8,6 +8,7 @@
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/CinematicScript.hpp"
+#include "game/CinematicPlayer.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
 #include <cassert>
@@ -204,6 +205,27 @@ int main() {
             });
         assert(cameraCommand != bootstrap.introScript().threads().end());
         assert(bootstrap.introEndScript().commandCount() == 1);
+
+        usm::game::CinematicPlayer cinematicPlayer;
+        assert(cinematicPlayer.start(bootstrap.introScript()));
+        assert(cinematicPlayer.durationMilliseconds() == 41800);
+        std::vector<std::string> dispatchedCommands;
+        const auto collectCommand =
+            [&dispatchedCommands](const usm::game::CinematicThread&,
+                                  const usm::game::CinematicCommand& command) {
+                dispatchedCommands.push_back(command.name);
+            };
+        assert(cinematicPlayer.advanceTo(0, collectCommand));
+        assert(dispatchedCommands.size() == 5);
+        assert(dispatchedCommands.front() == "PlayDAEAnim");
+        assert(cinematicPlayer.advanceTo(299, collectCommand));
+        assert(dispatchedCommands.size() == 5);
+        assert(cinematicPlayer.advanceTo(300, collectCommand));
+        assert(dispatchedCommands.size() == 6);
+        assert(dispatchedCommands.back() == "SoundControl");
+        assert(cinematicPlayer.advanceTo(41800, collectCommand));
+        assert(dispatchedCommands.size() == 38);
+        assert(cinematicPlayer.finished());
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

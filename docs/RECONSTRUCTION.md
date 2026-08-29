@@ -86,6 +86,12 @@ chain is cinematic 1264 (start 1265 and disable trigger 1263), the 38-command
 camera/character animations, 15 sound events, message strings, and visible
 rooms.
 
+`game::CinematicPlayer` provides the corresponding monotonic command
+scheduler. It performs a stable merge of thread-local command streams, so
+commands sharing a timestamp retain serialized thread order. The caller owns
+the clock and command handlers; tests currently verify all 38 intro commands,
+including the five events at time zero and the 41.8-second final event.
+
 ## Vox sound events
 
 The preserved `VoxSoundFile::LoadRecordFromFile` and `ReadBasicRecord`
