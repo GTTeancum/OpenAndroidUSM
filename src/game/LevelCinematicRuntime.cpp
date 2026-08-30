@@ -113,6 +113,10 @@ void LevelCinematicRuntime::bind(LevelTriggerRuntime& triggers,
     levelEnded_ = false;
     goToNextLevel_ = false;
     gameEnded_ = false;
+    lastCheckpointId_ = -1;
+    unlockedSkills_.fill(false);
+    bossRushTimerRunning_ = false;
+    transportRequested_ = false;
     controlsEnabled_ = true;
     blackOverlayEnabled_ = false;
 }
@@ -192,6 +196,49 @@ Result LevelCinematicRuntime::applyCommand(const CinematicCommand& command) {
             return Result::failure("StartCinematic has no valid CinematicID");
         }
         cinematicStartRequests_.push_back(cinematicId);
+        return Result::success();
+    }
+    if (command.name == "Save") {
+        std::int32_t checkpointId = -1;
+        if (!parseInteger(command, "^ID^CheckPoint", checkpointId) ||
+            checkpointId < 0) {
+            return Result::failure("Save has no valid checkpoint ID");
+        }
+        // CCinematicThread::SaveCheckpoint (0x00370384) stores the current
+        // player/camera state against this authored checkpoint. Persistent
+        // profile I/O is outside the single-level Windows target, but the
+        // active checkpoint remains explicit runtime state.
+        lastCheckpointId_ = checkpointId;
+        return Result::success();
+    }
+    if (command.name == "StartTimer") {
+        std::int32_t initialValue = 0;
+        if (!parseInteger(command, "InitValue", initialValue) ||
+            initialValue < 0) {
+            return Result::failure("StartTimer has an invalid InitValue");
+        }
+        // CCinematicThread::StartTimerOfBossRush (0x0036fe58) reads but does
+        // not retain InitValue; it only releases CBossRush's timer gate.
+        bossRushTimerRunning_ = true;
+        return Result::success();
+    }
+    if (command.name == "Unlock") {
+        const CinematicAttribute* skill = attribute(command, "$SkillID");
+        if (skill == nullptr || skill->value.empty() ||
+            skill->value.front() < '0' || skill->value.front() > '1') {
+            return Result::failure("Unlock has an invalid skill ID");
+        }
+        // CCinematicThread::OnUnlock (0x0037240c) derives the two-bit profile
+        // index from the first character of the authored value.
+        unlockedSkills_[static_cast<std::size_t>(skill->value.front() - '0')] =
+            true;
+        return Result::success();
+    }
+    if (command.name == "Transport") {
+        // The sole linked command is the final player-thread event in the
+        // game-over cinematic. Native code begins the level transport state;
+        // the first-level target exits after presenting that terminal pose.
+        transportRequested_ = true;
         return Result::success();
     }
     if (command.name == "SetSlowMotion") {

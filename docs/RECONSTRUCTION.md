@@ -104,6 +104,16 @@ handoff deterministically. The zero-time intro-start script now also disables
 trigger 1263 before explicit cinematic 1265 playback, preventing the opening
 sequence from retriggering during gameplay.
 
+The remaining control-only commands in the linked-room script census are
+also explicit. `Save` retains the authored checkpoint ID following
+`CCinematicThread::SaveCheckpoint` (`0x00370384`); disk profile persistence is
+outside this single-level target. `Unlock` preserves the two profile skill
+bits used for ultimate and spider sense. `StartTimer` follows
+`CCinematicThread::StartTimerOfBossRush` (`0x0036fe58`), whose only native
+effect is releasing the final encounter's timing gate, and terminal
+`Transport` records the game-over return request before the Windows target
+exits. None of those three control flags directly emits graphics or audio.
+
 Encounter conditions retain the per-thread blocking behavior recovered from
 `CCinematicThread::executeCommand` at `0x00372aa4`. A false `IfEnemyDead`
 leaves that command pending and suppresses only later commands in the same

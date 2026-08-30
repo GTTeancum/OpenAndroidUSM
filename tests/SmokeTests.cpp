@@ -51,6 +51,8 @@
 #include <fstream>
 #include <iterator>
 #include <iostream>
+#include <set>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -724,6 +726,37 @@ int main() {
                       << bootstrapResult.message() << '\n';
             return 1;
         }
+        std::set<std::string> linkedCommandNames;
+        const auto collectCommandNames = [&linkedCommandNames](
+                                             const auto& script) {
+            for (const auto& thread : script.threads()) {
+                for (const auto& command : thread.commands) {
+                    linkedCommandNames.insert(command.name);
+                }
+            }
+        };
+        collectCommandNames(bootstrap.introScript());
+        collectCommandNames(bootstrap.introStartScript());
+        for (const auto& cinematic : bootstrap.cinematics()) {
+            if (cinematic.scriptAvailable) {
+                collectCommandNames(cinematic.script);
+            }
+        }
+        const std::set<std::string> accountedLinkedCommands{
+            "ChangeCamera",      "DisableAI",       "DisableTrigger",
+            "EnableAI",         "EnableCameraArea", "EnableTrigger",
+            "GameEnd",          "GetDamage",       "IfEnemyDead",
+            "IfObjectDestroyed", "InterfaceControl", "KillObject",
+            "LevelEnd",         "MoveObject",      "MustBeVisibleRoom",
+            "Physics",          "PlayDAEAnim",     "PlayDAECamera",
+            "PlayEffect",       "Save",            "SetAnim",
+            "SetCameraArea",    "SetSlowMotion",   "SetVisible",
+            "ShakeCamera",      "ShowHealth",      "ShowMessage",
+            "ShowStream",       "SoundControl",    "StartCinematic",
+            "StartQTE",         "StartSlide",      "StartTimer",
+            "Transport",        "Tutorial",        "Unlock",
+        };
+        assert(linkedCommandNames == accountedLinkedCommands);
         assert(bootstrap.environmentEffects().size() == 23);
         for (const auto& effect : bootstrap.environmentEffects()) {
             assert(effect.roomId >= 1 && effect.roomId <= 8);
@@ -2429,6 +2462,24 @@ int main() {
             levelCommandRuntime.consumeCinematicStartRequests();
         assert(cinematicStarts.size() == 1 && cinematicStarts.front() == 1238);
         assert(levelCommandRuntime.consumeCinematicStartRequests().empty());
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("Save", "^ID^CheckPoint", "30027")));
+        assert(levelCommandRuntime.lastCheckpointId() == 30027);
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("StartTimer", "InitValue", "0")));
+        assert(levelCommandRuntime.bossRushTimerRunning());
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("Unlock", "$SkillID", "0 ultimate")));
+        assert(levelCommandRuntime.skillUnlocked(0));
+        assert(!levelCommandRuntime.skillUnlocked(1));
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("Unlock", "$SkillID", "1 sense")));
+        assert(levelCommandRuntime.skillUnlocked(1));
+        assert(levelCommandRuntime.applyCommand(
+            usm::game::CinematicCommand{0, -1, "Transport", {}}));
+        assert(levelCommandRuntime.transportRequested());
+        assert(!levelCommandRuntime.applyCommand(
+            controlCommand("Unlock", "$SkillID", "2 invalid")));
         usm::game::CinematicCommand slowMotion;
         slowMotion.name = "SetSlowMotion";
         slowMotion.attributes = {

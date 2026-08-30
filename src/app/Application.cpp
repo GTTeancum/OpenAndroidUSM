@@ -750,8 +750,8 @@ int Application::run(HINSTANCE instance) {
                     }
                     if (!terminalCinematic && chainedCinematics.size() > 1) {
                         result = Result::failure(
-                            "Concurrent gameplay cinematics are not yet "
-                            "reconstructed");
+                            "Gameplay cinematic issued multiple simultaneous "
+                            "handoffs");
                     } else if (!terminalCinematic &&
                                !chainedCinematics.empty()) {
                         result = startGameplayCinematic(
