@@ -4,6 +4,7 @@
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelObjectRuntime.hpp"
 
 #include <algorithm>
 #include <array>
@@ -135,7 +136,15 @@ int main() {
         const std::uint32_t captureWidth = capturing ? 1280U : 256U;
         const std::uint32_t captureHeight = capturing ? 720U : 256U;
         assert(gameRenderer.initializeOffscreen(captureWidth, captureHeight));
-        assert(gameRenderer.uploadLevelOneScene(levelOne));
+        const usm::Result uploadLevelResult =
+            gameRenderer.uploadLevelOneScene(levelOne);
+        if (!uploadLevelResult) {
+            std::cerr << uploadLevelResult.message() << '\n';
+            return 1;
+        }
+        usm::game::LevelObjectRuntime levelObjects;
+        assert(levelObjects.initialize(levelOne));
+        assert(gameRenderer.updateLevelOneObjects(levelOne, levelObjects));
         assert(gameRenderer.updateLevelOneActors(levelOne, 0));
         assert(gameRenderer.setCamera(levelOne.introCamera().sample(0)));
         gameRenderer.renderFrame();

@@ -151,6 +151,10 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = objectRuntime_.initialize(levelOne_);
+    if (!result) {
+        return fail(result.message());
+    }
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints());
     quickTimeEvent_.bind(levelOne_.buttonConfigs());
@@ -164,8 +168,12 @@ int Application::run(HINSTANCE instance) {
     result = introStartCommands.advanceTo(
         introStartCommands.durationMilliseconds(),
         [this, &introStartCommandResult](
-            const game::CinematicThread&,
+            const game::CinematicThread& thread,
             const game::CinematicCommand& command) {
+            if (introStartCommandResult) {
+                introStartCommandResult = objectRuntime_.applyCinematicCommand(
+                    levelOne_, thread, command);
+            }
             if (introStartCommandResult) {
                 introStartCommandResult =
                     levelCinematicRuntime_.applyCommand(command);
@@ -217,6 +225,7 @@ int Application::run(HINSTANCE instance) {
         const auto deltaMilliseconds = static_cast<std::uint32_t>(
             std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
         previousFrame = frameTime;
+        objectRuntime_.advanceAnimations(deltaMilliseconds);
         audio_.update();
         keyRouter_.beginFrame();
         controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
@@ -233,9 +242,14 @@ int Application::run(HINSTANCE instance) {
         result = introPlayer_.advanceTo(
             timestamp,
             [this, &soundResult,
-             &uiResult](const game::CinematicThread&,
+             &uiResult](const game::CinematicThread& thread,
                         const game::CinematicCommand& command) {
                 if (!soundResult || !uiResult) {
+                    return;
+                }
+                uiResult = objectRuntime_.applyCinematicCommand(
+                    levelOne_, thread, command);
+                if (!uiResult) {
                     return;
                 }
                 uiResult = cinematicUi_.applyCommand(command);
@@ -378,6 +392,10 @@ int Application::run(HINSTANCE instance) {
                             cinematicDamageApplied =
                                 cinematicDamageApplied ||
                                 gameplayPlayer_.health() < healthBefore;
+                        }
+                        if (commandResult) {
+                            commandResult = objectRuntime_.applyCinematicCommand(
+                                levelOne_, thread, command);
                         }
                         if (commandResult) {
                             commandResult = enemyRuntime_.applyCinematicCommand(
@@ -523,6 +541,10 @@ int Application::run(HINSTANCE instance) {
                         gameplayCamera_.sample(gameplayPlayer_.position()));
                 }
             }
+        }
+        if (result) {
+            result = renderer_.updateLevelOneObjects(levelOne_,
+                                                     objectRuntime_);
         }
         cinematicUi_.update(
             deltaMilliseconds,

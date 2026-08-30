@@ -195,6 +195,44 @@ struct LevelEnemyAsset {
     float awarenessAngleDegrees{};
 };
 
+enum class LevelObjectKind {
+    Destroyable,
+    Comic,
+    Car,
+    DropObject,
+    SpiderWebWall,
+    StaticObject,
+    Hostage,
+    StreamPiping,
+    SlideCar,
+};
+
+// Shared render data for mesh-bearing room objects. Object instances retain
+// their authored IDs and transforms separately so cinematic commands can
+// address them without coupling portable gameplay state to D3D resources.
+struct LevelObjectArchetypeAsset {
+    std::string meshFile;
+    std::string animationFile;
+    assets::ColladaMeshFile mesh;
+    std::vector<assets::BtexTexture> textures;
+    assets::ColladaAnimationFile animationBank;
+};
+
+struct LevelObjectAsset {
+    std::int32_t objectId{-1};
+    std::string name;
+    std::string gameType;
+    LevelObjectKind kind{LevelObjectKind::StaticObject};
+    std::string initialAnimation;
+    std::size_t archetypeIndex{};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::array<float, 16> worldTransform{};
+    bool visible{true};
+    bool hasCollision{};
+};
+
 struct LevelHudAsset {
     assets::SpriteAtlas interfaceAtlas;
     assets::DdsAtcTexture interfaceTexture;
@@ -280,6 +318,13 @@ public:
     [[nodiscard]] const std::vector<LevelEnemyAsset>& enemies() const noexcept {
         return enemies_;
     }
+    [[nodiscard]] const std::vector<LevelObjectArchetypeAsset>&
+    objectArchetypes() const noexcept {
+        return objectArchetypes_;
+    }
+    [[nodiscard]] const std::vector<LevelObjectAsset>& objects() const noexcept {
+        return objects_;
+    }
     [[nodiscard]] const AttackConfigDatabase& attackConfigs() const noexcept {
         return attackConfigs_;
     }
@@ -330,6 +375,8 @@ private:
     std::vector<LevelCinematicAsset> cinematics_;
     std::vector<EnemyArchetypeAsset> enemyArchetypes_;
     std::vector<LevelEnemyAsset> enemies_;
+    std::vector<LevelObjectArchetypeAsset> objectArchetypes_;
+    std::vector<LevelObjectAsset> objects_;
     AttackConfigDatabase attackConfigs_;
     ButtonConfigDatabase buttonConfigs_;
     EnemySpecialActionConfigDatabase enemySpecialActions_;

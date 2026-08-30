@@ -6,6 +6,7 @@
 #include "game/CinematicUiRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelObjectRuntime.hpp"
 #include "renderer/IRenderer.hpp"
 
 #include <DirectXMath.h>
@@ -17,6 +18,7 @@
 #include <span>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace usm::renderer {
 
@@ -49,6 +51,9 @@ public:
     [[nodiscard]] Result updateLevelOneEnemies(
         const game::LevelOneBootstrap& levelOne,
         const game::LevelEnemyRuntime& enemies);
+    [[nodiscard]] Result updateLevelOneObjects(
+        const game::LevelOneBootstrap& levelOne,
+        const game::LevelObjectRuntime& objects);
     [[nodiscard]] Result updateWebLine(
         bool visible, const assets::Vector3& anchor = {},
         const assets::Vector3& attachPosition = {});
@@ -109,7 +114,8 @@ private:
         std::span<const assets::BtexTexture> textures,
         std::span<const assets::RgbaImage> previewTexture,
         const std::array<float, 16>* transform = nullptr,
-        bool dynamicVertices = false);
+        bool dynamicVertices = false,
+        bool omitUntexturedMaterials = false);
     [[nodiscard]] Result createTextureView(
         std::span<const assets::RgbaImage> mipLevels,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);
@@ -147,11 +153,17 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> webLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> enemyGunLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> whiteTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cinematicUiTextTexture_;
     std::vector<GpuMesh> gpuMeshes_;
+    std::unordered_map<const assets::BtexTexture*,
+                       Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>>
+        sharedTextureViews_;
     std::size_t environmentMeshCount_{};
+    std::size_t levelObjectMeshStart_{};
+    std::size_t introActorMeshStart_{};
     std::size_t gameplayCinematicMeshStart_{};
     std::size_t enemyMeshStart_{};
     std::uint32_t hudVertexCount_{};

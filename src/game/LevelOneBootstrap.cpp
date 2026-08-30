@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <cstdlib>
 #include <iterator>
+#include <optional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -23,6 +25,14 @@ std::string normalizeArchivePath(std::string path) {
         path.erase(0, entityPrefix.size());
     }
     return path;
+}
+
+std::string asciiLower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char character) {
+                       return static_cast<char>(std::tolower(character));
+                   });
+    return value;
 }
 
 std::string_view userAttribute(const assets::IrrSceneNode& node,
@@ -107,15 +117,48 @@ const assets::IrrSceneNode* findLevelNode(
     return nullptr;
 }
 
+std::optional<LevelObjectKind> levelObjectKind(
+    std::string_view gameType) noexcept {
+    if (gameType == "DestroyableObject") {
+        return LevelObjectKind::Destroyable;
+    }
+    if (gameType == "Car") {
+        return LevelObjectKind::Car;
+    }
+    if (gameType == "DropObject") {
+        return LevelObjectKind::DropObject;
+    }
+    if (gameType == "SpiderWebWall") {
+        return LevelObjectKind::SpiderWebWall;
+    }
+    if (gameType == "StaticObject") {
+        return LevelObjectKind::StaticObject;
+    }
+    if (gameType == "Hostage") {
+        return LevelObjectKind::Hostage;
+    }
+    if (gameType == "StreamPiping") {
+        return LevelObjectKind::StreamPiping;
+    }
+    if (gameType == "SlideCar_bus") {
+        return LevelObjectKind::SlideCar;
+    }
+    return std::nullopt;
+}
+
 Result loadTextures(filesystem::GbmpArchive& primaryArchive,
                     filesystem::GbmpArchive* fallbackArchive,
                     const assets::ColladaMeshFile& mesh,
                     std::vector<assets::BtexTexture>& output,
-                    std::string_view assetName) {
+                    std::string_view assetName,
+                    filesystem::GbmpArchive* secondaryFallbackArchive =
+                        nullptr) {
     output.clear();
     output.reserve(mesh.images().size());
     std::vector<std::byte> resource;
-    for (const assets::ColladaImage& image : mesh.images()) {
+    for (std::size_t imageIndex = 0; imageIndex < mesh.images().size();
+         ++imageIndex) {
+        const assets::ColladaImage& image = mesh.images()[imageIndex];
         std::string source = image.sourcePath;
         std::replace(source.begin(), source.end(), '\\', '/');
         const std::string filename =
@@ -129,30 +172,59 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
             "textures/" + filename,
             source,
         };
-        const auto primaryCandidate = std::find_if(
-            candidates.begin(), candidates.end(),
-            [&primaryArchive](const std::string& path) {
-                return primaryArchive.find(path) != nullptr;
-            });
-        const auto fallbackCandidate =
-            fallbackArchive == nullptr
-                ? candidates.end()
-                : std::find_if(
-                      candidates.begin(), candidates.end(),
-                      [fallbackArchive](const std::string& path) {
-                          return fallbackArchive->find(path) != nullptr;
-                      });
-        if (primaryCandidate == candidates.end() &&
-            fallbackCandidate == candidates.end()) {
+        const std::string lowerFilename = asciiLower(filename);
+        filesystem::GbmpArchive* selectedArchive = nullptr;
+        std::string selectedPath;
+        const std::array archives{&primaryArchive, fallbackArchive,
+                                  secondaryFallbackArchive};
+        for (filesystem::GbmpArchive* archive : archives) {
+            if (archive == nullptr) {
+                continue;
+            }
+            const auto direct = std::find_if(
+                candidates.begin(), candidates.end(),
+                [archive](const std::string& path) {
+                    return archive->find(path) != nullptr;
+                });
+            if (direct != candidates.end()) {
+                selectedArchive = archive;
+                selectedPath = *direct;
+                break;
+            }
+            const auto byFilename = std::find_if(
+                archive->entries().begin(), archive->entries().end(),
+                [&lowerFilename](const filesystem::GbmpArchiveEntry& entry) {
+                    return asciiLower(std::filesystem::path(entry.path)
+                                          .filename()
+                                          .string()) == lowerFilename;
+                });
+            if (byFilename != archive->entries().end()) {
+                selectedArchive = archive;
+                selectedPath = byFilename->path;
+                break;
+            }
+        }
+        if (selectedArchive == nullptr) {
+            const bool referenced = std::any_of(
+                mesh.materials().begin(), mesh.materials().end(),
+                [imageIndex](const assets::ColladaMaterial& material) {
+                    return material.diffuseImageIndex == imageIndex ||
+                           material.secondaryImageIndex == imageIndex;
+                });
+            if (!referenced && !output.empty()) {
+                // Some shipped BDAE image libraries retain editor-only image
+                // names that no material references (vat.bdae includes
+                // levelnew_01_01.tga this way). Preserve image indexing with
+                // an unused valid view instead of rejecting the mesh.
+                output.push_back(output.front());
+                continue;
+            }
             output.clear();
             return Result::failure("Could not locate " +
                                    std::string(assetName) + " texture " +
                                    image.sourcePath);
         }
-        Result result = primaryCandidate != candidates.end()
-                            ? primaryArchive.read(*primaryCandidate, resource)
-                            : fallbackArchive->read(*fallbackCandidate,
-                                                    resource);
+        Result result = selectedArchive->read(selectedPath, resource);
         if (!result) {
             output.clear();
             return Result::failure("Could not load " +
@@ -259,6 +331,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     cinematics_.clear();
     enemyArchetypes_.clear();
     enemies_.clear();
+    objectArchetypes_.clear();
+    objects_.clear();
     hud_ = {};
     Result result = attackConfigs_.load(gameDataRoot);
     if (!result) {
@@ -480,6 +554,116 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                                    room.name + ": " + result.message());
         }
         rooms_.push_back(std::move(room));
+    }
+
+    // CRoom creates these concrete object classes from their authored
+    // !GameType values. Keep mesh/animation payloads deduplicated while
+    // preserving an independently addressable instance for every scene ID.
+    for (const LevelRoomAsset& room : rooms_) {
+        for (const assets::IrrSceneNode& node : room.scene.nodes()) {
+            const std::optional<LevelObjectKind> kind =
+                levelObjectKind(node.gameType);
+            if (!kind || node.meshFile.empty()) {
+                continue;
+            }
+            const std::string meshPath =
+                normalizeArchivePath(node.meshFile);
+            const std::string animationPath =
+                normalizeArchivePath(node.animationFile);
+            const auto existing = std::find_if(
+                objectArchetypes_.begin(), objectArchetypes_.end(),
+                [&meshPath, &animationPath](
+                    const LevelObjectArchetypeAsset& candidate) {
+                    return candidate.meshFile == meshPath &&
+                           candidate.animationFile == animationPath;
+                });
+            std::size_t archetypeIndex = 0;
+            if (existing == objectArchetypes_.end()) {
+                LevelObjectArchetypeAsset archetype;
+                archetype.meshFile = meshPath;
+                archetype.animationFile = animationPath;
+                filesystem::GbmpArchive* meshArchive =
+                    entityArchive.find(meshPath) != nullptr ? &entityArchive
+                                                            : &levelArchive;
+                if (meshArchive->find(meshPath) == nullptr) {
+                    return Result::failure("Could not locate level object mesh " +
+                                           node.meshFile);
+                }
+                result = meshArchive->read(meshPath, resource);
+                if (!result || !(result = archetype.mesh.load(resource))) {
+                    return Result::failure("Could not load level object " +
+                                           node.name + ": " +
+                                           result.message());
+                }
+                filesystem::GbmpArchive* textureFallback =
+                    meshArchive == &entityArchive ? &levelArchive
+                                                   : &entityArchive;
+                result = loadTextures(*meshArchive, textureFallback,
+                                      archetype.mesh, archetype.textures,
+                                      node.name, &spriteArchive);
+                if (!result) {
+                    return result;
+                }
+                if (!animationPath.empty()) {
+                    filesystem::GbmpArchive* animationArchive =
+                        entityArchive.find(animationPath) != nullptr
+                            ? &entityArchive
+                            : &levelArchive;
+                    if (animationArchive->find(animationPath) == nullptr) {
+                        return Result::failure(
+                            "Could not locate level object animation " +
+                            node.animationFile);
+                    }
+                    result = animationArchive->read(animationPath, resource);
+                    if (!result ||
+                        !(result = archetype.animationBank.load(resource))) {
+                        return Result::failure(
+                            "Could not load animation for level object " +
+                            node.name + ": " + result.message());
+                    }
+                }
+                objectArchetypes_.push_back(std::move(archetype));
+                archetypeIndex = objectArchetypes_.size() - 1;
+            } else {
+                archetypeIndex = static_cast<std::size_t>(
+                    std::distance(objectArchetypes_.begin(), existing));
+            }
+
+            LevelObjectAsset object;
+            object.objectId = node.id;
+            object.name = node.name;
+            object.gameType = node.gameType;
+            object.kind = *kind;
+            object.initialAnimation =
+                animationPath.empty() ? std::string{} : node.initialAnimation;
+            object.archetypeIndex = archetypeIndex;
+            object.position = worldPosition(node);
+            object.rotation = node.rotation;
+            object.scale = node.scale;
+            object.worldTransform = node.absoluteTransform;
+            object.visible = node.visible;
+            object.hasCollision = node.hasCollision;
+            if (!animationPath.empty() && !object.initialAnimation.empty()) {
+                const auto& animationBank =
+                    objectArchetypes_[archetypeIndex].animationBank;
+                if (animationBank.findClip(object.initialAnimation) == nullptr) {
+                    std::int32_t clipIndex = -1;
+                    if (parseIntegerText(object.initialAnimation, clipIndex) &&
+                        clipIndex >= 0 &&
+                        static_cast<std::size_t>(clipIndex) <
+                            animationBank.clips().size()) {
+                        object.initialAnimation =
+                            animationBank.clips()[clipIndex].name;
+                    } else {
+                        // CAnimatedObject::ProcessUserAttr (0x002fd560)
+                        // silently keeps the bind pose when @Anim cannot be
+                        // resolved by name.
+                        object.initialAnimation.clear();
+                    }
+                }
+            }
+            objects_.push_back(std::move(object));
+        }
     }
 
     const auto appendCameraAreas = [this](const assets::IrrScene& scene)

@@ -748,6 +748,8 @@ Result D3D11Renderer::uploadPreviewGeometry(
     const assets::ColladaGeometry& geometry,
     std::span<const assets::RgbaImage> mipLevels) {
     gpuMeshes_.clear();
+    sharedTextureViews_.clear();
+    whiteTexture_.Reset();
     environmentMeshCount_ = 0;
     return uploadGeometrySet({&geometry, 1}, nullptr, {}, mipLevels);
 }
@@ -760,6 +762,8 @@ Result D3D11Renderer::uploadSceneGeometry(
             "Scene texture count does not match the BDAE image library");
     }
     gpuMeshes_.clear();
+    sharedTextureViews_.clear();
+    whiteTexture_.Reset();
     environmentMeshCount_ = 0;
     return uploadGeometrySet(mesh.sceneGeometries(), &mesh, textures, {});
 }
@@ -767,6 +771,8 @@ Result D3D11Renderer::uploadSceneGeometry(
 Result D3D11Renderer::uploadLevelOneScene(
     const game::LevelOneBootstrap& levelOne) {
     gpuMeshes_.clear();
+    sharedTextureViews_.clear();
+    whiteTexture_.Reset();
     environmentMeshCount_ = 0;
     Result result = Result::success();
     for (const game::LevelRoomAsset& room : levelOne.rooms()) {
@@ -788,6 +794,49 @@ Result D3D11Renderer::uploadLevelOneScene(
     }
     gpuMeshes_.back().cameraRelative = sky.cameraRelative;
     environmentMeshCount_ = gpuMeshes_.size();
+    levelObjectMeshStart_ = gpuMeshes_.size();
+    for (const game::LevelObjectAsset& object : levelOne.objects()) {
+        if (object.archetypeIndex >= levelOne.objectArchetypes().size()) {
+            gpuMeshes_.clear();
+            return Result::failure("Level object archetype index is invalid");
+        }
+        const game::LevelObjectArchetypeAsset& archetype =
+            levelOne.objectArchetypes()[object.archetypeIndex];
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        std::span<const assets::ColladaGeometry> geometry =
+            archetype.mesh.sceneGeometries();
+        if (!object.initialAnimation.empty()) {
+            const assets::ColladaAnimationClip* clip =
+                archetype.animationBank.findClip(object.initialAnimation);
+            if (clip == nullptr) {
+                gpuMeshes_.clear();
+                return Result::failure(
+                    "Level object " + std::to_string(object.objectId) +
+                    " initial animation " + object.initialAnimation +
+                    " is missing");
+            }
+            result = assets::evaluateColladaPose(
+                archetype.mesh, archetype.animationBank,
+                clip->startMilliseconds, animatedGeometry);
+            if (!result) {
+                gpuMeshes_.clear();
+                return Result::failure("Could not evaluate level object " +
+                                       object.name + ": " +
+                                       result.message());
+            }
+            geometry = animatedGeometry;
+        }
+        result = uploadGeometrySet(geometry, &archetype.mesh,
+                                   archetype.textures, {},
+                                   &object.worldTransform, true, true);
+        if (!result) {
+            gpuMeshes_.clear();
+            return Result::failure("Could not upload level object " +
+                                   object.name + ": " + result.message());
+        }
+        gpuMeshes_.back().visible = object.visible;
+    }
+    introActorMeshStart_ = gpuMeshes_.size();
     for (const game::CinematicActorAsset& actor : levelOne.introActors()) {
         if (actor.mesh.images().size() != actor.textures.size()) {
             gpuMeshes_.clear();
@@ -895,6 +944,7 @@ Result D3D11Renderer::updateLevelOneActors(
     if (gpuMeshes_.size() != levelOne.introActors().size() +
                                  gameplayCinematicActorCount +
                                  levelOne.enemies().size() +
+                                 levelOne.objects().size() +
                                  environmentMeshCount_) {
         return Result::failure("Level-one actor GPU resources are incomplete");
     }
@@ -902,7 +952,7 @@ Result D3D11Renderer::updateLevelOneActors(
          actorIndex < levelOne.introActors().size(); ++actorIndex) {
         const game::CinematicActorAsset& actor =
             levelOne.introActors()[actorIndex];
-        GpuMesh& gpuMesh = gpuMeshes_[actorIndex + environmentMeshCount_];
+        GpuMesh& gpuMesh = gpuMeshes_[actorIndex + introActorMeshStart_];
         if (!gpuMesh.dynamicVertices) {
             return Result::failure("Actor vertex buffer is not dynamic");
         }
@@ -977,7 +1027,7 @@ Result D3D11Renderer::updateGameplayCinematicActors(
         }
         const std::size_t playerIndex = static_cast<std::size_t>(
             playerActor - levelOne.introActors().begin());
-        gpuMeshes_[environmentMeshCount_ + playerIndex].visible = false;
+        gpuMeshes_[introActorMeshStart_ + playerIndex].visible = false;
     }
 
     for (std::size_t enemyIndex = 0;
@@ -1076,6 +1126,63 @@ Result D3D11Renderer::updateLevelOneEnemies(
     return Result::success();
 }
 
+Result D3D11Renderer::updateLevelOneObjects(
+    const game::LevelOneBootstrap& levelOne,
+    const game::LevelObjectRuntime& objects) {
+    if (objects.states().size() != levelOne.objects().size() ||
+        levelObjectMeshStart_ + objects.states().size() > gpuMeshes_.size() ||
+        levelObjectMeshStart_ + objects.states().size() !=
+            introActorMeshStart_) {
+        return Result::failure("Level object GPU resources are incomplete");
+    }
+    for (std::size_t index = 0; index < objects.states().size(); ++index) {
+        const game::LevelObjectState& object = objects.states()[index];
+        if (object.asset == nullptr ||
+            object.asset->archetypeIndex >= levelOne.objectArchetypes().size()) {
+            return Result::failure("Level object runtime archetype is invalid");
+        }
+        const game::LevelObjectArchetypeAsset& archetype =
+            levelOne.objectArchetypes()[object.asset->archetypeIndex];
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        std::span<const assets::ColladaGeometry> geometry =
+            archetype.mesh.sceneGeometries();
+        if (!object.activeAnimation.empty()) {
+            const assets::ColladaAnimationClip* clip =
+                archetype.animationBank.findClip(object.activeAnimation);
+            if (clip == nullptr) {
+                return Result::failure("Level object animation is missing");
+            }
+            const std::uint32_t localTime =
+                clip->durationMilliseconds() == 0
+                    ? 0
+                    : object.animationLoops
+                          ? object.animationTimeMilliseconds %
+                                clip->durationMilliseconds()
+                          : std::min(object.animationTimeMilliseconds,
+                                     clip->durationMilliseconds());
+            Result result = assets::evaluateColladaPose(
+                archetype.mesh, archetype.animationBank,
+                clip->startMilliseconds + localTime, animatedGeometry);
+            if (!result) {
+                return Result::failure("Could not animate level object " +
+                                       object.asset->name + ": " +
+                                       result.message());
+            }
+            geometry = animatedGeometry;
+        }
+        GpuMesh& gpuMesh = gpuMeshes_[levelObjectMeshStart_ + index];
+        gpuMesh.visible = object.visible;
+        Result result =
+            updateDynamicMesh(gpuMesh, geometry, &object.worldTransform);
+        if (!result) {
+            return Result::failure("Could not update level object " +
+                                   object.asset->name + ": " +
+                                   result.message());
+        }
+    }
+    return Result::success();
+}
+
 Result D3D11Renderer::updateLevelOnePlayer(
     const game::LevelOneBootstrap& levelOne,
     const assets::ColladaAnimationClip& clip,
@@ -1091,7 +1198,7 @@ Result D3D11Renderer::updateLevelOnePlayer(
     }
     const std::size_t actorIndex = static_cast<std::size_t>(
         playerActor - levelOne.introActors().begin());
-    if (actorIndex + environmentMeshCount_ >= gpuMeshes_.size()) {
+    if (actorIndex + introActorMeshStart_ >= gpuMeshes_.size()) {
         return Result::failure("Player GPU resources are incomplete");
     }
 
@@ -1107,7 +1214,7 @@ Result D3D11Renderer::updateLevelOnePlayer(
         return Result::failure("Could not evaluate player clip " + clip.name +
                                ": " + result.message());
     }
-    GpuMesh& gpuMesh = gpuMeshes_[actorIndex + environmentMeshCount_];
+    GpuMesh& gpuMesh = gpuMeshes_[actorIndex + introActorMeshStart_];
     gpuMesh.visible = true;
     result = updateDynamicMesh(gpuMesh, animatedGeometry, &worldTransform);
     return !result ? Result::failure("Could not update player clip " +
@@ -1662,7 +1769,8 @@ Result D3D11Renderer::uploadGeometrySet(
     const assets::ColladaMeshFile* materialLibrary,
     std::span<const assets::BtexTexture> textures,
     std::span<const assets::RgbaImage> previewTexture,
-    const std::array<float, 16>* transform, bool dynamicVertices) {
+    const std::array<float, 16>* transform, bool dynamicVertices,
+    bool omitUntexturedMaterials) {
     if (!device_ || geometries.empty()) {
         return Result::failure("Geometry set is empty or D3D11 is uninitialized");
     }
@@ -1761,6 +1869,10 @@ Result D3D11Renderer::uploadGeometrySet(
                 } else {
                     batch.textureIndex = static_cast<std::uint32_t>(textures.size());
                 }
+                if (omitUntexturedMaterials &&
+                    (material == nullptr || !material->diffuseImageIndex)) {
+                    batch.indexCount = 0;
+                }
                 if (material != nullptr) {
                     batch.alphaTest = material->id.starts_with("alphatest") ||
                                       material->name.starts_with("alphatest");
@@ -1809,23 +1921,30 @@ Result D3D11Renderer::uploadGeometrySet(
     } else {
         gpuMesh.textures.reserve(textures.size() + 1);
         for (const assets::BtexTexture& texture : textures) {
+            const auto cached = sharedTextureViews_.find(&texture);
+            if (cached != sharedTextureViews_.end()) {
+                gpuMesh.textures.push_back(cached->second);
+                continue;
+            }
             ComPtr<ID3D11ShaderResourceView> view;
             Result textureResult = createTextureView(texture.mipLevels(), view);
             if (!textureResult) {
                 return textureResult;
             }
+            sharedTextureViews_.emplace(&texture, view);
             gpuMesh.textures.push_back(std::move(view));
         }
-        assets::RgbaImage white;
-        white.width = 1;
-        white.height = 1;
-        white.pixels = {255, 255, 255, 255};
-        ComPtr<ID3D11ShaderResourceView> view;
-        Result textureResult = createTextureView({&white, 1}, view);
-        if (!textureResult) {
-            return textureResult;
+        if (!whiteTexture_) {
+            assets::RgbaImage white;
+            white.width = 1;
+            white.height = 1;
+            white.pixels = {255, 255, 255, 255};
+            Result textureResult = createTextureView({&white, 1}, whiteTexture_);
+            if (!textureResult) {
+                return textureResult;
+            }
         }
-        gpuMesh.textures.push_back(std::move(view));
+        gpuMesh.textures.push_back(whiteTexture_);
     }
 
     assets::AxisAlignedBounds bounds = geometries.front().bounds;

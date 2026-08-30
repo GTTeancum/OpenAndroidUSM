@@ -194,6 +194,30 @@ authored player-hurt variants on entry. `PlayerStateSoundBank` predecodes the
 seven required clips, rotates variants deterministically, and dispatches them
 to XAudio2 from the native gameplay state rather than filename heuristics.
 
+## Authored room objects
+
+`LevelOneBootstrap` now materializes 106 mesh-bearing room instances rather
+than treating room geometry as the entire visible world. The set includes all
+77 `CDestroyableObject` props plus authored cars, drop objects, web walls,
+hostages, static objects, stream pipes, and the opening slide bus. Mesh,
+texture, and animation payloads are deduplicated into named archetypes while
+each scene instance retains its original object ID and absolute transform.
+
+`LevelObjectRuntime` is the renderer-independent state counterpart for
+`CAnimatedObject`, `CDestroyableObject`, `CStaticObject`, and
+`CDestroyableStreamPiping`. Cinematic `SetVisible`, `SetAnim`, `MoveObject`,
+`Physics`, and `ShowStream` commands now address those instances directly.
+This includes the three end-cinematic pipe hides and the animated web-wall
+open/close sequence. `Physics` currently records the exact handoff performed
+by `CDestroyableObject::SetPhysics` (`0x003061cc`); rigid-body integration is a
+separate gameplay slice.
+
+The D3D11 backend uploads a dynamic mesh per instance but shares immutable
+texture views by archetype, avoiding the original per-instance memory
+explosion. Editor-only, unreferenced image slots remain index-stable and
+untextured helper/shadow batches are omitted. A WARP capture verifies the
+textured street furniture and props without white fallback geometry.
+
 ## Collada mesh layout
 
 The BRES root points to `SCollada`; its geometry library contains named

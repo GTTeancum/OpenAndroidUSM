@@ -20,6 +20,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelObjectRuntime.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
@@ -691,6 +692,45 @@ int main() {
         assert(bootstrap.player().textures.size() == 2);
         assert(bootstrap.player().animationBank.tracks().size() == 46);
         assert(bootstrap.player().animationBank.clips().size() == 242);
+        assert(bootstrap.objects().size() == 106);
+        assert(!bootstrap.objectArchetypes().empty());
+        usm::game::LevelObjectRuntime objectRuntime;
+        assert(objectRuntime.initialize(bootstrap));
+        assert(objectRuntime.states().size() == bootstrap.objects().size());
+        assert(objectRuntime.find(20032) != nullptr);
+        assert(objectRuntime.find(1151) != nullptr);
+        usm::game::CinematicThread objectThread;
+        objectThread.objectId = 20032;
+        usm::game::CinematicCommand moveLevelObject;
+        moveLevelObject.name = "MoveObject";
+        moveLevelObject.attributes.push_back(
+            {"vector3d", "abspos", "100.0, 200.0, 300.0"});
+        assert(objectRuntime.applyCinematicCommand(
+            bootstrap, objectThread, moveLevelObject));
+        assert(objectRuntime.find(20032)->position.x == 100.0F);
+        assert(objectRuntime.find(20032)->worldTransform[14] == 300.0F);
+        assert(objectRuntime.applyCinematicCommand(
+            bootstrap, objectThread,
+            usm::game::CinematicCommand{0, -1, "Physics", {}}));
+        assert(objectRuntime.find(20032)->physicsEnabled);
+        usm::game::CinematicCommand hideStream;
+        hideStream.name = "ShowStream";
+        hideStream.attributes.push_back(
+            {"int", "ID^StreamPiping", "1202"});
+        hideStream.attributes.push_back({"bool", "Visible", "false"});
+        assert(objectRuntime.applyCinematicCommand(
+            bootstrap, {}, hideStream));
+        assert(!objectRuntime.find(1202)->visible);
+        usm::game::CinematicThread webWallThread;
+        webWallThread.objectId = 1151;
+        usm::game::CinematicCommand openWebWall;
+        openWebWall.name = "SetAnim";
+        openWebWall.attributes.push_back({"string", "$Anim", "open"});
+        openWebWall.attributes.push_back({"bool", "loop", "false"});
+        assert(objectRuntime.applyCinematicCommand(
+            bootstrap, webWallThread, openWebWall));
+        assert(objectRuntime.find(1151)->activeAnimation == "open");
+        assert(!objectRuntime.find(1151)->animationLoops);
         const auto& swingThrowLeft =
             bootstrap.player().animationBank.clips()[98];
         const auto& swingThrowRight =
