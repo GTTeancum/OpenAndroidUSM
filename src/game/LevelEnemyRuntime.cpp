@@ -112,6 +112,16 @@ assets::Vector3 facingFromMatrix(
     return {-matrix[4] / length, -matrix[5] / length, 0.0F};
 }
 
+std::string_view idleAnimation(const LevelEnemyAsset& enemy) noexcept {
+    if (enemy.gameType == "MeleeThugEnemy_knife") {
+        return "idle_knife_at_idle";
+    }
+    if (enemy.gameType == "RangeThug_big") {
+        return "idlebaz";
+    }
+    return "idle_at1_idle";
+}
+
 void setFacing(LevelEnemyState& enemy, const assets::Vector3& facing) noexcept {
     if (enemy.asset == nullptr) {
         return;
@@ -222,10 +232,7 @@ void LevelEnemyRuntime::updateGameplay(
                 continue;
             }
             enemy.behavior = EnemyBehaviorState::Idle;
-            enemy.activeAnimation =
-                enemy.asset->gameType == "MeleeThugEnemy_knife"
-                    ? "idle_knife_at_idle"
-                    : "idle_at1_idle";
+            enemy.activeAnimation = std::string(idleAnimation(*enemy.asset));
             enemy.animationTimeMilliseconds = 0;
             enemy.animationLoops = true;
         }
@@ -253,18 +260,15 @@ void LevelEnemyRuntime::updateGameplay(
             distanceSquared <= attackRange * attackRange) {
             const EnemyBehaviorState previousBehavior = enemy.behavior;
             enemy.behavior = EnemyBehaviorState::AttackRange;
-            const std::string_view idleAnimation =
-                enemy.asset->gameType == "MeleeThugEnemy_knife"
-                    ? "idle_knife_at_idle"
-                    : "idle_at1_idle";
+            const std::string_view idle = idleAnimation(*enemy.asset);
             const float distance = std::sqrt(distanceSquared);
             if (distance > std::numeric_limits<float>::epsilon()) {
                 setFacing(enemy, {toPlayerX / distance, toPlayerY / distance,
                                   0.0F});
             }
-            if (enemy.activeAnimation != idleAnimation ||
+            if (enemy.activeAnimation != idle ||
                 previousBehavior != EnemyBehaviorState::AttackRange) {
-                enemy.activeAnimation = idleAnimation;
+                enemy.activeAnimation = idle;
                 enemy.animationTimeMilliseconds = 0;
                 enemy.animationLoops = true;
             }

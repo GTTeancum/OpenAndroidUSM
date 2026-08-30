@@ -78,8 +78,8 @@ Spider-Man's serialized level-one start position.
 
 `GameplayPlayer` implements renderer-independent ground movement, collision,
 camera-relative controller input, named punch clips, authored impact timing,
-and health. `LevelEnemyRuntime` owns the mutable state of all 28 level-one
-thugs. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
+and health. `LevelEnemyRuntime` owns the mutable state of all 29 level-one
+enemies. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
 `MoveObject` commands feed that state directly; enabled enemies acquire the
 player using their scene-authored awareness radius and chase at the authored
 line speed.
@@ -142,8 +142,9 @@ resolves to Vox ID 178, `SFX_THUG_SWOOSH`. The native runtime queues these
 key-frame cues even when an attack misses, rotates hurt variants
 deterministically, and emits the corresponding death cue. Hurt and death
 animations are one-shot states; D3D11 clamps them at the final authored pose
-instead of wrapping. `EnemyBehaviorSoundBank` predecodes the nine level-one
-thug sounds before gameplay. WARP captures cover a mid-hurt pose and the
+instead of wrapping. `EnemyBehaviorSoundBank` predecodes all fourteen sounds
+used by level-one enemy types 0, 1, and 4 before gameplay. WARP captures
+cover a mid-hurt pose and the
 final prone death pose.
 
 Player combat audio is likewise state-driven. `PlayerStateConfigDatabase`
@@ -255,7 +256,9 @@ scene's link table names all thirteen playable room scenes. The native level
 bootstrap follows that table instead of a hard-coded intro subset and loads
 all thirteen geometry, collision, navigation, scene, and texture sets as
 separate D3D11 resources. The linked scenes contribute 27 triggers, 28 melee
-enemies, and 43 cinematic objects. Forty-two cinematic scripts are present;
+enemies, the Room 9 `RangeThug_big`, and 43 cinematic objects. The ranged
+thug retains enemy type 4, its 800 health, `idlebaz` idle, and authored
+`idle_death_on__ground_back` terminal pose. Forty-two cinematic scripts are present;
 Room 13's unreferenced editor object 1239 names a CFF absent from the shipped
 archive, so it is retained as explicitly unavailable and never dispatched.
 Room-owned trigger, enemy, and camera-control positions use their serialized

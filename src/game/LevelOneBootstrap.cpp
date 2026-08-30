@@ -648,7 +648,10 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                 cinematics_.push_back(std::move(cinematic));
                 continue;
             }
-            if (!node.gameType.starts_with("MeleeThugEnemy_")) {
+            const bool meleeThug =
+                node.gameType.starts_with("MeleeThugEnemy_");
+            const bool bigRangeThug = node.gameType == "RangeThug_big";
+            if (!meleeThug && !bigRangeThug) {
                 continue;
             }
 
@@ -705,14 +708,19 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             enemy.objectId = node.id;
             enemy.name = node.name;
             enemy.gameType = node.gameType;
-            enemy.enemyTypeId =
-                node.gameType == "MeleeThugEnemy_knife" ? 0 : 1;
+            enemy.enemyTypeId = bigRangeThug
+                                    ? 4
+                                    : node.gameType == "MeleeThugEnemy_knife"
+                                          ? 0
+                                          : 1;
             enemy.initialAnimation = node.initialAnimation;
             if (enemy.initialAnimation.empty()) {
-                enemy.initialAnimation =
-                    node.gameType == "MeleeThugEnemy_knife"
-                        ? "idle_knife_at_idle"
-                        : "idle_at1_idle";
+                enemy.initialAnimation = bigRangeThug
+                                             ? "idlebaz"
+                                             : node.gameType ==
+                                                       "MeleeThugEnemy_knife"
+                                                   ? "idle_knife_at_idle"
+                                                   : "idle_at1_idle";
             }
             enemy.archetypeIndex = archetypeIndex;
             enemy.position = worldPosition(node);

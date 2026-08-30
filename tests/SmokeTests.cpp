@@ -845,12 +845,12 @@ int main() {
         assert(batAttackEvents.front()->keyFramePercent == 47);
         assert(batAttackEvents.front()->attackId == 7);
         usm::audio::EnemyBehaviorSoundBank enemySounds;
-        constexpr std::array<std::int16_t, 2> firstLevelEnemyTypes{0, 1};
+        constexpr std::array<std::int16_t, 3> firstLevelEnemyTypes{0, 1, 4};
         assert(enemySounds.preload(behaviorConfigs,
                                    bootstrap.enemySpecialActions(),
                                    voxSounds, soundCatalog,
                                    firstLevelEnemyTypes));
-        assert(enemySounds.decodedSoundCount() == 9);
+        assert(enemySounds.decodedSoundCount() == 14);
         std::size_t enemySoundPlayCount = 0;
         assert(enemySounds.dispatch(
             185, [&enemySoundPlayCount](const usm::audio::PcmAudio& clip,
@@ -950,9 +950,9 @@ int main() {
         assert(enemyGatePlayer.finished());
         usm::game::LevelEnemyRuntime enemyRuntime;
         assert(enemyRuntime.initialize(bootstrap));
-        constexpr std::array<std::int32_t, 11> conditionEnemyIds{
+        constexpr std::array<std::int32_t, 12> conditionEnemyIds{
             394, 395, 397, 398, 399, 401,
-            488, 489, 505, 506, 1251,
+            488, 489, 505, 506, 1251, 30000,
         };
         for (const std::int32_t enemyId : conditionEnemyIds) {
             assert(enemyRuntime.find(enemyId) != nullptr);
@@ -960,12 +960,14 @@ int main() {
         usm::game::LevelEnemyRuntime killedEnemyRuntime;
         assert(killedEnemyRuntime.initialize(bootstrap));
         usm::game::CinematicThread killEnemyThread;
-        killEnemyThread.objectId = 400;
+        killEnemyThread.objectId = 30000;
         assert(killedEnemyRuntime.applyCinematicCommand(
             bootstrap, killEnemyThread,
             usm::game::CinematicCommand{0, -1, "KillObject", {}}));
-        assert(killedEnemyRuntime.find(400)->health == 0.0F);
-        assert(killedEnemyRuntime.find(400)->behavior ==
+        assert(killedEnemyRuntime.find(30000)->health == 0.0F);
+        assert(killedEnemyRuntime.find(30000)->activeAnimation ==
+               "idle_death_on__ground_back");
+        assert(killedEnemyRuntime.find(30000)->behavior ==
                usm::game::EnemyBehaviorState::Dead);
         usm::game::CinematicPlayer encounterPlayer;
         assert(encounterPlayer.start(firstEncounterCinematic->script));
@@ -1018,8 +1020,8 @@ int main() {
         assert(enemyRuntime.find(394)->aiEnabled);
         assert(enemyRuntime.find(395)->aiEnabled);
         assert(enemyRuntime.find(397)->aiEnabled);
-        assert(bootstrap.enemyArchetypes().size() == 2);
-        assert(bootstrap.enemies().size() == 28);
+        assert(bootstrap.enemyArchetypes().size() == 3);
+        assert(bootstrap.enemies().size() == 29);
         const auto firstKnifeEnemy = std::find_if(
             bootstrap.enemies().begin(), bootstrap.enemies().end(),
             [](const usm::game::LevelEnemyAsset& enemy) {
@@ -1034,6 +1036,19 @@ int main() {
         assert(bootstrap.enemyArchetypes()[firstKnifeEnemy->archetypeIndex]
                    .animationFile ==
                "../entities/meshes_bin/thug_bat_anim.bdae");
+        const auto bigRangeEnemy = std::find_if(
+            bootstrap.enemies().begin(), bootstrap.enemies().end(),
+            [](const usm::game::LevelEnemyAsset& enemy) {
+                return enemy.objectId == 30000;
+            });
+        assert(bigRangeEnemy != bootstrap.enemies().end());
+        assert(bigRangeEnemy->gameType == "RangeThug_big");
+        assert(bigRangeEnemy->enemyTypeId == 4);
+        assert(bigRangeEnemy->health == 800.0F);
+        assert(bigRangeEnemy->initialAnimation == "idlebaz");
+        assert(bootstrap.enemyArchetypes()[bigRangeEnemy->archetypeIndex]
+                   .animationBank.findClip("idle_death_on__ground_back") !=
+               nullptr);
         usm::game::LevelEnemyRuntime chaseRuntime;
         assert(chaseRuntime.initialize(bootstrap));
         const auto* chasingKnife = chaseRuntime.find(394);
