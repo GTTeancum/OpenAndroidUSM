@@ -235,6 +235,8 @@ int Application::run(HINSTANCE instance) {
             return audio_.play(clip, loop);
         };
     float scaledDeltaRemainderMilliseconds = 0.0F;
+    bool gameOverCinematicRequested = false;
+    bool exitAfterPresent = false;
     while (window_.pumpMessages()) {
         const auto frameTime = std::chrono::steady_clock::now();
         const auto frameElapsed =
@@ -281,6 +283,10 @@ int Application::run(HINSTANCE instance) {
                 if (!uiResult) {
                     return;
                 }
+                uiResult = levelCinematicRuntime_.applyCommand(command);
+                if (!uiResult) {
+                    return;
+                }
                 uiResult = cinematicUi_.applyCommand(command);
                 soundResult = introSounds_.dispatch(
                     command,
@@ -304,10 +310,25 @@ int Application::run(HINSTANCE instance) {
             return fail(result.message());
         }
         if (elapsed.count() < introDuration) {
+            renderer_.setCameraAreaRoomVisibility(
+                gameplayCamera_.mustInvisibleRooms(),
+                gameplayCamera_.mustVisibleRooms());
+            renderer_.setCinematicVisibleRooms(
+                levelCinematicRuntime_.forcedVisibleRooms());
             result = renderer_.setCamera(
                 levelCinematicRuntime_.applyCameraShake(
                     levelOne_.introCamera().sample(timestamp)));
         } else {
+            if (gameplayPlayer_.dead() &&
+                activeGameplayCinematic_ == nullptr &&
+                !gameOverCinematicRequested) {
+                result = startGameplayCinematic(
+                    levelOne_.player().endGameCinematicId);
+                if (!result) {
+                    return fail(result.message());
+                }
+                gameOverCinematicRequested = true;
+            }
             const auto stick = controller_.leftStick();
             game::PlayerMotionInput motion{stick.x, stick.y};
             if (motion.right == 0.0F && motion.forward == 0.0F) {
@@ -474,19 +495,32 @@ int Application::run(HINSTANCE instance) {
                         gameplayCinematicDurationMilliseconds_) {
                     const game::LevelCinematicAsset* completedCinematic =
                         activeGameplayCinematic_;
-                    activeGameplayCinematic_ = nullptr;
                     auto chainedCinematics = levelCinematicRuntime_
                                                  .consumeCinematicStartRequests();
-                    if (chainedCinematics.empty() &&
+                    const bool terminalCinematic =
+                        completedCinematic->levelEndAfterPlayback ||
+                        completedCinematic->gameEndAfterPlayback ||
+                        levelCinematicRuntime_.levelEnded() ||
+                        levelCinematicRuntime_.gameEnded();
+                    if (terminalCinematic) {
+                        // Preserve the terminal Collada pose through the last
+                        // present. CLevel::End/GameEnd then leave the original
+                        // level state; this first-level port exits cleanly.
+                        exitAfterPresent = true;
+                    } else {
+                        activeGameplayCinematic_ = nullptr;
+                    }
+                    if (!terminalCinematic && chainedCinematics.empty() &&
                         completedCinematic->nextCinematicId >= 0) {
                         chainedCinematics.push_back(
                             completedCinematic->nextCinematicId);
                     }
-                    if (chainedCinematics.size() > 1) {
+                    if (!terminalCinematic && chainedCinematics.size() > 1) {
                         result = Result::failure(
                             "Concurrent gameplay cinematics are not yet "
                             "reconstructed");
-                    } else if (!chainedCinematics.empty()) {
+                    } else if (!terminalCinematic &&
+                               !chainedCinematics.empty()) {
                         result = startGameplayCinematic(
                             chainedCinematics.front());
                     }
@@ -575,6 +609,11 @@ int Application::run(HINSTANCE instance) {
                     cameraPose =
                         gameplayCamera_.sample(gameplayPlayer_.position());
                 }
+                renderer_.setCameraAreaRoomVisibility(
+                    gameplayCamera_.mustInvisibleRooms(),
+                    gameplayCamera_.mustVisibleRooms());
+                renderer_.setCinematicVisibleRooms(
+                    levelCinematicRuntime_.forcedVisibleRooms());
                 result = renderer_.setCamera(
                     levelCinematicRuntime_.applyCameraShake(cameraPose));
             }
@@ -618,6 +657,9 @@ int Application::run(HINSTANCE instance) {
             return fail(result.message());
         }
         renderer_.renderFrame();
+        if (exitAfterPresent) {
+            break;
+        }
     }
     return EXIT_SUCCESS;
 }

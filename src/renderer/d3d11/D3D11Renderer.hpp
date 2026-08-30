@@ -71,6 +71,10 @@ public:
                                              shownHealthBarEnemy = nullptr);
     [[nodiscard]] Result updateCinematicUi(
         const game::CinematicUiFrame& frame);
+    void setCinematicVisibleRooms(std::span<const bool> rooms) noexcept;
+    void setCameraAreaRoomVisibility(
+        std::span<const bool> invisibleRooms,
+        std::span<const bool> visibleRooms) noexcept;
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -98,8 +102,11 @@ private:
         std::vector<DrawBatch> drawBatches;
         std::uint32_t vertexCount{};
         bool dynamicVertices{};
+        bool baseVisible{true};
         bool visible{true};
         bool cameraRelative{};
+        std::int32_t roomId{-1};
+        assets::AxisAlignedBounds bounds;
     };
 
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
@@ -129,6 +136,8 @@ private:
         const std::array<float, 16>* worldTransform);
     [[nodiscard]] Result uploadHudTexture(const game::LevelHudAsset& hud);
     void bindRenderTarget(std::uint32_t width, std::uint32_t height);
+    void setMeshVisible(GpuMesh& mesh, bool visible) noexcept;
+    void updateRoomVisibility(const DirectX::XMMATRIX& viewProjection) noexcept;
 
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context_;
@@ -170,6 +179,7 @@ private:
                        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>>
         sharedTextureViews_;
     std::size_t environmentMeshCount_{};
+    std::size_t roomMeshCount_{};
     std::size_t levelObjectMeshStart_{};
     std::size_t introActorMeshStart_{};
     std::size_t gameplayCinematicMeshStart_{};
@@ -190,6 +200,10 @@ private:
     DirectX::XMFLOAT4X4 viewRotation_{};
     assets::Vector3 cameraRight_{1.0F, 0.0F, 0.0F};
     assets::Vector3 cameraUp_{0.0F, 0.0F, 1.0F};
+    std::array<bool, 16> forcedVisibleRooms_{};
+    std::array<bool, 16> cameraAreaInvisibleRooms_{};
+    std::array<bool, 16> cameraAreaVisibleRooms_{};
+    std::array<bool, 16> roomVisibility_{};
     std::uint32_t width_{};
     std::uint32_t height_{};
 };

@@ -55,6 +55,35 @@ bool parseFloat(const CinematicCommand& command, std::string_view name,
            std::isfinite(output);
 }
 
+bool parseRoomList(std::string_view text,
+                   std::array<bool, 16>& output) noexcept {
+    output.fill(false);
+    while (!text.empty()) {
+        const std::size_t comma = text.find(',');
+        std::string_view item = text.substr(0, comma);
+        const std::size_t first = item.find_first_not_of(" \t\r\n");
+        if (first == std::string_view::npos) {
+            return false;
+        }
+        const std::size_t last = item.find_last_not_of(" \t\r\n");
+        item = item.substr(first, last - first + 1);
+        std::int32_t roomId = 0;
+        const auto parsed = std::from_chars(item.data(),
+                                            item.data() + item.size(), roomId);
+        if (parsed.ec != std::errc{} ||
+            parsed.ptr != item.data() + item.size() || roomId < 1 ||
+            roomId > static_cast<std::int32_t>(output.size())) {
+            return false;
+        }
+        output[static_cast<std::size_t>(roomId - 1)] = true;
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        text.remove_prefix(comma + 1);
+    }
+    return true;
+}
+
 } // namespace
 
 void LevelCinematicRuntime::bind(LevelTriggerRuntime& triggers,
@@ -80,6 +109,7 @@ void LevelCinematicRuntime::bind(LevelTriggerRuntime& triggers,
     cameraShakeSign_ = 1;
     cameraShakeTickRemainderMilliseconds_ = 0;
     cameraShakeOffset_ = {};
+    forcedVisibleRooms_.fill(false);
     levelEnded_ = false;
     goToNextLevel_ = false;
     gameEnded_ = false;
@@ -111,6 +141,27 @@ Result LevelCinematicRuntime::applyCommand(const CinematicCommand& command) {
         }
         controlsEnabled_ = controlsEnabled;
         blackOverlayEnabled_ = blackOverlayEnabled;
+        return Result::success();
+    }
+    if (command.name == "MustBeVisibleRoom") {
+        bool set = false;
+        if (!parseBoolean(command, "Set", set)) {
+            return Result::failure(
+                "MustBeVisibleRoom has no valid Set flag");
+        }
+        if (!set) {
+            forcedVisibleRooms_.fill(false);
+            return Result::success();
+        }
+        const CinematicAttribute* roomList =
+            attribute(command, "MustBeVisible");
+        std::array<bool, 16> parsedRooms{};
+        if (roomList == nullptr || roomList->value.empty() ||
+            !parseRoomList(roomList->value, parsedRooms)) {
+            return Result::failure(
+                "MustBeVisibleRoom has an invalid room list");
+        }
+        forcedVisibleRooms_ = parsedRooms;
         return Result::success();
     }
     if (command.name == "EnableCameraArea") {

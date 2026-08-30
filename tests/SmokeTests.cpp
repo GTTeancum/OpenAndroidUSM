@@ -682,6 +682,8 @@ int main() {
         assert(!initialCameraNode->cameraAreaDisabled);
         assert(initialCameraNode->nextCameraAreaIds[0] == 304);
         assert(initialCameraNode->cameraAreaSwitchTimeUnits[0] == 30);
+        assert(initialCameraNode->userAttributes.at("mustInVisibleRoom") ==
+               "5,7,8,6,2");
         assert(bootstrap.player().objectId == 288);
         assert(bootstrap.player().sceneNodeName == "SpiderMan");
         assert(bootstrap.player().initialAnimation ==
@@ -1354,6 +1356,31 @@ int main() {
         assert(levelEndCinematic->nextCinematicId == -1);
         assert(levelEndCinematic->levelEndAfterPlayback);
         assert(!levelEndCinematic->gameEndAfterPlayback);
+        assert(levelEndCinematic->colladaDurationMilliseconds == 66199);
+        std::size_t forcedRoomCommandCount = 0;
+        for (const auto& cinematic : bootstrap.cinematics()) {
+            for (const auto& thread : cinematic.script.threads()) {
+                for (const auto& command : thread.commands) {
+                    if (command.name != "MustBeVisibleRoom") {
+                        continue;
+                    }
+                    ++forcedRoomCommandCount;
+                    const auto* set = command.findAttribute("Set");
+                    const auto* rooms =
+                        command.findAttribute("MustBeVisible");
+                    assert(set != nullptr);
+                    if (cinematic.objectId == 1265) {
+                        assert(set->value == "true");
+                        assert(rooms != nullptr);
+                        assert(rooms->value == "1,2,3,4,5");
+                    } else {
+                        assert(cinematic.objectId == 1266);
+                        assert(set->value == "false");
+                    }
+                }
+            }
+        }
+        assert(forcedRoomCommandCount == 2);
         const auto gameOverCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {
@@ -1365,6 +1392,29 @@ int main() {
                20000.0F);
         assert(!gameOverCinematic->levelEndAfterPlayback);
         assert(gameOverCinematic->gameEndAfterPlayback);
+        assert(gameOverCinematic->hasColladaPlayback());
+        assert(std::any_of(
+            gameOverCinematic->script.threads().begin(),
+            gameOverCinematic->script.threads().end(),
+            [&bootstrap](const auto& thread) {
+                return thread.objectId == bootstrap.player().objectId &&
+                       std::any_of(thread.commands.begin(),
+                                   thread.commands.end(),
+                                   [](const auto& command) {
+                                       return command.name == "PlayDAEAnim";
+                                   });
+            }));
+        assert(std::any_of(
+            gameOverCinematic->script.threads().begin(),
+            gameOverCinematic->script.threads().end(),
+            [](const auto& thread) {
+                return std::any_of(
+                    thread.commands.begin(), thread.commands.end(),
+                    [](const auto& command) {
+                        return command.name == "Transport" &&
+                               command.timestampMilliseconds == 55000;
+                    });
+            }));
         const auto enemyGateCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {
@@ -1800,6 +1850,17 @@ int main() {
                       << gameplayCameraResult.message() << '\n';
             return 1;
         }
+        const auto& initialInvisibleRooms = gameplayCamera.mustInvisibleRooms();
+        for (std::size_t roomIndex = 0;
+             roomIndex < initialInvisibleRooms.size(); ++roomIndex) {
+            const bool expected = roomIndex == 1 || roomIndex == 4 ||
+                                  roomIndex == 5 || roomIndex == 6 ||
+                                  roomIndex == 7;
+            assert(initialInvisibleRooms[roomIndex] == expected);
+        }
+        assert(std::none_of(gameplayCamera.mustVisibleRooms().begin(),
+                            gameplayCamera.mustVisibleRooms().end(),
+                            [](bool visible) { return visible; }));
         const auto gameplayCameraPose =
             gameplayCamera.sample(bootstrap.player().position);
         usm::game::LevelCinematicRuntime levelCommandRuntime;
@@ -1849,6 +1910,26 @@ int main() {
         assert(levelCommandRuntime.applyCommand(disableControls));
         assert(levelCommandRuntime.controlsEnabled());
         assert(!levelCommandRuntime.blackOverlayEnabled());
+        usm::game::CinematicCommand forceRooms;
+        forceRooms.name = "MustBeVisibleRoom";
+        forceRooms.attributes = {
+            {"string", "MustBeVisible", "1,2,3,4,5"},
+            {"bool", "Set", "true"},
+        };
+        assert(levelCommandRuntime.applyCommand(forceRooms));
+        for (std::size_t roomIndex = 0;
+             roomIndex < levelCommandRuntime.forcedVisibleRooms().size();
+             ++roomIndex) {
+            assert(levelCommandRuntime.forcedVisibleRooms()[roomIndex] ==
+                   (roomIndex < 5));
+        }
+        forceRooms.attributes.back().value = "false";
+        forceRooms.attributes.front().value.clear();
+        assert(levelCommandRuntime.applyCommand(forceRooms));
+        assert(std::none_of(
+            levelCommandRuntime.forcedVisibleRooms().begin(),
+            levelCommandRuntime.forcedVisibleRooms().end(),
+            [](bool visible) { return visible; }));
         assert(levelCommandRuntime.applyCommand(
             controlCommand("StartCinematic", "CinematicID", "1238")));
         const auto cinematicStarts =

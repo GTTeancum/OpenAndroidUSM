@@ -183,6 +183,9 @@ struct LevelEnemyAsset {
     std::string initialAnimation;
     std::int16_t enemyTypeId{-1};
     std::size_t archetypeIndex{};
+    // CRoom::SetVisible addresses rooms through a one-based offset. Preserve
+    // that ownership so render visibility applies to child enemies too.
+    std::int32_t roomId{-1};
     assets::Vector3 position;
     assets::Quaternion rotation;
     assets::Vector3 scale{1.0F, 1.0F, 1.0F};
@@ -226,6 +229,7 @@ struct LevelObjectAsset {
     LevelObjectKind kind{LevelObjectKind::StaticObject};
     std::string initialAnimation;
     std::size_t archetypeIndex{};
+    std::int32_t roomId{-1};
     assets::Vector3 position;
     assets::Quaternion rotation;
     assets::Vector3 scale{1.0F, 1.0F, 1.0F};

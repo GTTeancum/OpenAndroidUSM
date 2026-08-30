@@ -781,6 +781,94 @@ void D3D11Renderer::bindRenderTarget(std::uint32_t width,
     context_->RSSetViewports(1, &viewport);
 }
 
+void D3D11Renderer::setMeshVisible(GpuMesh& mesh, bool visible) noexcept {
+    mesh.baseVisible = visible;
+    mesh.visible = visible;
+    if (mesh.roomId >= 1 &&
+        mesh.roomId <= static_cast<std::int32_t>(roomVisibility_.size())) {
+        mesh.visible = visible &&
+                       roomVisibility_[static_cast<std::size_t>(mesh.roomId - 1)];
+    }
+}
+
+void D3D11Renderer::setCinematicVisibleRooms(
+    std::span<const bool> rooms) noexcept {
+    forcedVisibleRooms_.fill(false);
+    const std::size_t count = std::min(rooms.size(), forcedVisibleRooms_.size());
+    std::copy_n(rooms.begin(), count, forcedVisibleRooms_.begin());
+}
+
+void D3D11Renderer::setCameraAreaRoomVisibility(
+    std::span<const bool> invisibleRooms,
+    std::span<const bool> visibleRooms) noexcept {
+    cameraAreaInvisibleRooms_.fill(false);
+    cameraAreaVisibleRooms_.fill(false);
+    std::copy_n(invisibleRooms.begin(),
+                std::min(invisibleRooms.size(),
+                         cameraAreaInvisibleRooms_.size()),
+                cameraAreaInvisibleRooms_.begin());
+    std::copy_n(visibleRooms.begin(),
+                std::min(visibleRooms.size(), cameraAreaVisibleRooms_.size()),
+                cameraAreaVisibleRooms_.begin());
+}
+
+void D3D11Renderer::updateRoomVisibility(
+    const DirectX::XMMATRIX& viewProjection) noexcept {
+    roomVisibility_.fill(false);
+    const std::size_t roomCount =
+        std::min(roomMeshCount_, roomVisibility_.size());
+    for (std::size_t roomIndex = 0; roomIndex < roomCount; ++roomIndex) {
+        const assets::AxisAlignedBounds& bounds = gpuMeshes_[roomIndex].bounds;
+        bool outsideLeft = true;
+        bool outsideRight = true;
+        bool outsideBottom = true;
+        bool outsideTop = true;
+        bool outsideNear = true;
+        bool outsideFar = true;
+        for (unsigned corner = 0; corner < 8; ++corner) {
+            const float x = (corner & 1U) != 0U ? bounds.maximum.x
+                                                : bounds.minimum.x;
+            const float y = (corner & 2U) != 0U ? bounds.maximum.y
+                                                : bounds.minimum.y;
+            const float z = (corner & 4U) != 0U ? bounds.maximum.z
+                                                : bounds.minimum.z;
+            const DirectX::XMVECTOR clip = DirectX::XMVector4Transform(
+                DirectX::XMVectorSet(x, y, z, 1.0F), viewProjection);
+            const float clipX = DirectX::XMVectorGetX(clip);
+            const float clipY = DirectX::XMVectorGetY(clip);
+            const float clipZ = DirectX::XMVectorGetZ(clip);
+            const float clipW = DirectX::XMVectorGetW(clip);
+            outsideLeft &= clipX < -clipW;
+            outsideRight &= clipX > clipW;
+            outsideBottom &= clipY < -clipW;
+            outsideTop &= clipY > clipW;
+            outsideNear &= clipZ < 0.0F;
+            outsideFar &= clipZ > clipW;
+        }
+        const bool intersectsFrustum =
+            !(outsideLeft || outsideRight || outsideBottom || outsideTop ||
+              outsideNear || outsideFar);
+        bool visible = intersectsFrustum;
+        if (cameraAreaInvisibleRooms_[roomIndex]) {
+            visible = false;
+        }
+        if (cameraAreaVisibleRooms_[roomIndex]) {
+            visible = true;
+        }
+        roomVisibility_[roomIndex] =
+            visible || forcedVisibleRooms_[roomIndex];
+    }
+    for (GpuMesh& mesh : gpuMeshes_) {
+        mesh.visible = mesh.baseVisible;
+        if (mesh.roomId >= 1 &&
+            mesh.roomId <= static_cast<std::int32_t>(roomVisibility_.size())) {
+            mesh.visible =
+                mesh.baseVisible &&
+                roomVisibility_[static_cast<std::size_t>(mesh.roomId - 1)];
+        }
+    }
+}
+
 Result D3D11Renderer::uploadPreviewGeometry(
     const assets::ColladaGeometry& geometry,
     std::span<const assets::RgbaImage> mipLevels) {
@@ -788,6 +876,11 @@ Result D3D11Renderer::uploadPreviewGeometry(
     sharedTextureViews_.clear();
     whiteTexture_.Reset();
     environmentMeshCount_ = 0;
+    roomMeshCount_ = 0;
+    forcedVisibleRooms_.fill(false);
+    cameraAreaInvisibleRooms_.fill(false);
+    cameraAreaVisibleRooms_.fill(false);
+    roomVisibility_.fill(true);
     return uploadGeometrySet({&geometry, 1}, nullptr, {}, mipLevels);
 }
 
@@ -802,6 +895,11 @@ Result D3D11Renderer::uploadSceneGeometry(
     sharedTextureViews_.clear();
     whiteTexture_.Reset();
     environmentMeshCount_ = 0;
+    roomMeshCount_ = 0;
+    forcedVisibleRooms_.fill(false);
+    cameraAreaInvisibleRooms_.fill(false);
+    cameraAreaVisibleRooms_.fill(false);
+    roomVisibility_.fill(true);
     return uploadGeometrySet(mesh.sceneGeometries(), &mesh, textures, {});
 }
 
@@ -811,8 +909,15 @@ Result D3D11Renderer::uploadLevelOneScene(
     sharedTextureViews_.clear();
     whiteTexture_.Reset();
     environmentMeshCount_ = 0;
+    roomMeshCount_ = 0;
+    forcedVisibleRooms_.fill(false);
+    cameraAreaInvisibleRooms_.fill(false);
+    cameraAreaVisibleRooms_.fill(false);
+    roomVisibility_.fill(true);
     Result result = Result::success();
-    for (const game::LevelRoomAsset& room : levelOne.rooms()) {
+    for (std::size_t roomIndex = 0; roomIndex < levelOne.rooms().size();
+         ++roomIndex) {
+        const game::LevelRoomAsset& room = levelOne.rooms()[roomIndex];
         result = uploadGeometrySet(room.geometry.sceneGeometries(),
                                    &room.geometry, room.textures, {});
         if (!result) {
@@ -820,7 +925,9 @@ Result D3D11Renderer::uploadLevelOneScene(
             return Result::failure("Could not upload " + room.name + ": " +
                                    result.message());
         }
+        gpuMeshes_.back().roomId = static_cast<std::int32_t>(roomIndex + 1);
     }
+    roomMeshCount_ = levelOne.rooms().size();
     const game::LevelStaticMeshAsset& sky = levelOne.introSky();
     result = uploadGeometrySet(sky.geometry.sceneGeometries(), &sky.geometry,
                                sky.textures, {});
@@ -871,7 +978,8 @@ Result D3D11Renderer::uploadLevelOneScene(
             return Result::failure("Could not upload level object " +
                                    object.name + ": " + result.message());
         }
-        gpuMeshes_.back().visible = object.visible;
+        gpuMeshes_.back().roomId = object.roomId;
+        setMeshVisible(gpuMeshes_.back(), object.visible);
     }
     introActorMeshStart_ = gpuMeshes_.size();
     for (const game::CinematicActorAsset& actor : levelOne.introActors()) {
@@ -899,7 +1007,8 @@ Result D3D11Renderer::uploadLevelOneScene(
                                    actor.sceneNodeName + ": " +
                                    result.message());
         }
-        gpuMeshes_.back().visible = actor.animationStartMilliseconds == 0;
+        setMeshVisible(gpuMeshes_.back(),
+                       actor.animationStartMilliseconds == 0);
     }
     gameplayCinematicMeshStart_ = gpuMeshes_.size();
     for (const game::LevelCinematicAsset& cinematic :
@@ -931,7 +1040,7 @@ Result D3D11Renderer::uploadLevelOneScene(
                                        actor.sceneNodeName + ": " +
                                        result.message());
             }
-            gpuMeshes_.back().visible = false;
+            setMeshVisible(gpuMeshes_.back(), false);
         }
     }
     enemyMeshStart_ = gpuMeshes_.size();
@@ -965,7 +1074,8 @@ Result D3D11Renderer::uploadLevelOneScene(
             return Result::failure("Could not upload enemy " + enemy.name +
                                    ": " + result.message());
         }
-        gpuMeshes_.back().visible = enemy.visible;
+        gpuMeshes_.back().roomId = enemy.roomId;
+        setMeshVisible(gpuMeshes_.back(), enemy.visible);
     }
     result = uploadHudTexture(levelOne.hud());
     if (!result) {
@@ -1010,8 +1120,9 @@ Result D3D11Renderer::updateLevelOneActors(
         if (!gpuMesh.dynamicVertices) {
             return Result::failure("Actor vertex buffer is not dynamic");
         }
-        gpuMesh.visible =
-            timestampMilliseconds >= actor.animationStartMilliseconds;
+        setMeshVisible(gpuMesh,
+                       timestampMilliseconds >=
+                           actor.animationStartMilliseconds);
         const std::uint32_t localTime =
             timestampMilliseconds <= actor.animationStartMilliseconds
                 ? 0
@@ -1058,7 +1169,7 @@ Result D3D11Renderer::updateGameplayCinematicActors(
             "Gameplay cinematic actor GPU resources are incomplete");
     }
     for (std::size_t index = 0; index < totalActorCount; ++index) {
-        gpuMeshes_[gameplayCinematicMeshStart_ + index].visible = false;
+        setMeshVisible(gpuMeshes_[gameplayCinematicMeshStart_ + index], false);
     }
     if (cinematic == nullptr || cinematic->actors.empty()) {
         return Result::success();
@@ -1081,7 +1192,7 @@ Result D3D11Renderer::updateGameplayCinematicActors(
         }
         const std::size_t playerIndex = static_cast<std::size_t>(
             playerActor - levelOne.introActors().begin());
-        gpuMeshes_[introActorMeshStart_ + playerIndex].visible = false;
+        setMeshVisible(gpuMeshes_[introActorMeshStart_ + playerIndex], false);
     }
 
     for (std::size_t enemyIndex = 0;
@@ -1091,7 +1202,7 @@ Result D3D11Renderer::updateGameplayCinematicActors(
                         [enemyId](const game::CinematicActorAsset& actor) {
                             return actor.objectId == enemyId;
                         })) {
-            gpuMeshes_[enemyMeshStart_ + enemyIndex].visible = false;
+            setMeshVisible(gpuMeshes_[enemyMeshStart_ + enemyIndex], false);
         }
     }
 
@@ -1102,8 +1213,9 @@ Result D3D11Renderer::updateGameplayCinematicActors(
         GpuMesh& gpuMesh =
             gpuMeshes_[gameplayCinematicMeshStart_ + activeActorOffset +
                        actorIndex];
-        gpuMesh.visible =
-            timestampMilliseconds >= actor.animationStartMilliseconds;
+        setMeshVisible(gpuMesh,
+                       timestampMilliseconds >=
+                           actor.animationStartMilliseconds);
         const std::uint32_t localTime =
             timestampMilliseconds <= actor.animationStartMilliseconds
                 ? 0
@@ -1168,7 +1280,7 @@ Result D3D11Renderer::updateLevelOneEnemies(
                                    result.message());
         }
         GpuMesh& gpuMesh = gpuMeshes_[enemyMeshStart_ + index];
-        gpuMesh.visible = enemy.visible;
+        setMeshVisible(gpuMesh, enemy.visible);
         result = updateDynamicMesh(gpuMesh, animatedGeometry,
                                    &enemy.worldTransform);
         if (!result) {
@@ -1225,7 +1337,7 @@ Result D3D11Renderer::updateLevelOneObjects(
             geometry = animatedGeometry;
         }
         GpuMesh& gpuMesh = gpuMeshes_[levelObjectMeshStart_ + index];
-        gpuMesh.visible = object.visible;
+        setMeshVisible(gpuMesh, object.visible);
         Result result =
             updateDynamicMesh(gpuMesh, geometry, &object.worldTransform);
         if (!result) {
@@ -1269,7 +1381,7 @@ Result D3D11Renderer::updateLevelOnePlayer(
                                ": " + result.message());
     }
     GpuMesh& gpuMesh = gpuMeshes_[actorIndex + introActorMeshStart_];
-    gpuMesh.visible = true;
+    setMeshVisible(gpuMesh, true);
     result = updateDynamicMesh(gpuMesh, animatedGeometry, &worldTransform);
     return !result ? Result::failure("Could not update player clip " +
                                      clip.name + ": " + result.message())
@@ -1954,6 +2066,7 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
         DirectX::XMConvertToRadians(camera.verticalFieldOfViewDegrees),
         static_cast<float>(width_) / static_cast<float>(height_),
         camera.nearPlane, camera.farPlane);
+    updateRoomVisibility(view * projection);
     DirectX::XMStoreFloat4x4(
         &worldViewProjection_,
         DirectX::XMMatrixTranspose(view * projection));
@@ -2022,6 +2135,26 @@ Result D3D11Renderer::uploadGeometrySet(
     }
     if (vertices.empty()) {
         return Result::failure("Geometry set contains no vertices");
+    }
+    gpuMesh.bounds.minimum = {vertices.front().position.x,
+                              vertices.front().position.y,
+                              vertices.front().position.z};
+    gpuMesh.bounds.maximum = gpuMesh.bounds.minimum;
+    for (std::size_t vertexIndex = 1; vertexIndex < vertices.size();
+         ++vertexIndex) {
+        const GpuVertex& vertex = vertices[vertexIndex];
+        gpuMesh.bounds.minimum.x =
+            std::min(gpuMesh.bounds.minimum.x, vertex.position.x);
+        gpuMesh.bounds.minimum.y =
+            std::min(gpuMesh.bounds.minimum.y, vertex.position.y);
+        gpuMesh.bounds.minimum.z =
+            std::min(gpuMesh.bounds.minimum.z, vertex.position.z);
+        gpuMesh.bounds.maximum.x =
+            std::max(gpuMesh.bounds.maximum.x, vertex.position.x);
+        gpuMesh.bounds.maximum.y =
+            std::max(gpuMesh.bounds.maximum.y, vertex.position.y);
+        gpuMesh.bounds.maximum.z =
+            std::max(gpuMesh.bounds.maximum.z, vertex.position.z);
     }
 
     D3D11_BUFFER_DESC vertexDescription{};

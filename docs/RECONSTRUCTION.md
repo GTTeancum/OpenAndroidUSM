@@ -714,6 +714,28 @@ deterministic motion and expiry, and visible frames for all three effect types
 authored by level one: `cartoon_hit_splash_big`, `explode_new`, and
 `rock_splash`.
 
+## Room visibility and terminal cinematics
+
+`CLevel::UpdateRooms` at `0x00381f24` combines the active camera frustum with
+each `CameraArea`'s authored `mustInVisibleRoom`/`mustVisibleRoom` masks and
+the cinematic room override. `CCinematicThread::MustBeVisibleRoom` at
+`0x00370f0c` supplies that final override during the opening sequence. The
+native bootstrap preserves one-based room ownership for geometry, objects,
+and enemies; D3D11 tests each room bounding box against the current clip
+volume and applies the resulting visibility to all three groups. This avoids
+rendering disconnected level sections while retaining the opening's explicit
+rooms 1-5 override.
+
+Player death now starts the authored cinematic referenced by
+`^EndGame^Cinematic` (1267 in level one). Its Collada camera and four actors,
+sound/dialogue commands, and 55-second transport command run through the same
+portable cinematic path as in-level sequences. The level-ending cinematic
+1238 likewise retains its delayed Rhino entrance and final pose until
+`CLevel::End`/`GameEnd` would leave the original level state; the Windows
+first-level target presents that last frame and exits cleanly. WARP
+regressions render both terminal sequences with their object-visibility
+commands and camera-area masks applied.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

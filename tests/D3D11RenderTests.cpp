@@ -147,8 +147,17 @@ int main() {
         }
         usm::game::LevelObjectRuntime levelObjects;
         assert(levelObjects.initialize(levelOne));
+        usm::game::GameplayCamera gameplayCamera;
+        assert(gameplayCamera.bind(levelOne.cameraAreas(),
+                                   levelOne.player().initialCameraAreaId));
         assert(gameRenderer.updateLevelOneObjects(levelOne, levelObjects));
         assert(gameRenderer.updateLevelOneActors(levelOne, 0));
+        std::array<bool, 16> cinematicVisibleRooms{};
+        std::fill_n(cinematicVisibleRooms.begin(), 5, true);
+        gameRenderer.setCameraAreaRoomVisibility(
+            gameplayCamera.mustInvisibleRooms(),
+            gameplayCamera.mustVisibleRooms());
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
         assert(gameRenderer.setCamera(levelOne.introCamera().sample(0)));
         gameRenderer.renderFrame();
 
@@ -199,9 +208,6 @@ int main() {
         const auto* idleClip =
             levelOne.player().animationBank.findClip("idle_stand");
         assert(idleClip != nullptr);
-        usm::game::GameplayCamera gameplayCamera;
-        assert(gameplayCamera.bind(levelOne.cameraAreas(),
-                                   levelOne.player().initialCameraAreaId));
         assert(gameRenderer.updateLevelOneActors(
             levelOne,
             levelOne.introCameraAnimation().durationMilliseconds()));
@@ -209,6 +215,11 @@ int main() {
             levelOne, *idleClip, 0, levelOne.player().worldTransform));
         const auto gameplayPose =
             gameplayCamera.sample(levelOne.player().position);
+        cinematicVisibleRooms.fill(false);
+        gameRenderer.setCameraAreaRoomVisibility(
+            gameplayCamera.mustInvisibleRooms(),
+            gameplayCamera.mustVisibleRooms());
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
         assert(gameRenderer.setCamera(gameplayPose));
         gameRenderer.renderFrame();
         RgbaImage gameplayFrame;
@@ -325,6 +336,82 @@ int main() {
                     beforeBossSandmanFrame.pixels[component + 2];
         }
         assert(beforeBossChangedPixels > 100);
+        const auto renderColladaCinematicFrame =
+            [&](std::int32_t cinematicId, std::uint32_t timestampMilliseconds,
+                std::int32_t cameraAreaId, std::string_view captureName) {
+                const auto cinematic = std::find_if(
+                    levelOne.cinematics().begin(), levelOne.cinematics().end(),
+                    [cinematicId](const auto& candidate) {
+                        return candidate.objectId == cinematicId;
+                    });
+                assert(cinematic != levelOne.cinematics().end());
+                assert(cinematic->hasColladaPlayback());
+                assert(timestampMilliseconds <=
+                       cinematic->colladaDurationMilliseconds);
+                usm::game::LevelObjectRuntime cinematicObjects;
+                assert(cinematicObjects.initialize(levelOne));
+                usm::game::CinematicPlayer commandPlayer;
+                assert(commandPlayer.start(cinematic->script));
+                usm::Result commandResult = usm::Result::success();
+                assert(commandPlayer.advanceTo(
+                    timestampMilliseconds,
+                    [&cinematicObjects, &commandResult, &levelOne](
+                        const usm::game::CinematicThread& thread,
+                        const usm::game::CinematicCommand& command) {
+                        if (commandResult) {
+                            commandResult =
+                                cinematicObjects.applyCinematicCommand(
+                                    levelOne, thread, command);
+                        }
+                    }));
+                assert(commandResult);
+                assert(gameRenderer.updateLevelOneObjects(levelOne,
+                                                           cinematicObjects));
+                assert(gameRenderer.updateGameplayCinematicActors(
+                    levelOne, &*cinematic, timestampMilliseconds));
+                assert(gameplayCamera.setCurrentArea(cameraAreaId));
+                gameRenderer.setCameraAreaRoomVisibility(
+                    gameplayCamera.mustInvisibleRooms(),
+                    gameplayCamera.mustVisibleRooms());
+                cinematicVisibleRooms.fill(false);
+                gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+                assert(gameRenderer.setCamera(
+                    cinematic->animatedCamera.sample(timestampMilliseconds)));
+                gameRenderer.renderFrame();
+                RgbaImage frame;
+                assert(gameRenderer.readBackImage(frame));
+                captureIfRequested(frame, captureName);
+                return frame;
+            };
+        const auto countChangedPixels = [](const RgbaImage& first,
+                                           const RgbaImage& second) {
+            assert(first.pixels.size() == second.pixels.size());
+            std::size_t changedPixels = 0;
+            for (std::size_t component = 0;
+                 component < first.pixels.size(); component += 4) {
+                changedPixels +=
+                    first.pixels[component] != second.pixels[component] ||
+                    first.pixels[component + 1] !=
+                        second.pixels[component + 1] ||
+                    first.pixels[component + 2] !=
+                        second.pixels[component + 2];
+            }
+            return changedPixels;
+        };
+        const RgbaImage levelEndingStartFrame =
+            renderColladaCinematicFrame(1238, 0, 10100,
+                                        "level-ending-00000.bmp");
+        const RgbaImage levelEndingActorsFrame = renderColladaCinematicFrame(
+            1238, 30000, 10100, "level-ending-30000.bmp");
+        assert(countChangedPixels(levelEndingStartFrame,
+                                  levelEndingActorsFrame) > 100);
+        const RgbaImage gameOverStartFrame =
+            renderColladaCinematicFrame(1267, 0, 283,
+                                        "game-over-00000.bmp");
+        const RgbaImage gameOverDialogueFrame = renderColladaCinematicFrame(
+            1267, 20000, 283, "game-over-20000.bmp");
+        assert(countChangedPixels(gameOverStartFrame,
+                                  gameOverDialogueFrame) > 100);
         assert(gameRenderer.updateLevelOnePlayer(
             levelOne, *idleClip, 0, levelOne.player().worldTransform));
         assert(gameRenderer.updateGameplayCinematicActors(levelOne, nullptr,

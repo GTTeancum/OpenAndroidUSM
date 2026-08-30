@@ -5,6 +5,7 @@
 #include "game/GameplayCamera.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -46,6 +47,10 @@ public:
     [[nodiscard]] bool blackOverlayEnabled() const noexcept {
         return blackOverlayEnabled_;
     }
+    [[nodiscard]] const std::array<bool, 16>& forcedVisibleRooms() const
+        noexcept {
+        return forcedVisibleRooms_;
+    }
 
 private:
     LevelTriggerRuntime* triggers_{};
@@ -67,6 +72,8 @@ private:
     std::int32_t cameraShakeSign_{1};
     std::uint32_t cameraShakeTickRemainderMilliseconds_{};
     assets::Vector3 cameraShakeOffset_{};
+    // CGameCamera stores the cinematic room override in a 16-bit bitset.
+    std::array<bool, 16> forcedVisibleRooms_{};
     bool levelEnded_{};
     bool goToNextLevel_{};
     bool gameEnded_{};

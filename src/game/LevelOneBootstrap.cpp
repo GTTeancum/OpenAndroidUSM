@@ -76,6 +76,29 @@ bool booleanAttribute(const assets::IrrSceneNode& node, std::string_view name,
     return fallback;
 }
 
+std::array<bool, 16> roomMaskAttribute(const assets::IrrSceneNode& node,
+                                       std::string_view name) noexcept {
+    std::array<bool, 16> rooms{};
+    std::string_view text = userAttribute(node, name);
+    while (!text.empty()) {
+        const std::size_t comma = text.find(',');
+        const std::string_view item = text.substr(0, comma);
+        std::int32_t roomId = 0;
+        const auto parsed = std::from_chars(
+            item.data(), item.data() + item.size(), roomId);
+        if (parsed.ec == std::errc{} &&
+            parsed.ptr == item.data() + item.size() && roomId >= 1 &&
+            roomId <= static_cast<std::int32_t>(rooms.size())) {
+            rooms[static_cast<std::size_t>(roomId - 1)] = true;
+        }
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        text.remove_prefix(comma + 1);
+    }
+    return rooms;
+}
+
 assets::Vector3 vectorAttribute(const assets::IrrSceneNode& node,
                                 std::string_view name) noexcept {
     std::string storage(userAttribute(node, name));
@@ -591,7 +614,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     // CRoom creates these concrete object classes from their authored
     // !GameType values. Keep mesh/animation payloads deduplicated while
     // preserving an independently addressable instance for every scene ID.
-    for (const LevelRoomAsset& room : rooms_) {
+    for (std::size_t roomIndex = 0; roomIndex < rooms_.size(); ++roomIndex) {
+        const LevelRoomAsset& room = rooms_[roomIndex];
         for (const assets::IrrSceneNode& node : room.scene.nodes()) {
             const std::optional<LevelObjectKind> kind =
                 levelObjectKind(node.gameType);
@@ -669,6 +693,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             object.initialAnimation =
                 animationPath.empty() ? std::string{} : node.initialAnimation;
             object.archetypeIndex = archetypeIndex;
+            object.roomId = static_cast<std::int32_t>(roomIndex + 1);
             object.position = worldPosition(node);
             object.rotation = node.rotation;
             object.scale = node.scale;
@@ -713,6 +738,10 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             area.zFollowRate = areaNode.cameraAreaZFollowRate;
             area.disabled = areaNode.cameraAreaDisabled;
             area.farPlaneOffset = areaNode.cameraFarPlaneOffset;
+            area.mustInvisibleRooms =
+                roomMaskAttribute(areaNode, "mustInVisibleRoom");
+            area.mustVisibleRooms =
+                roomMaskAttribute(areaNode, "mustVisibleRoom");
             for (std::size_t index = 0; index < area.controlPoints.size();
                  ++index) {
                 const assets::IrrSceneNode* controlNode = findLevelNode(
@@ -905,7 +934,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         }
     }
 
-    for (const LevelRoomAsset& room : rooms_) {
+    for (std::size_t roomIndex = 0; roomIndex < rooms_.size(); ++roomIndex) {
+        const LevelRoomAsset& room = rooms_[roomIndex];
         for (const assets::IrrSceneNode& node : room.scene.nodes()) {
             if (node.gameType == "Trigger") {
                 LevelTriggerAsset trigger;
@@ -1051,6 +1081,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                         : "idle_at1_idle";
             }
             enemy.archetypeIndex = archetypeIndex;
+            enemy.roomId = static_cast<std::int32_t>(roomIndex + 1);
             enemy.position = worldPosition(node);
             enemy.rotation = node.rotation;
             enemy.scale = node.scale;

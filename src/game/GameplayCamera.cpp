@@ -228,6 +228,18 @@ bool GameplayCamera::setCurrentArea(std::int32_t areaId) noexcept {
     return true;
 }
 
+const std::array<bool, 16>& GameplayCamera::mustInvisibleRooms() const
+    noexcept {
+    static constexpr std::array<bool, 16> kNoRooms{};
+    return currentArea_ == nullptr ? kNoRooms
+                                   : currentArea_->mustInvisibleRooms;
+}
+
+const std::array<bool, 16>& GameplayCamera::mustVisibleRooms() const noexcept {
+    static constexpr std::array<bool, 16> kNoRooms{};
+    return currentArea_ == nullptr ? kNoRooms : currentArea_->mustVisibleRooms;
+}
+
 bool GameplayCamera::updateArea(
     const assets::Vector3& playerPosition,
     std::uint32_t elapsedMilliseconds) noexcept {

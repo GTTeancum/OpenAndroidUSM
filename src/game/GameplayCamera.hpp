@@ -32,6 +32,8 @@ struct CameraArea {
     float zFollowRate{};
     bool disabled{};
     float farPlaneOffset{};
+    std::array<bool, 16> mustInvisibleRooms{};
+    std::array<bool, 16> mustVisibleRooms{};
 };
 
 // Native reconstruction of CCameraArea interpolation and the standard
@@ -55,6 +57,10 @@ public:
     [[nodiscard]] std::int32_t currentAreaId() const noexcept {
         return currentArea_ == nullptr ? -1 : currentArea_->objectId;
     }
+    [[nodiscard]] const std::array<bool, 16>& mustInvisibleRooms() const
+        noexcept;
+    [[nodiscard]] const std::array<bool, 16>& mustVisibleRooms() const
+        noexcept;
     [[nodiscard]] std::uint32_t lastSwitchDurationMilliseconds() const noexcept {
         return transitionDurationMilliseconds_;
     }
