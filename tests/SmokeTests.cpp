@@ -1011,6 +1011,42 @@ int main() {
         assert(firstEncounterCinematic->scriptFile ==
                "cinematics/levelnew_01_1162_cinematic.cff");
         assert(firstEncounterCinematic->script.commandCount() > 0);
+        const auto roomNineCameraCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 20013;
+            });
+        assert(roomNineCameraCinematic != bootstrap.cinematics().end());
+        assert(roomNineCameraCinematic->cameraTrack.valid());
+        assert(roomNineCameraCinematic->cameraTrack.keyframes().size() == 8);
+        const auto firstRoomNineCamera =
+            roomNineCameraCinematic->cameraTrack.sample(0);
+        assert(std::abs(firstRoomNineCamera.target.x - 13078.953125F) <
+               0.01F);
+        assert(std::abs(firstRoomNineCamera.position.x - 13170.248F) <
+               0.01F);
+        assert(std::abs(firstRoomNineCamera.position.y + 7534.116F) <
+               0.01F);
+        const auto middleRoomNineCamera =
+            roomNineCameraCinematic->cameraTrack.sample(500);
+        const auto secondRoomNineCamera =
+            roomNineCameraCinematic->cameraTrack.sample(1000);
+        assert(std::abs(middleRoomNineCamera.target.x -
+                        (firstRoomNineCamera.target.x +
+                         secondRoomNineCamera.target.x) *
+                            0.5F) < 0.01F);
+        const auto heldRoomNineCamera =
+            roomNineCameraCinematic->cameraTrack.sample(2175);
+        const auto cameraAt2150 =
+            roomNineCameraCinematic->cameraTrack.sample(2150);
+        assert(std::abs(heldRoomNineCamera.position.x -
+                        cameraAt2150.position.x) < 0.01F);
+        assert(std::count_if(
+                   bootstrap.cinematics().begin(),
+                   bootstrap.cinematics().end(),
+                   [](const usm::game::LevelCinematicAsset& cinematic) {
+                       return cinematic.cameraTrack.valid();
+                   }) == 8);
         const auto enemyGateCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {

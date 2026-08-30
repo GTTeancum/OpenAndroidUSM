@@ -659,6 +659,12 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                                            cinematic.name + ": " +
                                            result.message());
                 }
+                result = cinematic.cameraTrack.load(cinematic.script);
+                if (!result) {
+                    return Result::failure("Could not load camera track for " +
+                                           cinematic.name + ": " +
+                                           result.message());
+                }
                 cinematic.scriptAvailable = true;
                 cinematics_.push_back(std::move(cinematic));
                 continue;

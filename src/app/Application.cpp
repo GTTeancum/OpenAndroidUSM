@@ -439,8 +439,15 @@ int Application::run(HINSTANCE instance) {
                     enemyRuntime_.gunLines());
             }
             if (result) {
-                result = renderer_.setCamera(
-                    gameplayCamera_.sample(gameplayPlayer_.position()));
+                if (activeGameplayCinematic_ != nullptr &&
+                    activeGameplayCinematic_->cameraTrack.valid()) {
+                    result = renderer_.setCamera(
+                        activeGameplayCinematic_->cameraTrack.sample(
+                            gameplayCinematicTimeMilliseconds_));
+                } else {
+                    result = renderer_.setCamera(
+                        gameplayCamera_.sample(gameplayPlayer_.position()));
+                }
             }
         }
         if (!result) {

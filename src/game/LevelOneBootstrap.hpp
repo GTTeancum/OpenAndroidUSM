@@ -10,6 +10,7 @@
 #include "game/CinematicScript.hpp"
 #include "game/AttackConfig.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/CinematicCameraTrack.hpp"
 #include "game/EnemyBehaviorConfig.hpp"
 #include "game/EnemyAttributeConfig.hpp"
 #include "game/EnemyAttackIntervalConfig.hpp"
@@ -148,6 +149,7 @@ struct LevelCinematicAsset {
     std::string scriptFile;
     bool scriptAvailable{};
     CinematicScript script;
+    CinematicCameraTrack cameraTrack;
 };
 
 struct EnemyArchetypeAsset {

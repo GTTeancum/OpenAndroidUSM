@@ -531,6 +531,24 @@ The cinematic `StartSlide` command follows its preserved implementation at
 `0x003701c0`: it validates that both named waypoint endpoints exist, while the
 independent `CSlider` update performs the actual airborne proximity catch.
 
+## Authored encounter camera tracks
+
+Eight level-one encounter cinematics use type-2 camera threads instead of a
+Collada camera animation. `CinematicCameraTrack` reconstructs
+`CCinematic::initCameraCurve` at `0x0036f2dc` and
+`CCinematic::updateCameraThread` at `0x0036e9ac`. Each `ChangeCamera` command
+stores a target, direction, and signed distance; the original materializes
+the position as `target - direction * distance`, then independently blends
+the target and position tracks. Intervals of 50 ms or less are held as hard
+cuts. Longer intervals are linear unless the current command's `curve` flag
+selects the recovered cyclic Catmull-Rom/Hermite path.
+
+The bootstrap validates and retains these portable tracks alongside all 42
+runnable level scripts. During native encounter playback the application now
+uses the authored camera pose until the cinematic ends, then returns to the
+active gameplay `CameraArea`. Tests cover all eight shipped tracks, signed
+distance reconstruction, linear interpolation, and authored hard cuts.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a
