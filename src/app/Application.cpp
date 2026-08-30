@@ -54,7 +54,11 @@ int Application::run(HINSTANCE instance) {
     if (normalPunchAttack == nullptr) {
         return fail("ATTACK_HIT_NORMAL is missing from the combat config");
     }
-    result = soundCatalog_.index(gameDataRoot / "sound");
+    result = voxSounds_.load(gameDataRoot);
+    if (!result) {
+        return fail(result.message());
+    }
+    result = soundCatalog_.index(gameDataRoot / "sound", &voxSounds_);
     if (!result) {
         return fail(result.message());
     }

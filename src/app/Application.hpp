@@ -3,6 +3,7 @@
 #include "audio/xaudio2/XAudio2System.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
+#include "audio/VoxSoundTable.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayPlayer.hpp"
@@ -31,6 +32,7 @@ private:
     game::LevelOneBootstrap levelOne_;
     renderer::D3D11Renderer renderer_;
     audio::XAudio2System audio_;
+    audio::VoxSoundTable voxSounds_;
     audio::SoundEventCatalog soundCatalog_;
     audio::CinematicSoundBank introSounds_;
     game::CinematicPlayer introPlayer_;

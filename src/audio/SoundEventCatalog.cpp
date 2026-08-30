@@ -1,5 +1,7 @@
 #include "audio/SoundEventCatalog.hpp"
 
+#include "audio/VoxSoundTable.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -17,16 +19,29 @@ std::string normalizedEventName(std::string_view value) {
     return normalized;
 }
 
+std::string normalizedResourcePath(std::filesystem::path value) {
+    value.replace_extension();
+    std::string normalized = value.generic_string();
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char character) {
+                       return static_cast<char>(std::toupper(character));
+                   });
+    return normalized;
+}
+
 } // namespace
 
-Result SoundEventCatalog::index(const std::filesystem::path& soundRoot) {
+Result SoundEventCatalog::index(const std::filesystem::path& soundRoot,
+                                const VoxSoundTable* voxSounds) {
     pathsByEvent_.clear();
+    configuredPathsByEvent_.clear();
     std::error_code error;
     if (!std::filesystem::is_directory(soundRoot, error)) {
         return Result::failure("Sound root is not a readable directory: " +
                                soundRoot.string());
     }
 
+    std::map<std::string, std::filesystem::path, std::less<>> pathsByResource;
     for (std::filesystem::recursive_directory_iterator iterator(soundRoot, error),
          end;
          iterator != end; iterator.increment(error)) {
@@ -43,9 +58,28 @@ Result SoundEventCatalog::index(const std::filesystem::path& soundRoot) {
         pathsByEvent_[normalizedEventName(
                           iterator->path().stem().string())]
             .push_back(iterator->path());
+        const std::filesystem::path relative =
+            std::filesystem::relative(iterator->path(), soundRoot, error);
+        if (error) {
+            pathsByEvent_.clear();
+            return Result::failure("Could not index sound resource path: " +
+                                   error.message());
+        }
+        pathsByResource.emplace(normalizedResourcePath(relative),
+                                iterator->path());
     }
     if (pathsByEvent_.empty()) {
         return Result::failure("Sound root contains no Ogg/Vorbis resources");
+    }
+    if (voxSounds != nullptr) {
+        for (const VoxSoundRecord& record : voxSounds->records()) {
+            const auto resource = pathsByResource.find(
+                normalizedResourcePath(record.resourcePath));
+            if (resource != pathsByResource.end()) {
+                configuredPathsByEvent_.emplace(
+                    normalizedEventName(record.eventName), resource->second);
+            }
+        }
     }
     return Result::success();
 }
@@ -53,16 +87,11 @@ Result SoundEventCatalog::index(const std::filesystem::path& soundRoot) {
 const std::filesystem::path* SoundEventCatalog::resolve(
     std::string_view eventName) const noexcept {
     std::string normalized = normalizedEventName(eventName);
-    auto iterator = pathsByEvent_.find(normalized);
-    if (iterator == pathsByEvent_.end()) {
-        // Level 1's CFF uses SPIDY while the shipped asset spells SPIDEY.
-        constexpr std::string_view misspelling = "_SPIDY_";
-        const std::size_t position = normalized.find(misspelling);
-        if (position != std::string::npos) {
-            normalized.replace(position, misspelling.size(), "_SPIDEY_");
-            iterator = pathsByEvent_.find(normalized);
-        }
+    const auto configured = configuredPathsByEvent_.find(normalized);
+    if (configured != configuredPathsByEvent_.end()) {
+        return &configured->second;
     }
+    auto iterator = pathsByEvent_.find(normalized);
     if (iterator == pathsByEvent_.end() || iterator->second.size() != 1) {
         return nullptr;
     }

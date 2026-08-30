@@ -9,6 +9,7 @@
 #include "audio/OggAudio.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
+#include "audio/VoxSoundTable.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
@@ -130,16 +131,30 @@ int main() {
         assert(decodedAudio.channelCount > 0);
         assert(decodedAudio.frameCount() > 0);
 
+        usm::audio::VoxSoundTable voxSounds;
+        const usm::Result voxResult = voxSounds.load(dataRoot);
+        if (!voxResult) {
+            std::cerr << voxResult.message() << '\n';
+            return 1;
+        }
+        assert(voxSounds.records().size() == 493);
+        const auto* knifeHurt = voxSounds.find("SFX_THUG_KNIFE_HURT_1");
+        assert(knifeHurt != nullptr);
+        assert(knifeHurt->resourcePath ==
+               "sfx/NPC/Thugs/sfx_thug_hurt_1.wav");
+        assert(voxSounds.find("SFX_VERTICAL_IMPACT") != nullptr);
+
         usm::audio::SoundEventCatalog soundCatalog;
-        assert(soundCatalog.index(dataRoot / "sound"));
+        assert(soundCatalog.index(dataRoot / "sound", &voxSounds));
         assert(soundCatalog.eventCount() == 510);
         assert(soundCatalog.ambiguousEventCount() == 5);
+        assert(soundCatalog.configuredEventCount() == 483);
         assert(soundCatalog.resolve("SFX_WEB_SWING_START") != nullptr);
         assert(soundCatalog.resolve("VFX_PROLOGUE_SPIDY_01") != nullptr);
         assert(soundCatalog.resolve("SFX_CUTSCENE_LV3_SPIDY_ARRIVES") !=
                nullptr);
-        assert(soundCatalog.resolve("SFX_THUG_KNIFE_HURT_1") == nullptr);
-        assert(soundCatalog.resolve("SFX_VERTICAL_IMPACT") == nullptr);
+        assert(soundCatalog.resolve("SFX_THUG_KNIFE_HURT_1") != nullptr);
+        assert(soundCatalog.resolve("SFX_VERTICAL_IMPACT") != nullptr);
         usm::audio::PcmAudio catalogAudio;
         assert(soundCatalog.decode("SFX_WEB_SWING_START", catalogAudio));
         assert(catalogAudio.frameCount() > 0);
@@ -963,16 +978,8 @@ int main() {
 
         usm::audio::CinematicSoundBank introSounds;
         assert(introSounds.preload(bootstrap.introScript(), soundCatalog));
-        assert(introSounds.loadedEventCount() == 17);
-        assert(introSounds.unresolvedEvents().size() == 2);
-        assert(std::find(introSounds.unresolvedEvents().begin(),
-                         introSounds.unresolvedEvents().end(),
-                         "SFX_THUG_KNIFE_HURT_1") !=
-               introSounds.unresolvedEvents().end());
-        assert(std::find(introSounds.unresolvedEvents().begin(),
-                         introSounds.unresolvedEvents().end(),
-                         "SFX_VERTICAL_IMPACT") !=
-               introSounds.unresolvedEvents().end());
+        assert(introSounds.loadedEventCount() == 19);
+        assert(introSounds.unresolvedEvents().empty());
         std::size_t playedSoundCount = 0;
         assert(introSounds.dispatch(
             bootstrap.introScript().threads().front().commands.back(),
