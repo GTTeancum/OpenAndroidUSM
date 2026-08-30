@@ -260,6 +260,22 @@ struct LevelEnvironmentEffectAsset {
     bool visible{true};
 };
 
+enum class LevelBonusType : std::int32_t {
+    Health = 0,
+    WebPower = 1,
+    SkillPoint = 2,
+};
+
+// CBonus is serialized as an empty room node. ProcessUserAttr
+// (0x003937a8) creates the visible effect from these flags at runtime.
+struct LevelBonusAsset {
+    std::int32_t objectId{-1};
+    LevelBonusType type{LevelBonusType::Health};
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    bool visible{true};
+};
+
 // Authored CTriggerSound volume. The native object starts a looping 2D Vox
 // emitter while the player's collision box intersects this volume.
 struct LevelTriggerSoundAsset {
@@ -395,6 +411,9 @@ public:
     environmentEffects() const noexcept {
         return environmentEffects_;
     }
+    [[nodiscard]] const std::vector<LevelBonusAsset>& bonuses() const noexcept {
+        return bonuses_;
+    }
     [[nodiscard]] const std::vector<LevelTriggerSoundAsset>& triggerSounds()
         const noexcept {
         return triggerSounds_;
@@ -434,6 +453,7 @@ private:
     LevelHudAsset hud_;
     LevelEffectAsset effects_;
     std::vector<LevelEnvironmentEffectAsset> environmentEffects_;
+    std::vector<LevelBonusAsset> bonuses_;
     std::vector<LevelTriggerSoundAsset> triggerSounds_;
     LevelTextCatalog textCatalog_;
 };

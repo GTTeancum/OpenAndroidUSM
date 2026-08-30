@@ -109,7 +109,9 @@ struct LevelEffectRuntime::PersistentEmitter {
     assets::Vector3 origin;
     std::int32_t delayMilliseconds{};
     std::int32_t roomId{-1};
+    std::int32_t sourceObjectId{-1};
     float emissionRemainder{};
+    bool visible{true};
 };
 
 struct LevelEffectRuntime::Particle {
@@ -178,7 +180,7 @@ Result LevelEffectRuntime::applyCinematicCommand(
 
 Result LevelEffectRuntime::addPersistentEffect(
     std::string_view effectType, const assets::Vector3& origin,
-    std::int32_t roomId, bool visible) {
+    std::int32_t roomId, bool visible, std::int32_t sourceObjectId) {
     if (presets_ == nullptr) {
         return Result::failure("Effect runtime is not initialized");
     }
@@ -186,20 +188,36 @@ Result LevelEffectRuntime::addPersistentEffect(
     if (preset == nullptr) {
         return Result::failure("Persistent effect references an unknown preset");
     }
-    if (!visible) {
-        return Result::success();
-    }
     for (const EffectEmitterPreset& emitter : preset->emitters) {
         persistentEmitters_.push_back(
             {&emitter, origin,
-             std::max(emitter.startDelayMilliseconds, 0), roomId, 0.0F});
+             std::max(emitter.startDelayMilliseconds, 0), roomId,
+             sourceObjectId, 0.0F, visible});
     }
     return Result::success();
+}
+
+Result LevelEffectRuntime::setPersistentEffectVisible(
+    std::int32_t sourceObjectId, bool visible) noexcept {
+    bool found = false;
+    for (PersistentEmitter& emitter : persistentEmitters_) {
+        if (emitter.sourceObjectId != sourceObjectId) {
+            continue;
+        }
+        emitter.visible = visible;
+        found = true;
+    }
+    return found
+               ? Result::success()
+               : Result::failure("Persistent effect source was not found");
 }
 
 void LevelEffectRuntime::update(
     std::uint32_t elapsedMilliseconds) noexcept {
     for (PersistentEmitter& emitter : persistentEmitters_) {
+        if (!emitter.visible) {
+            continue;
+        }
         std::uint32_t emissionMilliseconds = elapsedMilliseconds;
         if (emitter.delayMilliseconds > 0) {
             if (elapsedMilliseconds <=

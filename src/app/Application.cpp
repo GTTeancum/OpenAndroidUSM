@@ -82,6 +82,10 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = soundCatalog_.decode("SFX_ORBS_COLLECT", bonusCollectSound_);
+    if (!result) {
+        return fail(result.message());
+    }
     // Application::SetSlowMotion/ResetSlowMotion use VoxSound IDs 0x186 and
     // 0x187 respectively. Their recovered event names make the native lookup
     // independent of record ordering.
@@ -197,7 +201,25 @@ int Application::run(HINSTANCE instance) {
     for (const game::LevelEnvironmentEffectAsset& effect :
          levelOne_.environmentEffects()) {
         result = effectRuntime_.addPersistentEffect(
-            effect.effectType, effect.position, effect.roomId, effect.visible);
+            effect.effectType, effect.position, effect.roomId, effect.visible,
+            effect.objectId);
+        if (!result) {
+            return fail(result.message());
+        }
+    }
+    result = levelBonusRuntime_.initialize(levelOne_.bonuses());
+    if (!result) {
+        return fail(result.message());
+    }
+    for (const game::LevelBonusAsset& bonus : levelOne_.bonuses()) {
+        const std::string_view effectType =
+            bonus.type == game::LevelBonusType::Health
+                ? "bonus_green"
+            : bonus.type == game::LevelBonusType::WebPower ? "bonus_blue"
+                                                            : "bonus_red";
+        result = effectRuntime_.addPersistentEffect(
+            effectType, bonus.position, bonus.roomId, bonus.visible,
+            bonus.objectId);
         if (!result) {
             return fail(result.message());
         }
@@ -735,6 +757,30 @@ int Application::run(HINSTANCE instance) {
                     }
                 }
             }
+            levelBonusRuntime_.update(gameplayPlayer_.position(),
+                                      gameDeltaMilliseconds);
+            for (const std::int32_t objectId :
+                 levelBonusRuntime_.consumeCollectedBonusIds()) {
+                result = effectRuntime_.setPersistentEffectVisible(objectId,
+                                                                   false);
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
+            for (const game::LevelBonusGrant& grant :
+                 levelBonusRuntime_.consumeGrants()) {
+                if (grant.type == game::LevelBonusType::Health) {
+                    gameplayPlayer_.addHealth(
+                        static_cast<float>(grant.amount));
+                } else if (grant.type == game::LevelBonusType::SkillPoint) {
+                    gameplayPlayer_.addSkillPoints(grant.amount);
+                }
+                result = audio_.playNamed("SFX_ORBS_COLLECT",
+                                          bonusCollectSound_);
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
             result = applyMusicTransition(levelMusicRuntime_.update(
                 enemyRuntime_.states(), gameplayPlayer_.dead()));
             if (!result) {
@@ -745,7 +791,10 @@ int Application::run(HINSTANCE instance) {
             result = renderer_.updatePlayerHud(
                 levelOne_.hud(), playerHudHealth_.currentRatio(),
                 playerHudHealth_.delayedRatio(), 1.0F,
-                enemyRuntime_.shownHealthBarEnemy());
+                enemyRuntime_.shownHealthBarEnemy(),
+                gameplayPlayer_.skillPoints(),
+                levelBonusRuntime_.showSkillPointTotal(),
+                &levelBonusRuntime_.skillPointPopup());
             const assets::ColladaAnimationClip* activeClip =
                 levelOne_.player().animationBank.findClip(
                     gameplayPlayer_.activeAnimation());
@@ -811,7 +860,7 @@ int Application::run(HINSTANCE instance) {
         }
         if (result) {
             result = renderer_.updateLevelOneEffects(
-                levelOne_.effects(), effectRuntime_);
+                levelOne_.effects(), effectRuntime_, levelBonusRuntime_);
         }
         cinematicUi_.update(
             gameDeltaMilliseconds,

@@ -289,6 +289,8 @@ int main() {
 
         usm::game::LevelEffectRuntime environmentEffects;
         assert(environmentEffects.initialize(levelOne.effects().presets));
+        usm::game::LevelBonusRuntime bonusRuntime;
+        assert(bonusRuntime.initialize(levelOne.bonuses()));
         const auto& environmentEffect = levelOne.environmentEffects().front();
         assert(environmentEffects.addPersistentEffect(
             environmentEffect.effectType, environmentEffect.position,
@@ -306,7 +308,8 @@ int main() {
         gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
         assert(gameRenderer.setCamera(environmentEffectCamera));
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
-                                                   environmentEffects));
+                                                   environmentEffects,
+                                                   bonusRuntime));
         gameRenderer.renderFrame();
         RgbaImage environmentEffectBaseline;
         assert(gameRenderer.readBackImage(environmentEffectBaseline));
@@ -315,7 +318,8 @@ int main() {
         environmentEffects.update(100);
         assert(!environmentEffects.particles().empty());
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
-                                                   environmentEffects));
+                                                   environmentEffects,
+                                                   bonusRuntime));
         gameRenderer.renderFrame();
         RgbaImage environmentEffectFrame;
         assert(gameRenderer.readBackImage(environmentEffectFrame));
@@ -334,6 +338,76 @@ int main() {
                     environmentEffectBaseline.pixels[component + 2];
         }
         assert(environmentEffectChangedPixels > 2);
+
+        usm::game::LevelEffectRuntime bonusEffects;
+        assert(bonusEffects.initialize(levelOne.effects().presets));
+        usm::game::LevelBonusAsset bonus = levelOne.bonuses().front();
+        bonus.position = gameplayPose.target;
+        bonus.roomId = 1;
+        const std::array renderBonuses{bonus};
+        usm::game::LevelBonusRuntime renderBonusRuntime;
+        assert(renderBonusRuntime.initialize(renderBonuses));
+        const std::string_view bonusEffectType =
+            bonus.type == usm::game::LevelBonusType::Health ? "bonus_green"
+                                                            : "bonus_red";
+        assert(bonusEffects.addPersistentEffect(
+            bonusEffectType, bonus.position, bonus.roomId, bonus.visible,
+            bonus.objectId));
+        cinematicVisibleRooms.fill(false);
+        cinematicVisibleRooms[0] = true;
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        assert(gameRenderer.setCamera(gameplayPose));
+        assert(gameRenderer.updateLevelOneEffects(
+            levelOne.effects(), bonusEffects, renderBonusRuntime));
+        gameRenderer.renderFrame();
+        RgbaImage bonusBaseline;
+        assert(gameRenderer.readBackImage(bonusBaseline));
+        bonusEffects.update(100);
+        bonusEffects.update(100);
+        assert(!bonusEffects.particles().empty());
+        assert(gameRenderer.updateLevelOneEffects(
+            levelOne.effects(), bonusEffects, renderBonusRuntime));
+        gameRenderer.renderFrame();
+        RgbaImage bonusStationaryFrame;
+        assert(gameRenderer.readBackImage(bonusStationaryFrame));
+        captureIfRequested(bonusStationaryFrame,
+                           "gameplay-bonus-stationary.bmp");
+        std::size_t bonusStationaryChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < bonusStationaryFrame.pixels.size(); component += 4) {
+            bonusStationaryChangedPixels +=
+                bonusStationaryFrame.pixels[component] !=
+                    bonusBaseline.pixels[component] ||
+                bonusStationaryFrame.pixels[component + 1] !=
+                    bonusBaseline.pixels[component + 1] ||
+                bonusStationaryFrame.pixels[component + 2] !=
+                    bonusBaseline.pixels[component + 2];
+        }
+        assert(bonusStationaryChangedPixels > 2);
+        renderBonusRuntime.update(
+            {bonus.position.x, bonus.position.y, bonus.position.z - 100.0F},
+            250);
+        assert(renderBonusRuntime.orbs().size() == 1);
+        assert(bonusEffects.setPersistentEffectVisible(bonus.objectId, false));
+        bonusEffects.update(300);
+        assert(gameRenderer.updateLevelOneEffects(
+            levelOne.effects(), bonusEffects, renderBonusRuntime));
+        gameRenderer.renderFrame();
+        RgbaImage bonusOrbFrame;
+        assert(gameRenderer.readBackImage(bonusOrbFrame));
+        captureIfRequested(bonusOrbFrame, "gameplay-bonus-orb.bmp");
+        std::size_t bonusOrbChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < bonusOrbFrame.pixels.size(); component += 4) {
+            bonusOrbChangedPixels +=
+                bonusOrbFrame.pixels[component] !=
+                    bonusBaseline.pixels[component] ||
+                bonusOrbFrame.pixels[component + 1] !=
+                    bonusBaseline.pixels[component + 1] ||
+                bonusOrbFrame.pixels[component + 2] !=
+                    bonusBaseline.pixels[component + 2];
+        }
+        assert(bonusOrbChangedPixels > 2);
         cinematicVisibleRooms.fill(false);
         gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
         assert(gameRenderer.setCamera(gameplayPose));
@@ -359,7 +433,7 @@ int main() {
                                return (particle.color >> 24U) != 0;
                            }));
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
-                                                   effects));
+                                                   effects, bonusRuntime));
         gameRenderer.renderFrame();
         RgbaImage gameplayEffectFrame;
         assert(gameRenderer.readBackImage(gameplayEffectFrame));
@@ -378,7 +452,7 @@ int main() {
         assert(effectChangedPixels > 2);
         effects.update(300);
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
-                                                   effects));
+                                                   effects, bonusRuntime));
         const auto renderAuthoredEffect =
             [&](std::string_view effectType,
                 std::uint32_t elapsedMilliseconds,
@@ -389,7 +463,8 @@ int main() {
                 effects.update(elapsedMilliseconds);
                 assert(!effects.particles().empty());
                 assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
-                                                           effects));
+                                                           effects,
+                                                           bonusRuntime));
                 gameRenderer.renderFrame();
                 RgbaImage frame;
                 assert(gameRenderer.readBackImage(frame));
@@ -548,6 +623,17 @@ int main() {
                     gameplayFrame.pixels[component + 2];
         }
         assert(hudChangedPixels > 100);
+        const usm::game::LevelBonusPopupState skillPointPopup{
+            levelOne.player().position, 5, 0.25F, true};
+        assert(gameRenderer.updatePlayerHud(
+            levelOne.hud(), 0.65F, 0.85F, 1.0F, nullptr, 5, true,
+            &skillPointPopup));
+        gameRenderer.renderFrame();
+        RgbaImage skillPointHudFrame;
+        assert(gameRenderer.readBackImage(skillPointHudFrame));
+        captureIfRequested(skillPointHudFrame,
+                           "gameplay-skill-point-hud.bmp");
+        assert(countChangedPixels(gameplayHudFrame, skillPointHudFrame) > 10);
         usm::game::LevelEnemyRuntime healthBarEnemies;
         assert(healthBarEnemies.initialize(levelOne));
         usm::game::CinematicThread showHealthThread;

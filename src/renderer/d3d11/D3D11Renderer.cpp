@@ -1486,7 +1486,8 @@ Result D3D11Renderer::updateEnemyGunLines(
 
 Result D3D11Renderer::updateLevelOneEffects(
     const game::LevelEffectAsset& assets,
-    const game::LevelEffectRuntime& effects) {
+    const game::LevelEffectRuntime& effects,
+    const game::LevelBonusRuntime& bonuses) {
     effectAlphaVertexCount_ = 0;
     effectAdditiveVertexCount_ = 0;
     if (!device_ || !context_ || !effectTexture_) {
@@ -1580,6 +1581,130 @@ Result D3D11Renderer::updateLevelOneEffects(
         appendParticle(particle,
                        particle.additive ? additiveVertices : alphaVertices,
                        valid);
+    }
+    const auto frameModule = [&](std::int32_t frameId,
+                                 assets::SpriteModule& module) {
+        const auto modules =
+            atlas.modulesForFrame(static_cast<std::size_t>(frameId));
+        if (frameId < 0 || modules.size() != 1 ||
+            modules.front().moduleIndex >= atlas.modules().size() ||
+            modules.front().flags != 0) {
+            return false;
+        }
+        module = atlas.modules()[modules.front().moduleIndex];
+        return module.imageIndex == 0;
+    };
+    const auto textureCoordinates = [&](const assets::SpriteModule& module) {
+        return std::array<float, 4>{
+            static_cast<float>(module.x) /
+                static_cast<float>(texture.width),
+            static_cast<float>(module.y) /
+                static_cast<float>(texture.height),
+            static_cast<float>(module.x + module.width) /
+                static_cast<float>(texture.width),
+            static_cast<float>(module.y + module.height) /
+                static_cast<float>(texture.height)};
+    };
+    const auto appendOrbHead = [&](const game::LevelBonusOrbRenderState& orb,
+                                   const assets::SpriteModule& module) {
+        const auto uv = textureCoordinates(module);
+        const float half = orb.headHalfWidth;
+        const auto point = [&](float right, float up) {
+            return DirectX::XMFLOAT3{
+                orb.headPosition.x + cameraRight_.x * right + cameraUp_.x * up,
+                orb.headPosition.y + cameraRight_.y * right + cameraUp_.y * up,
+                orb.headPosition.z + cameraRight_.z * right + cameraUp_.z * up};
+        };
+        constexpr std::uint32_t white = 0xffffffffU;
+        const GpuVertex topLeft{point(-half, half), {}, {uv[0], uv[1]}, white};
+        const GpuVertex topRight{point(half, half), {}, {uv[2], uv[1]}, white};
+        const GpuVertex bottomLeft{point(-half, -half), {}, {uv[0], uv[3]},
+                                   white};
+        const GpuVertex bottomRight{point(half, -half), {}, {uv[2], uv[3]},
+                                    white};
+        additiveVertices.insert(additiveVertices.end(),
+                                {topLeft, topRight, bottomLeft, topRight,
+                                 bottomRight, bottomLeft});
+    };
+    const auto appendOrbRibbon = [&](const game::LevelBonusOrbRenderState& orb,
+                                     const assets::SpriteModule& module) {
+        const auto uv = textureCoordinates(module);
+        const std::uint32_t color = rgbaVertexColor(
+            orb.type == game::LevelBonusType::SkillPoint ? 0x64ff0000U
+                                                          : 0x6400ff00U);
+        for (std::size_t index = 0;
+             index + 1 < orb.trailPositions.size(); ++index) {
+            const assets::Vector3& first = orb.trailPositions[index];
+            const assets::Vector3& second = orb.trailPositions[index + 1];
+            const DirectX::XMVECTOR tangent = DirectX::XMVectorSet(
+                second.x - first.x, second.y - first.y,
+                second.z - first.z, 0.0F);
+            const DirectX::XMVECTOR toCamera = DirectX::XMVectorSet(
+                cameraPosition_.x - first.x,
+                cameraPosition_.y - first.y,
+                cameraPosition_.z - first.z, 0.0F);
+            DirectX::XMVECTOR widthDirection =
+                DirectX::XMVector3Cross(tangent, toCamera);
+            if (DirectX::XMVectorGetX(
+                    DirectX::XMVector3LengthSq(widthDirection)) < 0.0001F) {
+                widthDirection = DirectX::XMVectorSet(
+                    cameraRight_.x, cameraRight_.y, cameraRight_.z, 0.0F);
+            } else {
+                widthDirection = DirectX::XMVector3Normalize(widthDirection);
+            }
+            const float widthX =
+                DirectX::XMVectorGetX(widthDirection) * orb.trailHalfWidth;
+            const float widthY =
+                DirectX::XMVectorGetY(widthDirection) * orb.trailHalfWidth;
+            const float widthZ =
+                DirectX::XMVectorGetZ(widthDirection) * orb.trailHalfWidth;
+            const DirectX::XMFLOAT3 firstLeft{first.x - widthX,
+                                               first.y - widthY,
+                                               first.z - widthZ};
+            const DirectX::XMFLOAT3 firstRight{first.x + widthX,
+                                                first.y + widthY,
+                                                first.z + widthZ};
+            const DirectX::XMFLOAT3 secondLeft{second.x - widthX,
+                                                second.y - widthY,
+                                                second.z - widthZ};
+            const DirectX::XMFLOAT3 secondRight{second.x + widthX,
+                                                 second.y + widthY,
+                                                 second.z + widthZ};
+            const float firstFraction =
+                static_cast<float>(index) /
+                static_cast<float>(orb.trailPositions.size() - 1);
+            const float secondFraction =
+                static_cast<float>(index + 1) /
+                static_cast<float>(orb.trailPositions.size() - 1);
+            const float firstV = uv[3] + (uv[1] - uv[3]) * firstFraction;
+            const float secondV = uv[3] + (uv[1] - uv[3]) * secondFraction;
+            additiveVertices.insert(
+                additiveVertices.end(),
+                {GpuVertex{firstLeft, {}, {uv[0], firstV}, color},
+                 GpuVertex{firstRight, {}, {uv[2], firstV}, color},
+                 GpuVertex{secondLeft, {}, {uv[0], secondV}, color},
+                 GpuVertex{firstRight, {}, {uv[2], firstV}, color},
+                 GpuVertex{secondRight, {}, {uv[2], secondV}, color},
+                 GpuVertex{secondLeft, {}, {uv[0], secondV}, color}});
+        }
+    };
+    for (const game::LevelBonusOrbRenderState& orb : bonuses.orbs()) {
+        if (orb.roomId >= 1 &&
+            orb.roomId <= static_cast<std::int32_t>(roomVisibility_.size()) &&
+            !roomVisibility_[static_cast<std::size_t>(orb.roomId - 1)]) {
+            continue;
+        }
+        assets::SpriteModule trailModule;
+        assets::SpriteModule headModule;
+        const std::int32_t headFrame =
+            orb.type == game::LevelBonusType::SkillPoint ? 14 : 15;
+        if (!frameModule(5, trailModule) ||
+            !frameModule(headFrame, headModule)) {
+            valid = false;
+            continue;
+        }
+        appendOrbRibbon(orb, trailModule);
+        appendOrbHead(orb, headModule);
     }
     if (!valid) {
         return Result::failure(
@@ -1707,7 +1832,11 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
                                       float delayedHealthRatio,
                                       float webPowerRatio,
                                       const game::LevelEnemyState*
-                                          shownHealthBarEnemy) {
+                                          shownHealthBarEnemy,
+                                      std::int32_t skillPoints,
+                                      bool showSkillPointTotal,
+                                      const game::LevelBonusPopupState*
+                                          skillPointPopup) {
     if (!device_ || !context_ || !hudTexture_ || width_ == 0 || height_ == 0) {
         return Result::failure("HUD GPU resources are incomplete");
     }
@@ -1736,7 +1865,8 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
     const auto appendFrame = [&](std::size_t frameIndex, float originX,
                                  float originY, float fillRatio,
                                  float rightClipPixels,
-                                 bool fillFromRight = false) {
+                                 bool fillFromRight = false,
+                                 std::uint8_t alpha = 0xff) {
         const float clampedRatio = std::clamp(fillRatio, 0.0F, 1.0F);
         for (const assets::SpriteFrameModule& frameModule :
              atlas.modulesForFrame(frameIndex)) {
@@ -1801,7 +1931,9 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
             if (flipX) {
                 std::swap(u0, u1);
             }
-            constexpr std::uint32_t white = 0xffffffffU;
+            const std::uint32_t white =
+                rgbaVertexColor((static_cast<std::uint32_t>(alpha) << 24U) |
+                                0x00ffffffU);
             const GpuVertex topLeft{{x0, y0, 0.0F}, {}, {u0, v0}, white};
             const GpuVertex topRight{{x1, y0, 0.0F}, {}, {u1, v0}, white};
             const GpuVertex bottomLeft{{x0, y1, 0.0F}, {}, {u0, v1}, white};
@@ -1809,6 +1941,34 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
             vertices.insert(vertices.end(),
                             {topLeft, topRight, bottomLeft, topRight,
                              bottomRight, bottomLeft});
+        }
+    };
+    const auto frameAdvance = [&](std::size_t frameIndex) {
+        float advance = 0.0F;
+        for (const assets::SpriteFrameModule& frameModule :
+             atlas.modulesForFrame(frameIndex)) {
+            if (frameModule.moduleIndex >= atlas.modules().size()) {
+                continue;
+            }
+            const assets::SpriteModule& module =
+                atlas.modules()[frameModule.moduleIndex];
+            advance = std::max(
+                advance, static_cast<float>(frameModule.x) + module.width);
+        }
+        return std::max(advance, 1.0F);
+    };
+    const auto appendNumber = [&](std::int32_t value, float originX,
+                                  float originY, std::uint8_t alpha) {
+        constexpr std::array<std::size_t, 10> digitFrames{
+            0x42, 0x39, 0x3a, 0x3b, 0x3c,
+            0x3d, 0x3e, 0x3f, 0x40, 0x41};
+        const std::string digits = std::to_string(std::max(value, 0));
+        float cursor = originX;
+        for (const char digit : digits) {
+            const std::size_t frame =
+                digitFrames[static_cast<std::size_t>(digit - '0')];
+            appendFrame(frame, cursor, originY, 1.0F, 0.0F, false, alpha);
+            cursor += frameAdvance(frame);
         }
     };
 
@@ -1823,6 +1983,40 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
     appendFrame(0x18, playerHudX, playerHudY, 1.0F, 0.0F);
     appendFrame(0x19, playerHudX, playerHudY, webPowerRatio, 5.0F);
     appendFrame(0x1f, playerHudX, playerHudY, 1.0F, 0.0F);
+
+    if (showSkillPointTotal) {
+        // CLevel::RenderSkillPoint (0x0038728c) uses the original 480x320
+        // positions (80,90) and keeps the total visible for six seconds.
+        // SetShowSkillPointFrame (0x0037f358) also creates frame 0x21 at
+        // (40,90) for the duration of that display.
+        appendFrame(0x21, 40.0F, 90.0F, 1.0F, 0.0F);
+        appendFrame(0x6f, 80.0F, 90.0F, 1.0F, 0.0F);
+        appendNumber(skillPoints, 98.0F, 94.0F, 0xff);
+    }
+    if (skillPointPopup != nullptr && skillPointPopup->visible) {
+        const DirectX::XMMATRIX viewProjection = DirectX::XMMatrixTranspose(
+            DirectX::XMLoadFloat4x4(&worldViewProjection_));
+        const DirectX::XMVECTOR world = DirectX::XMVectorSet(
+            skillPointPopup->playerPosition.x,
+            skillPointPopup->playerPosition.y,
+            skillPointPopup->playerPosition.z, 1.0F);
+        const DirectX::XMVECTOR projected =
+            DirectX::XMVector3TransformCoord(world, viewProjection);
+        const float screenX =
+            (DirectX::XMVectorGetX(projected) + 1.0F) * 0.5F * width_;
+        const float screenY =
+            (1.0F - DirectX::XMVectorGetY(projected)) * 0.5F * height_;
+        const float popupX = (screenX - screenOffsetX) / screenScale;
+        const float popupY = (screenY - screenOffsetY) / screenScale -
+                             80.0F - 40.0F * skillPointPopup->progress;
+        const std::uint8_t popupAlpha = static_cast<std::uint8_t>(
+            std::clamp(std::lround(
+                           (1.0F - skillPointPopup->progress) * 255.0F),
+                       0L, 255L));
+        appendFrame(0x43, popupX, popupY, 1.0F, 0.0F, false, popupAlpha);
+        appendNumber(skillPointPopup->amount, popupX + 17.0F, popupY,
+                     popupAlpha);
+    }
 
     if (shownHealthBarEnemy != nullptr && shownHealthBarEnemy->asset != nullptr) {
         struct EnemyHealthFrames {
@@ -2066,6 +2260,7 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
     cameraUp_ = {DirectX::XMVectorGetX(billboardUp),
                  DirectX::XMVectorGetY(billboardUp),
                  DirectX::XMVectorGetZ(billboardUp)};
+    cameraPosition_ = camera.position;
     const DirectX::XMMATRIX skyView = buildOriginalLookAtMatrix(
         DirectX::XMVectorZero(), direction, up);
     const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(

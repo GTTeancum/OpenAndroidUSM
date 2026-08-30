@@ -44,6 +44,8 @@ public:
     [[nodiscard]] bool requestWeb() noexcept;
     [[nodiscard]] bool releaseWeb() noexcept;
     [[nodiscard]] bool applyDamage(float damage) noexcept;
+    void addHealth(float health) noexcept;
+    void addSkillPoints(std::int32_t points) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
         const CinematicThread& thread, const CinematicCommand& command);
     void update(const PlayerMotionInput& input, const CameraPose& camera,
@@ -67,6 +69,9 @@ public:
     [[nodiscard]] std::uint32_t animationTimeMilliseconds() const noexcept;
     [[nodiscard]] float health() const noexcept { return health_; }
     [[nodiscard]] float maximumHealth() const noexcept { return maximumHealth_; }
+    [[nodiscard]] std::int32_t skillPoints() const noexcept {
+        return skillPoints_;
+    }
     [[nodiscard]] bool dead() const noexcept { return health_ <= 0.0F; }
     [[nodiscard]] bool cinematicDriven() const noexcept {
         return cinematicDriven_;
@@ -159,6 +164,7 @@ private:
     std::size_t enteredStateCount_{};
     float health_{1000.0F};
     float maximumHealth_{1000.0F};
+    std::int32_t skillPoints_{};
     std::int32_t objectId_{-1};
     bool cinematicDriven_{};
     bool cinematicAnimationLoops_{true};

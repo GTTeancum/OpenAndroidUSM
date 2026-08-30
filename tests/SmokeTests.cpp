@@ -21,6 +21,7 @@
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
+#include "game/LevelBonusRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
@@ -274,6 +275,8 @@ int main() {
                downtownMixed->parameter2c == 3 &&
                sandmanMusic->parameter2c == 3);
         assert(loseMusic->parameter2c == 4);
+        const auto* orbCollect = voxSounds.find("SFX_ORBS_COLLECT");
+        assert(orbCollect != nullptr && orbCollect->id == 98);
         const auto* knifeHurt = voxSounds.find("SFX_THUG_KNIFE_HURT_1");
         assert(knifeHurt != nullptr);
         assert(knifeHurt->resourcePath ==
@@ -713,6 +716,23 @@ int main() {
             assert(bootstrap.effects().presets.find(effect.effectType) !=
                    nullptr);
         }
+        assert(bootstrap.bonuses().size() == 56);
+        assert(std::count_if(
+                   bootstrap.bonuses().begin(), bootstrap.bonuses().end(),
+                   [](const usm::game::LevelBonusAsset& bonus) {
+                       return bonus.type == usm::game::LevelBonusType::Health;
+                   }) == 15);
+        assert(std::count_if(
+                   bootstrap.bonuses().begin(), bootstrap.bonuses().end(),
+                   [](const usm::game::LevelBonusAsset& bonus) {
+                       return bonus.type ==
+                              usm::game::LevelBonusType::SkillPoint;
+                   }) == 41);
+        assert(std::none_of(
+            bootstrap.bonuses().begin(), bootstrap.bonuses().end(),
+            [](const usm::game::LevelBonusAsset& bonus) {
+                return bonus.type == usm::game::LevelBonusType::WebPower;
+            }));
         assert(bootstrap.triggerSounds().size() == 2);
         assert(bootstrap.triggerSounds()[0].objectId == 40006);
         assert(bootstrap.triggerSounds()[0].eventName == "SFX_FIRE_TRAP");
@@ -911,6 +931,8 @@ int main() {
         assert(bootstrap.effects().presets.find("rock_splash") != nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash_big") !=
                nullptr);
+        assert(bootstrap.effects().presets.find("bonus_green") != nullptr);
+        assert(bootstrap.effects().presets.find("bonus_red") != nullptr);
         const auto* ambientFirePreset =
             bootstrap.effects().presets.find("big_firesomke");
         assert(ambientFirePreset != nullptr);
@@ -927,14 +949,50 @@ int main() {
         assert(bootstrap.effects().texture.image().height == 256);
         usm::game::LevelEffectRuntime effectRuntime;
         assert(effectRuntime.initialize(bootstrap.effects().presets));
+        usm::game::LevelBonusRuntime bonusRuntime;
+        assert(bonusRuntime.initialize(bootstrap.bonuses()));
+        assert(bonusRuntime.visibleBonusCount() == 56);
+        const usm::game::LevelBonusAsset& collectedBonus =
+            bootstrap.bonuses().front();
+        const usm::assets::Vector3 collectionPosition{
+            collectedBonus.position.x, collectedBonus.position.y,
+            collectedBonus.position.z - 100.0F};
+        bonusRuntime.update(collectionPosition, 1);
+        const auto collectedBonusIds =
+            bonusRuntime.consumeCollectedBonusIds();
+        assert(collectedBonusIds.size() == 1);
+        assert(collectedBonusIds.front() == collectedBonus.objectId);
+        assert(bonusRuntime.visibleBonusCount() == 55);
+        assert(bonusRuntime.orbs().size() == 1);
+        assert(bonusRuntime.orbs().front().trailHalfWidth >
+               bonusRuntime.orbs().front().headHalfWidth);
+        bonusRuntime.update(collectionPosition, 2100);
+        const auto bonusGrants = bonusRuntime.consumeGrants();
+        assert(bonusGrants.size() == 1);
+        assert(bonusGrants.front().objectId == collectedBonus.objectId);
+        assert(bonusGrants.front().amount ==
+               (collectedBonus.type == usm::game::LevelBonusType::Health
+                    ? 80
+                    : 5));
+        assert(bonusRuntime.orbs().empty());
+        if (collectedBonus.type == usm::game::LevelBonusType::SkillPoint) {
+            assert(bonusRuntime.showSkillPointTotal());
+            bonusRuntime.update(collectionPosition, 1000);
+            assert(bonusRuntime.skillPointPopup().visible);
+            assert(bonusRuntime.skillPointPopup().amount == 5);
+            bonusRuntime.update(collectionPosition, 2000);
+            assert(!bonusRuntime.skillPointPopup().visible);
+        }
         usm::game::LevelEffectRuntime environmentEffectRuntime;
         assert(environmentEffectRuntime.initialize(
             bootstrap.effects().presets));
         for (const auto& effect : bootstrap.environmentEffects()) {
             assert(environmentEffectRuntime.addPersistentEffect(
                 effect.effectType, effect.position, effect.roomId,
-                effect.visible));
+                effect.visible, effect.objectId));
         }
+        assert(environmentEffectRuntime.setPersistentEffectVisible(
+            bootstrap.environmentEffects().front().objectId, false));
         environmentEffectRuntime.update(1000);
         assert(!environmentEffectRuntime.particles().empty());
         assert(std::any_of(

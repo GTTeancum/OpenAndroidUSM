@@ -390,6 +390,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     objectArchetypes_.clear();
     objects_.clear();
     environmentEffects_.clear();
+    bonuses_.clear();
     triggerSounds_.clear();
     hud_ = {};
     effects_ = {};
@@ -662,6 +663,23 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                 }
                 environmentEffects_.push_back(
                     {node.id, effectType,
+                     static_cast<std::int32_t>(roomIndex + 1),
+                     worldPosition(node), node.visible});
+                continue;
+            }
+            if (node.gameType == "Bonus") {
+                LevelBonusType type = LevelBonusType::Health;
+                if (booleanAttribute(node, "WebPower", false)) {
+                    type = LevelBonusType::WebPower;
+                } else if (booleanAttribute(node, "SkillPoint", false)) {
+                    type = LevelBonusType::SkillPoint;
+                } else if (!booleanAttribute(node, "HP", false)) {
+                    return Result::failure("Bonus " +
+                                           std::to_string(node.id) +
+                                           " has no enabled type flag");
+                }
+                bonuses_.push_back(
+                    {node.id, type,
                      static_cast<std::int32_t>(roomIndex + 1),
                      worldPosition(node), node.visible});
                 continue;

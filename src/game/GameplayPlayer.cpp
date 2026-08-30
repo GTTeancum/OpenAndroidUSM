@@ -296,6 +296,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     }
     maximumHealth_ = std::max(asset.health, 1.0F);
     health_ = maximumHealth_;
+    skillPoints_ = 0;
     if (collision_ != nullptr) {
         assets::Vector3 grounded;
         (void)collision_->resolveGroundMotion(position_, position_, grounded,
@@ -394,6 +395,18 @@ bool GameplayPlayer::applyDamage(float damage) noexcept {
     }
     health_ = std::max(0.0F, health_ - damage);
     return true;
+}
+
+void GameplayPlayer::addHealth(float health) noexcept {
+    if (health > 0.0F && !dead()) {
+        health_ = std::min(maximumHealth_, health_ + health);
+    }
+}
+
+void GameplayPlayer::addSkillPoints(std::int32_t points) noexcept {
+    if (points > 0) {
+        skillPoints_ += points;
+    }
 }
 
 Result GameplayPlayer::applyCinematicCommand(

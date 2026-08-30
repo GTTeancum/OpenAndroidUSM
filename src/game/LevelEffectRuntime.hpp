@@ -36,7 +36,10 @@ public:
         const CinematicCommand& command);
     [[nodiscard]] Result addPersistentEffect(
         std::string_view effectType, const assets::Vector3& origin,
-        std::int32_t roomId, bool visible = true);
+        std::int32_t roomId, bool visible = true,
+        std::int32_t sourceObjectId = -1);
+    [[nodiscard]] Result setPersistentEffectVisible(
+        std::int32_t sourceObjectId, bool visible) noexcept;
     void update(std::uint32_t elapsedMilliseconds) noexcept;
 
     [[nodiscard]] std::span<const EffectParticleState> particles() const

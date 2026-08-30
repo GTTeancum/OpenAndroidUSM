@@ -476,6 +476,32 @@ with a uniformly scaled and centered 3:2 safe canvas on widescreen displays.
 WARP regressions compare frames before and after HUD submission and produce a
 1280x720 capture for visual review.
 
+## Collectible bonuses and health orbs
+
+The 13 linked level-one rooms contain 56 `CBonus` nodes: 15 health pickups and
+41 skill-point pickups. `CBonus::ProcessUserAttr` at `0x003937a8` maps their
+serialized flags to `bonus_green` and `bonus_red` particle presets. The
+portable bootstrap retains every object ID, room, world position, and type;
+`LevelEffectRuntime` creates the authored stationary emitters and can disable
+each source independently when collected.
+
+`CBonus::Update` at `0x00393680` uses a 150-unit player-center radius and then
+launches `CHealthOrbs`. `LevelBonusRuntime` reproduces the moving target at
+player height +100, the roughly 2.04-second Hermite path from
+`CHealthOrbs::Init`/`OnAnimate` (`0x003a190c`/`0x003a17c0`), difficulty health
+amounts 80/50/35/20, and five skill points per authored red pickup. The D3D11
+backend draws the frame-5 ribbon plus frame-15 health or frame-14 skill head
+from `effects.bsprite`; arrival plays Vox record 98,
+`SFX_ORBS_COLLECT`.
+
+Skill pickups also follow `CBonusManager::Update`/`Draw2D`
+(`0x0039413c`/`0x00393f8c`): points aggregate for one second, then rise and
+fade above the projected player for two seconds. The total counter follows
+`CLevel::SetShowSkillPointFrame`/`RenderSkillPoint`
+(`0x0037f358`/`0x0038728c`) and stays visible for six seconds. Deterministic
+tests cover every linked pickup, grant timing, amounts, and UI lifetime; WARP
+captures verify stationary, ribbon, and HUD pixels.
+
 ## Player states and authored jump traversal
 
 `PlayerStateConfigDatabase` now preserves the portable fields recovered from

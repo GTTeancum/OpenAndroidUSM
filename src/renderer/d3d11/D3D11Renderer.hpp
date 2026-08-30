@@ -4,6 +4,7 @@
 #include "assets/BtexTexture.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/CinematicUiRuntime.hpp"
+#include "game/LevelBonusRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
@@ -62,13 +63,18 @@ public:
         std::span<const game::EnemyGunLineState> gunLines);
     [[nodiscard]] Result updateLevelOneEffects(
         const game::LevelEffectAsset& assets,
-        const game::LevelEffectRuntime& effects);
+        const game::LevelEffectRuntime& effects,
+        const game::LevelBonusRuntime& bonuses);
     [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
                                          float webPowerRatio,
                                          const game::LevelEnemyState*
-                                             shownHealthBarEnemy = nullptr);
+                                             shownHealthBarEnemy = nullptr,
+                                         std::int32_t skillPoints = 0,
+                                         bool showSkillPointTotal = false,
+                                         const game::LevelBonusPopupState*
+                                             skillPointPopup = nullptr);
     [[nodiscard]] Result updateCinematicUi(
         const game::CinematicUiFrame& frame);
     void setCinematicVisibleRooms(std::span<const bool> rooms) noexcept;
@@ -200,6 +206,7 @@ private:
     DirectX::XMFLOAT4X4 viewRotation_{};
     assets::Vector3 cameraRight_{1.0F, 0.0F, 0.0F};
     assets::Vector3 cameraUp_{0.0F, 0.0F, 1.0F};
+    assets::Vector3 cameraPosition_;
     std::array<bool, 16> forcedVisibleRooms_{};
     std::array<bool, 16> cameraAreaInvisibleRooms_{};
     std::array<bool, 16> cameraAreaVisibleRooms_{};

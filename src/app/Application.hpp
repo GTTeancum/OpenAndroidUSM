@@ -13,6 +13,7 @@
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
+#include "game/LevelBonusRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
@@ -55,6 +56,7 @@ private:
     audio::CinematicSoundBank gameplaySounds_;
     audio::PcmAudio slowMotionEnterSound_;
     audio::PcmAudio slowMotionExitSound_;
+    audio::PcmAudio bonusCollectSound_;
     std::map<std::string, audio::PcmAudio, std::less<>> triggerSoundClips_;
     game::CinematicPlayer introPlayer_;
     game::CinematicUiRuntime cinematicUi_;
@@ -66,6 +68,7 @@ private:
     game::LevelTriggerRuntime triggerRuntime_;
     game::LevelTriggerSoundRuntime triggerSoundRuntime_;
     game::LevelCinematicRuntime levelCinematicRuntime_;
+    game::LevelBonusRuntime levelBonusRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::LevelEffectRuntime effectRuntime_;
     game::LevelMusicRuntime levelMusicRuntime_;
