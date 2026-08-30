@@ -1169,7 +1169,8 @@ int main() {
         const auto gameplayCameraPose =
             gameplayCamera.sample(bootstrap.player().position);
         usm::game::LevelCinematicRuntime levelCommandRuntime;
-        levelCommandRuntime.bind(triggerRuntime, gameplayCamera);
+        levelCommandRuntime.bind(triggerRuntime, gameplayCamera,
+                                 bootstrap.waypoints());
         const auto controlCommand = [](std::string name,
                                        std::string attributeName,
                                        std::string value) {
@@ -1208,6 +1209,13 @@ int main() {
             levelCommandRuntime.consumeCinematicStartRequests();
         assert(cinematicStarts.size() == 1 && cinematicStarts.front() == 1238);
         assert(levelCommandRuntime.consumeCinematicStartRequests().empty());
+        usm::game::CinematicCommand startSlide = controlCommand(
+            "StartSlide", "^SID^WayPoint", "429");
+        startSlide.attributes.push_back(
+            {"int", "^EID^WayPoint", "430"});
+        assert(levelCommandRuntime.applyCommand(startSlide));
+        startSlide.attributes.back().value = "999999";
+        assert(!levelCommandRuntime.applyCommand(startSlide));
         assert(levelCommandRuntime.applyCommand(
             controlCommand("LevelEnd", "GoToNext", "true")));
         assert(levelCommandRuntime.levelEnded());
@@ -1498,7 +1506,8 @@ int main() {
         assert(introGameplayCamera.bind(
             bootstrap.cameraAreas(), bootstrap.player().initialCameraAreaId));
         usm::game::LevelCinematicRuntime introCommandRuntime;
-        introCommandRuntime.bind(introTriggerRuntime, introGameplayCamera);
+        introCommandRuntime.bind(introTriggerRuntime, introGameplayCamera,
+                                 bootstrap.waypoints());
         usm::game::CinematicPlayer introStartPlayer;
         assert(introStartPlayer.start(bootstrap.introStartScript()));
         usm::Result introStartResult = usm::Result::success();

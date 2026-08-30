@@ -6,6 +6,7 @@
 #include "game/LevelTriggerRuntime.hpp"
 
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace usm::game {
@@ -15,7 +16,8 @@ namespace usm::game {
 // their corresponding gameplay runtimes.
 class LevelCinematicRuntime final {
 public:
-    void bind(LevelTriggerRuntime& triggers, GameplayCamera& camera) noexcept;
+    void bind(LevelTriggerRuntime& triggers, GameplayCamera& camera,
+              std::span<const LevelWayPointAsset> waypoints = {}) noexcept;
     [[nodiscard]] Result applyCommand(const CinematicCommand& command);
 
     [[nodiscard]] std::vector<std::int32_t> consumeCinematicStartRequests();
@@ -26,6 +28,7 @@ public:
 private:
     LevelTriggerRuntime* triggers_{};
     GameplayCamera* camera_{};
+    std::span<const LevelWayPointAsset> waypoints_;
     std::vector<std::int32_t> cinematicStartRequests_;
     bool levelEnded_{};
     bool goToNextLevel_{};

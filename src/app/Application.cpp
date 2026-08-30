@@ -150,7 +150,8 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_);
+    levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
+                                levelOne_.waypoints());
     game::CinematicPlayer introStartCommands;
     result = introStartCommands.start(levelOne_.introStartScript());
     if (!result) {

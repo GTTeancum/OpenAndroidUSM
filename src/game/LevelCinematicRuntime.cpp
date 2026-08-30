@@ -1,5 +1,6 @@
 #include "game/LevelCinematicRuntime.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <string_view>
 
@@ -43,9 +44,12 @@ bool parseBoolean(const CinematicCommand& command, std::string_view name,
 } // namespace
 
 void LevelCinematicRuntime::bind(LevelTriggerRuntime& triggers,
-                                 GameplayCamera& camera) noexcept {
+                                 GameplayCamera& camera,
+                                 std::span<const LevelWayPointAsset>
+                                     waypoints) noexcept {
     triggers_ = &triggers;
     camera_ = &camera;
+    waypoints_ = waypoints;
     cinematicStartRequests_.clear();
     levelEnded_ = false;
     goToNextLevel_ = false;
@@ -94,6 +98,28 @@ Result LevelCinematicRuntime::applyCommand(const CinematicCommand& command) {
             return Result::failure("StartCinematic has no valid CinematicID");
         }
         cinematicStartRequests_.push_back(cinematicId);
+        return Result::success();
+    }
+    if (command.name == "StartSlide") {
+        std::int32_t startId = -1;
+        std::int32_t endId = -1;
+        if (!parseInteger(command, "^SID^WayPoint", startId) ||
+            !parseInteger(command, "^EID^WayPoint", endId)) {
+            return Result::failure("StartSlide has invalid waypoint IDs");
+        }
+        const auto hasWaypoint = [this](std::int32_t id) {
+            return std::any_of(
+                waypoints_.begin(), waypoints_.end(),
+                [id](const LevelWayPointAsset& point) {
+                    return point.objectId == id;
+                });
+        };
+        // CCinematicThread::StartSlide (0x003701c0) only resolves and
+        // validates both endpoints. CSlider performs the actual proximity
+        // catch independently in its update path.
+        if (!hasWaypoint(startId) || !hasWaypoint(endId)) {
+            return Result::failure("StartSlide references an unknown waypoint");
+        }
         return Result::success();
     }
     if (command.name == "LevelEnd") {

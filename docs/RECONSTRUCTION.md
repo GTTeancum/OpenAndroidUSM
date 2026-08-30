@@ -482,6 +482,9 @@ web releases retain their linked waypoint destination, allowing grab point
 443 to feed waypoint 445 and the second authored slide. Deterministic tests
 cover graph extraction, proximity rejection, projected catches, segment
 switching, terminal metadata, player state transitions, and audio dispatch.
+The cinematic `StartSlide` command follows its preserved implementation at
+`0x003701c0`: it validates that both named waypoint endpoints exist, while the
+independent `CSlider` update performs the actual airborne proximity catch.
 
 ## BTEX/PVRTC textures
 
