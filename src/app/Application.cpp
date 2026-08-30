@@ -289,6 +289,7 @@ int Application::run(HINSTANCE instance) {
             }
             const bool controlsEnabled =
                 levelCinematicRuntime_.controlsEnabled() &&
+                !gameplayPlayer_.cinematicDriven() &&
                 !quickTimeEvent_.active() &&
                 !(activeGameplayCinematic_ != nullptr &&
                   activeGameplayCinematic_->hasColladaPlayback());

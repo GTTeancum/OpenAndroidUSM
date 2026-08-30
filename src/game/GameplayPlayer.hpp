@@ -68,6 +68,9 @@ public:
     [[nodiscard]] float health() const noexcept { return health_; }
     [[nodiscard]] float maximumHealth() const noexcept { return maximumHealth_; }
     [[nodiscard]] bool dead() const noexcept { return health_ <= 0.0F; }
+    [[nodiscard]] bool cinematicDriven() const noexcept {
+        return cinematicDriven_;
+    }
     [[nodiscard]] bool airborne() const noexcept;
     [[nodiscard]] std::uint16_t activeStateId() const noexcept;
     [[nodiscard]] float animatedFootHeight() const noexcept;
@@ -157,6 +160,9 @@ private:
     float health_{1000.0F};
     float maximumHealth_{1000.0F};
     std::int32_t objectId_{-1};
+    bool cinematicDriven_{};
+    bool cinematicAnimationLoops_{true};
+    float cinematicAnimationSpeed_{1.0F};
 };
 
 } // namespace usm::game

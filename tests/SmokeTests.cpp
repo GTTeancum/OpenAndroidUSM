@@ -1592,6 +1592,35 @@ int main() {
                                                 &levelCollision));
         usm::game::CinematicThread playerDamageThread;
         playerDamageThread.objectId = bootstrap.player().objectId;
+        assert(cinematicDamagePlayer.applyCinematicCommand(
+            playerDamageThread,
+            usm::game::CinematicCommand{0, -1, "DisableAI", {}}));
+        assert(cinematicDamagePlayer.cinematicDriven());
+        usm::game::CinematicCommand scriptedPlayerAnimation;
+        scriptedPlayerAnimation.name = "SetAnim";
+        scriptedPlayerAnimation.attributes.push_back(
+            {"string", "$Anim", "knockback_flying_to_onground"});
+        scriptedPlayerAnimation.attributes.push_back(
+            {"bool", "loop", "false"});
+        scriptedPlayerAnimation.attributes.push_back(
+            {"float", "speed", "1.000000"});
+        assert(cinematicDamagePlayer.applyCinematicCommand(
+            playerDamageThread, scriptedPlayerAnimation));
+        assert(cinematicDamagePlayer.activeAnimation() ==
+               "knockback_flying_to_onground");
+        usm::game::CinematicCommand scriptedPlayerMove;
+        scriptedPlayerMove.name = "MoveObject";
+        scriptedPlayerMove.attributes.push_back(
+            {"vector3d", "abspos", "4331.134766, 4229.501953, 114.176003"});
+        scriptedPlayerMove.attributes.push_back(
+            {"quaternion", "rot",
+             "0.007853, -0.006498, -0.712064, 0.702041"});
+        assert(cinematicDamagePlayer.applyCinematicCommand(
+            playerDamageThread, scriptedPlayerMove));
+        assert(std::abs(cinematicDamagePlayer.position().x - 4331.134766F) <
+               0.001F);
+        cinematicDamagePlayer.update({}, {}, 100);
+        assert(cinematicDamagePlayer.animationTimeMilliseconds() == 100);
         usm::game::CinematicCommand playerDamageCommand;
         playerDamageCommand.name = "GetDamage";
         playerDamageCommand.attributes.push_back(
@@ -1603,6 +1632,10 @@ int main() {
         playerDamageCommand.attributes.front().value = "invalid";
         assert(!cinematicDamagePlayer.applyCinematicCommand(
             playerDamageThread, playerDamageCommand));
+        assert(cinematicDamagePlayer.applyCinematicCommand(
+            playerDamageThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        assert(!cinematicDamagePlayer.cinematicDriven());
         assert(std::abs(groundedPlayer.position().z - initialGroundHeight) <
                0.001F);
         std::vector<usm::assets::ColladaGeometry> idlePose;

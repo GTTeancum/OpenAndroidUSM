@@ -642,6 +642,16 @@ authored Hammer Thug and Sandman bars. Cinematic `GetDamage` applies its
 authored `DamageValue` to portable player state, including the QTE-failure
 script's 200-point hit and normal hurt-audio dispatch.
 
+Non-Collada cinematic player commands now remain source-level state changes as
+well. `GameplayPlayer::applyCinematicCommand` resolves the authored player
+thread and implements `DisableAI`, `EnableAI`, `SetAnim`, `MoveObject`, and
+`GetDamage`. While `DisableAI` owns the player, regular controller locomotion
+is suspended, named clips advance at their scripted speed/loop mode, and each
+absolute position/quaternion rebuilds the native world transform. The QTE
+success and failure branches therefore reproduce their scripted knockback,
+landing, recovery, and final positions instead of leaving the gameplay player
+idle underneath the recovered camera.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

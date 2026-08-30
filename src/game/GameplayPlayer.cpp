@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <cstdlib>
 
 namespace usm::game {
 namespace {
@@ -86,6 +87,96 @@ const assets::ColladaAnimationClip* clipById(
     return &animationBank->clips()[static_cast<std::size_t>(animationId)];
 }
 
+float parseFloat(std::string_view text, float fallback) noexcept {
+    const std::string storage(text);
+    char* end = nullptr;
+    const float value = std::strtof(storage.c_str(), &end);
+    return end == storage.c_str() ? fallback : value;
+}
+
+bool parseBoolean(std::string_view text, bool fallback) noexcept {
+    if (text == "true" || text == "1") {
+        return true;
+    }
+    if (text == "false" || text == "0") {
+        return false;
+    }
+    return fallback;
+}
+
+assets::Vector3 parseVector3(std::string_view text,
+                             assets::Vector3 fallback) noexcept {
+    std::string storage(text);
+    std::replace(storage.begin(), storage.end(), ',', ' ');
+    const char* cursor = storage.c_str();
+    char* end = nullptr;
+    assets::Vector3 result;
+    for (float* component : {&result.x, &result.y, &result.z}) {
+        *component = std::strtof(cursor, &end);
+        if (end == cursor) {
+            return fallback;
+        }
+        cursor = end;
+    }
+    return result;
+}
+
+assets::Quaternion parseQuaternion(std::string_view text,
+                                   assets::Quaternion fallback) noexcept {
+    std::string storage(text);
+    std::replace(storage.begin(), storage.end(), ',', ' ');
+    const char* cursor = storage.c_str();
+    char* end = nullptr;
+    assets::Quaternion result;
+    for (float* component : {&result.x, &result.y, &result.z, &result.w}) {
+        *component = std::strtof(cursor, &end);
+        if (end == cursor) {
+            return fallback;
+        }
+        cursor = end;
+    }
+    return result;
+}
+
+std::array<float, 16> scriptedWorldMatrix(
+    const assets::Vector3& position, assets::Quaternion rotation,
+    const assets::Vector3& scale) noexcept {
+    const float length =
+        std::sqrt(rotation.x * rotation.x + rotation.y * rotation.y +
+                  rotation.z * rotation.z + rotation.w * rotation.w);
+    if (length > std::numeric_limits<float>::epsilon()) {
+        rotation.x /= length;
+        rotation.y /= length;
+        rotation.z /= length;
+        rotation.w /= length;
+    }
+    const float xx = rotation.x * rotation.x;
+    const float yy = rotation.y * rotation.y;
+    const float zz = rotation.z * rotation.z;
+    const float xy = rotation.x * rotation.y;
+    const float xz = rotation.x * rotation.z;
+    const float yz = rotation.y * rotation.z;
+    const float wx = rotation.w * rotation.x;
+    const float wy = rotation.w * rotation.y;
+    const float wz = rotation.w * rotation.z;
+    return {(1.0F - 2.0F * (yy + zz)) * scale.x,
+            (2.0F * (xy - wz)) * scale.x,
+            (2.0F * (xz + wy)) * scale.x,
+            0.0F,
+            (2.0F * (xy + wz)) * scale.y,
+            (1.0F - 2.0F * (xx + zz)) * scale.y,
+            (2.0F * (yz - wx)) * scale.y,
+            0.0F,
+            (2.0F * (xz - wy)) * scale.z,
+            (2.0F * (yz + wx)) * scale.z,
+            (1.0F - 2.0F * (xx + yy)) * scale.z,
+            0.0F,
+            position.x,
+            position.y,
+            position.z,
+            1.0F};
+}
+
 } // namespace
 
 Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
@@ -105,6 +196,9 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     }
     position_ = asset.position;
     objectId_ = asset.objectId;
+    cinematicDriven_ = false;
+    cinematicAnimationLoops_ = true;
+    cinematicAnimationSpeed_ = 1.0F;
     renderPosition_ = position_;
     jumpAnchorHeight_ = position_.z;
     worldTransform_ = asset.worldTransform;
@@ -304,7 +398,66 @@ bool GameplayPlayer::applyDamage(float damage) noexcept {
 
 Result GameplayPlayer::applyCinematicCommand(
     const CinematicThread& thread, const CinematicCommand& command) {
-    if (thread.objectId != objectId_ || command.name != "GetDamage") {
+    if (thread.objectId != objectId_) {
+        return Result::success();
+    }
+    if (command.name == "DisableAI") {
+        cinematicDriven_ = true;
+        attackState_ = AttackState::None;
+        return Result::success();
+    }
+    if (command.name == "EnableAI") {
+        cinematicDriven_ = false;
+        cinematicAnimationSpeed_ = 1.0F;
+        locomotionState_ = LocomotionState::Grounded;
+        renderPosition_ = position_;
+        return Result::success();
+    }
+    if (command.name == "SetAnim") {
+        const CinematicAttribute* animation = command.findAttribute("$Anim");
+        if (animation == nullptr || animationBank_ == nullptr) {
+            return Result::failure("Player SetAnim has no animation name");
+        }
+        const assets::ColladaAnimationClip* clip =
+            animationBank_->findClip(animation->value);
+        if (clip == nullptr) {
+            return Result::failure("Player SetAnim references a missing clip");
+        }
+        setAnimation(clip->name);
+        if (const CinematicAttribute* loop = command.findAttribute("loop")) {
+            cinematicAnimationLoops_ = parseBoolean(loop->value, true);
+        }
+        if (const CinematicAttribute* speed = command.findAttribute("speed")) {
+            cinematicAnimationSpeed_ = parseFloat(speed->value, 1.0F);
+        }
+        return Result::success();
+    }
+    if (command.name == "MoveObject") {
+        if (const CinematicAttribute* absolute =
+                command.findAttribute("abspos")) {
+            position_ = parseVector3(absolute->value, position_);
+        } else if (const CinematicAttribute* local =
+                       command.findAttribute("pos")) {
+            position_ = parseVector3(local->value, position_);
+        }
+        assets::Quaternion rotation{};
+        rotation.w = 1.0F;
+        if (const CinematicAttribute* authoredRotation =
+                command.findAttribute("rot")) {
+            rotation = parseQuaternion(authoredRotation->value, rotation);
+        }
+        renderPosition_ = position_;
+        jumpAnchorHeight_ = position_.z;
+        worldTransform_ = scriptedWorldMatrix(position_, rotation, scale_);
+        const float faceLength =
+            std::hypot(worldTransform_[4], worldTransform_[5]);
+        if (faceLength > std::numeric_limits<float>::epsilon()) {
+            facing_ = {-worldTransform_[4] / faceLength,
+                       -worldTransform_[5] / faceLength, 0.0F};
+        }
+        return Result::success();
+    }
+    if (command.name != "GetDamage") {
         return Result::success();
     }
     const CinematicAttribute* damage = command.findAttribute("DamageValue");
@@ -326,6 +479,25 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
                             const CameraPose& camera,
                             std::uint32_t elapsedMilliseconds) noexcept {
     if (dead()) {
+        return;
+    }
+    if (cinematicDriven_) {
+        const double advanced = static_cast<double>(elapsedMilliseconds) *
+                                cinematicAnimationSpeed_;
+        animationTimeMilliseconds_ += static_cast<std::uint64_t>(
+            std::max(advanced, 0.0));
+        if (!cinematicAnimationLoops_ && animationBank_ != nullptr) {
+            const assets::ColladaAnimationClip* clip =
+                animationBank_->findClip(activeAnimation_);
+            if (clip != nullptr) {
+                const std::uint32_t finalPoseTime =
+                    clip->durationMilliseconds() == 0
+                        ? 0
+                        : clip->durationMilliseconds() - 1;
+                animationTimeMilliseconds_ = std::min<std::uint64_t>(
+                    animationTimeMilliseconds_, finalPoseTime);
+            }
+        }
         return;
     }
     if (attackState_ != AttackState::None) {
