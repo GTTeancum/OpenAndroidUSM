@@ -256,6 +256,30 @@ int main() {
                     gameplayFrame.pixels[component + 2];
         }
         assert(hudChangedPixels > 100);
+        usm::game::CinematicUiFrame tutorialUi;
+        tutorialUi.text = u"Press [A] to jump";
+        tutorialUi.textVisible = true;
+        tutorialUi.letterboxVisible = true;
+        tutorialUi.quickTimeEventVisible = true;
+        tutorialUi.quickTimeEventProgress = 0.5F;
+        assert(gameRenderer.updateCinematicUi(tutorialUi));
+        gameRenderer.renderFrame();
+        RgbaImage tutorialUiFrame;
+        assert(gameRenderer.readBackImage(tutorialUiFrame));
+        captureIfRequested(tutorialUiFrame, "gameplay-tutorial-ui.bmp");
+        std::size_t tutorialUiChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < tutorialUiFrame.pixels.size(); component += 4) {
+            tutorialUiChangedPixels +=
+                tutorialUiFrame.pixels[component] !=
+                    gameplayHudFrame.pixels[component] ||
+                tutorialUiFrame.pixels[component + 1] !=
+                    gameplayHudFrame.pixels[component + 1] ||
+                tutorialUiFrame.pixels[component + 2] !=
+                    gameplayHudFrame.pixels[component + 2];
+        }
+        assert(tutorialUiChangedPixels > 100);
+        assert(gameRenderer.updateCinematicUi({}));
         assert(gameRenderer.updateLevelOnePlayer(
             levelOne, *idleClip, idleClip->durationMilliseconds() / 2,
             levelOne.player().worldTransform));

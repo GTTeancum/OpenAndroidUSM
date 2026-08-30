@@ -154,6 +154,7 @@ int Application::run(HINSTANCE instance) {
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints());
     quickTimeEvent_.bind(levelOne_.buttonConfigs());
+    cinematicUi_.bind(levelOne_.textCatalog());
     game::CinematicPlayer introStartCommands;
     result = introStartCommands.start(levelOne_.introStartScript());
     if (!result) {
@@ -213,6 +214,8 @@ int Application::run(HINSTANCE instance) {
         const auto frameElapsed =
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 frameTime - previousFrame);
+        const auto deltaMilliseconds = static_cast<std::uint32_t>(
+            std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
         previousFrame = frameTime;
         audio_.update();
         keyRouter_.beginFrame();
@@ -226,13 +229,16 @@ int Application::run(HINSTANCE instance) {
         const auto timestamp = static_cast<std::uint32_t>(
             std::min<std::int64_t>(elapsed.count(), introDuration));
         Result soundResult = Result::success();
+        Result uiResult = Result::success();
         result = introPlayer_.advanceTo(
             timestamp,
-            [this, &soundResult](const game::CinematicThread&,
-                                 const game::CinematicCommand& command) {
-                if (!soundResult) {
+            [this, &soundResult,
+             &uiResult](const game::CinematicThread&,
+                        const game::CinematicCommand& command) {
+                if (!soundResult || !uiResult) {
                     return;
                 }
+                uiResult = cinematicUi_.applyCommand(command);
                 soundResult = introSounds_.dispatch(
                     command,
                     [this](std::string_view eventName,
@@ -246,8 +252,9 @@ int Application::run(HINSTANCE instance) {
         if (!result) {
             return fail(result.message());
         }
-        if (!soundResult) {
-            return fail(soundResult.message());
+        if (!soundResult || !uiResult) {
+            return fail(!soundResult ? soundResult.message()
+                                     : uiResult.message());
         }
         result = renderer_.updateLevelOneActors(levelOne_, timestamp);
         if (!result) {
@@ -293,8 +300,6 @@ int Application::run(HINSTANCE instance) {
             }
             const auto cameraBeforeMovement =
                 gameplayCamera_.sample(gameplayPlayer_.position());
-            const auto deltaMilliseconds = static_cast<std::uint32_t>(
-                std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    deltaMilliseconds);
             for (std::string_view enteredState =
@@ -375,6 +380,9 @@ int Application::run(HINSTANCE instance) {
                         if (commandResult) {
                             commandResult =
                                 levelCinematicRuntime_.applyCommand(command);
+                        }
+                        if (commandResult) {
+                            commandResult = cinematicUi_.applyCommand(command);
                         }
                         if (commandResult) {
                             commandResult = gameplaySounds_.dispatch(
@@ -500,6 +508,20 @@ int Application::run(HINSTANCE instance) {
                         gameplayCamera_.sample(gameplayPlayer_.position()));
                 }
             }
+        }
+        cinematicUi_.update(
+            deltaMilliseconds,
+            keyRouter_.state().quickTimeEvent.pressed);
+        const float qteProgress =
+            quickTimeEvent_.active() &&
+                    quickTimeEvent_.durationMilliseconds() != 0
+                ? static_cast<float>(quickTimeEvent_.elapsedMilliseconds()) /
+                      static_cast<float>(
+                          quickTimeEvent_.durationMilliseconds())
+                : 0.0F;
+        if (result) {
+            result = renderer_.updateCinematicUi(cinematicUi_.frame(
+                quickTimeEvent_.active(), qteProgress));
         }
         if (!result) {
             return fail(result.message());

@@ -587,6 +587,26 @@ actors afterward. Gameplay controls and enemy simulation are suspended while
 a full Collada cinematic owns the scene. A WARP regression renders cinematic
 1254 before and after the delayed Sandman entrance.
 
+## Localized cinematic and tutorial UI
+
+`LocalizedStringTable` parses the original newline-delimited key maps and
+offset-indexed UTF-16LE language payloads from `xlsStrings.pack`. The native
+bootstrap loads all 18 level-one dialogue strings and 17 tutorial strings in
+English without embedding copyrighted game text in the repository.
+`CinematicUiRuntime` follows `CCinematicThread::OnTutorial`, `ShowMessage`,
+and `InterfaceControlCmd` at `0x003710d4`, `0x003725f8`, and `0x003711e0`:
+timed captions expire independently, persistent tutorials dismiss through the
+controller, black-screen tutorials dim gameplay, and cinematic black bands
+follow the authored interface state. Xperia touch/button markup is translated
+to XInput A/X/B labels at runtime.
+
+The D3D11 backend rasterizes the selected UTF-16 text with the system Segoe UI
+font into an RGBA texture, then composites captions, tutorial panels,
+letterbox bands, and the authored QTE countdown through the existing
+alpha-blended screen-space shader. The game-facing state contains no DirectX
+or Windows handles. A WARP regression verifies that the native text, bands,
+and QTE prompt materially alter the rendered frame.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

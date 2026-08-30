@@ -29,6 +29,7 @@
 #include "game/WebSwingRuntime.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
+#include "game/CinematicUiRuntime.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
 #include <cassert>
@@ -605,6 +606,61 @@ int main() {
             return 1;
         }
         assert(bootstrap.mainScene().nodes().size() == 154);
+        assert(bootstrap.textCatalog().level().size() == 18);
+        assert(bootstrap.textCatalog().tutorial().size() == 17);
+        const auto* openingCaption =
+            bootstrap.textCatalog().findLevelString(
+                "STR_PROLOGUE_SPIDERMAN_01");
+        assert(openingCaption != nullptr);
+        assert(*openingCaption ==
+               u"My spider-sense has been going wild all morning! What the "
+               u"heck's wrong?!");
+        const auto* jumpTutorial =
+            bootstrap.textCatalog().findTutorialString("STR_JUMP");
+        assert(jumpTutorial != nullptr);
+        assert(jumpTutorial->find(u"jump") != std::u16string::npos);
+        usm::game::CinematicUiRuntime cinematicUi;
+        cinematicUi.bind(bootstrap.textCatalog());
+        const auto tutorialCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 71;
+            });
+        assert(tutorialCinematic != bootstrap.cinematics().end());
+        const auto tutorialCommand = std::find_if(
+            tutorialCinematic->script.threads().back().commands.begin(),
+            tutorialCinematic->script.threads().back().commands.end(),
+            [](const usm::game::CinematicCommand& command) {
+                return command.name == "Tutorial";
+            });
+        assert(tutorialCommand !=
+               tutorialCinematic->script.threads().back().commands.end());
+        assert(cinematicUi.applyCommand(*tutorialCommand));
+        assert(cinematicUi.tutorialVisible());
+        assert(cinematicUi.frame().text.find(u"[X]") !=
+               std::u16string::npos);
+        cinematicUi.update(2999, false);
+        assert(cinematicUi.tutorialVisible());
+        cinematicUi.update(1, false);
+        assert(!cinematicUi.tutorialVisible());
+        const usm::game::CinematicCommand* openingMessageCommand = nullptr;
+        for (const auto& thread : bootstrap.introScript().threads()) {
+            const auto command = std::find_if(
+                thread.commands.begin(), thread.commands.end(),
+                [](const usm::game::CinematicCommand& candidate) {
+                    return candidate.name == "ShowMessage";
+                });
+            if (command != thread.commands.end()) {
+                openingMessageCommand = &*command;
+                break;
+            }
+        }
+        assert(openingMessageCommand != nullptr);
+        assert(cinematicUi.applyCommand(*openingMessageCommand));
+        assert(cinematicUi.messageVisible());
+        assert(cinematicUi.frame().text == *openingCaption);
+        cinematicUi.update(3850, false);
+        assert(!cinematicUi.messageVisible());
         assert(bootstrap.mainScene().findNode(288) != nullptr);
         assert(bootstrap.mainScene().findNode(288)->gameType == "SpiderMan");
         assert(bootstrap.mainScene().findNode(288)->animationFile ==

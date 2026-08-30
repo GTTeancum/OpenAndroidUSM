@@ -18,6 +18,7 @@
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/EnemySpecialActionConfig.hpp"
 #include "game/GameplayCamera.hpp"
+#include "game/LocalizedStringTable.hpp"
 
 #include <array>
 #include <cstdint>
@@ -306,6 +307,9 @@ public:
         return enemyAttackIntervalConfigs_;
     }
     [[nodiscard]] const LevelHudAsset& hud() const noexcept { return hud_; }
+    [[nodiscard]] const LevelTextCatalog& textCatalog() const noexcept {
+        return textCatalog_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -334,6 +338,7 @@ private:
     EnemyAttackIntervalConfigDatabase enemyAttackIntervalConfigs_;
     EnemyRangeAttackConfigDatabase enemyRangeAttackConfigs_;
     LevelHudAsset hud_;
+    LevelTextCatalog textCatalog_;
 };
 
 } // namespace usm::game

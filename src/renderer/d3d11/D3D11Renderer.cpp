@@ -10,6 +10,7 @@
 #include <cstring>
 #include <limits>
 #include <sstream>
+#include <string>
 #include <string_view>
 
 namespace usm::renderer {
@@ -268,6 +269,83 @@ bool textureHasTransparency(const assets::BtexTexture& texture) noexcept {
         }
     }
     return false;
+}
+
+Result renderWindowsText(std::u16string_view text,
+                         assets::RgbaImage& image) {
+    constexpr std::uint32_t textureWidth = 1024;
+    constexpr std::uint32_t textureHeight = 256;
+    image = {};
+    image.width = textureWidth;
+    image.height = textureHeight;
+    image.pixels.resize(static_cast<std::size_t>(textureWidth) *
+                        textureHeight * 4U);
+
+    BITMAPINFO bitmapInfo{};
+    bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapInfo.bmiHeader.biWidth = static_cast<LONG>(textureWidth);
+    bitmapInfo.bmiHeader.biHeight = -static_cast<LONG>(textureHeight);
+    bitmapInfo.bmiHeader.biPlanes = 1;
+    bitmapInfo.bmiHeader.biBitCount = 32;
+    bitmapInfo.bmiHeader.biCompression = BI_RGB;
+    void* bitmapPixels = nullptr;
+    HDC deviceContext = CreateCompatibleDC(nullptr);
+    if (deviceContext == nullptr) {
+        return Result::failure("Could not create cinematic text DC");
+    }
+    HBITMAP bitmap = CreateDIBSection(deviceContext, &bitmapInfo,
+                                      DIB_RGB_COLORS, &bitmapPixels, nullptr,
+                                      0);
+    if (bitmap == nullptr || bitmapPixels == nullptr) {
+        DeleteDC(deviceContext);
+        return Result::failure("Could not create cinematic text bitmap");
+    }
+    HGDIOBJ previousBitmap = SelectObject(deviceContext, bitmap);
+    std::memset(bitmapPixels, 0,
+                static_cast<std::size_t>(textureWidth) * textureHeight * 4U);
+    SetBkMode(deviceContext, TRANSPARENT);
+    SetTextColor(deviceContext, RGB(255, 255, 255));
+    HFONT font = CreateFontW(-42, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                             CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+                             DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+    if (font == nullptr) {
+        SelectObject(deviceContext, previousBitmap);
+        DeleteObject(bitmap);
+        DeleteDC(deviceContext);
+        return Result::failure("Could not create cinematic text font");
+    }
+    HGDIOBJ previousFont = SelectObject(deviceContext, font);
+    std::wstring wideText;
+    wideText.reserve(text.size());
+    for (char16_t character : text) {
+        wideText.push_back(static_cast<wchar_t>(character));
+    }
+    RECT bounds{32, 16, static_cast<LONG>(textureWidth - 32),
+                static_cast<LONG>(textureHeight - 16)};
+    DrawTextW(deviceContext, wideText.c_str(),
+              static_cast<int>(wideText.size()), &bounds,
+              DT_CENTER | DT_VCENTER | DT_WORDBREAK | DT_NOPREFIX);
+
+    const auto* bgra = static_cast<const std::uint8_t*>(bitmapPixels);
+    for (std::size_t pixel = 0;
+         pixel < static_cast<std::size_t>(textureWidth) * textureHeight;
+         ++pixel) {
+        const std::uint8_t blue = bgra[pixel * 4U];
+        const std::uint8_t green = bgra[pixel * 4U + 1U];
+        const std::uint8_t red = bgra[pixel * 4U + 2U];
+        const std::uint8_t alpha = std::max({red, green, blue});
+        image.pixels[pixel * 4U] = 255;
+        image.pixels[pixel * 4U + 1U] = 255;
+        image.pixels[pixel * 4U + 2U] = 255;
+        image.pixels[pixel * 4U + 3U] = alpha;
+    }
+    SelectObject(deviceContext, previousFont);
+    SelectObject(deviceContext, previousBitmap);
+    DeleteObject(font);
+    DeleteObject(bitmap);
+    DeleteDC(deviceContext);
+    return Result::success();
 }
 
 } // namespace
@@ -1343,6 +1421,119 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
     return Result::success();
 }
 
+Result D3D11Renderer::updateCinematicUi(
+    const game::CinematicUiFrame& frame) {
+    cinematicUiColorVertexBuffer_.Reset();
+    cinematicUiColorVertexCount_ = 0;
+    if (!device_) {
+        return Result::failure("Cinematic UI has no D3D11 device");
+    }
+
+    std::vector<GpuVertex> colorVertices;
+    const auto appendColorQuad = [&colorVertices](float left, float top,
+                                                   float right, float bottom,
+                                                   std::uint32_t argb) {
+        const std::uint32_t color = rgbaVertexColor(argb);
+        const GpuVertex topLeft{{left, top, 0.0F}, {}, {}, color};
+        const GpuVertex topRight{{right, top, 0.0F}, {}, {}, color};
+        const GpuVertex bottomLeft{{left, bottom, 0.0F}, {}, {}, color};
+        const GpuVertex bottomRight{{right, bottom, 0.0F}, {}, {}, color};
+        colorVertices.insert(colorVertices.end(),
+                             {topLeft, topRight, bottomLeft, topRight,
+                              bottomRight, bottomLeft});
+    };
+    if (frame.dimBackground) {
+        appendColorQuad(-1.0F, 1.0F, 1.0F, -1.0F, 0xb0000000U);
+    }
+    if (frame.letterboxVisible) {
+        appendColorQuad(-1.0F, 1.0F, 1.0F, 0.78F, 0xe0000000U);
+        appendColorQuad(-1.0F, -0.78F, 1.0F, -1.0F, 0xe0000000U);
+    }
+    if (frame.textVisible) {
+        const bool centered =
+            frame.dimBackground || frame.quickTimeEventVisible;
+        appendColorQuad(-0.9F, centered ? 0.35F : -0.48F, 0.9F,
+                        centered ? -0.35F : -0.96F, 0xb0000000U);
+    }
+    if (frame.quickTimeEventVisible) {
+        appendColorQuad(-0.42F, -0.39F, 0.42F, -0.45F, 0xff303030U);
+        appendColorQuad(-0.42F, -0.39F,
+                        -0.42F + 0.84F *
+                                     (1.0F - frame.quickTimeEventProgress),
+                        -0.45F, 0xfff0c030U);
+    }
+    if (!colorVertices.empty()) {
+        D3D11_BUFFER_DESC description{};
+        description.ByteWidth = static_cast<UINT>(colorVertices.size() *
+                                                   sizeof(GpuVertex));
+        description.Usage = D3D11_USAGE_IMMUTABLE;
+        description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        D3D11_SUBRESOURCE_DATA data{colorVertices.data(), 0, 0};
+        const HRESULT createResult = device_->CreateBuffer(
+            &description, &data, &cinematicUiColorVertexBuffer_);
+        if (FAILED(createResult)) {
+            return hresultFailure(
+                "ID3D11Device::CreateBuffer(cinematic UI colors)",
+                createResult);
+        }
+        cinematicUiColorVertexCount_ =
+            static_cast<std::uint32_t>(colorVertices.size());
+    }
+
+    if (!frame.textVisible || frame.text.empty()) {
+        cinematicUiTextVertexBuffer_.Reset();
+        cinematicUiTextTexture_.Reset();
+        cinematicUiTextVertexCount_ = 0;
+        cinematicUiText_.clear();
+        return Result::success();
+    }
+    const bool centered = frame.dimBackground || frame.quickTimeEventVisible;
+    if (frame.text == cinematicUiText_ &&
+        centered == cinematicUiTextCentered_ &&
+        cinematicUiTextVertexBuffer_ && cinematicUiTextTexture_) {
+        return Result::success();
+    }
+    cinematicUiTextVertexBuffer_.Reset();
+    cinematicUiTextTexture_.Reset();
+    cinematicUiTextVertexCount_ = 0;
+    assets::RgbaImage textImage;
+    Result result = renderWindowsText(frame.text, textImage);
+    if (!result) {
+        return result;
+    }
+    result = createTextureView({&textImage, 1}, cinematicUiTextTexture_);
+    if (!result) {
+        return result;
+    }
+    const float top = centered ? 0.34F : -0.5F;
+    const float bottom = centered ? -0.34F : -0.94F;
+    constexpr std::uint32_t white = 0xffffffffU;
+    const std::array<GpuVertex, 6> textVertices{
+        GpuVertex{{-0.88F, top, 0.0F}, {}, {0.0F, 0.0F}, white},
+        GpuVertex{{0.88F, top, 0.0F}, {}, {1.0F, 0.0F}, white},
+        GpuVertex{{-0.88F, bottom, 0.0F}, {}, {0.0F, 1.0F}, white},
+        GpuVertex{{0.88F, top, 0.0F}, {}, {1.0F, 0.0F}, white},
+        GpuVertex{{0.88F, bottom, 0.0F}, {}, {1.0F, 1.0F}, white},
+        GpuVertex{{-0.88F, bottom, 0.0F}, {}, {0.0F, 1.0F}, white},
+    };
+    D3D11_BUFFER_DESC description{};
+    description.ByteWidth = sizeof(textVertices);
+    description.Usage = D3D11_USAGE_IMMUTABLE;
+    description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    D3D11_SUBRESOURCE_DATA data{textVertices.data(), 0, 0};
+    const HRESULT createResult = device_->CreateBuffer(
+        &description, &data, &cinematicUiTextVertexBuffer_);
+    if (FAILED(createResult)) {
+        return hresultFailure(
+            "ID3D11Device::CreateBuffer(cinematic UI text)", createResult);
+    }
+    cinematicUiTextVertexCount_ =
+        static_cast<std::uint32_t>(textVertices.size());
+    cinematicUiText_ = frame.text;
+    cinematicUiTextCentered_ = centered;
+    return Result::success();
+}
+
 Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
     if (!context_ || !transformBuffer_ || !viewRotationBuffer_ || width_ == 0 ||
         height_ == 0 ||
@@ -1777,6 +1968,46 @@ void D3D11Renderer::renderFrame() {
         context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
         context_->RSSetState(rasterizerState_.Get());
         context_->Draw(hudVertexCount_, 0);
+    }
+
+    if (cinematicUiColorVertexCount_ != 0 &&
+        cinematicUiColorVertexBuffer_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(
+            0, 1, cinematicUiColorVertexBuffer_.GetAddressOf(), &stride,
+            &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
+        context_->PSSetShader(colorPixelShader_.Get(), nullptr, 0);
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        context_->Draw(cinematicUiColorVertexCount_, 0);
+    }
+    if (cinematicUiTextVertexCount_ != 0 && cinematicUiTextVertexBuffer_ &&
+        cinematicUiTextTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(
+            0, 1, cinematicUiTextVertexBuffer_.GetAddressOf(), &stride,
+            &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
+        context_->PSSetShader(hudPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(
+            0, 1, cinematicUiTextTexture_.GetAddressOf());
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        context_->Draw(cinematicUiTextVertexCount_, 0);
     }
 
     if (swapChain_) {

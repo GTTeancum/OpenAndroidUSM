@@ -101,6 +101,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
     src/game/CinematicCameraTrack.cpp
+    src/game/CinematicUiRuntime.cpp
     src/game/EnemyBehaviorConfig.cpp
     src/game/EnemyAttributeConfig.cpp
     src/game/EnemyAttackIntervalConfig.cpp
@@ -113,6 +114,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelEnemyRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
     src/game/LevelOneBootstrap.cpp
+    src/game/LocalizedStringTable.cpp
     src/game/LevelSlideRuntime.cpp
     src/game/PlayerHudHealthState.cpp
     src/game/PlayerStateConfig.cpp
@@ -150,6 +152,7 @@ target_link_libraries(OpenAndroidUSM.D3D11 PRIVATE
     dxgi
     dxguid
     d3dcompiler
+    gdi32
 )
 if(MSVC)
     target_compile_options(OpenAndroidUSM.D3D11 PRIVATE /W4 /permissive- /EHsc /utf-8)

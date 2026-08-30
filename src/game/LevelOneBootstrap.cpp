@@ -270,6 +270,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Could not load button configs: " +
                                result.message());
     }
+    result = textCatalog_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load localized strings: " +
+                               result.message());
+    }
     result = enemySpecialActions_.load(gameDataRoot);
     if (!result) {
         return Result::failure("Could not load enemy special actions: " +

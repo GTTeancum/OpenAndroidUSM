@@ -7,6 +7,7 @@
 #include "audio/VoxSoundTable.hpp"
 #include "audio/PlayerStateSoundBank.hpp"
 #include "game/CinematicPlayer.hpp"
+#include "game/CinematicUiRuntime.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
@@ -44,6 +45,7 @@ private:
     audio::CinematicSoundBank introSounds_;
     audio::CinematicSoundBank gameplaySounds_;
     game::CinematicPlayer introPlayer_;
+    game::CinematicUiRuntime cinematicUi_;
     game::GameplayCamera gameplayCamera_;
     game::LevelCollision levelCollision_;
     game::GameplayPlayer gameplayPlayer_;

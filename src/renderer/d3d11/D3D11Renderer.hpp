@@ -3,6 +3,7 @@
 #include "assets/ColladaMesh.hpp"
 #include "assets/BtexTexture.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/CinematicUiRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "renderer/IRenderer.hpp"
@@ -14,6 +15,7 @@
 #include <array>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace usm::renderer {
@@ -56,6 +58,8 @@ public:
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
                                          float webPowerRatio);
+    [[nodiscard]] Result updateCinematicUi(
+        const game::CinematicUiFrame& frame);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -141,14 +145,21 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> webLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> enemyGunLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cinematicUiTextTexture_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
     std::size_t gameplayCinematicMeshStart_{};
     std::size_t enemyMeshStart_{};
     std::uint32_t hudVertexCount_{};
+    std::uint32_t cinematicUiColorVertexCount_{};
+    std::uint32_t cinematicUiTextVertexCount_{};
     std::uint32_t hudVertexCapacity_{};
     std::uint32_t webLineVertexCount_{};
     std::uint32_t enemyGunLineVertexCount_{};
+    std::u16string cinematicUiText_;
+    bool cinematicUiTextCentered_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};
