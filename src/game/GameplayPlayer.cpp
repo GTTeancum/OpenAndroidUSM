@@ -3,6 +3,7 @@
 #include "game/LevelCollision.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <limits>
 
@@ -103,6 +104,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
             "Player animation bank is missing movement or punch clips");
     }
     position_ = asset.position;
+    objectId_ = asset.objectId;
     renderPosition_ = position_;
     jumpAnchorHeight_ = position_.z;
     worldTransform_ = asset.worldTransform;
@@ -298,6 +300,26 @@ bool GameplayPlayer::applyDamage(float damage) noexcept {
     }
     health_ = std::max(0.0F, health_ - damage);
     return true;
+}
+
+Result GameplayPlayer::applyCinematicCommand(
+    const CinematicThread& thread, const CinematicCommand& command) {
+    if (thread.objectId != objectId_ || command.name != "GetDamage") {
+        return Result::success();
+    }
+    const CinematicAttribute* damage = command.findAttribute("DamageValue");
+    if (damage == nullptr) {
+        return Result::failure("Player GetDamage is missing DamageValue");
+    }
+    float value = 0.0F;
+    const char* begin = damage->value.data();
+    const char* end = begin + damage->value.size();
+    const auto parsed = std::from_chars(begin, end, value);
+    if (parsed.ec != std::errc{} || parsed.ptr != end || value < 0.0F) {
+        return Result::failure("Player GetDamage has an invalid DamageValue");
+    }
+    (void)applyDamage(value);
+    return Result::success();
 }
 
 void GameplayPlayer::update(const PlayerMotionInput& input,

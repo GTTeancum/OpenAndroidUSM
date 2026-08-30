@@ -1287,7 +1287,9 @@ Result D3D11Renderer::uploadHudTexture(const game::LevelHudAsset& hud) {
 Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
                                       float currentHealthRatio,
                                       float delayedHealthRatio,
-                                      float webPowerRatio) {
+                                      float webPowerRatio,
+                                      const game::LevelEnemyState*
+                                          shownHealthBarEnemy) {
     if (!device_ || !context_ || !hudTexture_ || width_ == 0 || height_ == 0) {
         return Result::failure("HUD GPU resources are incomplete");
     }
@@ -1296,8 +1298,12 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
     const assets::RgbaImage& texture = hud.interfaceTexture.image();
     constexpr float virtualWidth = 480.0F;
     constexpr float virtualHeight = 320.0F;
-    constexpr float hudX = 46.0F;
-    constexpr float hudY = 32.0F;
+    // CreateAllItems_3x2 (0x002eed48) authors UI items 0x14 and 0x15 at
+    // (46, 32) and (435, 32) on the original 480x320 canvas.
+    constexpr float playerHudX = 46.0F;
+    constexpr float playerHudY = 32.0F;
+    constexpr float enemyHudX = 435.0F;
+    constexpr float enemyHudY = 32.0F;
     const float screenScale =
         std::min(static_cast<float>(width_) / virtualWidth,
                  static_cast<float>(height_) / virtualHeight);
@@ -1309,8 +1315,10 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
     std::vector<GpuVertex> vertices;
     vertices.reserve(36);
     bool valid = true;
-    const auto appendFrame = [&](std::size_t frameIndex, float fillRatio,
-                                 float rightClipPixels) {
+    const auto appendFrame = [&](std::size_t frameIndex, float originX,
+                                 float originY, float fillRatio,
+                                 float rightClipPixels,
+                                 bool fillFromRight = false) {
         const float clampedRatio = std::clamp(fillRatio, 0.0F, 1.0F);
         for (const assets::SpriteFrameModule& frameModule :
              atlas.modulesForFrame(frameIndex)) {
@@ -1320,10 +1328,18 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
             }
             const assets::SpriteModule& module =
                 atlas.modules()[frameModule.moduleIndex];
-            if (module.imageIndex != 0 || frameModule.flags != 0) {
+            // CSprite frame-module flag bit 0 mirrors the module in X. The
+            // enemy bars reuse left-facing atlas modules on the right side of
+            // the HUD through this flag; the level-one HUD does not use the
+            // remaining transform bits.
+            constexpr std::uint8_t horizontalFlip = 0x01;
+            if (module.imageIndex != 0 ||
+                (frameModule.flags & ~horizontalFlip) != 0) {
                 valid = false;
                 continue;
             }
+            const bool flipX =
+                (frameModule.flags & horizontalFlip) != 0;
             const float unclippedWidth =
                 std::max(0.0F, static_cast<float>(module.width) -
                                    rightClipPixels);
@@ -1332,11 +1348,14 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
                 continue;
             }
 
-            const float left =
-                screenOffsetX +
-                (hudX + static_cast<float>(frameModule.x)) * screenScale;
+            const float leftTrim =
+                fillFromRight ? unclippedWidth - visibleWidth : 0.0F;
+            const float left = screenOffsetX +
+                               (originX + static_cast<float>(frameModule.x) +
+                                leftTrim) *
+                                   screenScale;
             const float top = screenOffsetY +
-                              (hudY + static_cast<float>(frameModule.y)) *
+                              (originY + static_cast<float>(frameModule.y)) *
                                   screenScale;
             const float right = left + visibleWidth * screenScale;
             const float bottom =
@@ -1347,15 +1366,23 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
             const float y1 =
                 1.0F - bottom / static_cast<float>(height_) * 2.0F;
 
-            const float u0 =
-                static_cast<float>(module.x) / texture.width;
+            const float sourceLeftTrim =
+                fillFromRight && !flipX ? leftTrim : 0.0F;
+            float u0 =
+                (static_cast<float>(module.x) + sourceLeftTrim) /
+                texture.width;
             const float v0 =
                 static_cast<float>(module.y) / texture.height;
-            const float u1 =
-                (static_cast<float>(module.x) + visibleWidth) / texture.width;
+            float u1 =
+                (static_cast<float>(module.x) + sourceLeftTrim +
+                 visibleWidth) /
+                texture.width;
             const float v1 =
                 (static_cast<float>(module.y) + module.height) /
                 texture.height;
+            if (flipX) {
+                std::swap(u0, u1);
+            }
             constexpr std::uint32_t white = 0xffffffffU;
             const GpuVertex topLeft{{x0, y0, 0.0F}, {}, {u0, v0}, white};
             const GpuVertex topRight{{x1, y0, 0.0F}, {}, {u1, v0}, white};
@@ -1370,14 +1397,64 @@ Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
     currentHealthRatio = std::clamp(currentHealthRatio, 0.0F, 1.0F);
     delayedHealthRatio =
         std::clamp(delayedHealthRatio, currentHealthRatio, 1.0F);
-    appendFrame(0x1b, 1.0F, 0.0F);
+    appendFrame(0x1b, playerHudX, playerHudY, 1.0F, 0.0F);
     if (delayedHealthRatio > currentHealthRatio) {
-        appendFrame(0x1c, delayedHealthRatio, 0.0F);
+        appendFrame(0x1c, playerHudX, playerHudY, delayedHealthRatio, 0.0F);
     }
-    appendFrame(0x1d, currentHealthRatio, 0.0F);
-    appendFrame(0x18, 1.0F, 0.0F);
-    appendFrame(0x19, webPowerRatio, 5.0F);
-    appendFrame(0x1f, 1.0F, 0.0F);
+    appendFrame(0x1d, playerHudX, playerHudY, currentHealthRatio, 0.0F);
+    appendFrame(0x18, playerHudX, playerHudY, 1.0F, 0.0F);
+    appendFrame(0x19, playerHudX, playerHudY, webPowerRatio, 5.0F);
+    appendFrame(0x1f, playerHudX, playerHudY, 1.0F, 0.0F);
+
+    if (shownHealthBarEnemy != nullptr && shownHealthBarEnemy->asset != nullptr) {
+        struct EnemyHealthFrames {
+            std::size_t surround;
+            std::size_t fill;
+            std::size_t icon;
+        };
+        std::optional<EnemyHealthFrames> frames;
+        switch (shownHealthBarEnemy->asset->enemyTypeId) {
+        case 6:
+            frames = EnemyHealthFrames{0x4e, 0x4f, 0x50};
+            break;
+        case 5:
+            frames = EnemyHealthFrames{0x4e, 0x4f, 0x53};
+            break;
+        case 16:
+            frames = EnemyHealthFrames{0x68, 0x69, 0x6a};
+            break;
+        case 7:
+            frames = EnemyHealthFrames{0x6b, 0x6c, 0x6d};
+            break;
+        case 13:
+        case 17:
+            frames = EnemyHealthFrames{0x65, 0x66, 0x67};
+            break;
+        case 18:
+            frames = EnemyHealthFrames{0x75, 0x76, 0x77};
+            break;
+        case 15:
+            frames = EnemyHealthFrames{0x81, 0x82, 0x83};
+            break;
+        case 23:
+            frames = EnemyHealthFrames{0x84, 0x85, 0x86};
+            break;
+        default:
+            break;
+        }
+        if (frames) {
+            const float maximumHealth =
+                std::max(shownHealthBarEnemy->asset->health, 1.0F);
+            const float enemyHealthRatio =
+                shownHealthBarEnemy->health / maximumHealth;
+            // CLevel::ShowHealthBarOfEnemy (0x00387548) paints the surround,
+            // clips the fill from its right edge, then overlays the icon.
+            appendFrame(frames->surround, enemyHudX, enemyHudY, 1.0F, 0.0F);
+            appendFrame(frames->fill, enemyHudX, enemyHudY,
+                        enemyHealthRatio, 0.0F, true);
+            appendFrame(frames->icon, enemyHudX, enemyHudY, 1.0F, 0.0F);
+        }
+    }
     if (!valid) {
         return Result::failure(
             "HUD frame uses an unsupported image or sprite transform");

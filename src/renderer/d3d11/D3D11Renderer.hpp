@@ -57,7 +57,9 @@ public:
     [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
-                                         float webPowerRatio);
+                                         float webPowerRatio,
+                                         const game::LevelEnemyState*
+                                             shownHealthBarEnemy = nullptr);
     [[nodiscard]] Result updateCinematicUi(
         const game::CinematicUiFrame& frame);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);

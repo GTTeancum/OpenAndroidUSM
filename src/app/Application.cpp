@@ -350,9 +350,10 @@ int Application::run(HINSTANCE instance) {
                             deltaMilliseconds,
                         gameplayCinematicDurationMilliseconds_);
                 Result commandResult = Result::success();
+                bool cinematicDamageApplied = false;
                 result = gameplayCinematicPlayer_.advanceToConditional(
                     gameplayCinematicTimeMilliseconds_,
-                    [this, &commandResult](
+                    [this, &commandResult, &cinematicDamageApplied](
                         const game::CinematicThread& thread,
                         const game::CinematicCommand& command) {
                         if (command.name == "IfEnemyDead") {
@@ -368,6 +369,15 @@ int Application::run(HINSTANCE instance) {
                             const game::LevelEnemyState* enemy =
                                 enemyRuntime_.find(objectId);
                             return enemy != nullptr && enemy->health <= 0.0F;
+                        }
+                        if (commandResult) {
+                            const float healthBefore = gameplayPlayer_.health();
+                            commandResult =
+                                gameplayPlayer_.applyCinematicCommand(thread,
+                                                                        command);
+                            cinematicDamageApplied =
+                                cinematicDamageApplied ||
+                                gameplayPlayer_.health() < healthBefore;
                         }
                         if (commandResult) {
                             commandResult = enemyRuntime_.applyCinematicCommand(
@@ -401,6 +411,10 @@ int Application::run(HINSTANCE instance) {
                     });
                 if (result && !commandResult) {
                     result = commandResult;
+                }
+                if (result && cinematicDamageApplied) {
+                    result = playerSounds_.dispatchStateEnter(
+                        "k_state_hurt_light", playGameplaySound);
                 }
                 if (result && gameplayCinematicPlayer_.finished() &&
                     gameplayCinematicTimeMilliseconds_ >=
@@ -460,7 +474,8 @@ int Application::run(HINSTANCE instance) {
                                     deltaMilliseconds);
             result = renderer_.updatePlayerHud(
                 levelOne_.hud(), playerHudHealth_.currentRatio(),
-                playerHudHealth_.delayedRatio(), 1.0F);
+                playerHudHealth_.delayedRatio(), 1.0F,
+                enemyRuntime_.shownHealthBarEnemy());
             const assets::ColladaAnimationClip* activeClip =
                 levelOne_.player().animationBank.findClip(
                     gameplayPlayer_.activeAnimation());

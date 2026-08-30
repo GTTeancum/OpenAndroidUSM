@@ -95,6 +95,7 @@ public:
     }
     [[nodiscard]] const LevelEnemyState* find(std::int32_t objectId) const
         noexcept;
+    [[nodiscard]] const LevelEnemyState* shownHealthBarEnemy() const noexcept;
 
 private:
     [[nodiscard]] LevelEnemyState* findMutable(std::int32_t objectId) noexcept;
@@ -121,6 +122,7 @@ private:
     std::vector<EnemySoundCue> pendingSoundCues_;
     std::vector<EnemyGunLineState> gunLines_;
     const LevelOneBootstrap* level_{};
+    std::optional<std::int32_t> shownHealthBarObjectId_;
 };
 
 } // namespace usm::game

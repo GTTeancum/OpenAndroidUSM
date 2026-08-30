@@ -1213,6 +1213,25 @@ int main() {
         assert(enemyGatePlayer.finished());
         usm::game::LevelEnemyRuntime enemyRuntime;
         assert(enemyRuntime.initialize(bootstrap));
+        usm::game::CinematicThread showHealthThread;
+        showHealthThread.objectId = bootstrap.player().objectId;
+        usm::game::CinematicCommand showHammerHealth;
+        showHammerHealth.name = "ShowHealth";
+        showHammerHealth.attributes.push_back(
+            {"int", "ObjectID", "1139"});
+        assert(enemyRuntime.applyCinematicCommand(
+            bootstrap, showHealthThread, showHammerHealth));
+        assert(enemyRuntime.shownHealthBarEnemy() != nullptr);
+        assert(enemyRuntime.shownHealthBarEnemy()->asset->objectId == 1139);
+        assert(enemyRuntime.shownHealthBarEnemy()->asset->enemyTypeId == 5);
+        showHammerHealth.attributes.front().value = "1199";
+        assert(enemyRuntime.applyCinematicCommand(
+            bootstrap, showHealthThread, showHammerHealth));
+        assert(enemyRuntime.shownHealthBarEnemy()->asset->objectId == 1199);
+        assert(enemyRuntime.shownHealthBarEnemy()->asset->enemyTypeId == 16);
+        showHammerHealth.attributes.front().value = "not-an-id";
+        assert(!enemyRuntime.applyCinematicCommand(
+            bootstrap, showHealthThread, showHammerHealth));
         constexpr std::array<std::int32_t, 16> conditionEnemyIds{
             394, 395, 397, 398, 399, 401, 488, 489,
             505, 506, 1139, 1199, 1251, 10339, 10340, 30000,
@@ -1528,6 +1547,22 @@ int main() {
         assert(groundedPlayer.applyDamage(groundedPlayer.maximumHealth()));
         assert(groundedPlayer.dead());
         assert(!groundedPlayer.requestPunch());
+        usm::game::GameplayPlayer cinematicDamagePlayer;
+        assert(cinematicDamagePlayer.initialize(bootstrap.player(),
+                                                &levelCollision));
+        usm::game::CinematicThread playerDamageThread;
+        playerDamageThread.objectId = bootstrap.player().objectId;
+        usm::game::CinematicCommand playerDamageCommand;
+        playerDamageCommand.name = "GetDamage";
+        playerDamageCommand.attributes.push_back(
+            {"float", "DamageValue", "200.000000"});
+        assert(cinematicDamagePlayer.applyCinematicCommand(
+            playerDamageThread, playerDamageCommand));
+        assert(cinematicDamagePlayer.health() ==
+               cinematicDamagePlayer.maximumHealth() - 200.0F);
+        playerDamageCommand.attributes.front().value = "invalid";
+        assert(!cinematicDamagePlayer.applyCinematicCommand(
+            playerDamageThread, playerDamageCommand));
         assert(std::abs(groundedPlayer.position().z - initialGroundHeight) <
                0.001F);
         std::vector<usm::assets::ColladaGeometry> idlePose;

@@ -70,6 +70,13 @@ bool parseBool(std::string_view text, bool fallback) noexcept {
     return fallback;
 }
 
+bool parseInteger(std::string_view text, std::int32_t& value) noexcept {
+    const char* begin = text.data();
+    const char* end = begin + text.size();
+    const auto parsed = std::from_chars(begin, end, value);
+    return parsed.ec == std::errc{} && parsed.ptr == end;
+}
+
 std::array<float, 16> worldMatrix(const assets::Vector3& position,
                                   assets::Quaternion rotation,
                                   const assets::Vector3& scale) noexcept {
@@ -193,6 +200,7 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
     pendingPlayerHits_.clear();
     pendingSoundCues_.clear();
     gunLines_.clear();
+    shownHealthBarObjectId_.reset();
     level_ = &level;
     states_.reserve(level.enemies().size());
     for (const LevelEnemyAsset& enemy : level.enemies()) {
@@ -727,6 +735,23 @@ void LevelEnemyRuntime::enterDeadState(LevelEnemyState& enemy) {
 Result LevelEnemyRuntime::applyCinematicCommand(
     const LevelOneBootstrap& level, const CinematicThread& thread,
     const CinematicCommand& command) {
+    // CCinematicThread::ShowHealth (0x00370fb8) resolves the optional
+    // ObjectID and registers that enemy with CLevel::RegisterHealthBar
+    // (0x0037dfec). The original renderer then queries the registered enemy
+    // every frame through CAIEntityManager::GetShowHealthBoss (0x003760e0).
+    if (command.name == "ShowHealth") {
+        std::int32_t objectId = thread.objectId;
+        if (const CinematicAttribute* attribute =
+                command.findAttribute("ObjectID");
+            attribute != nullptr && !parseInteger(attribute->value, objectId)) {
+            return Result::failure("Enemy ShowHealth has an invalid ObjectID");
+        }
+        if (find(objectId) == nullptr) {
+            return Result::failure("Enemy ShowHealth references a missing enemy");
+        }
+        shownHealthBarObjectId_ = objectId;
+        return Result::success();
+    }
     LevelEnemyState* enemy = findMutable(thread.objectId);
     if (enemy == nullptr) {
         return Result::success();
@@ -796,6 +821,16 @@ const LevelEnemyState* LevelEnemyRuntime::find(
             return state.asset != nullptr && state.asset->objectId == objectId;
         });
     return match == states_.end() ? nullptr : &*match;
+}
+
+const LevelEnemyState* LevelEnemyRuntime::shownHealthBarEnemy() const noexcept {
+    if (!shownHealthBarObjectId_) {
+        return nullptr;
+    }
+    const LevelEnemyState* enemy = find(*shownHealthBarObjectId_);
+    // CLevel::ShowHealthBarOfEnemy (0x00387548) returns before painting when
+    // the registered enemy has no health left.
+    return enemy != nullptr && enemy->health > 0.0F ? enemy : nullptr;
 }
 
 LevelEnemyState* LevelEnemyRuntime::findMutable(

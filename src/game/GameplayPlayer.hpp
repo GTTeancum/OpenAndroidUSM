@@ -3,6 +3,7 @@
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/CinematicScript.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelSlideRuntime.hpp"
 #include "game/PlayerStateConfig.hpp"
@@ -43,6 +44,8 @@ public:
     [[nodiscard]] bool requestWeb() noexcept;
     [[nodiscard]] bool releaseWeb() noexcept;
     [[nodiscard]] bool applyDamage(float damage) noexcept;
+    [[nodiscard]] Result applyCinematicCommand(
+        const CinematicThread& thread, const CinematicCommand& command);
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
     [[nodiscard]] bool consumePunchImpact() noexcept;
@@ -153,6 +156,7 @@ private:
     std::size_t enteredStateCount_{};
     float health_{1000.0F};
     float maximumHealth_{1000.0F};
+    std::int32_t objectId_{-1};
 };
 
 } // namespace usm::game

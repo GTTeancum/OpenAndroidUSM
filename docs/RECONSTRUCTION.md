@@ -607,6 +607,17 @@ alpha-blended screen-space shader. The game-facing state contains no DirectX
 or Windows handles. A WARP regression verifies that the native text, bands,
 and QTE prompt materially alter the rendered frame.
 
+Enemy cinematic health bars are reconstructed from
+`CCinematicThread::ShowHealth` (`0x00370fb8`),
+`CLevel::RegisterHealthBar` (`0x0037dfec`), and
+`CLevel::ShowHealthBarOfEnemy` (`0x00387548`). The renderer uses the original
+`interface.bsprite` surround, right-to-left fill, and enemy portrait frames.
+The 480x320 anchor `(435, 32)` comes from UI item `0x15` in
+`CreateAllItems_3x2` (`0x002eed48`); level one therefore displays distinct
+authored Hammer Thug and Sandman bars. Cinematic `GetDamage` applies its
+authored `DamageValue` to portable player state, including the QTE-failure
+script's 200-point hit and normal hurt-audio dispatch.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

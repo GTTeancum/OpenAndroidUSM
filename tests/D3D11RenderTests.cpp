@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -56,6 +57,10 @@ void captureIfRequested(const usm::assets::RgbaImage& image,
 } // namespace
 
 int main() {
+#ifdef _WIN32
+    _set_error_mode(_OUT_TO_STDERR);
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
     using namespace usm::assets;
 
     ColladaGeometry triangle;
@@ -256,6 +261,48 @@ int main() {
                     gameplayFrame.pixels[component + 2];
         }
         assert(hudChangedPixels > 100);
+        usm::game::LevelEnemyRuntime healthBarEnemies;
+        assert(healthBarEnemies.initialize(levelOne));
+        usm::game::CinematicThread showHealthThread;
+        showHealthThread.objectId = levelOne.player().objectId;
+        usm::game::CinematicCommand showHealthCommand;
+        showHealthCommand.name = "ShowHealth";
+        showHealthCommand.attributes.push_back(
+            {"int", "ObjectID", "1199"});
+        assert(healthBarEnemies.applyCinematicCommand(
+            levelOne, showHealthThread, showHealthCommand));
+        const usm::Result enemyHealthHudResult = gameRenderer.updatePlayerHud(
+            levelOne.hud(), 0.65F, 0.85F, 1.0F,
+            healthBarEnemies.shownHealthBarEnemy());
+        if (!enemyHealthHudResult) {
+            std::cerr << enemyHealthHudResult.message() << '\n';
+            for (const std::size_t frameIndex : {0x68U, 0x69U, 0x6aU}) {
+                for (const auto& module :
+                     levelOne.hud().interfaceAtlas.modulesForFrame(frameIndex)) {
+                    std::cerr << "frame " << frameIndex << " module "
+                              << module.moduleIndex << " flags "
+                              << static_cast<unsigned>(module.flags) << '\n';
+                }
+            }
+            return 1;
+        }
+        gameRenderer.renderFrame();
+        RgbaImage enemyHealthHudFrame;
+        assert(gameRenderer.readBackImage(enemyHealthHudFrame));
+        captureIfRequested(enemyHealthHudFrame,
+                           "gameplay-sandman-health-hud.bmp");
+        std::size_t enemyHealthChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < enemyHealthHudFrame.pixels.size(); component += 4) {
+            enemyHealthChangedPixels +=
+                enemyHealthHudFrame.pixels[component] !=
+                    gameplayHudFrame.pixels[component] ||
+                enemyHealthHudFrame.pixels[component + 1] !=
+                    gameplayHudFrame.pixels[component + 1] ||
+                enemyHealthHudFrame.pixels[component + 2] !=
+                    gameplayHudFrame.pixels[component + 2];
+        }
+        assert(enemyHealthChangedPixels > 100);
         usm::game::CinematicUiFrame tutorialUi;
         tutorialUi.text = u"Press [A] to jump";
         tutorialUi.textVisible = true;
