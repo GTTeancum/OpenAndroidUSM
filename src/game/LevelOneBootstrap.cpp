@@ -259,6 +259,37 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                            : Result::failure(room.name +
                                              " has no diffuse textures");
         }
+        const auto collisionNode = std::find_if(
+            room.scene.nodes().begin(), room.scene.nodes().end(),
+            [](const assets::IrrSceneNode& node) {
+                return node.gameType == "Collisions" &&
+                       !node.meshFile.empty();
+            });
+        const auto navigationNode = std::find_if(
+            room.scene.nodes().begin(), room.scene.nodes().end(),
+            [](const assets::IrrSceneNode& node) {
+                return node.gameType == "NavMesh" &&
+                       !node.meshFile.empty();
+            });
+        if (collisionNode == room.scene.nodes().end() ||
+            navigationNode == room.scene.nodes().end()) {
+            return Result::failure(room.name +
+                                   " has no collision or navigation mesh");
+        }
+        result = levelArchive.read(
+            normalizeArchivePath(collisionNode->meshFile), resource);
+        if (!result || !(result = room.collision.load(resource)) ||
+            room.collision.geometries().empty()) {
+            return Result::failure("Could not load collision mesh for " +
+                                   room.name + ": " + result.message());
+        }
+        result = levelArchive.read(
+            normalizeArchivePath(navigationNode->meshFile), resource);
+        if (!result || !(result = room.navigationMesh.load(resource)) ||
+            room.navigationMesh.geometries().empty()) {
+            return Result::failure("Could not load navigation mesh for " +
+                                   room.name + ": " + result.message());
+        }
         introRooms_.push_back(std::move(room));
     }
 

@@ -73,7 +73,11 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    result = gameplayPlayer_.initialize(levelOne_.player());
+    result = levelCollision_.build(levelOne_.introRooms());
+    if (!result) {
+        return fail(result.message());
+    }
+    result = gameplayPlayer_.initialize(levelOne_.player(), &levelCollision_);
     if (!result) {
         return fail(result.message());
     }

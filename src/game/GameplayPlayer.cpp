@@ -1,5 +1,7 @@
 #include "game/GameplayPlayer.hpp"
 
+#include "game/LevelCollision.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -13,7 +15,8 @@ float length2D(float x, float y) noexcept { return std::sqrt(x * x + y * y); }
 
 } // namespace
 
-Result GameplayPlayer::initialize(const LevelPlayerAsset& asset) {
+Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
+                                  const LevelCollision* collision) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
         asset.animationBank.findClip("run") == nullptr) {
         return Result::failure(
@@ -35,6 +38,16 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset) {
     }
     activeAnimation_ = "idle_stand";
     animationTimeMilliseconds_ = 0;
+    collision_ = collision;
+    if (collision_ != nullptr) {
+        assets::Vector3 grounded;
+        (void)collision_->resolveGroundMotion(position_, position_, grounded,
+                                              100.0F, 500.0F);
+        position_ = grounded;
+        worldTransform_[12] = position_.x;
+        worldTransform_[13] = position_.y;
+        worldTransform_[14] = position_.z;
+    }
     return Result::success();
 }
 
@@ -80,8 +93,16 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     const float distance = kMaximumRunSpeedCentimetersPerSecond *
                            inputMagnitude *
                            (static_cast<float>(elapsedMilliseconds) / 1000.0F);
-    position_.x += movement.x * distance;
-    position_.y += movement.y * distance;
+    assets::Vector3 desired = position_;
+    desired.x += movement.x * distance;
+    desired.y += movement.y * distance;
+    if (collision_ != nullptr) {
+        assets::Vector3 resolved;
+        (void)collision_->resolveGroundMotion(position_, desired, resolved);
+        position_ = resolved;
+    } else {
+        position_ = desired;
+    }
     facing_ = movement;
     updateWorldTransform(facing_);
     setAnimation("run");

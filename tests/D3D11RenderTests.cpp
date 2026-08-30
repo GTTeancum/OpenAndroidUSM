@@ -1,6 +1,7 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/GameplayPlayer.hpp"
+#include "game/LevelCollision.hpp"
 
 #include <algorithm>
 #include <array>
@@ -191,7 +192,9 @@ int main() {
         captureIfRequested(gameplayMiddleFrame, "gameplay-idle-middle.bmp");
 
         usm::game::GameplayPlayer gameplayPlayer;
-        assert(gameplayPlayer.initialize(levelOne.player()));
+        usm::game::LevelCollision levelCollision;
+        assert(levelCollision.build(levelOne.introRooms()));
+        assert(gameplayPlayer.initialize(levelOne.player(), &levelCollision));
         gameplayPlayer.update({0.0F, 1.0F},
                               gameplayCamera.sample(gameplayPlayer.position()),
                               750);

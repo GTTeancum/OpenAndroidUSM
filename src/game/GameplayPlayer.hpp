@@ -11,6 +11,8 @@
 
 namespace usm::game {
 
+class LevelCollision;
+
 struct PlayerMotionInput {
     float right{};
     float forward{};
@@ -21,7 +23,8 @@ struct PlayerMotionInput {
 // (0x00341524), and Player::UpdateMCSpeed (0x00346f50).
 class GameplayPlayer final {
 public:
-    [[nodiscard]] Result initialize(const LevelPlayerAsset& asset);
+    [[nodiscard]] Result initialize(const LevelPlayerAsset& asset,
+                                    const LevelCollision* collision = nullptr);
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
 
@@ -46,6 +49,7 @@ private:
     assets::Vector3 facing_{1.0F, 0.0F, 0.0F};
     std::string_view activeAnimation_{"idle_stand"};
     std::uint64_t animationTimeMilliseconds_{};
+    const LevelCollision* collision_{};
 };
 
 } // namespace usm::game

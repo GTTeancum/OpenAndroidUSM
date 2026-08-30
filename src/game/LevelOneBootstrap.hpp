@@ -36,6 +36,8 @@ struct LevelRoomAsset {
     std::string name;
     assets::IrrScene scene;
     assets::ColladaMeshFile geometry;
+    assets::ColladaMeshFile collision;
+    assets::ColladaMeshFile navigationMesh;
     std::vector<assets::BtexTexture> textures;
 };
 

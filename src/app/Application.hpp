@@ -6,6 +6,7 @@
 #include "game/CinematicPlayer.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayPlayer.hpp"
+#include "game/LevelCollision.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
@@ -31,6 +32,7 @@ private:
     audio::CinematicSoundBank introSounds_;
     game::CinematicPlayer introPlayer_;
     game::GameplayCamera gameplayCamera_;
+    game::LevelCollision levelCollision_;
     game::GameplayPlayer gameplayPlayer_;
 };
 

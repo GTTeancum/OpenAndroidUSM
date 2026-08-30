@@ -11,11 +11,13 @@
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/GameplayPlayer.hpp"
+#include "game/LevelCollision.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
 #include <cassert>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -47,6 +49,37 @@ int main() {
                  InputContext::Gameplay);
     assert(router.state().jump.released);
     assert(!router.state().jump.held);
+
+    usm::assets::ColladaGeometry collisionFixture;
+    collisionFixture.vertices = {
+        {{0.0F, 0.0F, 0.0F}},
+        {{1000.0F, 0.0F, 0.0F}},
+        {{1000.0F, 1000.0F, 0.0F}},
+        {{0.0F, 1000.0F, 0.0F}},
+        {{500.0F, 0.0F, 0.0F}},
+        {{500.0F, 1000.0F, 0.0F}},
+        {{500.0F, 0.0F, 200.0F}},
+        {{500.0F, 1000.0F, 200.0F}},
+    };
+    usm::assets::ColladaMeshBuffer collisionFixtureBuffer;
+    collisionFixtureBuffer.indices = {
+        0, 1, 2, 0, 2, 3,
+        4, 6, 7, 4, 7, 5,
+    };
+    collisionFixture.meshBuffers.push_back(collisionFixtureBuffer);
+    std::array<usm::assets::ColladaGeometry, 1> collisionFixtureSet{
+        collisionFixture};
+    usm::game::LevelCollision collisionFixtureWorld;
+    assert(collisionFixtureWorld.build(collisionFixtureSet));
+    float fixtureGround = -1.0F;
+    assert(collisionFixtureWorld.groundHeight({250.0F, 500.0F, 20.0F},
+                                              50.0F, 100.0F,
+                                              fixtureGround));
+    assert(std::abs(fixtureGround) < 0.001F);
+    usm::assets::Vector3 wallResolved;
+    assert(collisionFixtureWorld.resolveGroundMotion(
+        {400.0F, 500.0F, 0.0F}, {600.0F, 500.0F, 0.0F}, wallResolved));
+    assert(std::abs(wallResolved.x - 450.0F) < 0.01F);
 
     router.beginFrame();
     router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, true},
@@ -264,6 +297,17 @@ int main() {
                usm::assets::ColladaAnimationProperty::Translation);
         assert(bootstrap.player().animationBank.tracks()[44].property ==
                usm::assets::ColladaAnimationProperty::TranslationX);
+        usm::game::LevelCollision levelCollision;
+        assert(levelCollision.build(bootstrap.introRooms()));
+        assert(levelCollision.triangleCount() > 100);
+        float initialGroundHeight = 0.0F;
+        assert(levelCollision.groundHeight(bootstrap.player().position,
+                                           100.0F, 500.0F,
+                                           initialGroundHeight));
+        usm::game::GameplayPlayer groundedPlayer;
+        assert(groundedPlayer.initialize(bootstrap.player(), &levelCollision));
+        assert(std::abs(groundedPlayer.position().z - initialGroundHeight) <
+               0.001F);
         std::vector<usm::assets::ColladaGeometry> idlePose;
         const auto* recoveredIdle =
             bootstrap.player().animationBank.findClip("idle_stand");
