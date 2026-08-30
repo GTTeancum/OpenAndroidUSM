@@ -59,6 +59,7 @@ private:
         std::uint32_t vertexCount{};
         bool dynamicVertices{};
         bool visible{true};
+        bool cameraRelative{};
     };
 
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
@@ -98,7 +99,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
     std::vector<GpuMesh> gpuMeshes_;
+    std::size_t environmentMeshCount_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
+    DirectX::XMFLOAT4X4 skyViewProjection_{};
     std::uint32_t width_{};
     std::uint32_t height_{};
 };

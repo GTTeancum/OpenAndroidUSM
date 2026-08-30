@@ -97,6 +97,11 @@ int main() {
         RgbaImage rendered;
         assert(gameRenderer.readBackImage(rendered));
         captureIfRequested(rendered, "intro-00000.bmp");
+        const std::size_t skyPixel =
+            (rendered.width / 2U) * 4U;
+        assert(rendered.pixels[skyPixel] + rendered.pixels[skyPixel + 1] +
+                   rendered.pixels[skyPixel + 2] >
+               50);
         std::size_t changedPixels = 0;
         for (std::size_t pixel = 0; pixel < rendered.pixels.size(); pixel += 4) {
             const bool isBackground = rendered.pixels[pixel] < 12 &&

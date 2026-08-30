@@ -116,8 +116,18 @@ aspect ratio, 1-unit near plane, 1000-unit far plane, and target reference
 `#Camera01.Target-node`. The intro CFF overrides the far plane to 10000.
 `game::CinematicCamera` binds the named position/target tracks, retains the
 level's Collada Z-up convention, and feeds sampled world-space poses to the
-D3D11 view/projection path. WARP regression coverage renders Room 1 from the
-actual time-zero intro camera rather than the earlier normalized overview.
+D3D11 view/projection path. WARP regression coverage renders the intro
+environment from the actual time-zero camera rather than the earlier
+normalized overview.
+
+The intro's `MustBeVisible` command names Rooms 1 through 5. The native level
+bootstrap loads those five authored room scenes, their `geometry01` through
+`geometry05` BDAEs, and every referenced texture as separate D3D11 resources.
+It also loads `lvl01_sky.bdae`. The preserved `CSkyBoxObject::Update` at
+`0x0031b6f4` replaces the sky object's position with the active camera position
+every frame; the D3D11 sky path implements the equivalent translation-free
+view matrix. This keeps the 8.8k-unit skyline dome centered around the moving
+cinematic camera instead of exposing the clear color outside Room 1.
 
 The eight `PlayDAEAnim` commands are resolved through their CFF object IDs to
 named Irrlicht scene nodes: Spider-Man (288), three thugs (1257–1259), the

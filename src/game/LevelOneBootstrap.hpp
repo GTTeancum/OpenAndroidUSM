@@ -31,6 +31,20 @@ struct CinematicActorAsset {
     assets::ColladaAnimationFile animation;
 };
 
+struct LevelRoomAsset {
+    std::string name;
+    assets::IrrScene scene;
+    assets::ColladaMeshFile geometry;
+    std::vector<assets::BtexTexture> textures;
+};
+
+struct LevelStaticMeshAsset {
+    std::string name;
+    assets::ColladaMeshFile geometry;
+    std::vector<assets::BtexTexture> textures;
+    bool cameraRelative{};
+};
+
 class LevelOneBootstrap final {
 public:
     [[nodiscard]] Result load(const std::filesystem::path& gameDataRoot);
@@ -39,20 +53,27 @@ public:
         return mainScene_;
     }
     [[nodiscard]] const assets::IrrScene& firstRoom() const noexcept {
-        return firstRoom_;
+        return introRooms_.front().scene;
     }
     [[nodiscard]] const assets::ColladaGeometry& previewGeometry() const noexcept {
-        return roomGeometry_.geometries().front();
+        return introRooms_.front().geometry.geometries().front();
     }
     [[nodiscard]] const assets::BtexTexture& previewTexture() const noexcept {
-        return roomTextures_.front();
+        return introRooms_.front().textures.front();
     }
     [[nodiscard]] const assets::ColladaMeshFile& roomGeometry() const noexcept {
-        return roomGeometry_;
+        return introRooms_.front().geometry;
     }
     [[nodiscard]] const std::vector<assets::BtexTexture>& roomTextures() const
         noexcept {
-        return roomTextures_;
+        return introRooms_.front().textures;
+    }
+    [[nodiscard]] const std::vector<LevelRoomAsset>& introRooms() const
+        noexcept {
+        return introRooms_;
+    }
+    [[nodiscard]] const LevelStaticMeshAsset& introSky() const noexcept {
+        return introSky_;
     }
     [[nodiscard]] const CinematicScript& introStartScript() const noexcept {
         return introStartScript_;
@@ -77,9 +98,8 @@ public:
 
 private:
     assets::IrrScene mainScene_;
-    assets::IrrScene firstRoom_;
-    assets::ColladaMeshFile roomGeometry_;
-    std::vector<assets::BtexTexture> roomTextures_;
+    std::vector<LevelRoomAsset> introRooms_;
+    LevelStaticMeshAsset introSky_;
     CinematicScript introStartScript_;
     CinematicScript introScript_;
     CinematicScript introEndScript_;

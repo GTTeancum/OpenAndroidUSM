@@ -187,6 +187,11 @@ int main() {
         assert(bootstrap.mainScene().nodes().size() == 154);
         assert(bootstrap.mainScene().findNode(288) != nullptr);
         assert(bootstrap.mainScene().findNode(288)->gameType == "SpiderMan");
+        assert(bootstrap.introRooms().size() == 5);
+        assert(bootstrap.introRooms()[4].name == "Room5");
+        assert(!bootstrap.introRooms()[4].geometry.geometries().empty());
+        assert(bootstrap.introSky().cameraRelative);
+        assert(!bootstrap.introSky().geometry.geometries().empty());
         assert(bootstrap.firstRoom().nodes().size() == 60);
         assert(!bootstrap.previewGeometry().vertices.empty());
         assert(!bootstrap.previewTexture().mipLevels().empty());

@@ -423,6 +423,7 @@ Result D3D11Renderer::uploadPreviewGeometry(
     const assets::ColladaGeometry& geometry,
     std::span<const assets::RgbaImage> mipLevels) {
     gpuMeshes_.clear();
+    environmentMeshCount_ = 0;
     return uploadGeometrySet({&geometry, 1}, nullptr, {}, mipLevels);
 }
 
@@ -434,19 +435,34 @@ Result D3D11Renderer::uploadSceneGeometry(
             "Scene texture count does not match the BDAE image library");
     }
     gpuMeshes_.clear();
+    environmentMeshCount_ = 0;
     return uploadGeometrySet(mesh.sceneGeometries(), &mesh, textures, {});
 }
 
 Result D3D11Renderer::uploadLevelOneScene(
     const game::LevelOneBootstrap& levelOne) {
     gpuMeshes_.clear();
-    Result result = uploadGeometrySet(
-        levelOne.roomGeometry().sceneGeometries(), &levelOne.roomGeometry(),
-        levelOne.roomTextures(), {});
+    environmentMeshCount_ = 0;
+    Result result = Result::success();
+    for (const game::LevelRoomAsset& room : levelOne.introRooms()) {
+        result = uploadGeometrySet(room.geometry.sceneGeometries(),
+                                   &room.geometry, room.textures, {});
+        if (!result) {
+            gpuMeshes_.clear();
+            return Result::failure("Could not upload " + room.name + ": " +
+                                   result.message());
+        }
+    }
+    const game::LevelStaticMeshAsset& sky = levelOne.introSky();
+    result = uploadGeometrySet(sky.geometry.sceneGeometries(), &sky.geometry,
+                               sky.textures, {});
     if (!result) {
         gpuMeshes_.clear();
-        return result;
+        return Result::failure("Could not upload " + sky.name + ": " +
+                               result.message());
     }
+    gpuMeshes_.back().cameraRelative = sky.cameraRelative;
+    environmentMeshCount_ = gpuMeshes_.size();
     for (const game::CinematicActorAsset& actor : levelOne.introActors()) {
         if (actor.mesh.images().size() != actor.textures.size()) {
             gpuMeshes_.clear();
@@ -480,14 +496,15 @@ Result D3D11Renderer::uploadLevelOneScene(
 Result D3D11Renderer::updateLevelOneActors(
     const game::LevelOneBootstrap& levelOne,
     std::uint32_t timestampMilliseconds) {
-    if (gpuMeshes_.size() != levelOne.introActors().size() + 1) {
+    if (gpuMeshes_.size() !=
+        levelOne.introActors().size() + environmentMeshCount_) {
         return Result::failure("Level-one actor GPU resources are incomplete");
     }
     for (std::size_t actorIndex = 0;
          actorIndex < levelOne.introActors().size(); ++actorIndex) {
         const game::CinematicActorAsset& actor =
             levelOne.introActors()[actorIndex];
-        GpuMesh& gpuMesh = gpuMeshes_[actorIndex + 1];
+        GpuMesh& gpuMesh = gpuMeshes_[actorIndex + environmentMeshCount_];
         if (!gpuMesh.dynamicVertices) {
             return Result::failure("Actor vertex buffer is not dynamic");
         }
@@ -585,6 +602,8 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
     }
     const DirectX::XMMATRIX view =
         DirectX::XMMatrixLookAtLH(position, target, up);
+    const DirectX::XMMATRIX skyView = DirectX::XMMatrixLookAtLH(
+        DirectX::XMVectorZero(), direction, up);
     const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
         DirectX::XMConvertToRadians(camera.verticalFieldOfViewDegrees),
         static_cast<float>(width_) / static_cast<float>(height_),
@@ -592,6 +611,9 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
     DirectX::XMStoreFloat4x4(
         &worldViewProjection_,
         DirectX::XMMatrixTranspose(view * projection));
+    DirectX::XMStoreFloat4x4(
+        &skyViewProjection_,
+        DirectX::XMMatrixTranspose(skyView * projection));
     context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
                                 &worldViewProjection_, 0, 0);
     return Result::success();
@@ -856,6 +878,11 @@ void D3D11Renderer::renderFrame() {
                 gpuMesh.textures.empty()) {
                 continue;
             }
+            const DirectX::XMFLOAT4X4& transform =
+                gpuMesh.cameraRelative ? skyViewProjection_
+                                       : worldViewProjection_;
+            context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                        &transform, 0, 0);
             context_->IASetVertexBuffers(
                 0, 1, gpuMesh.vertexBuffer.GetAddressOf(), &stride, &offset);
             context_->IASetIndexBuffer(gpuMesh.indexBuffer.Get(),

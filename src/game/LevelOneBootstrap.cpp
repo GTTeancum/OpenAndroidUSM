@@ -28,9 +28,11 @@ const assets::IrrSceneNode* findLevelNode(const assets::IrrScene& mainScene,
     return node != nullptr ? node : firstRoom.findNode(id);
 }
 
-Result loadTextures(filesystem::GbmpArchive& archive,
+Result loadTextures(filesystem::GbmpArchive& primaryArchive,
+                    filesystem::GbmpArchive* fallbackArchive,
                     const assets::ColladaMeshFile& mesh,
-                    std::vector<assets::BtexTexture>& output) {
+                    std::vector<assets::BtexTexture>& output,
+                    std::string_view assetName) {
     output.clear();
     output.reserve(mesh.images().size());
     std::vector<std::byte> resource;
@@ -48,27 +50,42 @@ Result loadTextures(filesystem::GbmpArchive& archive,
             "textures/" + filename,
             source,
         };
-        const auto candidate = std::find_if(
+        const auto primaryCandidate = std::find_if(
             candidates.begin(), candidates.end(),
-            [&archive](const std::string& path) {
-                return archive.find(path) != nullptr;
+            [&primaryArchive](const std::string& path) {
+                return primaryArchive.find(path) != nullptr;
             });
-        if (candidate == candidates.end()) {
+        const auto fallbackCandidate =
+            fallbackArchive == nullptr
+                ? candidates.end()
+                : std::find_if(
+                      candidates.begin(), candidates.end(),
+                      [fallbackArchive](const std::string& path) {
+                          return fallbackArchive->find(path) != nullptr;
+                      });
+        if (primaryCandidate == candidates.end() &&
+            fallbackCandidate == candidates.end()) {
             output.clear();
-            return Result::failure("Could not locate actor texture " +
+            return Result::failure("Could not locate " +
+                                   std::string(assetName) + " texture " +
                                    image.sourcePath);
         }
-        Result result = archive.read(*candidate, resource);
+        Result result = primaryCandidate != candidates.end()
+                            ? primaryArchive.read(*primaryCandidate, resource)
+                            : fallbackArchive->read(*fallbackCandidate,
+                                                    resource);
         if (!result) {
             output.clear();
-            return Result::failure("Could not load actor texture " +
+            return Result::failure("Could not load " +
+                                   std::string(assetName) + " texture " +
                                    image.sourcePath + ": " + result.message());
         }
         assets::BtexTexture texture;
         result = texture.load(resource);
         if (!result) {
             output.clear();
-            return Result::failure("Could not decode actor texture " +
+            return Result::failure("Could not decode " +
+                                   std::string(assetName) + " texture " +
                                    image.sourcePath + ": " + result.message());
         }
         output.push_back(std::move(texture));
@@ -79,7 +96,8 @@ Result loadTextures(filesystem::GbmpArchive& archive,
 } // namespace
 
 Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
-    roomTextures_.clear();
+    introRooms_.clear();
+    introSky_ = {};
     introActors_.clear();
     filesystem::GbmpArchive levelArchive;
     Result result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
@@ -102,52 +120,77 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return result;
     }
 
-    result = levelArchive.read("levelnew_01_0_Room1.irr", resource);
-    if (!result) {
-        return result;
-    }
-    result = firstRoom_.load(resource);
-    if (!result) {
-        return result;
+    introRooms_.reserve(5);
+    for (std::uint32_t roomNumber = 1; roomNumber <= 5; ++roomNumber) {
+        LevelRoomAsset room;
+        room.name = "Room" + std::to_string(roomNumber);
+        const std::string roomFile =
+            "levelnew_01_" + std::to_string(roomNumber - 1) + "_" +
+            room.name + ".irr";
+        result = levelArchive.read(roomFile, resource);
+        if (!result) {
+            return result;
+        }
+        result = room.scene.load(resource);
+        if (!result) {
+            return Result::failure("Could not parse " + room.name + ": " +
+                                   result.message());
+        }
+        const auto geometryNode = std::find_if(
+            room.scene.nodes().begin(), room.scene.nodes().end(),
+            [](const assets::IrrSceneNode& node) {
+                return node.gameType == "Geometry" && !node.meshFile.empty();
+            });
+        if (geometryNode == room.scene.nodes().end()) {
+            return Result::failure(room.name +
+                                   " has no Geometry scene node");
+        }
+        result = levelArchive.read(
+            normalizeArchivePath(geometryNode->meshFile), resource);
+        if (!result) {
+            return result;
+        }
+        result = room.geometry.load(resource);
+        if (!result || room.geometry.geometries().empty()) {
+            return Result::failure("Could not parse geometry for " +
+                                   room.name + ": " + result.message());
+        }
+        result = loadTextures(levelArchive, &entityArchive, room.geometry,
+                              room.textures, room.name);
+        if (!result || room.textures.empty()) {
+            return !result ? result
+                           : Result::failure(room.name +
+                                             " has no diffuse textures");
+        }
+        introRooms_.push_back(std::move(room));
     }
 
-    result = levelArchive.read("meshes_bin/geometry01.bdae", resource);
+    introSky_.name = "Level 1 sky";
+    result = levelArchive.read("meshes_bin/lvl01_sky.bdae", resource);
     if (!result) {
         return result;
     }
-    result = roomGeometry_.load(resource);
+    result = introSky_.geometry.load(resource);
+    if (!result || introSky_.geometry.geometries().empty()) {
+        return Result::failure("Could not parse Level 1 sky: " +
+                               result.message());
+    }
+    result = loadTextures(levelArchive, &entityArchive, introSky_.geometry,
+                          introSky_.textures, introSky_.name);
     if (!result) {
         return result;
     }
-    if (roomGeometry_.geometries().empty()) {
-        return Result::failure("Room 1 geometry contains no renderable meshes");
+    const auto skyNode = std::find_if(
+        mainScene_.nodes().begin(), mainScene_.nodes().end(),
+        [](const assets::IrrSceneNode& node) {
+            return node.meshFile.find("lvl01_sky.bdae") != std::string::npos;
+        });
+    if (skyNode == mainScene_.nodes().end()) {
+        return Result::failure("Level 1 scene has no sky mesh node");
     }
-
-    roomTextures_.reserve(roomGeometry_.images().size());
-    for (const assets::ColladaImage& image : roomGeometry_.images()) {
-        result = levelArchive.read("textures_bin/" + image.sourcePath, resource);
-        if (!result) {
-            result = entityArchive.read("textures_bin/" + image.sourcePath,
-                                        resource);
-            if (!result) {
-                roomTextures_.clear();
-                return Result::failure("Could not load Room 1 texture " +
-                                       image.sourcePath + ": " +
-                                       result.message());
-            }
-        }
-        assets::BtexTexture texture;
-        result = texture.load(resource);
-        if (!result) {
-            roomTextures_.clear();
-            return Result::failure("Could not decode Room 1 texture " +
-                                   image.sourcePath + ": " + result.message());
-        }
-        roomTextures_.push_back(std::move(texture));
-    }
-    if (roomTextures_.empty()) {
-        return Result::failure("Room 1 geometry has no diffuse textures");
-    }
+    // CSkyBoxObject::Update (0x0031b6f4) replaces the serialized node
+    // position with the active camera position every frame.
+    introSky_.cameraRelative = true;
 
     result = levelArchive.read(
         "cinematics/levelnew_01_1264_cinematic.cff", resource);
@@ -199,7 +242,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             const CinematicAttribute* animationFile =
                 command.findAttribute("AnimFile");
             const assets::IrrSceneNode* sceneNode =
-                findLevelNode(mainScene_, firstRoom_, thread.objectId);
+                findLevelNode(mainScene_, introRooms_.front().scene,
+                              thread.objectId);
             if (animationFile == nullptr || sceneNode == nullptr ||
                 sceneNode->meshFile.empty()) {
                 introActors_.clear();
@@ -231,7 +275,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                                        actor.sceneNodeName + ": " +
                                        result.message());
             }
-            result = loadTextures(entityArchive, actor.mesh, actor.textures);
+            result = loadTextures(entityArchive, nullptr, actor.mesh,
+                                  actor.textures, actor.sceneNodeName);
             if (!result) {
                 introActors_.clear();
                 return result;
