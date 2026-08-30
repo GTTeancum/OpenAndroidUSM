@@ -397,7 +397,7 @@ int Application::run(HINSTANCE instance) {
                     return fail(result.message());
                 }
             }
-            for (const game::EnemyMeleeHit& hit :
+            for (const game::EnemyPlayerHit& hit :
                  enemyRuntime_.consumePlayerHits()) {
                 if (gameplayPlayer_.applyDamage(hit.damage)) {
                     result = playerSounds_.dispatchStateEnter(
@@ -433,6 +433,10 @@ int Application::run(HINSTANCE instance) {
             if (result) {
                 result = renderer_.updateLevelOneEnemies(levelOne_,
                                                          enemyRuntime_);
+            }
+            if (result) {
+                result = renderer_.updateEnemyGunLines(
+                    enemyRuntime_.gunLines());
             }
             if (result) {
                 result = renderer_.setCamera(

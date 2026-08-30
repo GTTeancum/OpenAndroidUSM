@@ -118,7 +118,7 @@ Enemy melee timing is not guessed. The typed
 to 45% and 75% of `idle_knife_at_idle`; bat thugs attach attack ID 7 to 47% of
 `idle_at1_idle`. Those IDs resolve through `EnemysAttackConfigs.bin` to the
 authored damage, hit-box reach, and angular sector. The native runtime checks
-each crossed looping key frame, queues a named `EnemyMeleeHit`, and applies it
+each crossed looping key frame, queues a named `EnemyPlayerHit`, and applies it
 to player health. Core regressions exercise both knife impact frames and
 verify their recovered 25-point damage.
 
@@ -138,6 +138,24 @@ duration in milliseconds, projectile speed in centimeters per second, and
 damage. `CBehaviorRangeAttack::StateEnter` at `0x003c143c` consumes the
 duration and `UpdateAttack` at `0x003c20e0` consumes the damage; representative
 map IDs and values are regression-tested from the shipped archive.
+
+The weapon-selection chain is also data-driven. `EnemyAttributeConfigDatabase`
+follows the ranged-attack vector embedded by `ReadAttributeInfo` at
+`0x0033bf00`; enemy type 3 (`THUG_GUN`) authors map index 4. The recovered
+26-entry table used by `CEnemy::InitEntityAttribute` at `0x003373e8` resolves
+that index to weapon type 13, and `EnemyAttackIntervalConfigDatabase` decodes
+the 24 rows and 25 enemy-type columns in `AttackIntervalTimeConfigs.bin`.
+Weapon type 13 selects row 8, `ENEMY_RANGE_ATTACK_GUN_LINE`, with a 2000 ms
+type-3 interval and ranged-config map 8 (1000 ms animation, 30 damage).
+
+`LevelEnemyRuntime` uses that chain to alternate the authored
+`idle_shoot_left_idle` and `idle_shoot_right_idle` clips. Their 50% special
+action emits sound map 18 and creates a portable `EnemyGunLineState` rather
+than an ARM object. Motion and lifetime use the recovered `CGunLine::Update`
+constants (1500 cm/s and two seconds); each swept segment checks level
+occlusion and the player before applying the configured damage. D3D11 draws a
+depth-tested translucent tracer from this backend-independent state, and WARP
+exercises the dynamic gun-line buffer.
 
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation

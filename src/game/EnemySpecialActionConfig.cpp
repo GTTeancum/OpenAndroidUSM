@@ -2,6 +2,7 @@
 
 #include "filesystem/GbmpArchive.hpp"
 
+#include <algorithm>
 #include <utility>
 
 namespace usm::game {
@@ -129,11 +130,21 @@ Result EnemySpecialActionConfigDatabase::load(
 std::vector<const EnemyAnimationSpecialAction*>
 EnemySpecialActionConfigDatabase::findAttackEvents(
     std::int16_t enemyTypeId, std::string_view animationName) const {
+    auto matches = findEvents(enemyTypeId, animationName);
+    std::erase_if(matches, [](const EnemyAnimationSpecialAction* action) {
+        return action == nullptr || action->actionType != 0 ||
+               action->attackId < 0;
+    });
+    return matches;
+}
+
+std::vector<const EnemyAnimationSpecialAction*>
+EnemySpecialActionConfigDatabase::findEvents(
+    std::int16_t enemyTypeId, std::string_view animationName) const {
     std::vector<const EnemyAnimationSpecialAction*> matches;
     for (const EnemyAnimationSpecialAction& action : actions_) {
         if (action.enemyTypeId == enemyTypeId &&
-            action.animationName == animationName && action.actionType == 0 &&
-            action.attackId >= 0) {
+            action.animationName == animationName) {
             matches.push_back(&action);
         }
     }

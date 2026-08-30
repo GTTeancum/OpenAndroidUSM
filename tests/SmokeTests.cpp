@@ -807,6 +807,28 @@ int main() {
         assert(bootstrap.enemySpecialActions().actions().size() == 230);
         const auto& behaviorConfigs = bootstrap.enemyBehaviorConfigs();
         const auto& rangeAttackConfigs = bootstrap.enemyRangeAttackConfigs();
+        const auto& enemyAttributes = bootstrap.enemyAttributeConfigs();
+        assert(enemyAttributes.definitions().size() == 25);
+        const auto* gunThugAttributes = enemyAttributes.find(3);
+        const auto* bigThugAttributes = enemyAttributes.find(4);
+        assert(gunThugAttributes != nullptr &&
+               gunThugAttributes->exportedId == 3 &&
+               gunThugAttributes->name == "THUG_GUN" &&
+               gunThugAttributes->rangedAttackTypeMapIndices ==
+                   std::vector<std::int32_t>{4});
+        assert(bigThugAttributes != nullptr &&
+               bigThugAttributes->name == "THUG_BIG" &&
+               bigThugAttributes->rangedAttackTypeMapIndices ==
+                   std::vector<std::int32_t>{6});
+        assert(usm::game::resolveEnemyRangeWeaponType(4) == 13);
+        assert(usm::game::resolveEnemyRangeWeaponType(6) == 17);
+        const auto& attackIntervals = bootstrap.enemyAttackIntervalConfigs();
+        assert(attackIntervals.definitions().size() == 24);
+        const auto* gunLineInterval = attackIntervals.findForWeaponType(13);
+        assert(gunLineInterval != nullptr && gunLineInterval->id == 8 &&
+               gunLineInterval->name == "ENEMY_RANGE_ATTACK_GUN_LINE" &&
+               gunLineInterval->weaponTypeMapIndex == 4 &&
+               gunLineInterval->intervalMilliseconds[3] == 2000.0F);
         assert(rangeAttackConfigs.definitions().size() == 17);
         const auto* rangeAttack01 = rangeAttackConfigs.findByMapId(7);
         const auto* rangeAttack05 = rangeAttackConfigs.findByMapId(11);
@@ -824,6 +846,11 @@ int main() {
                rangeAttack15->animationDurationMilliseconds == 0.0F &&
                rangeAttack15->projectileSpeedCentimetersPerSecond == -1.0F &&
                rangeAttack15->damage == 80.0F);
+        const auto* gunLineAttack =
+            rangeAttackConfigs.findByMapId(gunLineInterval->id);
+        assert(gunLineAttack != nullptr && gunLineAttack->id == 1 &&
+               gunLineAttack->animationDurationMilliseconds == 1000.0F &&
+               gunLineAttack->damage == 30.0F);
         assert(behaviorConfigs.animationMaps().size() == 239);
         assert(behaviorConfigs.animationLists().size() == 202);
         assert(behaviorConfigs.soundMaps().size() == 63);
@@ -1147,6 +1174,53 @@ int main() {
         assert(gunEnemy != bootstrap.enemies().end());
         assert(gunEnemy->enemyTypeId == 3);
         assert(gunEnemy->initialAnimation == "idle");
+        const auto gunFireEvents =
+            bootstrap.enemySpecialActions().findEvents(
+                3, "idle_shoot_left_idle");
+        assert(gunFireEvents.size() == 1);
+        assert(gunFireEvents.front()->actionType == 0);
+        assert(gunFireEvents.front()->keyFramePercent == 50);
+        assert(gunFireEvents.front()->attackId == -1);
+        assert(gunFireEvents.front()->soundMapIds ==
+               std::vector<std::int16_t>{18});
+        usm::game::LevelEnemyRuntime gunAttackRuntime;
+        assert(gunAttackRuntime.initialize(bootstrap));
+        usm::game::CinematicThread enableGunThread;
+        enableGunThread.objectId = 10344;
+        assert(gunAttackRuntime.applyCinematicCommand(
+            bootstrap, enableGunThread,
+            usm::game::CinematicCommand{0, -1, "SetVisible", {}}));
+        assert(gunAttackRuntime.applyCinematicCommand(
+            bootstrap, enableGunThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        const auto* attackingGunThug = gunAttackRuntime.find(10344);
+        assert(attackingGunThug != nullptr);
+        const auto* gunFireClip =
+            bootstrap.enemyArchetypes()
+                [attackingGunThug->asset->archetypeIndex]
+                    .animationBank.findClip("idle_shoot_left_idle");
+        assert(gunFireClip != nullptr);
+        const usm::assets::Vector3 gunVictim{
+            attackingGunThug->position.x + 1000.0F,
+            attackingGunThug->position.y,
+            attackingGunThug->position.z};
+        gunAttackRuntime.updateGameplay(
+            gunFireClip->durationMilliseconds() / 2, gunVictim);
+        assert(gunAttackRuntime.find(10344)->activeAnimation ==
+               "idle_shoot_left_idle");
+        assert(gunAttackRuntime.gunLines().size() == 1);
+        assert(gunAttackRuntime.gunLines().front().sourceObjectId == 10344);
+        assert(gunAttackRuntime.gunLines().front().damage == 30.0F);
+        const auto gunCues = gunAttackRuntime.consumeSoundCues();
+        assert(gunCues.size() == 1);
+        assert(gunCues.front().sourceObjectId == 10344);
+        gunAttackRuntime.updateGameplay(700, gunVictim);
+        const auto gunHits = gunAttackRuntime.consumePlayerHits();
+        assert(gunHits.size() == 1);
+        assert(gunHits.front().sourceObjectId == 10344);
+        assert(gunHits.front().attackId == -1);
+        assert(gunHits.front().damage == 30.0F);
+        assert(gunAttackRuntime.gunLines().empty());
         assert(hammerEnemy != bootstrap.enemies().end());
         assert(hammerEnemy->enemyTypeId == 5);
         assert(hammerEnemy->health == 1000.0F);
@@ -1201,7 +1275,7 @@ int main() {
         auto enemyHits = enemyAttackRuntime.consumePlayerHits();
         const auto firstKnifeHit = std::find_if(
             enemyHits.begin(), enemyHits.end(),
-            [](const usm::game::EnemyMeleeHit& hit) {
+            [](const usm::game::EnemyPlayerHit& hit) {
                 return hit.sourceObjectId == 394;
             });
         assert(firstKnifeHit != enemyHits.end());
@@ -1216,7 +1290,7 @@ int main() {
         enemyHits = enemyAttackRuntime.consumePlayerHits();
         const auto secondKnifeHit = std::find_if(
             enemyHits.begin(), enemyHits.end(),
-            [](const usm::game::EnemyMeleeHit& hit) {
+            [](const usm::game::EnemyPlayerHit& hit) {
                 return hit.sourceObjectId == 394;
             });
         assert(secondKnifeHit != enemyHits.end());

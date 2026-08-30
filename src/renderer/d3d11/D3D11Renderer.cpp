@@ -580,6 +580,16 @@ Result D3D11Renderer::createPipeline() {
         return hresultFailure("ID3D11Device::CreateBuffer(web line)",
                               callResult);
     }
+    D3D11_BUFFER_DESC gunLineDescription = webLineDescription;
+    constexpr std::uint32_t kMaximumGunLineVertices = 64;
+    gunLineDescription.ByteWidth =
+        kMaximumGunLineVertices * sizeof(GpuVertex);
+    callResult = device_->CreateBuffer(&gunLineDescription, nullptr,
+                                       &enemyGunLineVertexBuffer_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateBuffer(enemy gun lines)",
+                              callResult);
+    }
 
     D3D11_SAMPLER_DESC samplerDescription{};
     samplerDescription.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -936,6 +946,59 @@ Result D3D11Renderer::updateWebLine(
     std::memcpy(mapped.pData, vertices.data(), sizeof(vertices));
     context_->Unmap(webLineVertexBuffer_.Get(), 0);
     webLineVertexCount_ = static_cast<std::uint32_t>(vertices.size());
+    return Result::success();
+}
+
+Result D3D11Renderer::updateEnemyGunLines(
+    std::span<const game::EnemyGunLineState> gunLines) {
+    enemyGunLineVertexCount_ = 0;
+    if (gunLines.empty()) {
+        return Result::success();
+    }
+    if (!context_ || !enemyGunLineVertexBuffer_) {
+        return Result::failure("Enemy gun-line buffer is unavailable");
+    }
+    constexpr std::size_t kMaximumGunLines = 32;
+    constexpr float kTracerLengthCentimeters = 300.0F;
+    constexpr std::uint32_t kGunLineColor = 0xf0ffd060U;
+    std::vector<GpuVertex> vertices;
+    vertices.reserve(std::min(gunLines.size(), kMaximumGunLines) * 2U);
+    for (const game::EnemyGunLineState& line :
+         gunLines.first(std::min(gunLines.size(), kMaximumGunLines))) {
+        if (!line.active) {
+            continue;
+        }
+        const float tracerLength = std::clamp(
+            static_cast<float>(line.ageMilliseconds) * 1.5F, 3.0F,
+            kTracerLengthCentimeters);
+        const assets::Vector3 tail{
+            line.position.x - line.direction.x * tracerLength,
+            line.position.y - line.direction.y * tracerLength,
+            line.position.z - line.direction.z * tracerLength};
+        vertices.push_back({{tail.x, tail.y, tail.z},
+                            {0.0F, 0.0F, 1.0F},
+                            {},
+                            kGunLineColor});
+        vertices.push_back({{line.position.x, line.position.y, line.position.z},
+                            {0.0F, 0.0F, 1.0F},
+                            {},
+                            kGunLineColor});
+    }
+    if (vertices.empty()) {
+        return Result::success();
+    }
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    const HRESULT mapResult = context_->Map(enemyGunLineVertexBuffer_.Get(), 0,
+                                            D3D11_MAP_WRITE_DISCARD, 0,
+                                            &mapped);
+    if (FAILED(mapResult)) {
+        return hresultFailure("ID3D11DeviceContext::Map(enemy gun lines)",
+                              mapResult);
+    }
+    std::memcpy(mapped.pData, vertices.data(),
+                vertices.size() * sizeof(GpuVertex));
+    context_->Unmap(enemyGunLineVertexBuffer_.Get(), 0);
+    enemyGunLineVertexCount_ = static_cast<std::uint32_t>(vertices.size());
     return Result::success();
 }
 
@@ -1541,6 +1604,29 @@ void D3D11Renderer::renderFrame() {
         context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
         context_->RSSetState(rasterizerState_.Get());
         context_->Draw(webLineVertexCount_, 0);
+    }
+
+    if (enemyGunLineVertexCount_ != 0 && enemyGunLineVertexBuffer_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                    &worldViewProjection_, 0, 0);
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(
+            0, 1, enemyGunLineVertexBuffer_.GetAddressOf(), &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        const std::array<ID3D11Buffer*, 2> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
+        context_->PSSetShader(colorPixelShader_.Get(), nullptr, 0);
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        context_->Draw(enemyGunLineVertexCount_, 0);
     }
 
     if (hudVertexCount_ != 0 && hudVertexBuffer_ && hudTexture_) {

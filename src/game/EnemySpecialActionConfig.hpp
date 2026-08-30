@@ -40,6 +40,8 @@ public:
     }
     [[nodiscard]] std::vector<const EnemyAnimationSpecialAction*> findAttackEvents(
         std::int16_t enemyTypeId, std::string_view animationName) const;
+    [[nodiscard]] std::vector<const EnemyAnimationSpecialAction*> findEvents(
+        std::int16_t enemyTypeId, std::string_view animationName) const;
 
 private:
     std::vector<EnemyAnimationSpecialAction> actions_;

@@ -203,6 +203,16 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Could not load enemy behavior configs: " +
                                result.message());
     }
+    result = enemyAttributeConfigs_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load enemy attribute configs: " +
+                               result.message());
+    }
+    result = enemyAttackIntervalConfigs_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load enemy attack intervals: " +
+                               result.message());
+    }
     result = enemyRangeAttackConfigs_.load(gameDataRoot);
     if (!result) {
         return Result::failure("Could not load enemy range-attack configs: " +

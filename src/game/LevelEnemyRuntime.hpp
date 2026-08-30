@@ -40,9 +40,11 @@ struct LevelEnemyState {
     EnemyBehaviorState behavior{EnemyBehaviorState::Disabled};
     std::uint32_t hurtVariantCursor{};
     std::uint32_t soundVariantCursor{};
+    std::uint32_t rangeAttackVariantCursor{};
+    std::uint32_t rangeAttackCooldownMilliseconds{};
 };
 
-struct EnemyMeleeHit {
+struct EnemyPlayerHit {
     std::int32_t sourceObjectId{-1};
     std::int16_t attackId{-1};
     float damage{};
@@ -51,6 +53,18 @@ struct EnemyMeleeHit {
 struct EnemySoundCue {
     std::int32_t sourceObjectId{-1};
     std::int32_t voxSoundId{-1};
+};
+
+// Portable counterpart of CGunLine. The original advances a short tracer at
+// 1500 cm/s, checks each swept segment against the player and level, and
+// retires it after two seconds.
+struct EnemyGunLineState {
+    std::int32_t sourceObjectId{-1};
+    assets::Vector3 position;
+    assets::Vector3 direction;
+    float damage{};
+    std::uint32_t ageMilliseconds{};
+    bool active{};
 };
 
 // Mutable native state for the authored enemy objects. Cinematic command names
@@ -66,7 +80,7 @@ public:
         const assets::Vector3& attackPosition,
         const assets::Vector3& attackDirection, float radius, float damage,
         float minimumForwardDot = 0.0F) noexcept;
-    [[nodiscard]] std::vector<EnemyMeleeHit> consumePlayerHits() noexcept;
+    [[nodiscard]] std::vector<EnemyPlayerHit> consumePlayerHits() noexcept;
     [[nodiscard]] std::vector<EnemySoundCue> consumeSoundCues() noexcept;
     [[nodiscard]] bool destroy(std::int32_t objectId) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
@@ -75,6 +89,9 @@ public:
 
     [[nodiscard]] std::span<const LevelEnemyState> states() const noexcept {
         return states_;
+    }
+    [[nodiscard]] std::span<const EnemyGunLineState> gunLines() const noexcept {
+        return gunLines_;
     }
     [[nodiscard]] const LevelEnemyState* find(std::int32_t objectId) const
         noexcept;
@@ -86,6 +103,12 @@ private:
     void queueAuthoredAttackEvents(LevelEnemyState& enemy,
                                    std::uint32_t previousTimeMilliseconds,
                                    const assets::Vector3& playerPosition);
+    void updateGunLines(std::uint32_t elapsedMilliseconds,
+                        const assets::Vector3& playerPosition,
+                        const LevelCollision* collision) noexcept;
+    void startGunLineAttack(LevelEnemyState& enemy);
+    [[nodiscard]] bool isGunLineEnemy(
+        const LevelEnemyState& enemy) const noexcept;
     void queueStateSound(LevelEnemyState& enemy,
                          std::string_view behaviorStateName);
     void selectStateAnimation(LevelEnemyState& enemy,
@@ -94,8 +117,9 @@ private:
     void enterDeadState(LevelEnemyState& enemy);
 
     std::vector<LevelEnemyState> states_;
-    std::vector<EnemyMeleeHit> pendingPlayerHits_;
+    std::vector<EnemyPlayerHit> pendingPlayerHits_;
     std::vector<EnemySoundCue> pendingSoundCues_;
+    std::vector<EnemyGunLineState> gunLines_;
     const LevelOneBootstrap* level_{};
 };
 

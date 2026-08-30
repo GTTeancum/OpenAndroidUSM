@@ -13,6 +13,12 @@ namespace usm::game {
 namespace {
 
 constexpr float kRadiansToDegrees = 57.29577951308232F;
+constexpr float kGunLineSpeedCentimetersPerSecond = 1500.0F;
+constexpr std::uint32_t kGunLineLifetimeMilliseconds = 2000;
+constexpr float kGunLinePlayerRadiusCentimeters = 60.0F;
+constexpr float kGunLineMaximumRangeCentimeters =
+    kGunLineSpeedCentimetersPerSecond *
+    (static_cast<float>(kGunLineLifetimeMilliseconds) / 1000.0F);
 
 assets::Vector3 parseVector3(std::string_view text,
                              assets::Vector3 fallback = {}) noexcept {
@@ -186,6 +192,7 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
     states_.clear();
     pendingPlayerHits_.clear();
     pendingSoundCues_.clear();
+    gunLines_.clear();
     level_ = &level;
     states_.reserve(level.enemies().size());
     for (const LevelEnemyAsset& enemy : level.enemies()) {
@@ -207,6 +214,8 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
                            false,
                            enemy.aiEnabled ? EnemyBehaviorState::Idle
                                            : EnemyBehaviorState::Disabled,
+                           0,
+                           0,
                            0,
                            0});
     }
@@ -231,6 +240,7 @@ void LevelEnemyRuntime::updateGameplay(
     std::uint32_t elapsedMilliseconds,
     const assets::Vector3& playerPosition,
     const LevelCollision* collision) noexcept {
+    updateGunLines(elapsedMilliseconds, playerPosition, collision);
     for (LevelEnemyState& enemy : states_) {
         if (enemy.asset == nullptr) {
             continue;
@@ -278,12 +288,52 @@ void LevelEnemyRuntime::updateGameplay(
             distanceSquared <= attackRange * attackRange) {
             const EnemyBehaviorState previousBehavior = enemy.behavior;
             enemy.behavior = EnemyBehaviorState::AttackRange;
-            const std::string_view attack = attackAnimation(*enemy.asset);
             const float distance = std::sqrt(distanceSquared);
             if (distance > std::numeric_limits<float>::epsilon()) {
                 setFacing(enemy, {toPlayerX / distance, toPlayerY / distance,
                                   0.0F});
             }
+            if (isGunLineEnemy(enemy)) {
+                if (previousBehavior != EnemyBehaviorState::AttackRange) {
+                    enemy.rangeAttackCooldownMilliseconds = 0;
+                    startGunLineAttack(enemy);
+                } else {
+                    const EnemyArchetypeAsset& archetype =
+                        level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+                    const assets::ColladaAnimationClip* clip =
+                        archetype.animationBank.findClip(enemy.activeAnimation);
+                    if (clip != nullptr && !enemy.animationLoops &&
+                        enemy.animationTimeMilliseconds >=
+                            clip->durationMilliseconds()) {
+                        enemy.activeAnimation =
+                            std::string(idleAnimation(*enemy.asset));
+                        enemy.animationTimeMilliseconds = 0;
+                        enemy.animationLoops = true;
+                        const auto* interval =
+                            level_->enemyAttackIntervalConfigs()
+                                .findForWeaponType(13);
+                        enemy.rangeAttackCooldownMilliseconds =
+                            interval == nullptr
+                                ? 0U
+                                : static_cast<std::uint32_t>(std::max(
+                                      interval->intervalMilliseconds
+                                          [enemy.asset->enemyTypeId],
+                                      0.0F));
+                    }
+                    if (enemy.activeAnimation == idleAnimation(*enemy.asset)) {
+                        if (enemy.rangeAttackCooldownMilliseconds <=
+                            elapsedMilliseconds) {
+                            enemy.rangeAttackCooldownMilliseconds = 0;
+                            startGunLineAttack(enemy);
+                        } else {
+                            enemy.rangeAttackCooldownMilliseconds -=
+                                elapsedMilliseconds;
+                        }
+                    }
+                }
+                continue;
+            }
+            const std::string_view attack = attackAnimation(*enemy.asset);
             if (enemy.activeAnimation != attack ||
                 previousBehavior != EnemyBehaviorState::AttackRange) {
                 enemy.activeAnimation = attack;
@@ -404,8 +454,8 @@ bool LevelEnemyRuntime::destroy(std::int32_t objectId) noexcept {
     return true;
 }
 
-std::vector<EnemyMeleeHit> LevelEnemyRuntime::consumePlayerHits() noexcept {
-    std::vector<EnemyMeleeHit> hits = std::move(pendingPlayerHits_);
+std::vector<EnemyPlayerHit> LevelEnemyRuntime::consumePlayerHits() noexcept {
+    std::vector<EnemyPlayerHit> hits = std::move(pendingPlayerHits_);
     pendingPlayerHits_.clear();
     return hits;
 }
@@ -420,6 +470,9 @@ float LevelEnemyRuntime::maximumAttackReach(
     const LevelEnemyState& enemy) const noexcept {
     if (level_ == nullptr || enemy.asset == nullptr) {
         return 0.0F;
+    }
+    if (isGunLineEnemy(enemy)) {
+        return kGunLineMaximumRangeCentimeters;
     }
     float maximumReach = 0.0F;
     const auto events = level_->enemySpecialActions().findAttackEvents(
@@ -452,12 +505,11 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
     if (clip == nullptr || clip->durationMilliseconds() == 0) {
         return;
     }
-    const auto events = level_->enemySpecialActions().findAttackEvents(
+    const auto events = level_->enemySpecialActions().findEvents(
         enemy.asset->enemyTypeId, enemy.activeAnimation);
     for (const EnemyAnimationSpecialAction* event : events) {
         if (event == nullptr || event->keyFramePercent < 0 ||
-            event->keyFramePercent >= 100 || event->attackId < 0 ||
-            event->attackId > std::numeric_limits<std::int16_t>::max()) {
+            event->keyFramePercent >= 100) {
             continue;
         }
         const std::uint32_t eventTime = static_cast<std::uint32_t>(
@@ -477,6 +529,36 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
                 pendingSoundCues_.push_back(
                     {enemy.asset->objectId, voxSoundId});
             }
+        }
+        if (isGunLineEnemy(enemy) && event->actionType == 0 &&
+            event->attackId < 0) {
+            const EnemyAttackIntervalDefinition* interval =
+                level_->enemyAttackIntervalConfigs().findForWeaponType(13);
+            const EnemyRangeAttackDefinition* attack =
+                interval == nullptr
+                    ? nullptr
+                    : level_->enemyRangeAttackConfigs().findByMapId(
+                          interval->id);
+            const float length = std::hypot(
+                playerPosition.x - enemy.position.x,
+                playerPosition.y - enemy.position.y);
+            if (attack != nullptr &&
+                length > std::numeric_limits<float>::epsilon()) {
+                gunLines_.push_back(
+                    {enemy.asset->objectId,
+                     {enemy.position.x, enemy.position.y,
+                      enemy.position.z + 100.0F},
+                     {(playerPosition.x - enemy.position.x) / length,
+                      (playerPosition.y - enemy.position.y) / length, 0.0F},
+                     attack->damage,
+                     0,
+                     true});
+            }
+            continue;
+        }
+        if (event->attackId < 0 ||
+            event->attackId > std::numeric_limits<std::int16_t>::max()) {
+            continue;
         }
         const auto attackId = static_cast<std::int16_t>(event->attackId);
         const AttackDefinition* attack = level_->attackConfigs().find(attackId);
@@ -506,6 +588,95 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
         pendingPlayerHits_.push_back(
             {enemy.asset->objectId, attackId, attack->damage});
     }
+}
+
+void LevelEnemyRuntime::updateGunLines(
+    std::uint32_t elapsedMilliseconds,
+    const assets::Vector3& playerPosition,
+    const LevelCollision* collision) noexcept {
+    for (EnemyGunLineState& line : gunLines_) {
+        if (!line.active) {
+            continue;
+        }
+        const assets::Vector3 previous = line.position;
+        const float travel = kGunLineSpeedCentimetersPerSecond *
+                             static_cast<float>(elapsedMilliseconds) / 1000.0F;
+        line.position.x += line.direction.x * travel;
+        line.position.y += line.direction.y * travel;
+        line.position.z += line.direction.z * travel;
+        line.ageMilliseconds = std::min<std::uint32_t>(
+            line.ageMilliseconds + elapsedMilliseconds,
+            kGunLineLifetimeMilliseconds);
+        if (collision != nullptr &&
+            collision->segmentBlocked(previous, line.position)) {
+            line.active = false;
+            continue;
+        }
+        const float segmentX = line.position.x - previous.x;
+        const float segmentY = line.position.y - previous.y;
+        const float segmentLengthSquared =
+            segmentX * segmentX + segmentY * segmentY;
+        float time = 0.0F;
+        if (segmentLengthSquared > std::numeric_limits<float>::epsilon()) {
+            time = std::clamp(
+                ((playerPosition.x - previous.x) * segmentX +
+                 (playerPosition.y - previous.y) * segmentY) /
+                    segmentLengthSquared,
+                0.0F, 1.0F);
+        }
+        const float closestX = previous.x + segmentX * time;
+        const float closestY = previous.y + segmentY * time;
+        const float playerX = playerPosition.x - closestX;
+        const float playerY = playerPosition.y - closestY;
+        if (playerX * playerX + playerY * playerY <=
+            kGunLinePlayerRadiusCentimeters *
+                kGunLinePlayerRadiusCentimeters) {
+            pendingPlayerHits_.push_back(
+                {line.sourceObjectId, -1, line.damage});
+            line.active = false;
+        } else if (line.ageMilliseconds >= kGunLineLifetimeMilliseconds) {
+            line.active = false;
+        }
+    }
+    std::erase_if(gunLines_, [](const EnemyGunLineState& line) {
+        return !line.active;
+    });
+}
+
+void LevelEnemyRuntime::startGunLineAttack(LevelEnemyState& enemy) {
+    if (level_ == nullptr || enemy.asset == nullptr) {
+        return;
+    }
+    constexpr std::array<std::string_view, 2> kGunAnimations{
+        "idle_shoot_left_idle", "idle_shoot_right_idle"};
+    const std::string_view animation =
+        kGunAnimations[enemy.rangeAttackVariantCursor % kGunAnimations.size()];
+    enemy.rangeAttackVariantCursor = static_cast<std::uint32_t>(
+        (enemy.rangeAttackVariantCursor + 1) % kGunAnimations.size());
+    const EnemyArchetypeAsset& archetype =
+        level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+    if (archetype.animationBank.findClip(animation) == nullptr) {
+        return;
+    }
+    enemy.activeAnimation = animation;
+    enemy.animationTimeMilliseconds = 0;
+    enemy.animationLoops = false;
+}
+
+bool LevelEnemyRuntime::isGunLineEnemy(
+    const LevelEnemyState& enemy) const noexcept {
+    if (level_ == nullptr || enemy.asset == nullptr) {
+        return false;
+    }
+    const EnemyAttributeDefinition* attributes =
+        level_->enemyAttributeConfigs().find(enemy.asset->enemyTypeId);
+    if (attributes == nullptr ||
+        attributes->rangedAttackTypeMapIndices.empty()) {
+        return false;
+    }
+    const auto weaponType = resolveEnemyRangeWeaponType(
+        attributes->rangedAttackTypeMapIndices.front());
+    return weaponType == 13;
 }
 
 void LevelEnemyRuntime::queueStateSound(

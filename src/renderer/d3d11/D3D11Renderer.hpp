@@ -46,6 +46,8 @@ public:
     [[nodiscard]] Result updateWebLine(
         bool visible, const assets::Vector3& anchor = {},
         const assets::Vector3& attachPosition = {});
+    [[nodiscard]] Result updateEnemyGunLines(
+        std::span<const game::EnemyGunLineState> gunLines);
     [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
@@ -133,6 +135,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthDisabledState_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> hudVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> webLineVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> enemyGunLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
@@ -140,6 +143,7 @@ private:
     std::uint32_t hudVertexCount_{};
     std::uint32_t hudVertexCapacity_{};
     std::uint32_t webLineVertexCount_{};
+    std::uint32_t enemyGunLineVertexCount_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};

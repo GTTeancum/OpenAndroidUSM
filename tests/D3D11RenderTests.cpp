@@ -85,6 +85,11 @@ int main() {
     assert(center[0] > 80);
     assert(center[1] > 20);
     assert(center[3] == 255);
+    const usm::game::EnemyGunLineState gunLine{
+        1, {0.5F, 0.0F, -0.1F}, {1.0F, 0.0F, 0.0F}, 30.0F, 100, true};
+    assert(renderer.updateEnemyGunLines({&gunLine, 1}));
+    renderer.renderFrame();
+    assert(renderer.updateEnemyGunLines({}));
 
     const std::filesystem::path dataRoot = USM_TEST_GAME_DATA_ROOT;
     if (std::filesystem::exists(dataRoot / "levelnew_01.pack")) {
