@@ -11,6 +11,11 @@
 
 namespace usm::platform {
 
+struct ControllerStick {
+    float x{};
+    float y{};
+};
+
 class XInputController final {
 public:
     using EventHandler =
@@ -21,6 +26,9 @@ public:
 
     void poll(const EventHandler& handler) noexcept;
     [[nodiscard]] bool connected() const noexcept { return connected_; }
+    [[nodiscard]] ControllerStick leftStick() const noexcept {
+        return leftStick_;
+    }
 
 private:
     void emitTransition(bool wasPressed, bool isPressed,
@@ -31,6 +39,7 @@ private:
     std::uint32_t playerIndex_{};
     WORD previousButtons_{};
     bool connected_{};
+    ControllerStick leftStick_;
 };
 
 } // namespace usm::platform

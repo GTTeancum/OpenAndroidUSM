@@ -1,5 +1,6 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/GameplayPlayer.hpp"
 
 #include <algorithm>
 #include <array>
@@ -93,6 +94,12 @@ int main() {
                 "sky-texture-" + std::to_string(textureIndex) + ".bmp");
         }
         for (std::size_t textureIndex = 0;
+             textureIndex < levelOne.roomTextures().size(); ++textureIndex) {
+            captureIfRequested(
+                levelOne.roomTextures()[textureIndex].mipLevels().front(),
+                "room-texture-" + std::to_string(textureIndex) + ".bmp");
+        }
+        for (std::size_t textureIndex = 0;
              textureIndex < levelOne.introActors().front().textures.size();
              ++textureIndex) {
             captureIfRequested(
@@ -182,6 +189,38 @@ int main() {
         RgbaImage gameplayMiddleFrame;
         assert(gameRenderer.readBackImage(gameplayMiddleFrame));
         captureIfRequested(gameplayMiddleFrame, "gameplay-idle-middle.bmp");
+
+        usm::game::GameplayPlayer gameplayPlayer;
+        assert(gameplayPlayer.initialize(levelOne.player()));
+        gameplayPlayer.update({0.0F, 1.0F},
+                              gameplayCamera.sample(gameplayPlayer.position()),
+                              750);
+        (void)gameplayCamera.updateArea(gameplayPlayer.position(), 750);
+        const auto* runClip =
+            levelOne.player().animationBank.findClip("run");
+        assert(runClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *runClip,
+            gameplayPlayer.animationTimeMilliseconds(),
+            gameplayPlayer.worldTransform()));
+        assert(gameRenderer.setCamera(
+            gameplayCamera.sample(gameplayPlayer.position())));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayRunningFrame;
+        assert(gameRenderer.readBackImage(gameplayRunningFrame));
+        captureIfRequested(gameplayRunningFrame, "gameplay-running.bmp");
+        std::size_t gameplayChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < gameplayRunningFrame.pixels.size(); component += 4) {
+            gameplayChangedPixels +=
+                gameplayRunningFrame.pixels[component] !=
+                    gameplayMiddleFrame.pixels[component] ||
+                gameplayRunningFrame.pixels[component + 1] !=
+                    gameplayMiddleFrame.pixels[component + 1] ||
+                gameplayRunningFrame.pixels[component + 2] !=
+                    gameplayMiddleFrame.pixels[component + 2];
+        }
+        assert(gameplayChangedPixels > 100);
     }
     return 0;
 }

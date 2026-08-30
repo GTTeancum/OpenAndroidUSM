@@ -32,6 +32,26 @@ constexpr std::array<Binding, 12> kBindings{{
 
 constexpr SHORT kStickDirectionThreshold = 9000;
 
+ControllerStick normalizeLeftStick(SHORT x, SHORT y) noexcept {
+    constexpr float kMaximumAxis = 32767.0F;
+    constexpr float kDeadZone =
+        static_cast<float>(XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) / kMaximumAxis;
+    float normalizedX = std::clamp(static_cast<float>(x) / kMaximumAxis,
+                                   -1.0F, 1.0F);
+    float normalizedY = std::clamp(static_cast<float>(y) / kMaximumAxis,
+                                   -1.0F, 1.0F);
+    const float magnitude =
+        std::sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+    if (magnitude <= kDeadZone) {
+        return {};
+    }
+    const float remappedMagnitude =
+        std::min((magnitude - kDeadZone) / (1.0F - kDeadZone), 1.0F);
+    normalizedX = normalizedX / magnitude * remappedMagnitude;
+    normalizedY = normalizedY / magnitude * remappedMagnitude;
+    return {normalizedX, normalizedY};
+}
+
 WORD addLeftStickDirections(WORD buttons, SHORT x, SHORT y) noexcept {
     if (x < -kStickDirectionThreshold) {
         buttons |= XINPUT_GAMEPAD_DPAD_LEFT;
@@ -58,11 +78,14 @@ void XInputController::poll(const EventHandler& handler) noexcept {
             }
         }
         previousButtons_ = 0;
+        leftStick_ = {};
         connected_ = false;
         return;
     }
 
     connected_ = true;
+    leftStick_ = normalizeLeftStick(state.Gamepad.sThumbLX,
+                                    state.Gamepad.sThumbLY);
     const WORD currentButtons = addLeftStickDirections(
         state.Gamepad.wButtons, state.Gamepad.sThumbLX, state.Gamepad.sThumbLY);
 

@@ -10,6 +10,7 @@
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/GameplayPlayer.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -237,6 +238,14 @@ int main() {
         assert(bootstrap.mainScene().findNode(288)->initialCameraAreaId == 283);
         assert(bootstrap.mainScene().findNode(288)->linkedCinematicId == 1265);
         assert(bootstrap.mainScene().findNode(288)->endGameCinematicId == 1267);
+        const auto* initialCameraNode = bootstrap.mainScene().findNode(283);
+        assert(initialCameraNode != nullptr);
+        assert(initialCameraNode->cameraAreaHeight == 500.0F);
+        assert(initialCameraNode->cameraAreaZFollowRate == 0.5F);
+        assert(!initialCameraNode->cameraAreaInverseNormal);
+        assert(!initialCameraNode->cameraAreaDisabled);
+        assert(initialCameraNode->nextCameraAreaIds[0] == 304);
+        assert(initialCameraNode->cameraAreaSwitchTimeUnits[0] == 30);
         assert(bootstrap.player().objectId == 288);
         assert(bootstrap.player().sceneNodeName == "SpiderMan");
         assert(bootstrap.player().initialAnimation ==
@@ -298,6 +307,73 @@ int main() {
                       << gameplayCameraPose.position.z << '\n';
             return 1;
         }
+        usm::game::GameplayPlayer gameplayPlayer;
+        assert(gameplayPlayer.initialize(bootstrap.player()));
+        const auto initialPlayerPosition = gameplayPlayer.position();
+        gameplayPlayer.update({0.0F, 1.0F}, gameplayCameraPose, 1000);
+        const auto movedPlayerPosition = gameplayPlayer.position();
+        const float playerDisplacement = std::hypot(
+            movedPlayerPosition.x - initialPlayerPosition.x,
+            movedPlayerPosition.y - initialPlayerPosition.y);
+        assert(std::abs(playerDisplacement - 700.0F) < 0.1F);
+        assert(gameplayPlayer.activeAnimation() == "run");
+        assert(gameplayPlayer.animationTimeMilliseconds() == 1000);
+        assert(std::abs(gameplayPlayer.worldTransform()[12] -
+                        movedPlayerPosition.x) < 0.001F);
+        assert(std::abs(gameplayPlayer.worldTransform()[13] -
+                        movedPlayerPosition.y) < 0.001F);
+        gameplayPlayer.update({}, gameplayCameraPose, 16);
+        assert(gameplayPlayer.activeAnimation() == "idle_stand");
+        assert(gameplayPlayer.animationTimeMilliseconds() == 16);
+
+        auto makeCameraArea = [](std::int32_t id, float minimumX,
+                                 float maximumX) {
+            usm::game::CameraArea area;
+            area.objectId = id;
+            area.height = 100.0F;
+            area.controlPoints[0].position = {minimumX, 0.0F, 0.0F};
+            area.controlPoints[1].position = {maximumX, 0.0F, 0.0F};
+            area.controlPoints[2].position = {maximumX, 10.0F, 0.0F};
+            area.controlPoints[3].position = {minimumX, 10.0F, 0.0F};
+            for (auto& point : area.controlPoints) {
+                point.direction = {0.0F, 1.0F, 0.0F};
+                point.distance = 100.0F;
+            }
+            return area;
+        };
+        std::array<usm::game::CameraArea, 2> adjacentCameraAreas{
+            makeCameraArea(1, 0.0F, 10.0F),
+            makeCameraArea(2, 10.0F, 20.0F),
+        };
+        adjacentCameraAreas[0].nextAreaIds[0] = 2;
+        adjacentCameraAreas[0].switchTimeUnits[0] = 5;
+        for (auto& point : adjacentCameraAreas[1].controlPoints) {
+            point.direction = {1.0F, 0.0F, 0.0F};
+            point.distance = 200.0F;
+        }
+        usm::game::GameplayCamera switchingCamera;
+        assert(switchingCamera.bind(adjacentCameraAreas, 1));
+        assert(!switchingCamera.updateArea({5.0F, 5.0F, 0.0F}));
+        const auto cameraBeforeSwitch =
+            switchingCamera.sample({15.0F, 5.0F, 0.0F});
+        assert(switchingCamera.updateArea({15.0F, 5.0F, 0.0F}));
+        assert(switchingCamera.currentAreaId() == 2);
+        assert(switchingCamera.lastSwitchDurationMilliseconds() == 250);
+        const auto cameraAtSwitch =
+            switchingCamera.sample({15.0F, 5.0F, 0.0F});
+        assert(std::abs(cameraAtSwitch.position.x -
+                        cameraBeforeSwitch.position.x) < 0.001F);
+        assert(std::abs(cameraAtSwitch.position.y -
+                        cameraBeforeSwitch.position.y) < 0.001F);
+        assert(!switchingCamera.updateArea({15.0F, 5.0F, 0.0F}, 125));
+        const auto cameraHalfway =
+            switchingCamera.sample({15.0F, 5.0F, 0.0F});
+        assert(std::abs(cameraHalfway.position.x -
+                        cameraAtSwitch.position.x) > 1.0F);
+        assert(!switchingCamera.updateArea({15.0F, 5.0F, 0.0F}, 125));
+        const auto cameraAfterSwitch =
+            switchingCamera.sample({15.0F, 5.0F, 0.0F});
+        assert(std::abs(cameraAfterSwitch.position.x - -185.0F) < 0.01F);
         assert(bootstrap.introRooms().size() == 5);
         assert(bootstrap.introRooms()[4].name == "Room5");
         assert(!bootstrap.introRooms()[4].geometry.geometries().empty());

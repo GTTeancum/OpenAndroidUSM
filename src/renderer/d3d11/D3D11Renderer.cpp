@@ -134,6 +134,31 @@ Result hresultFailure(std::string_view operation, HRESULT value) {
     return Result::failure(message.str());
 }
 
+DirectX::XMMATRIX buildOriginalLookAtMatrix(
+    DirectX::FXMVECTOR position, DirectX::FXMVECTOR target,
+    DirectX::FXMVECTOR up) noexcept {
+    // Irrlicht's preserved buildCameraLookAtMatrix (image 0x003f4a18)
+    // constructs screen-right as forward x up. XMMatrixLookAtLH uses the
+    // opposite cross-product order, which mirrors every sign and character.
+    const DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(
+        DirectX::XMVectorSubtract(target, position));
+    const DirectX::XMVECTOR right = DirectX::XMVector3Normalize(
+        DirectX::XMVector3Cross(forward, up));
+    const DirectX::XMVECTOR adjustedUp =
+        DirectX::XMVector3Cross(right, forward);
+    return DirectX::XMMATRIX(
+        DirectX::XMVectorGetX(right), DirectX::XMVectorGetX(adjustedUp),
+        DirectX::XMVectorGetX(forward), 0.0F,
+        DirectX::XMVectorGetY(right), DirectX::XMVectorGetY(adjustedUp),
+        DirectX::XMVectorGetY(forward), 0.0F,
+        DirectX::XMVectorGetZ(right), DirectX::XMVectorGetZ(adjustedUp),
+        DirectX::XMVectorGetZ(forward), 0.0F,
+        -DirectX::XMVectorGetX(DirectX::XMVector3Dot(right, position)),
+        -DirectX::XMVectorGetX(DirectX::XMVector3Dot(adjustedUp, position)),
+        -DirectX::XMVectorGetX(DirectX::XMVector3Dot(forward, position)),
+        1.0F);
+}
+
 Result compileShader(std::string_view source, const char* target,
                      ComPtr<ID3DBlob>& bytecode) {
     UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
@@ -763,8 +788,8 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
         return Result::failure("Perspective camera direction is invalid");
     }
     const DirectX::XMMATRIX view =
-        DirectX::XMMatrixLookAtLH(position, target, up);
-    const DirectX::XMMATRIX skyView = DirectX::XMMatrixLookAtLH(
+        buildOriginalLookAtMatrix(position, target, up);
+    const DirectX::XMMATRIX skyView = buildOriginalLookAtMatrix(
         DirectX::XMVectorZero(), direction, up);
     const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
         DirectX::XMConvertToRadians(camera.verticalFieldOfViewDegrees),

@@ -147,10 +147,30 @@ std::array<float, 4> controlPointWeights(const CameraArea& area,
     return result;
 }
 
+bool containsPlayer(const CameraArea& area, const Vector3& player) noexcept {
+    if (area.disabled) {
+        return false;
+    }
+    const Vector3 projected = projectOnControlPlane(area, player);
+    if (distance(player, projected) > area.height + 1e-3F) {
+        return false;
+    }
+    return pointInTriangle(projected, area.controlPoints[0].position,
+                           area.controlPoints[1].position,
+                           area.controlPoints[2].position) ||
+           pointInTriangle(projected, area.controlPoints[0].position,
+                           area.controlPoints[2].position,
+                           area.controlPoints[3].position);
+}
+
 } // namespace
 
 Result GameplayCamera::bind(std::span<const CameraArea> areas,
                             std::int32_t initialAreaId) {
+    areas_ = areas;
+    transitionDurationMilliseconds_ = 0;
+    transitionElapsedMilliseconds_ = 0;
+    transitionProgress_ = 1.0F;
     const auto match = std::find_if(
         areas.begin(), areas.end(), [initialAreaId](const CameraArea& area) {
             return area.objectId == initialAreaId;
@@ -170,6 +190,61 @@ Result GameplayCamera::bind(std::span<const CameraArea> areas,
     }
     currentArea_ = &*match;
     return Result::success();
+}
+
+bool GameplayCamera::updateArea(
+    const assets::Vector3& playerPosition,
+    std::uint32_t elapsedMilliseconds) noexcept {
+    if (currentArea_ == nullptr || containsPlayer(*currentArea_, playerPosition)) {
+        advanceTransition(elapsedMilliseconds);
+        return false;
+    }
+    for (std::size_t index = 0; index < currentArea_->nextAreaIds.size();
+         ++index) {
+        const std::int32_t neighborId = currentArea_->nextAreaIds[index];
+        const auto neighbor = std::find_if(
+            areas_.begin(), areas_.end(), [neighborId](const CameraArea& area) {
+                return area.objectId == neighborId;
+            });
+        if (neighbor == areas_.end() ||
+            !containsPlayer(*neighbor, playerPosition)) {
+            continue;
+        }
+        transitionStartPose_ = sample(playerPosition);
+        transitionDurationMilliseconds_ =
+            currentArea_->switchTimeUnits[index] * 50U;
+        transitionElapsedMilliseconds_ = 0;
+        transitionProgress_ =
+            transitionDurationMilliseconds_ == 0 ? 1.0F : 0.0F;
+        currentArea_ = &*neighbor;
+        advanceTransition(elapsedMilliseconds);
+        return true;
+    }
+    advanceTransition(elapsedMilliseconds);
+    return false;
+}
+
+void GameplayCamera::advanceTransition(
+    std::uint32_t elapsedMilliseconds) noexcept {
+    if (transitionProgress_ >= 1.0F ||
+        transitionDurationMilliseconds_ == 0) {
+        transitionProgress_ = 1.0F;
+        return;
+    }
+    transitionElapsedMilliseconds_ = std::min(
+        transitionDurationMilliseconds_,
+        transitionElapsedMilliseconds_ +
+            std::min(elapsedMilliseconds,
+                     transitionDurationMilliseconds_ -
+                         transitionElapsedMilliseconds_));
+    const float time =
+        static_cast<float>(transitionElapsedMilliseconds_) /
+        static_cast<float>(transitionDurationMilliseconds_);
+    // CameraAreaSwitcher::UpdateTimer (0x002f5894) accelerates for the first
+    // half and decelerates for the second half with 4 / duration^2.
+    transitionProgress_ = time <= 0.5F
+                              ? 2.0F * time * time
+                              : 1.0F - 2.0F * (1.0F - time) * (1.0F - time);
 }
 
 CameraPose GameplayCamera::sample(
@@ -203,6 +278,23 @@ CameraPose GameplayCamera::sample(
     pose.verticalFieldOfViewDegrees = 45.0F;
     pose.nearPlane = 1.0F;
     pose.farPlane = 10000.0F + currentArea_->farPlaneOffset;
+    if (transitionProgress_ < 1.0F) {
+        const float progress = transitionProgress_;
+        const float remaining = 1.0F - progress;
+        const Vector3 startDirection = normalize(subtract(
+            transitionStartPose_.target, transitionStartPose_.position));
+        const float startDistance = distance(transitionStartPose_.target,
+                                             transitionStartPose_.position);
+        const Vector3 finalDirection = direction;
+        const Vector3 blendedDirection = normalize(add(
+            scale(startDirection, remaining), scale(finalDirection, progress)));
+        pose.target = add(scale(transitionStartPose_.target, remaining),
+                          scale(pose.target, progress));
+        const float blendedDistance =
+            startDistance * remaining + cameraDistance * progress;
+        pose.position =
+            subtract(pose.target, scale(blendedDirection, blendedDistance));
+    }
     return pose;
 }
 

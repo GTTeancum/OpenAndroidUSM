@@ -73,21 +73,26 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    const assets::ColladaAnimationClip* idleClip =
-        levelOne_.player().animationBank.findClip("idle_stand");
-    if (idleClip == nullptr) {
-        return fail("The player animation bank has no idle_stand clip");
+    result = gameplayPlayer_.initialize(levelOne_.player());
+    if (!result) {
+        return fail(result.message());
     }
 
     const auto introStart = std::chrono::steady_clock::now();
+    auto previousFrame = introStart;
     while (window_.pumpMessages()) {
+        const auto frameTime = std::chrono::steady_clock::now();
+        const auto frameElapsed =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                frameTime - previousFrame);
+        previousFrame = frameTime;
         audio_.update();
         keyRouter_.beginFrame();
         controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
             keyRouter_.route(event, reconstructed::InputContext::Gameplay);
         });
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - introStart);
+            frameTime - introStart);
         const auto introDuration =
             levelOne_.introCameraAnimation().durationMilliseconds();
         const auto timestamp = static_cast<std::uint32_t>(
@@ -119,15 +124,36 @@ int Application::run(HINSTANCE instance) {
             result =
                 renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
         } else {
-            const auto gameplayTime = static_cast<std::uint32_t>(
-                std::min<std::int64_t>(elapsed.count() - introDuration,
-                                       std::numeric_limits<std::uint32_t>::max()));
+            const auto stick = controller_.leftStick();
+            game::PlayerMotionInput motion{stick.x, stick.y};
+            if (motion.right == 0.0F && motion.forward == 0.0F) {
+                const auto& input = keyRouter_.state();
+                motion.right = static_cast<float>(input.moveRight.held) -
+                               static_cast<float>(input.moveLeft.held);
+                motion.forward = static_cast<float>(input.moveUp.held) -
+                                 static_cast<float>(input.moveDown.held);
+            }
+            const auto cameraBeforeMovement =
+                gameplayCamera_.sample(gameplayPlayer_.position());
+            const auto deltaMilliseconds = static_cast<std::uint32_t>(
+                std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
+            gameplayPlayer_.update(motion, cameraBeforeMovement,
+                                   deltaMilliseconds);
+            (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
+                                             deltaMilliseconds);
+            const assets::ColladaAnimationClip* activeClip =
+                levelOne_.player().animationBank.findClip(
+                    gameplayPlayer_.activeAnimation());
+            if (activeClip == nullptr) {
+                return fail("The active player animation is missing");
+            }
             result = renderer_.updateLevelOnePlayer(
-                levelOne_, *idleClip, gameplayTime,
-                levelOne_.player().worldTransform);
+                levelOne_, *activeClip,
+                gameplayPlayer_.animationTimeMilliseconds(),
+                gameplayPlayer_.worldTransform());
             if (result) {
                 result = renderer_.setCamera(
-                    gameplayCamera_.sample(levelOne_.player().position));
+                    gameplayCamera_.sample(gameplayPlayer_.position()));
             }
         }
         if (!result) {

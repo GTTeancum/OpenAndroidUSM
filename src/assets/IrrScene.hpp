@@ -44,6 +44,11 @@ struct IrrSceneNode {
     std::int32_t endGameCinematicId{-1};
     std::array<std::int32_t, 4> cameraControlPointIds{{-1, -1, -1, -1}};
     std::array<std::int32_t, 4> nextCameraAreaIds{{-1, -1, -1, -1}};
+    std::array<std::uint32_t, 4> cameraAreaSwitchTimeUnits{};
+    bool cameraAreaInverseNormal{};
+    float cameraAreaHeight{};
+    float cameraAreaZFollowRate{};
+    bool cameraAreaDisabled{};
     Vector3 cameraDirection;
     float cameraDistance{};
     Vector3 cameraTargetOffset;

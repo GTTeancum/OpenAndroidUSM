@@ -182,6 +182,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         CameraArea area;
         area.objectId = areaNode.id;
         area.nextAreaIds = areaNode.nextCameraAreaIds;
+        area.switchTimeUnits = areaNode.cameraAreaSwitchTimeUnits;
+        area.inverseNormal = areaNode.cameraAreaInverseNormal;
+        area.height = areaNode.cameraAreaHeight;
+        area.zFollowRate = areaNode.cameraAreaZFollowRate;
+        area.disabled = areaNode.cameraAreaDisabled;
         area.farPlaneOffset = areaNode.cameraFarPlaneOffset;
         for (std::size_t index = 0; index < area.controlPoints.size();
              ++index) {

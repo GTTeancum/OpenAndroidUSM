@@ -116,7 +116,27 @@ void collectSceneNodes(const pugi::xml_node& parent,
                                        "^Next" + suffix + "^CameraArea")
                         .attribute("value")
                         .as_int(-1);
+                node.cameraAreaSwitchTimeUnits[index] =
+                    findNamedAttribute(userAttributes, "switchTime" + suffix)
+                        .attribute("value")
+                        .as_uint();
             }
+            node.cameraAreaInverseNormal =
+                findNamedAttribute(userAttributes, "inverseNormal")
+                    .attribute("value")
+                    .as_bool();
+            node.cameraAreaHeight =
+                findNamedAttribute(userAttributes, "height")
+                    .attribute("value")
+                    .as_float();
+            node.cameraAreaZFollowRate =
+                findNamedAttribute(userAttributes, "zFollowRate")
+                    .attribute("value")
+                    .as_float();
+            node.cameraAreaDisabled =
+                findNamedAttribute(userAttributes, "disable")
+                    .attribute("value")
+                    .as_bool();
             node.cameraDirection = {
                 findNamedAttribute(userAttributes, "dx")
                     .attribute("value")
