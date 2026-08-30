@@ -34,6 +34,9 @@ public:
     [[nodiscard]] Result initialize(const EffectPresetDatabase& presets);
     [[nodiscard]] Result applyCinematicCommand(
         const CinematicCommand& command);
+    [[nodiscard]] Result playEffect(std::string_view effectType,
+                                    const assets::Vector3& origin,
+                                    std::int32_t roomId = -1);
     [[nodiscard]] Result addPersistentEffect(
         std::string_view effectType, const assets::Vector3& origin,
         std::int32_t roomId, bool visible = true,

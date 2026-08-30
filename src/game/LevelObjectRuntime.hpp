@@ -34,6 +34,10 @@ public:
     [[nodiscard]] Result applyCinematicCommand(
         const LevelOneBootstrap& level, const CinematicThread& thread,
         const CinematicCommand& command);
+    [[nodiscard]] Result setRuntimeState(std::int32_t objectId,
+                                         const assets::Vector3& position,
+                                         bool visible,
+                                         bool physicsEnabled);
 
     [[nodiscard]] std::span<const LevelObjectState> states() const noexcept {
         return states_;

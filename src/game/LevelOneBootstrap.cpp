@@ -392,6 +392,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     environmentEffects_.clear();
     bonuses_.clear();
     hints_.clear();
+    dropAreas_.clear();
+    dropObjects_.clear();
     triggerSounds_.clear();
     hud_ = {};
     effects_ = {};
@@ -718,6 +720,24 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                 hints_.push_back(std::move(hint));
                 continue;
             }
+            if (node.gameType == "DropArea") {
+                LevelDropAreaAsset area;
+                area.objectId = node.id;
+                area.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                area.position = worldPosition(node);
+                area.sizes = vectorAttribute(node, "Sizes");
+                area.effectType =
+                    std::string(userAttribute(node, "$EffectType"));
+                if (area.sizes.x == 0.0F || area.sizes.y == 0.0F ||
+                    area.sizes.z == 0.0F || area.effectType.empty() ||
+                    effects_.presets.find(area.effectType) == nullptr) {
+                    return Result::failure("DropArea " +
+                                           std::to_string(node.id) +
+                                           " has invalid attributes");
+                }
+                dropAreas_.push_back(std::move(area));
+                continue;
+            }
             if (node.gameType == "TriggerSound") {
                 const std::string eventName(
                     userAttribute(node, "$VoxSounds"));
@@ -840,7 +860,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             object.rotation = node.rotation;
             object.scale = node.scale;
             object.worldTransform = node.absoluteTransform;
-            object.visible = node.visible;
+            object.visible =
+                node.visible && *kind != LevelObjectKind::DropObject;
             object.hasCollision = node.hasCollision;
             if (!animationPath.empty() && !object.initialAnimation.empty()) {
                 const auto& animationBank =
@@ -860,6 +881,48 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                         object.initialAnimation.clear();
                     }
                 }
+            }
+            if (*kind == LevelObjectKind::DropObject) {
+                LevelDropObjectAsset drop;
+                drop.objectId = node.id;
+                drop.ownerAreaId =
+                    integerAttribute(node, "!^Owner^DropArea");
+                drop.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                drop.delayMilliseconds =
+                    integerAttribute(node, "DelayTime", 0);
+                drop.damage = floatAttribute(node, "Damage", 1.0F);
+                drop.position = object.position;
+                drop.effectType =
+                    std::string(userAttribute(node, "$EffectType"));
+                const auto& geometries =
+                    objectArchetypes_[archetypeIndex].mesh.sceneGeometries();
+                assets::Vector3 extents{};
+                for (const assets::ColladaGeometry& geometry : geometries) {
+                    extents.x = std::max(
+                        extents.x,
+                        std::max(std::abs(geometry.bounds.minimum.x),
+                                 std::abs(geometry.bounds.maximum.x)));
+                    extents.y = std::max(
+                        extents.y,
+                        std::max(std::abs(geometry.bounds.minimum.y),
+                                 std::abs(geometry.bounds.maximum.y)));
+                    extents.z = std::max(
+                        extents.z,
+                        std::max(std::abs(geometry.bounds.minimum.z),
+                                 std::abs(geometry.bounds.maximum.z)));
+                }
+                drop.halfExtents = {
+                    std::max(extents.x * std::abs(node.scale.x), 1.0F),
+                    std::max(extents.y * std::abs(node.scale.y), 1.0F),
+                    std::max(extents.z * std::abs(node.scale.z), 1.0F)};
+                if (drop.ownerAreaId < 0 || drop.delayMilliseconds < 0 ||
+                    drop.damage < 0.0F || drop.effectType.empty() ||
+                    effects_.presets.find(drop.effectType) == nullptr) {
+                    return Result::failure("DropObject " +
+                                           std::to_string(node.id) +
+                                           " has invalid attributes");
+                }
+                dropObjects_.push_back(std::move(drop));
             }
             objects_.push_back(std::move(object));
         }

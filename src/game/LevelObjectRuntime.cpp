@@ -222,6 +222,21 @@ Result LevelObjectRuntime::applyCinematicCommand(
     return Result::success();
 }
 
+Result LevelObjectRuntime::setRuntimeState(
+    std::int32_t objectId, const assets::Vector3& position, bool visible,
+    bool physicsEnabled) {
+    LevelObjectState* object = findMutable(objectId);
+    if (object == nullptr || object->asset == nullptr) {
+        return Result::failure("Level object runtime state target was not found");
+    }
+    object->position = position;
+    object->worldTransform = worldMatrix(
+        position, object->asset->rotation, object->asset->scale);
+    object->visible = visible;
+    object->physicsEnabled = physicsEnabled;
+    return Result::success();
+}
+
 const LevelObjectState* LevelObjectRuntime::find(
     std::int32_t objectId) const noexcept {
     const auto match = std::find_if(

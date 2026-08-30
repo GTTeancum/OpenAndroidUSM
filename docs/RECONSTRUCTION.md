@@ -850,6 +850,28 @@ slots with an already decoded view, and resolves that exact shipped alias so
 the D3D11 two-layer reflection material remains intact. WARP renders an
 isolated cover and verifies that its runtime visibility changes the frame.
 
+## Falling room hazards
+
+Room 8 contains five `DropArea`/`DropObject` pairs. The area update at
+`0x00309dc0` is a one-shot player-volume test: entering it restarts the
+authored `explode_new` effect and activates its linked chair. The chair state
+machine at `0x00309a48` first makes the otherwise hidden mesh visible and
+plays VoxSound ID `0x155`, recovered as
+`SFX_BATTERY_CELL_EXPLOSION`, waits its authored 500-1000 ms delay, starts the
+chair's `firesmoke_xp` effect, enables collision, and then falls. Its native
+fixed-tick velocity increases by 10 up to 100 while Z is reduced by the prior
+velocity; the portable runtime expresses the same progression in elapsed
+time so higher display rates do not speed up the hazard.
+
+`LevelDropRuntime` owns only trigger, delay, fall, visibility, and hit state.
+It sends renderer-neutral transforms to `LevelObjectRuntime`, room-owned
+one-shot requests to `LevelEffectRuntime`, and a single 100-point player hit
+when the falling prop intersects the player's box. The D3D11 regression
+renders an isolated activated chair and verifies the native dormant state is
+invisible. Core tests cover all five authored links, exact effect names,
+activation/delay transitions, falling motion, spatial sound metadata, and the
+one-shot damage event.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

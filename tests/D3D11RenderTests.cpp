@@ -283,6 +283,38 @@ int main() {
                     comicHiddenFrame.pixels[component + 2];
         }
         assert(comicChangedPixels > 20);
+
+        const auto& renderedDrop = levelOne.dropObjects().front();
+        assert(comicObjects.setRuntimeState(
+            renderedDrop.objectId, {0.0F, 0.0F, 0.0F}, true, true));
+        assert(gameRenderer.updateLevelOneObjects(levelOne, comicObjects));
+        cinematicVisibleRooms.fill(false);
+        cinematicVisibleRooms[static_cast<std::size_t>(
+            renderedDrop.roomId - 1)] = true;
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        assert(gameRenderer.setCamera(comicCamera));
+        gameRenderer.renderFrame();
+        RgbaImage dropVisibleFrame;
+        assert(gameRenderer.readBackImage(dropVisibleFrame));
+        captureIfRequested(dropVisibleFrame, "gameplay-falling-object.bmp");
+        assert(comicObjects.setRuntimeState(
+            renderedDrop.objectId, {0.0F, 0.0F, -150.0F}, false, false));
+        assert(gameRenderer.updateLevelOneObjects(levelOne, comicObjects));
+        gameRenderer.renderFrame();
+        RgbaImage dropHiddenFrame;
+        assert(gameRenderer.readBackImage(dropHiddenFrame));
+        std::size_t dropChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < dropVisibleFrame.pixels.size(); component += 4) {
+            dropChangedPixels +=
+                dropVisibleFrame.pixels[component] !=
+                    dropHiddenFrame.pixels[component] ||
+                dropVisibleFrame.pixels[component + 1] !=
+                    dropHiddenFrame.pixels[component + 1] ||
+                dropVisibleFrame.pixels[component + 2] !=
+                    dropHiddenFrame.pixels[component + 2];
+        }
+        assert(dropChangedPixels > 20);
         assert(gameRenderer.updateLevelOneObjects(levelOne, levelObjects));
         cinematicVisibleRooms.fill(false);
         gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);

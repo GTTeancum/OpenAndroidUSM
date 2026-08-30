@@ -166,14 +166,23 @@ Result LevelEffectRuntime::applyCinematicCommand(
         !validPosition) {
         return Result::failure("PlayEffect has invalid type or position");
     }
-    const EffectPreset* preset = presets_->find(type->value);
+    return playEffect(type->value, origin, -1);
+}
+
+Result LevelEffectRuntime::playEffect(
+    std::string_view effectType, const assets::Vector3& origin,
+    std::int32_t roomId) {
+    if (presets_ == nullptr) {
+        return Result::failure("Effect runtime is not initialized");
+    }
+    const EffectPreset* preset = presets_->find(effectType);
     if (preset == nullptr) {
-        return Result::failure("PlayEffect references an unknown preset");
+        return Result::failure("Effect references an unknown preset");
     }
     for (const EffectEmitterPreset& emitter : preset->emitters) {
         pendingEmitters_.push_back(
             {&emitter, origin,
-             std::max(emitter.startDelayMilliseconds, 0), -1});
+             std::max(emitter.startDelayMilliseconds, 0), roomId});
     }
     return Result::success();
 }

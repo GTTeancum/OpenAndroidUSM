@@ -24,6 +24,7 @@
 #include "game/LevelBonusRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelDropRuntime.hpp"
 #include "game/LevelHintRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
@@ -286,6 +287,14 @@ int main() {
         const auto* fireTrap = voxSounds.find("SFX_FIRE_TRAP");
         assert(fireTrap != nullptr);
         assert(fireTrap->id == 146);
+        const auto* dropExplosion =
+            voxSounds.find("SFX_BATTERY_CELL_EXPLOSION");
+        assert(dropExplosion != nullptr && dropExplosion->id == 0x155);
+        assert(dropExplosion->resourcePath ==
+               "sfx/CUTSCENES/sfx_battery_cell_explosion.wav");
+        assert(dropExplosion->minimumDistance == 0.0F);
+        assert(dropExplosion->maximumDistance == 2500.0F);
+        assert(!dropExplosion->distanceCullingEnabled);
 
         usm::game::PlayerStateConfigDatabase playerStateConfigs;
         const usm::Result playerStateConfigResult =
@@ -482,6 +491,9 @@ int main() {
         assert(soundCatalog.resolve("SFX_VERTICAL_IMPACT") != nullptr);
         usm::audio::PcmAudio catalogAudio;
         assert(soundCatalog.decode("SFX_WEB_SWING_START", catalogAudio));
+        assert(catalogAudio.frameCount() > 0);
+        assert(soundCatalog.decode("SFX_BATTERY_CELL_EXPLOSION",
+                                   catalogAudio));
         assert(catalogAudio.frameCount() > 0);
 
         usm::audio::PlayerStateSoundBank playerSounds;
@@ -748,6 +760,59 @@ int main() {
         assert(spiderSenseHint.atlas.animations().size() == 9);
         assert(spiderSenseHint.texture.image().width == 256);
         assert(spiderSenseHint.texture.image().height == 256);
+        assert(bootstrap.dropAreas().size() == 5);
+        assert(bootstrap.dropObjects().size() == 5);
+        for (const auto& drop : bootstrap.dropObjects()) {
+            assert(drop.roomId == 8);
+            assert(drop.delayMilliseconds >= 500);
+            assert(drop.damage == 100.0F);
+            assert(drop.effectType == "firesmoke_xp");
+            assert(std::any_of(
+                bootstrap.dropAreas().begin(), bootstrap.dropAreas().end(),
+                [&drop](const auto& area) {
+                    return area.objectId == drop.ownerAreaId &&
+                           area.effectType == "explode_new";
+                }));
+        }
+
+        const std::array<usm::game::LevelDropAreaAsset, 1> testDropAreas{{
+            {1, 8, {0.0F, 0.0F, 0.0F}, {200.0F, 200.0F, 200.0F},
+             "explode_new"},
+        }};
+        const std::array<usm::game::LevelDropObjectAsset, 1> testDropObjects{{
+            {2, 1, 8, 800, 100.0F, {0.0F, 0.0F, 300.0F},
+             {50.0F, 50.0F, 50.0F}, "firesmoke_xp"},
+        }};
+        usm::game::LevelDropRuntime dropRuntime;
+        assert(dropRuntime.initialize(testDropAreas, testDropObjects));
+        dropRuntime.update({}, 1);
+        auto dropEvents = dropRuntime.consumeEvents();
+        assert(dropEvents.size() == 1);
+        assert(dropEvents.front().kind ==
+               usm::game::LevelDropEventKind::Activated);
+        assert(dropEvents.front().effectType == "explode_new");
+        assert(dropRuntime.states().front().visible);
+        assert(dropRuntime.states().front().phase ==
+               usm::game::LevelDropPhase::Delay);
+        dropRuntime.update({}, 799);
+        dropEvents = dropRuntime.consumeEvents();
+        assert(dropEvents.size() == 1);
+        assert(dropEvents.front().kind ==
+               usm::game::LevelDropEventKind::BeganFalling);
+        assert(dropEvents.front().effectType == "firesmoke_xp");
+        assert(dropRuntime.states().front().physicsEnabled);
+        dropRuntime.update({}, 100);
+        const float firstDropZ = dropRuntime.states().front().position.z;
+        dropRuntime.update({}, 100);
+        assert(dropRuntime.states().front().position.z < firstDropZ);
+        dropRuntime.update({}, 100);
+        dropEvents = dropRuntime.consumeEvents();
+        assert(std::any_of(
+            dropEvents.begin(), dropEvents.end(), [](const auto& event) {
+                return event.kind ==
+                           usm::game::LevelDropEventKind::HitPlayer &&
+                       event.damage == 100.0F;
+            }));
 
         usm::game::LevelHintRuntime hintRuntime;
         assert(hintRuntime.initialize(bootstrap.hints()));
@@ -1112,6 +1177,14 @@ int main() {
         assert(std::abs(firstParticleWithFrame(3)->rotationDegrees -
                         initialRockRotation) >
                0.01F);
+        assert(effectRuntime.initialize(bootstrap.effects().presets));
+        assert(effectRuntime.playEffect("explode_new", {1.0F, 2.0F, 3.0F},
+                                        8));
+        effectRuntime.update(1);
+        assert(!effectRuntime.particles().empty());
+        assert(std::all_of(
+            effectRuntime.particles().begin(), effectRuntime.particles().end(),
+            [](const auto& particle) { return particle.roomId == 8; }));
         playHitEffect.attributes.front().value = "missing_effect";
         assert(!effectRuntime.applyCinematicCommand(playHitEffect));
         std::size_t authoredEffectCommandCount = 0;
@@ -1163,6 +1236,10 @@ int main() {
         assert(objectRuntime.find(472)->activeAnimation == "water");
         assert(objectRuntime.find(40032) != nullptr);
         assert(objectRuntime.find(1257) == nullptr);
+        for (const auto& drop : bootstrap.dropObjects()) {
+            const auto* state = objectRuntime.find(drop.objectId);
+            assert(state != nullptr && !state->visible);
+        }
         usm::game::CinematicThread objectThread;
         objectThread.objectId = 20032;
         usm::game::CinematicCommand moveLevelObject;

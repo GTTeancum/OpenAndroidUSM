@@ -292,6 +292,25 @@ struct LevelHintAsset {
     assets::DdsAtcTexture texture;
 };
 
+struct LevelDropAreaAsset {
+    std::int32_t objectId{-1};
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    assets::Vector3 sizes;
+    std::string effectType;
+};
+
+struct LevelDropObjectAsset {
+    std::int32_t objectId{-1};
+    std::int32_t ownerAreaId{-1};
+    std::int32_t roomId{-1};
+    std::int32_t delayMilliseconds{};
+    float damage{};
+    assets::Vector3 position;
+    assets::Vector3 halfExtents{50.0F, 50.0F, 50.0F};
+    std::string effectType;
+};
+
 // Authored CTriggerSound volume. The native object starts a looping 2D Vox
 // emitter while the player's collision box intersects this volume.
 struct LevelTriggerSoundAsset {
@@ -433,6 +452,14 @@ public:
     [[nodiscard]] const std::vector<LevelHintAsset>& hints() const noexcept {
         return hints_;
     }
+    [[nodiscard]] const std::vector<LevelDropAreaAsset>& dropAreas() const
+        noexcept {
+        return dropAreas_;
+    }
+    [[nodiscard]] const std::vector<LevelDropObjectAsset>& dropObjects() const
+        noexcept {
+        return dropObjects_;
+    }
     [[nodiscard]] const std::vector<LevelTriggerSoundAsset>& triggerSounds()
         const noexcept {
         return triggerSounds_;
@@ -474,6 +501,8 @@ private:
     std::vector<LevelEnvironmentEffectAsset> environmentEffects_;
     std::vector<LevelBonusAsset> bonuses_;
     std::vector<LevelHintAsset> hints_;
+    std::vector<LevelDropAreaAsset> dropAreas_;
+    std::vector<LevelDropObjectAsset> dropObjects_;
     std::vector<LevelTriggerSoundAsset> triggerSounds_;
     LevelTextCatalog textCatalog_;
 };

@@ -86,6 +86,11 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = soundCatalog_.decode("SFX_BATTERY_CELL_EXPLOSION",
+                                  dropObjectSound_);
+    if (!result) {
+        return fail(result.message());
+    }
     // Application::SetSlowMotion/ResetSlowMotion use VoxSound IDs 0x186 and
     // 0x187 respectively. Their recovered event names make the native lookup
     // independent of record ordering.
@@ -191,6 +196,11 @@ int Application::run(HINSTANCE instance) {
         return fail(result.message());
     }
     result = objectRuntime_.initialize(levelOne_);
+    if (!result) {
+        return fail(result.message());
+    }
+    result = dropRuntime_.initialize(levelOne_.dropAreas(),
+                                     levelOne_.dropObjects());
     if (!result) {
         return fail(result.message());
     }
@@ -771,6 +781,52 @@ int Application::run(HINSTANCE instance) {
                         "k_state_hurt_light", playGameplaySound);
                     if (!result) {
                         return fail(result.message());
+                    }
+                }
+            }
+            dropRuntime_.update(gameplayPlayer_.position(),
+                                gameDeltaMilliseconds);
+            for (const game::LevelDropObjectState& drop :
+                 dropRuntime_.states()) {
+                result = objectRuntime_.setRuntimeState(
+                    drop.asset->objectId, drop.position, drop.visible,
+                    drop.physicsEnabled);
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
+            for (const game::LevelDropEvent& event :
+                 dropRuntime_.consumeEvents()) {
+                if (!event.effectType.empty()) {
+                    result = effectRuntime_.playEffect(
+                        event.effectType, event.position, event.roomId);
+                    if (!result) {
+                        return fail(result.message());
+                    }
+                }
+                if (event.kind == game::LevelDropEventKind::Activated) {
+                    const audio::VoxSoundRecord* record =
+                        voxSounds_.find("SFX_BATTERY_CELL_EXPLOSION");
+                    if (record == nullptr) {
+                        return fail("Drop-object sound has no VoxSound record");
+                    }
+                    result = audio_.playNamed3D(
+                        "DropObject:" + std::to_string(event.objectId),
+                        dropObjectSound_,
+                        {event.position, record->minimumDistance,
+                         record->maximumDistance,
+                         record->distanceCullingEnabled});
+                    if (!result) {
+                        return fail(result.message());
+                    }
+                } else if (event.kind ==
+                           game::LevelDropEventKind::HitPlayer) {
+                    if (gameplayPlayer_.applyDamage(event.damage)) {
+                        result = playerSounds_.dispatchStateEnter(
+                            "k_state_hurt_light", playGameplaySound);
+                        if (!result) {
+                            return fail(result.message());
+                        }
                     }
                 }
             }
