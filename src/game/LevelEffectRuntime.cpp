@@ -101,6 +101,15 @@ struct LevelEffectRuntime::PendingEmitter {
     const EffectEmitterPreset* preset{};
     assets::Vector3 origin;
     std::int32_t delayMilliseconds{};
+    std::int32_t roomId{-1};
+};
+
+struct LevelEffectRuntime::PersistentEmitter {
+    const EffectEmitterPreset* preset{};
+    assets::Vector3 origin;
+    std::int32_t delayMilliseconds{};
+    std::int32_t roomId{-1};
+    float emissionRemainder{};
 };
 
 struct LevelEffectRuntime::Particle {
@@ -118,6 +127,7 @@ struct LevelEffectRuntime::Particle {
     float spinDeltaDegrees{};
     std::uint32_t startColor{0xffffffffU};
     bool spinInitialized{};
+    std::int32_t roomId{-1};
 };
 
 LevelEffectRuntime::LevelEffectRuntime() = default;
@@ -129,6 +139,7 @@ Result LevelEffectRuntime::initialize(const EffectPresetDatabase& presets) {
     }
     presets_ = &presets;
     pendingEmitters_.clear();
+    persistentEmitters_.clear();
     particles_.clear();
     renderParticles_.clear();
     randomState_ = 0x6d2b79f5U;
@@ -160,13 +171,62 @@ Result LevelEffectRuntime::applyCinematicCommand(
     for (const EffectEmitterPreset& emitter : preset->emitters) {
         pendingEmitters_.push_back(
             {&emitter, origin,
-             std::max(emitter.startDelayMilliseconds, 0)});
+             std::max(emitter.startDelayMilliseconds, 0), -1});
+    }
+    return Result::success();
+}
+
+Result LevelEffectRuntime::addPersistentEffect(
+    std::string_view effectType, const assets::Vector3& origin,
+    std::int32_t roomId, bool visible) {
+    if (presets_ == nullptr) {
+        return Result::failure("Effect runtime is not initialized");
+    }
+    const EffectPreset* preset = presets_->find(effectType);
+    if (preset == nullptr) {
+        return Result::failure("Persistent effect references an unknown preset");
+    }
+    if (!visible) {
+        return Result::success();
+    }
+    for (const EffectEmitterPreset& emitter : preset->emitters) {
+        persistentEmitters_.push_back(
+            {&emitter, origin,
+             std::max(emitter.startDelayMilliseconds, 0), roomId, 0.0F});
     }
     return Result::success();
 }
 
 void LevelEffectRuntime::update(
     std::uint32_t elapsedMilliseconds) noexcept {
+    for (PersistentEmitter& emitter : persistentEmitters_) {
+        std::uint32_t emissionMilliseconds = elapsedMilliseconds;
+        if (emitter.delayMilliseconds > 0) {
+            if (elapsedMilliseconds <=
+                static_cast<std::uint32_t>(emitter.delayMilliseconds)) {
+                emitter.delayMilliseconds -=
+                    static_cast<std::int32_t>(elapsedMilliseconds);
+                continue;
+            }
+            emissionMilliseconds -=
+                static_cast<std::uint32_t>(emitter.delayMilliseconds);
+            emitter.delayMilliseconds = 0;
+        }
+        const float particlesPerSecond =
+            static_cast<float>(emitter.preset->minimumParticlesPerSecond +
+                               emitter.preset->maximumParticlesPerSecond) *
+            0.5F;
+        emitter.emissionRemainder +=
+            particlesPerSecond *
+            static_cast<float>(emissionMilliseconds) * 0.001F;
+        const std::int32_t particleCount = std::clamp(
+            static_cast<std::int32_t>(emitter.emissionRemainder), 0, 256);
+        emitter.emissionRemainder -= static_cast<float>(particleCount);
+        for (std::int32_t index = 0; index < particleCount; ++index) {
+            spawnParticle(*emitter.preset, emitter.origin, emitter.roomId);
+        }
+    }
+
     for (auto iterator = pendingEmitters_.begin();
          iterator != pendingEmitters_.end();) {
         iterator->delayMilliseconds -=
@@ -257,16 +317,24 @@ void LevelEffectRuntime::update(
         const float lifeProgress =
             static_cast<float>(particle.ageMilliseconds) /
             static_cast<float>(particle.lifetimeMilliseconds);
-        float fadeProgress = 0.0F;
-        const float fadeStart =
-            static_cast<float>(preset.fadeStartPercent) / 100.0F;
-        const float fadeEnd =
-            static_cast<float>(preset.fadeEndPercent) / 100.0F;
-        if (lifeProgress >= fadeStart) {
-            fadeProgress = fadeEnd <= fadeStart
-                               ? 1.0F
-                               : (lifeProgress - fadeStart) /
-                                     (fadeEnd - fadeStart);
+        std::uint32_t color = particle.startColor;
+        for (const EffectColorAffector& affector : preset.colorAffectors) {
+            const float start =
+                static_cast<float>(affector.startPercent) / 100.0F;
+            if (lifeProgress < start) {
+                break;
+            }
+            const float end =
+                static_cast<float>(affector.endPercent) / 100.0F;
+            const float progress =
+                end <= start
+                    ? 1.0F
+                    : std::clamp((lifeProgress - start) / (end - start),
+                                 0.0F, 1.0F);
+            color = interpolateColor(color, affector.targetColor, progress);
+            if (lifeProgress < end) {
+                break;
+            }
         }
         float width = particle.initialWidth;
         float height = particle.initialHeight;
@@ -288,9 +356,8 @@ void LevelEffectRuntime::update(
         }
         renderParticles_.push_back(
             {particle.position, width, height, particle.rotationDegrees,
-             interpolateColor(particle.startColor, preset.fadeTargetColor,
-                              fadeProgress),
-             preset.frameId, preset.additive});
+             color,
+             preset.frameId, preset.additive, particle.roomId});
     }
 }
 
@@ -315,53 +382,59 @@ void LevelEffectRuntime::spawnEmitter(
     particles_.reserve(particles_.size() +
                        static_cast<std::size_t>(particleCount));
     for (std::int32_t index = 0; index < particleCount; ++index) {
-        Particle particle;
-        particle.preset = &preset;
-        particle.position = {
-            emitter.origin.x + preset.position.x +
-                randomRange(-preset.box.x * 0.5F, preset.box.x * 0.5F),
-            emitter.origin.y + preset.position.y +
-                randomRange(-preset.box.y * 0.5F, preset.box.y * 0.5F),
-            emitter.origin.z + preset.position.z +
-                randomRange(-preset.box.z * 0.5F, preset.box.z * 0.5F),
-        };
-        const float speedScale =
-            1.0F + randomRange(-static_cast<float>(preset.speedVariationPercent),
-                               static_cast<float>(preset.speedVariationPercent)) /
-                       100.0F;
-        particle.velocity = {preset.direction.x * speedScale,
-                             preset.direction.y * speedScale,
-                             preset.direction.z * speedScale};
-        particle.initialVelocity = particle.velocity;
-        particle.rotationPivot = {
-            emitter.origin.x + preset.position.x + preset.rotationPivot.x,
-            emitter.origin.y + preset.position.y + preset.rotationPivot.y,
-            emitter.origin.z + preset.position.z + preset.rotationPivot.z,
-        };
-        particle.lifetimeMilliseconds = static_cast<std::uint32_t>(
-            std::max(1.0F,
-                     randomRange(
-                         static_cast<float>(
-                             preset.minimumParticleLifetimeMilliseconds),
-                         static_cast<float>(
-                             preset.maximumParticleLifetimeMilliseconds))));
-        const float sizeScale =
-            1.0F + randomRange(-static_cast<float>(preset.sizeVariationPercent),
-                               static_cast<float>(preset.sizeVariationPercent)) /
-                       100.0F;
-        particle.initialWidth =
-            preset.particleWidth * preset.scale.x * sizeScale;
-        particle.initialHeight =
-            preset.particleHeight * preset.scale.y * sizeScale;
-        particle.rotationDegrees = randomRange(
-            static_cast<float>(preset.initialRotationMinimumDegrees),
-            static_cast<float>(preset.initialRotationMaximumDegrees));
-        const float colorProgress = randomUnit();
-        particle.startColor = interpolateColor(preset.minimumStartColor,
-                                               preset.maximumStartColor,
-                                               colorProgress);
-        particles_.push_back(particle);
+        spawnParticle(preset, emitter.origin, emitter.roomId);
     }
+}
+
+void LevelEffectRuntime::spawnParticle(
+    const EffectEmitterPreset& preset, const assets::Vector3& origin,
+    std::int32_t roomId) noexcept {
+    Particle particle;
+    particle.preset = &preset;
+    particle.position = {
+        origin.x + preset.position.x +
+            randomRange(-preset.box.x * 0.5F, preset.box.x * 0.5F),
+        origin.y + preset.position.y +
+            randomRange(-preset.box.y * 0.5F, preset.box.y * 0.5F),
+        origin.z + preset.position.z +
+            randomRange(-preset.box.z * 0.5F, preset.box.z * 0.5F),
+    };
+    const float speedScale =
+        1.0F + randomRange(-static_cast<float>(preset.speedVariationPercent),
+                           static_cast<float>(preset.speedVariationPercent)) /
+                   100.0F;
+    particle.velocity = {preset.direction.x * speedScale,
+                         preset.direction.y * speedScale,
+                         preset.direction.z * speedScale};
+    particle.initialVelocity = particle.velocity;
+    particle.rotationPivot = {
+        origin.x + preset.position.x + preset.rotationPivot.x,
+        origin.y + preset.position.y + preset.rotationPivot.y,
+        origin.z + preset.position.z + preset.rotationPivot.z,
+    };
+    particle.lifetimeMilliseconds = static_cast<std::uint32_t>(
+        std::max(1.0F,
+                 randomRange(
+                     static_cast<float>(
+                         preset.minimumParticleLifetimeMilliseconds),
+                     static_cast<float>(
+                         preset.maximumParticleLifetimeMilliseconds))));
+    const float sizeScale =
+        1.0F + randomRange(-static_cast<float>(preset.sizeVariationPercent),
+                           static_cast<float>(preset.sizeVariationPercent)) /
+                   100.0F;
+    particle.initialWidth =
+        preset.particleWidth * preset.scale.x * sizeScale;
+    particle.initialHeight =
+        preset.particleHeight * preset.scale.y * sizeScale;
+    particle.rotationDegrees = randomRange(
+        static_cast<float>(preset.initialRotationMinimumDegrees),
+        static_cast<float>(preset.initialRotationMaximumDegrees));
+    particle.startColor = interpolateColor(preset.minimumStartColor,
+                                           preset.maximumStartColor,
+                                           randomUnit());
+    particle.roomId = roomId;
+    particles_.push_back(particle);
 }
 
 float LevelEffectRuntime::randomUnit() noexcept {

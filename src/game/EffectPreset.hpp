@@ -12,6 +12,12 @@
 
 namespace usm::game {
 
+struct EffectColorAffector {
+    std::uint32_t targetColor{};
+    std::int32_t startPercent{100};
+    std::int32_t endPercent{100};
+};
+
 struct EffectEmitterPreset {
     std::string name;
     assets::Vector3 position;
@@ -33,14 +39,11 @@ struct EffectEmitterPreset {
     std::int32_t sizeVariationPercent{};
     std::uint32_t minimumStartColor{0xffffffffU};
     std::uint32_t maximumStartColor{0xffffffffU};
-    std::uint32_t fadeTargetColor{};
     std::int32_t minimumParticleLifetimeMilliseconds{};
     std::int32_t maximumParticleLifetimeMilliseconds{};
     std::int32_t speedVariationPercent{};
     std::int32_t initialRotationMinimumDegrees{};
     std::int32_t initialRotationMaximumDegrees{};
-    std::int32_t fadeStartPercent{100};
-    std::int32_t fadeEndPercent{100};
     std::int32_t sizeStartPercent{};
     std::int32_t sizeEndPercent{100};
     std::int32_t gravityStartPercent{};
@@ -54,6 +57,7 @@ struct EffectEmitterPreset {
     bool hasRotation{};
     bool hasSpin{};
     bool additive{};
+    std::vector<EffectColorAffector> colorAffectors;
 };
 
 struct EffectPreset {

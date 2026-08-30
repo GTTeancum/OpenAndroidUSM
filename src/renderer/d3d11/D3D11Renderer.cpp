@@ -1571,6 +1571,12 @@ Result D3D11Renderer::updateLevelOneEffects(
 
     bool valid = true;
     for (const game::EffectParticleState& particle : effects.particles()) {
+        if (particle.roomId >= 1 &&
+            particle.roomId <=
+                static_cast<std::int32_t>(roomVisibility_.size()) &&
+            !roomVisibility_[static_cast<std::size_t>(particle.roomId - 1)]) {
+            continue;
+        }
         appendParticle(particle,
                        particle.additive ? additiveVertices : alphaVertices,
                        valid);

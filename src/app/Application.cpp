@@ -129,6 +129,18 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    for (const game::LevelTriggerSoundAsset& sound :
+         levelOne_.triggerSounds()) {
+        if (triggerSoundClips_.contains(sound.eventName)) {
+            continue;
+        }
+        audio::PcmAudio clip;
+        result = soundCatalog_.decode(sound.eventName, clip);
+        if (!result) {
+            return fail(result.message());
+        }
+        triggerSoundClips_.emplace(sound.eventName, std::move(clip));
+    }
     result = introPlayer_.start(levelOne_.introScript());
     if (!result) {
         return fail(result.message());
@@ -165,6 +177,7 @@ int Application::run(HINSTANCE instance) {
     playerHudHealth_.initialize(gameplayPlayer_.health(),
                                 gameplayPlayer_.maximumHealth());
     triggerRuntime_.bind(levelOne_.triggers());
+    triggerSoundRuntime_.bind(levelOne_.triggerSounds());
     result = enemyRuntime_.initialize(levelOne_);
     if (!result) {
         return fail(result.message());
@@ -176,6 +189,14 @@ int Application::run(HINSTANCE instance) {
     result = effectRuntime_.initialize(levelOne_.effects().presets);
     if (!result) {
         return fail(result.message());
+    }
+    for (const game::LevelEnvironmentEffectAsset& effect :
+         levelOne_.environmentEffects()) {
+        result = effectRuntime_.addPersistentEffect(
+            effect.effectType, effect.position, effect.roomId, effect.visible);
+        if (!result) {
+            return fail(result.message());
+        }
     }
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints());
@@ -445,6 +466,28 @@ int Application::run(HINSTANCE instance) {
                                              gameDeltaMilliseconds);
             const auto triggerEvents =
                 triggerRuntime_.update(gameplayPlayer_.position());
+            for (const game::TriggerSoundEvent& event :
+                 triggerSoundRuntime_.update(gameplayPlayer_.position())) {
+                const auto clip = triggerSoundClips_.find(event.eventName);
+                if (clip == triggerSoundClips_.end()) {
+                    return fail("TriggerSound clip was not preloaded");
+                }
+                const std::string voiceName =
+                    "TriggerSound:" + std::to_string(event.triggerId);
+                if (event.kind == game::TriggerSoundEventKind::Started) {
+                    const audio::VoxSoundRecord* record =
+                        voxSounds_.find(event.eventName);
+                    const float volume =
+                        record != nullptr && record->id == 0xa1 ? 0.5F : 1.0F;
+                    result = audio_.playNamed(voiceName, clip->second, true,
+                                              volume, 500);
+                } else {
+                    result = audio_.stopNamed(voiceName, 500);
+                }
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
             if (activeGameplayCinematic_ == nullptr &&
                 !quickTimeEvent_.active()) {
                 for (const game::TriggerEvent& event : triggerEvents) {

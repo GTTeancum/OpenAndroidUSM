@@ -17,6 +17,7 @@
 #include "game/LevelObjectRuntime.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
+#include "game/LevelTriggerSoundRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
@@ -26,6 +27,9 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
 
 #include <Windows.h>
+
+#include <map>
+#include <string>
 
 namespace usm {
 
@@ -48,6 +52,7 @@ private:
     audio::CinematicSoundBank gameplaySounds_;
     audio::PcmAudio slowMotionEnterSound_;
     audio::PcmAudio slowMotionExitSound_;
+    std::map<std::string, audio::PcmAudio, std::less<>> triggerSoundClips_;
     game::CinematicPlayer introPlayer_;
     game::CinematicUiRuntime cinematicUi_;
     game::GameplayCamera gameplayCamera_;
@@ -56,6 +61,7 @@ private:
     game::PlayerHudHealthState playerHudHealth_;
     game::PlayerStateConfigDatabase playerStateConfigs_;
     game::LevelTriggerRuntime triggerRuntime_;
+    game::LevelTriggerSoundRuntime triggerSoundRuntime_;
     game::LevelCinematicRuntime levelCinematicRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::LevelEffectRuntime effectRuntime_;

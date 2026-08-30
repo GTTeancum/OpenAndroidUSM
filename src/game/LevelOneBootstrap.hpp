@@ -249,6 +249,30 @@ struct LevelEffectAsset {
     assets::DdsAtcTexture texture;
 };
 
+// Room-owned CEffect nodes reconstructed from their $EffectType preset and
+// absolute Irrlicht transform.
+struct LevelEnvironmentEffectAsset {
+    std::int32_t objectId{-1};
+    std::string effectType;
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    bool visible{true};
+};
+
+// Authored CTriggerSound volume. The native object starts a looping 2D Vox
+// emitter while the player's collision box intersects this volume.
+struct LevelTriggerSoundAsset {
+    std::int32_t objectId{-1};
+    std::string eventName;
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::array<float, 16> worldTransform{};
+    assets::Vector3 sizes;
+    bool axisAlignedBox{};
+};
+
 class LevelOneBootstrap final {
 public:
     [[nodiscard]] Result load(const std::filesystem::path& gameDataRoot);
@@ -366,6 +390,14 @@ public:
     [[nodiscard]] const LevelEffectAsset& effects() const noexcept {
         return effects_;
     }
+    [[nodiscard]] const std::vector<LevelEnvironmentEffectAsset>&
+    environmentEffects() const noexcept {
+        return environmentEffects_;
+    }
+    [[nodiscard]] const std::vector<LevelTriggerSoundAsset>& triggerSounds()
+        const noexcept {
+        return triggerSounds_;
+    }
     [[nodiscard]] const LevelTextCatalog& textCatalog() const noexcept {
         return textCatalog_;
     }
@@ -400,6 +432,8 @@ private:
     EnemyRangeAttackConfigDatabase enemyRangeAttackConfigs_;
     LevelHudAsset hud_;
     LevelEffectAsset effects_;
+    std::vector<LevelEnvironmentEffectAsset> environmentEffects_;
+    std::vector<LevelTriggerSoundAsset> triggerSounds_;
     LevelTextCatalog textCatalog_;
 };
 

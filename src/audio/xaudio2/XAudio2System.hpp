@@ -5,6 +5,7 @@
 #include "audio/SpatialSound.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <list>
 #include <memory>
 #include <string>
@@ -24,12 +25,16 @@ public:
     [[nodiscard]] Result initialize() override;
     [[nodiscard]] Result play(const PcmAudio& audio, bool loop = false);
     [[nodiscard]] Result playNamed(std::string_view eventName,
-                                   const PcmAudio& audio, bool loop = false);
+                                   const PcmAudio& audio, bool loop = false,
+                                   float volume = 1.0F,
+                                   std::uint32_t fadeMilliseconds = 0);
     [[nodiscard]] Result playNamed3D(std::string_view eventName,
                                     const PcmAudio& audio,
                                     const SpatialSoundSource& source,
                                     bool loop = false);
-    [[nodiscard]] Result stopNamed(std::string_view eventName) noexcept;
+    [[nodiscard]] Result stopNamed(
+        std::string_view eventName,
+        std::uint32_t fadeMilliseconds = 0) noexcept;
     void setListener(const assets::Vector3& position,
                      const assets::Vector3& target,
                      const assets::Vector3& up) noexcept;
@@ -58,6 +63,12 @@ private:
         std::string eventName;
         SpatialSoundSource spatialSource;
         bool spatialized{};
+        float volume{1.0F};
+        float fadeStartVolume{1.0F};
+        float fadeTargetVolume{1.0F};
+        std::uint32_t fadeElapsedMilliseconds{};
+        std::uint32_t fadeDurationMilliseconds{};
+        bool stopAfterFade{};
     };
 
     void applySpatialization(ActiveVoice& active) noexcept;
@@ -68,6 +79,7 @@ private:
     std::list<ActiveVoice> activeVoices_;
     assets::Vector3 listenerPosition_{};
     assets::Vector3 listenerRight_{1.0F, 0.0F, 0.0F};
+    std::chrono::steady_clock::time_point lastUpdateTime_{};
 };
 
 } // namespace usm::audio

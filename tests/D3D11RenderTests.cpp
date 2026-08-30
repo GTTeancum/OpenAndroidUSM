@@ -226,6 +226,58 @@ int main() {
         assert(gameRenderer.readBackImage(gameplayFrame));
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
+
+        usm::game::LevelEffectRuntime environmentEffects;
+        assert(environmentEffects.initialize(levelOne.effects().presets));
+        const auto& environmentEffect = levelOne.environmentEffects().front();
+        assert(environmentEffects.addPersistentEffect(
+            environmentEffect.effectType, environmentEffect.position,
+            environmentEffect.roomId, environmentEffect.visible));
+        const usm::game::CameraPose environmentEffectCamera{
+            {environmentEffect.position.x,
+             environmentEffect.position.y - 1200.0F,
+             environmentEffect.position.z + 350.0F},
+            {environmentEffect.position.x, environmentEffect.position.y,
+             environmentEffect.position.z + 150.0F},
+            {0.0F, 0.0F, 1.0F}, 70.0F, 10.0F, 5000.0F};
+        cinematicVisibleRooms.fill(false);
+        cinematicVisibleRooms[static_cast<std::size_t>(
+            environmentEffect.roomId - 1)] = true;
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        assert(gameRenderer.setCamera(environmentEffectCamera));
+        assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
+                                                   environmentEffects));
+        gameRenderer.renderFrame();
+        RgbaImage environmentEffectBaseline;
+        assert(gameRenderer.readBackImage(environmentEffectBaseline));
+        captureIfRequested(environmentEffectBaseline,
+                           "gameplay-environment-baseline.bmp");
+        environmentEffects.update(100);
+        assert(!environmentEffects.particles().empty());
+        assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
+                                                   environmentEffects));
+        gameRenderer.renderFrame();
+        RgbaImage environmentEffectFrame;
+        assert(gameRenderer.readBackImage(environmentEffectFrame));
+        captureIfRequested(environmentEffectFrame,
+                           "gameplay-environment-fire-smoke.bmp");
+        std::size_t environmentEffectChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < environmentEffectFrame.pixels.size();
+             component += 4) {
+            environmentEffectChangedPixels +=
+                environmentEffectFrame.pixels[component] !=
+                    environmentEffectBaseline.pixels[component] ||
+                environmentEffectFrame.pixels[component + 1] !=
+                    environmentEffectBaseline.pixels[component + 1] ||
+                environmentEffectFrame.pixels[component + 2] !=
+                    environmentEffectBaseline.pixels[component + 2];
+        }
+        assert(environmentEffectChangedPixels > 2);
+        cinematicVisibleRooms.fill(false);
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        assert(gameRenderer.setCamera(gameplayPose));
+
         usm::game::LevelEffectRuntime effects;
         assert(effects.initialize(levelOne.effects().presets));
         usm::game::CinematicCommand playEffect;

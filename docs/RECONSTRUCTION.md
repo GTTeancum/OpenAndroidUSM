@@ -440,6 +440,13 @@ panning. The serialized 0x14 float is preserved in `VoxSoundRecord` but is not
 used as linear gain: the original `Get2DEmitter` and `Get3DEmitter` paths do
 not consult that field, and most shipped records store zero there.
 
+Both level-one `CTriggerSound` volumes are reconstructed from their authored
+OBB dimensions. Following `CTriggerSound::Update`/`SetState` at `0x0036cb14`
+and `0x0036ca34`, entering a volume starts its `SFX_FIRE_TRAP` 2D loop and
+leaving it stops the same independently tagged XAudio2 voice. Start and stop
+use the native 500 ms fades; the original event-ID 0xa1 half-volume special
+case is retained even though level one's fire loop is event 146.
+
 ## Native interface sprites and player HUD
 
 `assets::SpriteAtlas` follows `CSprite::LoadSpriteData` at original address
@@ -711,6 +718,16 @@ over the configured lifetime interval. `CFpsParticleSpinAffector::affect` at
 `CFpsParticleRotationAffector::affect` at `0x0039df08` rotates particle
 positions about its pivot using degrees per second. Emitters without a gravity
 affector retain their velocity instead of being damped toward zero.
+
+The room loader also instantiates all 23 authored `CEffect` nodes across level
+one. Their `SysMinLifeTime = SysMaxLifeTime = -1` emitters run continuously at
+the preset particle rate, retain one-based room ownership for frustum/room
+visibility, and cover the five persistent fire/smoke presets used by the
+scene. Presets may contain several `FadeOut` color affectors. These are kept as
+separate time intervals and evaluated in chronological order, matching
+`CFpsParticleFadeOutAffector::affect` at `0x0039d2a8`; this preserves authored
+transparent-to-opaque fade-in, color hold, and fade-out stages instead of
+collapsing them into a permanently transparent final stage.
 
 The D3D11 backend expands those states into camera-facing sprite quads and
 separates standard vertex-alpha particles from `trans_add` particles. Ghidra's

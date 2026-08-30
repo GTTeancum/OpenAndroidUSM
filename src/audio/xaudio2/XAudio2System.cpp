@@ -50,6 +50,7 @@ Result XAudio2System::initialize() {
     if (FAILED(result)) {
         return Result::failure("IXAudio2::CreateMasteringVoice failed");
     }
+    lastUpdateTime_ = std::chrono::steady_clock::now();
     return Result::success();
 }
 
@@ -58,13 +59,18 @@ Result XAudio2System::play(const PcmAudio& audio, bool loop) {
 }
 
 Result XAudio2System::playNamed(std::string_view eventName,
-                               const PcmAudio& audio, bool loop) {
+                               const PcmAudio& audio, bool loop,
+                               float volume,
+                               std::uint32_t fadeMilliseconds) {
     if (engine_ == nullptr || masteringVoice_ == nullptr) {
         return Result::failure("XAudio2 has not been initialized");
     }
     if (audio.sampleRate == 0 || audio.channelCount == 0 ||
         audio.interleavedSamples.empty()) {
         return Result::failure("PCM audio is empty or invalid");
+    }
+    if (!std::isfinite(volume) || volume < 0.0F) {
+        return Result::failure("XAudio2 voice volume is invalid");
     }
 
     update();
@@ -73,6 +79,10 @@ Result XAudio2System::playNamed(std::string_view eventName,
     active.callback = std::make_unique<VoiceCallback>();
     active.samples = audio.interleavedSamples;
     active.eventName = eventName;
+    active.volume = fadeMilliseconds == 0 ? volume : 0.0F;
+    active.fadeStartVolume = active.volume;
+    active.fadeTargetVolume = volume;
+    active.fadeDurationMilliseconds = fadeMilliseconds;
 
     WAVEFORMATEX format{};
     format.wFormatTag = WAVE_FORMAT_PCM;
@@ -90,6 +100,7 @@ Result XAudio2System::playNamed(std::string_view eventName,
         activeVoices_.pop_back();
         return Result::failure("IXAudio2::CreateSourceVoice failed");
     }
+    (void)active.voice->SetVolume(active.volume);
 
     XAUDIO2_BUFFER buffer{};
     buffer.Flags = XAUDIO2_END_OF_STREAM;
@@ -161,17 +172,29 @@ void XAudio2System::applySpatialization(ActiveVoice& active) noexcept {
             mix.leftGain,
             mix.rightGain,
         };
+        (void)active.voice->SetVolume(active.volume);
         (void)active.voice->SetOutputMatrix(masteringVoice_, 1, 2,
                                             matrix.data());
         return;
     }
-    (void)active.voice->SetVolume(mix.attenuation);
+    (void)active.voice->SetVolume(active.volume * mix.attenuation);
 }
 
-Result XAudio2System::stopNamed(std::string_view eventName) noexcept {
+Result XAudio2System::stopNamed(
+    std::string_view eventName,
+    std::uint32_t fadeMilliseconds) noexcept {
     for (auto iterator = activeVoices_.begin();
          iterator != activeVoices_.end();) {
         if (iterator->eventName != eventName) {
+            ++iterator;
+            continue;
+        }
+        if (fadeMilliseconds != 0 && iterator->voice != nullptr) {
+            iterator->fadeStartVolume = iterator->volume;
+            iterator->fadeTargetVolume = 0.0F;
+            iterator->fadeElapsedMilliseconds = 0;
+            iterator->fadeDurationMilliseconds = fadeMilliseconds;
+            iterator->stopAfterFade = true;
             ++iterator;
             continue;
         }
@@ -185,8 +208,42 @@ Result XAudio2System::stopNamed(std::string_view eventName) noexcept {
 }
 
 void XAudio2System::update() {
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - lastUpdateTime_);
+    lastUpdateTime_ = now;
+    const std::uint32_t elapsedMilliseconds = static_cast<std::uint32_t>(
+        std::clamp<std::int64_t>(elapsed.count(), 0, 1000));
     for (auto iterator = activeVoices_.begin(); iterator != activeVoices_.end();) {
         if (!iterator->callback->finished.load()) {
+            if (iterator->fadeDurationMilliseconds != 0) {
+                iterator->fadeElapsedMilliseconds = std::min(
+                    iterator->fadeDurationMilliseconds,
+                    iterator->fadeElapsedMilliseconds + elapsedMilliseconds);
+                const float progress =
+                    static_cast<float>(iterator->fadeElapsedMilliseconds) /
+                    static_cast<float>(iterator->fadeDurationMilliseconds);
+                iterator->volume =
+                    iterator->fadeStartVolume +
+                    (iterator->fadeTargetVolume -
+                     iterator->fadeStartVolume) *
+                        progress;
+                if (iterator->spatialized) {
+                    applySpatialization(*iterator);
+                } else {
+                    (void)iterator->voice->SetVolume(iterator->volume);
+                }
+                if (iterator->fadeElapsedMilliseconds ==
+                    iterator->fadeDurationMilliseconds) {
+                    iterator->fadeDurationMilliseconds = 0;
+                    if (iterator->stopAfterFade) {
+                        iterator->voice->Stop();
+                        iterator->voice->DestroyVoice();
+                        iterator = activeVoices_.erase(iterator);
+                        continue;
+                    }
+                }
+            }
             ++iterator;
             continue;
         }

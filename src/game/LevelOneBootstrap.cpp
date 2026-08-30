@@ -356,6 +356,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     enemies_.clear();
     objectArchetypes_.clear();
     objects_.clear();
+    environmentEffects_.clear();
+    triggerSounds_.clear();
     hud_ = {};
     effects_ = {};
     Result result = attackConfigs_.load(gameDataRoot);
@@ -614,6 +616,48 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     // CRoom creates these concrete object classes from their authored
     // !GameType values. Keep mesh/animation payloads deduplicated while
     // preserving an independently addressable instance for every scene ID.
+    for (std::size_t roomIndex = 0; roomIndex < rooms_.size(); ++roomIndex) {
+        const LevelRoomAsset& room = rooms_[roomIndex];
+        for (const assets::IrrSceneNode& node : room.scene.nodes()) {
+            if (node.gameType == "Effect") {
+                const std::string effectType(
+                    userAttribute(node, "$EffectType"));
+                if (effectType.empty() ||
+                    effects_.presets.find(effectType) == nullptr) {
+                    return Result::failure("Room effect " + node.name +
+                                           " has an unknown preset");
+                }
+                environmentEffects_.push_back(
+                    {node.id, effectType,
+                     static_cast<std::int32_t>(roomIndex + 1),
+                     worldPosition(node), node.visible});
+                continue;
+            }
+            if (node.gameType == "TriggerSound") {
+                const std::string eventName(
+                    userAttribute(node, "$VoxSounds"));
+                const assets::Vector3 sizes = vectorAttribute(node, "Sizes");
+                if (eventName.empty() || sizes.x <= 0.0F ||
+                    sizes.y <= 0.0F || sizes.z <= 0.0F) {
+                    return Result::failure("TriggerSound " + node.name +
+                                           " has invalid attributes");
+                }
+                LevelTriggerSoundAsset sound;
+                sound.objectId = node.id;
+                sound.eventName = eventName;
+                sound.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                sound.position = worldPosition(node);
+                sound.rotation = node.rotation;
+                sound.scale = node.scale;
+                sound.worldTransform = node.absoluteTransform;
+                sound.sizes = sizes;
+                sound.axisAlignedBox =
+                    booleanAttribute(node, "IsAABBox", false);
+                triggerSounds_.push_back(std::move(sound));
+            }
+        }
+    }
+
     for (std::size_t roomIndex = 0; roomIndex < rooms_.size(); ++roomIndex) {
         const LevelRoomAsset& room = rooms_[roomIndex];
         for (const assets::IrrSceneNode& node : room.scene.nodes()) {

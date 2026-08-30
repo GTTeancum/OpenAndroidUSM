@@ -148,14 +148,18 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                     value.attribute("name").as_string();
                 if (field == "Affector") {
                     currentAffector = value.attribute("value").as_string();
+                    if (currentAffector == "FadeOut") {
+                        emitter.colorAffectors.push_back({});
+                    }
                 } else if (currentAffector == "FadeOut") {
                     if (field == "TargetColor") {
-                        emitter.fadeTargetColor = colorValue(value, 0U);
+                        emitter.colorAffectors.back().targetColor =
+                            colorValue(value, 0U);
                     } else if (field == "StartTime(%)") {
-                        emitter.fadeStartPercent =
+                        emitter.colorAffectors.back().startPercent =
                             value.attribute("value").as_int(100);
                     } else if (field == "EndTime(%)") {
-                        emitter.fadeEndPercent =
+                        emitter.colorAffectors.back().endPercent =
                             value.attribute("value").as_int(100);
                     }
                 } else if (currentAffector == "Gravity") {
@@ -216,6 +220,13 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                 return Result::failure(
                     "Effect emitter has invalid particle fields");
             }
+            std::stable_sort(
+                emitter.colorAffectors.begin(),
+                emitter.colorAffectors.end(),
+                [](const EffectColorAffector& first,
+                   const EffectColorAffector& second) {
+                    return first.startPercent < second.startPercent;
+                });
             preset.emitters.push_back(std::move(emitter));
         }
         if (!preset.emitters.empty()) {

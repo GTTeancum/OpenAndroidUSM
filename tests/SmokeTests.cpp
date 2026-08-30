@@ -28,6 +28,7 @@
 #include "game/PlayerStateConfig.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
+#include "game/LevelTriggerSoundRuntime.hpp"
 #include "game/WebGrabPointRuntime.hpp"
 #include "game/WebSwingRuntime.hpp"
 #include "game/CinematicScript.hpp"
@@ -262,6 +263,9 @@ int main() {
         assert(knifeHurt->resourcePath ==
                "sfx/NPC/Thugs/sfx_thug_hurt_1.wav");
         assert(voxSounds.find("SFX_VERTICAL_IMPACT") != nullptr);
+        const auto* fireTrap = voxSounds.find("SFX_FIRE_TRAP");
+        assert(fireTrap != nullptr);
+        assert(fireTrap->id == 146);
 
         usm::game::PlayerStateConfigDatabase playerStateConfigs;
         const usm::Result playerStateConfigResult =
@@ -632,6 +636,34 @@ int main() {
                       << bootstrapResult.message() << '\n';
             return 1;
         }
+        assert(bootstrap.environmentEffects().size() == 23);
+        for (const auto& effect : bootstrap.environmentEffects()) {
+            assert(effect.roomId >= 1 && effect.roomId <= 8);
+            assert(effect.visible);
+            assert(bootstrap.effects().presets.find(effect.effectType) !=
+                   nullptr);
+        }
+        assert(bootstrap.triggerSounds().size() == 2);
+        assert(bootstrap.triggerSounds()[0].objectId == 40006);
+        assert(bootstrap.triggerSounds()[0].eventName == "SFX_FIRE_TRAP");
+        assert(bootstrap.triggerSounds()[0].roomId == 2);
+        assert(!bootstrap.triggerSounds()[0].axisAlignedBox);
+        assert(bootstrap.triggerSounds()[1].objectId == 40007);
+        assert(bootstrap.triggerSounds()[1].roomId == 8);
+        usm::game::LevelTriggerSoundRuntime triggerSoundRuntime;
+        triggerSoundRuntime.bind(bootstrap.triggerSounds());
+        auto triggerSoundEvents = triggerSoundRuntime.update(
+            bootstrap.triggerSounds()[0].position);
+        assert(triggerSoundEvents.size() == 1);
+        assert(triggerSoundEvents[0].triggerId == 40006);
+        assert(triggerSoundEvents[0].kind ==
+               usm::game::TriggerSoundEventKind::Started);
+        triggerSoundEvents = triggerSoundRuntime.update(
+            {100000.0F, 100000.0F, 100000.0F});
+        assert(triggerSoundEvents.size() == 1);
+        assert(triggerSoundEvents[0].triggerId == 40006);
+        assert(triggerSoundEvents[0].kind ==
+               usm::game::TriggerSoundEventKind::Stopped);
         assert(bootstrap.mainScene().nodes().size() == 154);
         assert(bootstrap.textCatalog().level().size() == 18);
         assert(bootstrap.textCatalog().tutorial().size() == 17);
@@ -750,12 +782,44 @@ int main() {
         assert(bootstrap.effects().presets.find("rock_splash") != nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash_big") !=
                nullptr);
+        const auto* ambientFirePreset =
+            bootstrap.effects().presets.find("big_firesomke");
+        assert(ambientFirePreset != nullptr);
+        assert(ambientFirePreset->emitters.front().colorAffectors.size() == 3);
+        assert(ambientFirePreset->emitters.front()
+                   .colorAffectors.front()
+                   .startPercent == 0);
+        assert(ambientFirePreset->emitters.front()
+                   .colorAffectors.back()
+                   .startPercent == 80);
         assert(bootstrap.effects().atlas.modules().size() == 16);
         assert(bootstrap.effects().atlas.frames().size() == 16);
         assert(bootstrap.effects().texture.image().width == 256);
         assert(bootstrap.effects().texture.image().height == 256);
         usm::game::LevelEffectRuntime effectRuntime;
         assert(effectRuntime.initialize(bootstrap.effects().presets));
+        usm::game::LevelEffectRuntime environmentEffectRuntime;
+        assert(environmentEffectRuntime.initialize(
+            bootstrap.effects().presets));
+        for (const auto& effect : bootstrap.environmentEffects()) {
+            assert(environmentEffectRuntime.addPersistentEffect(
+                effect.effectType, effect.position, effect.roomId,
+                effect.visible));
+        }
+        environmentEffectRuntime.update(1000);
+        assert(!environmentEffectRuntime.particles().empty());
+        assert(std::any_of(
+            environmentEffectRuntime.particles().begin(),
+            environmentEffectRuntime.particles().end(),
+            [](const auto& particle) {
+                return (particle.color >> 24U) != 0;
+            }));
+        assert(std::all_of(
+            environmentEffectRuntime.particles().begin(),
+            environmentEffectRuntime.particles().end(),
+            [](const auto& particle) {
+                return particle.roomId >= 1 && particle.roomId <= 8;
+            }));
         usm::game::CinematicCommand playHitEffect;
         playHitEffect.name = "PlayEffect";
         playHitEffect.attributes = {
