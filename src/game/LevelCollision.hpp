@@ -31,6 +31,9 @@ public:
     void resolveAirMotion(const assets::Vector3& start,
                           const assets::Vector3& desired,
                           assets::Vector3& resolved) const noexcept;
+    [[nodiscard]] bool segmentBlocked(
+        const assets::Vector3& start,
+        const assets::Vector3& end) const noexcept;
 
     [[nodiscard]] std::size_t triangleCount() const noexcept {
         return triangles_.size();

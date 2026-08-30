@@ -408,6 +408,32 @@ state IDs, authored clips, root-height arc, midair rejection, landing, and
 sound cues; a WARP regression renders the midpoint pose in the first gameplay
 camera area.
 
+## Authored web-grab and waypoint traversal
+
+`LevelOneBootstrap` preserves all nine level-one `WebGrabPoint` records and
+all fifteen main/room `WayPoint` records as typed C++ data. The web fields
+retain the exact serialized spellings and meanings recovered from
+`CWebGrabPoint::ProcessUserAttr` at `0x00327320`: linked direction control
+point, rope length, `VisiableLength`, vertical/horizontal angles, exit speed,
+control lock, target waypoint, and target slide. `CWebGrabPoint::Init` at
+`0x00327470` resolves the optional waypoint position; the reconstruction also
+resolves each linked `CamCtrlPoint` direction without discarding the original
+object IDs. Waypoint records retain their two outgoing links, gravity,
+standability, jump direction, travel time, camera-area link, enabled flag,
+and electric-shock flag. This includes the authored 429-to-430 slide chain
+and forced exits from grab points 383 and 443.
+
+`WebGrabPointRuntime` reconstructs `Player::GetBestWebGrabPoint` at
+`0x00344424`, `GetClosestWebGrabPoint` at `0x00344648`, and
+`SearchWebGrabPoint` at `0x0034486c`. Candidates must have an unobstructed
+collision-mesh segment from half a player radius above the scene anchor and
+a normalized facing dot product greater than the recovered `0.2` constant.
+The nearest candidate wins, after which its authored visible length is
+checked exactly once; the red/green hint fallback remains separately
+available as the closest line-of-sight point. Deterministic tests cover
+facing, current-point rejection, nearest selection, the post-selection
+range rule, and triangle occlusion.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

@@ -36,6 +36,10 @@ float length(const Vector3& value) noexcept {
                      value.z * value.z);
 }
 
+float dot(const Vector3& left, const Vector3& right) noexcept {
+    return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
 float pointSegmentDistanceSquared(float pointX, float pointY,
                                   const Vector3& start,
                                   const Vector3& end) noexcept {
@@ -313,6 +317,52 @@ void LevelCollision::resolveAirMotion(const Vector3& start,
         std::abs(desired.y - start.y) > 1e-4F) {
         resolveWalls(start, resolved);
     }
+}
+
+bool LevelCollision::segmentBlocked(const Vector3& start,
+                                    const Vector3& end) const noexcept {
+    const Vector3 direction = subtract(end, start);
+    constexpr float kIntersectionEpsilon = 1e-5F;
+    for (const Triangle& triangle : triangles_) {
+        if (std::max(start.x, end.x) < triangle.minimumX ||
+            std::min(start.x, end.x) > triangle.maximumX ||
+            std::max(start.y, end.y) < triangle.minimumY ||
+            std::min(start.y, end.y) > triangle.maximumY ||
+            std::max(start.z, end.z) < triangle.minimumZ ||
+            std::min(start.z, end.z) > triangle.maximumZ) {
+            continue;
+        }
+        const Vector3 firstEdge = subtract(triangle.second, triangle.first);
+        const Vector3 secondEdge = subtract(triangle.third, triangle.first);
+        const Vector3 determinantCross = cross(direction, secondEdge);
+        const float determinant = dot(firstEdge, determinantCross);
+        if (std::abs(determinant) <= kIntersectionEpsilon) {
+            continue;
+        }
+        const float inverseDeterminant = 1.0F / determinant;
+        const Vector3 fromFirst = subtract(start, triangle.first);
+        const float firstWeight =
+            dot(fromFirst, determinantCross) * inverseDeterminant;
+        if (firstWeight < 0.0F || firstWeight > 1.0F) {
+            continue;
+        }
+        const Vector3 secondCross = cross(fromFirst, firstEdge);
+        const float secondWeight =
+            dot(direction, secondCross) * inverseDeterminant;
+        if (secondWeight < 0.0F ||
+            firstWeight + secondWeight > 1.0F) {
+            continue;
+        }
+        const float segmentTime =
+            dot(secondEdge, secondCross) * inverseDeterminant;
+        // Endpoints are omitted so standing on collision geometry or attaching
+        // to a point placed directly on it does not self-occlude.
+        if (segmentTime > kIntersectionEpsilon &&
+            segmentTime < 1.0F - kIntersectionEpsilon) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void LevelCollision::resolveWalls(const Vector3& start,

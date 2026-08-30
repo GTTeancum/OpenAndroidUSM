@@ -22,6 +22,7 @@
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
 #include "game/LevelTriggerRuntime.hpp"
+#include "game/WebGrabPointRuntime.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -36,7 +37,16 @@
 #include <string_view>
 #include <vector>
 
+#if defined(_MSC_VER) && defined(_DEBUG)
+#include <crtdbg.h>
+#endif
+
 int main() {
+#if defined(_MSC_VER) && defined(_DEBUG)
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
     const auto success = usm::Result::success();
     assert(static_cast<bool>(success));
 
@@ -108,6 +118,46 @@ int main() {
     assert(collisionFixtureWorld.resolveGroundMotion(
         {400.0F, 500.0F, 0.0F}, {600.0F, 500.0F, 0.0F}, wallResolved));
     assert(std::abs(wallResolved.x - 450.0F) < 0.01F);
+    assert(collisionFixtureWorld.segmentBlocked({400.0F, 500.0F, 25.0F},
+                                                {600.0F, 500.0F, 100.0F}));
+    assert(!collisionFixtureWorld.segmentBlocked({100.0F, 500.0F, 25.0F},
+                                                 {300.0F, 500.0F, 100.0F}));
+
+    std::array<usm::game::LevelWebGrabPointAsset, 3> selectionPoints{};
+    selectionPoints[0].objectId = 1;
+    selectionPoints[0].position = {100.0F, 0.0F, 0.0F};
+    selectionPoints[0].visibleLength = 90.0F;
+    selectionPoints[1].objectId = 2;
+    selectionPoints[1].position = {200.0F, 0.0F, 0.0F};
+    selectionPoints[1].visibleLength = -1.0F;
+    selectionPoints[2].objectId = 3;
+    selectionPoints[2].position = {-50.0F, 0.0F, 0.0F};
+    selectionPoints[2].visibleLength = -1.0F;
+    usm::game::WebGrabPointRuntime webGrabSelection;
+    webGrabSelection.bind(selectionPoints);
+    const usm::assets::Vector3 selectionOrigin{};
+    const usm::assets::Vector3 selectionFacing{1.0F, 0.0F, 0.0F};
+    assert(webGrabSelection.findBest(selectionOrigin, selectionFacing)->
+               objectId == 1);
+    assert(webGrabSelection.findBest(selectionOrigin, selectionFacing, 1)->
+               objectId == 2);
+    assert(webGrabSelection.findClosestVisible(selectionOrigin)->objectId ==
+           3);
+    // SearchWebGrabPoint applies VisiableLength only after choosing the best
+    // facing candidate, so it does not fall through to point 2 here.
+    assert(webGrabSelection.search(selectionOrigin, selectionFacing) ==
+           nullptr);
+    selectionPoints[0].visibleLength = 100.0F;
+    assert(webGrabSelection.search(selectionOrigin, selectionFacing)->
+               objectId == 1);
+
+    std::array<usm::game::LevelWebGrabPointAsset, 1> occludedPoint{};
+    occludedPoint[0].objectId = 4;
+    occludedPoint[0].position = {600.0F, 500.0F, 100.0F};
+    occludedPoint[0].visibleLength = -1.0F;
+    webGrabSelection.bind(occludedPoint, &collisionFixtureWorld);
+    assert(webGrabSelection.search({400.0F, 500.0F, 0.0F}, selectionFacing) ==
+           nullptr);
 
     router.beginFrame();
     router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, true},
@@ -483,6 +533,54 @@ int main() {
                usm::assets::ColladaAnimationProperty::Translation);
         assert(bootstrap.player().animationBank.tracks()[44].property ==
                usm::assets::ColladaAnimationProperty::TranslationX);
+        assert(bootstrap.waypoints().size() == 15);
+        assert(bootstrap.webGrabPoints().size() == 9);
+        const auto webGrab377 = std::find_if(
+            bootstrap.webGrabPoints().begin(),
+            bootstrap.webGrabPoints().end(), [](const auto& point) {
+                return point.objectId == 377;
+            });
+        assert(webGrab377 != bootstrap.webGrabPoints().end());
+        assert(webGrab377->directionControlPointId == 408);
+        assert(std::abs(webGrab377->position.x - 4845.52F) < 0.01F);
+        assert(std::abs(webGrab377->position.y + 6079.96F) < 0.01F);
+        assert(std::abs(webGrab377->position.z - 535.477F) < 0.01F);
+        assert(std::abs(webGrab377->direction.x + 0.969569F) < 0.00001F);
+        assert(std::abs(webGrab377->direction.y - 0.232773F) < 0.00001F);
+        assert(std::abs(webGrab377->direction.z + 0.075849F) < 0.00001F);
+        assert(webGrab377->length == 600.0F);
+        assert(webGrab377->visibleLength == 1500.0F);
+        assert(webGrab377->verticalAngleDegrees == 80.0F);
+        assert(webGrab377->horizontalAngleDegrees == -15.0F);
+        assert(webGrab377->exitSpeed == 0.45F);
+        assert(!webGrab377->cannotControl);
+        assert(!webGrab377->hasTargetWaypoint);
+        const auto webGrab383 = std::find_if(
+            bootstrap.webGrabPoints().begin(),
+            bootstrap.webGrabPoints().end(), [](const auto& point) {
+                return point.objectId == 383;
+            });
+        assert(webGrab383 != bootstrap.webGrabPoints().end());
+        assert(webGrab383->cannotControl);
+        assert(webGrab383->targetWaypointId == 30031);
+        assert(webGrab383->hasTargetWaypoint);
+        assert(std::abs(webGrab383->targetWaypointPosition.x - 2712.0F) <
+               0.01F);
+        assert(std::abs(webGrab383->targetWaypointPosition.y - 2953.27F) <
+               0.01F);
+        assert(std::abs(webGrab383->targetWaypointPosition.z - 148.214F) <
+               0.01F);
+        const auto slideWaypoint = std::find_if(
+            bootstrap.waypoints().begin(), bootstrap.waypoints().end(),
+            [](const auto& waypoint) { return waypoint.objectId == 429; });
+        assert(slideWaypoint != bootstrap.waypoints().end());
+        assert(slideWaypoint->enabled);
+        assert(slideWaypoint->nextWaypointIds[0] == 430);
+        assert(slideWaypoint->nextWaypointIds[1] == -1);
+        assert(slideWaypoint->useGravityWhenEnd);
+        assert(!slideWaypoint->unstandable);
+        assert(slideWaypoint->jumpDirection == 0);
+        assert(slideWaypoint->linkedCameraAreaId == -1);
         assert(bootstrap.attackConfigs().attacks().size() == 85);
         const auto* normalAttack = bootstrap.attackConfigs().find(7);
         assert(normalAttack != nullptr);

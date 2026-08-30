@@ -110,6 +110,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelOneBootstrap.cpp
     src/game/PlayerHudHealthState.cpp
     src/game/PlayerStateConfig.cpp
+    src/game/WebGrabPointRuntime.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)

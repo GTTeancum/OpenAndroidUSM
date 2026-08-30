@@ -89,6 +89,43 @@ struct LevelTriggerAsset {
     std::int32_t whileOutsideCinematicId{-1};
 };
 
+// Authored path node consumed by Player slide/forced-traversal states. These
+// names mirror the serialized editor attributes and the recovered WayPoint
+// runtime instead of collapsing the graph to an anonymous position list.
+struct LevelWayPointAsset {
+    std::int32_t objectId{-1};
+    std::string name;
+    assets::Vector3 position;
+    bool enabled{true};
+    bool electricShock{};
+    std::array<std::int32_t, 2> nextWaypointIds{{-1, -1}};
+    bool useGravityWhenEnd{true};
+    bool unstandable{};
+    std::int32_t jumpDirection{};
+    float timeToMe{};
+    std::int32_t linkedCameraAreaId{-1};
+};
+
+// CWebGrabPoint fields recovered from ProcessUserAttr (0x00327320) and Init
+// (0x00327470). The linked CamCtrlPoint supplies the swing-plane direction;
+// an optional WayPoint supplies the forced exit destination.
+struct LevelWebGrabPointAsset {
+    std::int32_t objectId{-1};
+    assets::Vector3 position;
+    std::int32_t directionControlPointId{-1};
+    assets::Vector3 direction;
+    float length{};
+    float visibleLength{-1.0F};
+    float verticalAngleDegrees{};
+    float horizontalAngleDegrees{};
+    float exitSpeed{};
+    bool cannotControl{};
+    std::int32_t targetWaypointId{-1};
+    bool hasTargetWaypoint{};
+    assets::Vector3 targetWaypointPosition;
+    std::int32_t targetSlideId{-1};
+};
+
 struct LevelCinematicAsset {
     std::int32_t objectId{-1};
     std::string name;
@@ -189,6 +226,14 @@ public:
     [[nodiscard]] const std::vector<LevelTriggerAsset>& triggers() const noexcept {
         return triggers_;
     }
+    [[nodiscard]] const std::vector<LevelWayPointAsset>& waypoints() const
+        noexcept {
+        return waypoints_;
+    }
+    [[nodiscard]] const std::vector<LevelWebGrabPointAsset>& webGrabPoints()
+        const noexcept {
+        return webGrabPoints_;
+    }
     [[nodiscard]] const std::vector<LevelCinematicAsset>& cinematics() const
         noexcept {
         return cinematics_;
@@ -226,6 +271,8 @@ private:
     LevelPlayerAsset player_;
     std::vector<CameraArea> cameraAreas_;
     std::vector<LevelTriggerAsset> triggers_;
+    std::vector<LevelWayPointAsset> waypoints_;
+    std::vector<LevelWebGrabPointAsset> webGrabPoints_;
     std::vector<LevelCinematicAsset> cinematics_;
     std::vector<EnemyArchetypeAsset> enemyArchetypes_;
     std::vector<LevelEnemyAsset> enemies_;

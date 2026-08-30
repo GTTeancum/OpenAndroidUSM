@@ -180,6 +180,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     player_ = {};
     cameraAreas_.clear();
     triggers_.clear();
+    waypoints_.clear();
+    webGrabPoints_.clear();
     cinematics_.clear();
     enemyArchetypes_.clear();
     enemies_.clear();
@@ -437,6 +439,98 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     if (!result) {
         cameraAreas_.clear();
         return result;
+    }
+
+    const auto appendWaypoints = [this](const assets::IrrScene& scene) {
+        for (const assets::IrrSceneNode& node : scene.nodes()) {
+            if (node.gameType != "WayPoint") {
+                continue;
+            }
+            LevelWayPointAsset waypoint;
+            waypoint.objectId = node.id;
+            waypoint.name = node.name;
+            waypoint.position = worldPosition(node);
+            waypoint.enabled = booleanAttribute(node, "Enabled", true);
+            waypoint.electricShock =
+                booleanAttribute(node, "ElectricShock", false);
+            waypoint.nextWaypointIds = {
+                integerAttribute(node, "^Next1^WayPoint"),
+                integerAttribute(node, "^Next2^WayPoint"),
+            };
+            waypoint.useGravityWhenEnd =
+                booleanAttribute(node, "UseGravityWhenEnd", true);
+            waypoint.unstandable =
+                booleanAttribute(node, "UnStandable", false);
+            waypoint.jumpDirection = integerAttribute(node, "$JumpDir", 0);
+            waypoint.timeToMe = floatAttribute(node, "TimeToMe");
+            waypoint.linkedCameraAreaId =
+                integerAttribute(node, "^Linked^CameraArea");
+            waypoints_.push_back(std::move(waypoint));
+        }
+    };
+    appendWaypoints(mainScene_);
+    for (const LevelRoomAsset& room : rooms_) {
+        appendWaypoints(room.scene);
+    }
+
+    const auto appendWebGrabPoints = [this](const assets::IrrScene& scene)
+        -> Result {
+        for (const assets::IrrSceneNode& node : scene.nodes()) {
+            if (node.gameType != "WebGrabPoint") {
+                continue;
+            }
+            LevelWebGrabPointAsset point;
+            point.objectId = node.id;
+            point.position = worldPosition(node);
+            point.directionControlPointId =
+                integerAttribute(node, "^Dir^CamCtrlPoint");
+            const assets::IrrSceneNode* directionNode = findLevelNode(
+                mainScene_, rooms_, point.directionControlPointId);
+            if (directionNode == nullptr ||
+                directionNode->gameType != "CamCtrlPoint") {
+                return Result::failure("Web grab point " +
+                                       std::to_string(point.objectId) +
+                                       " has no valid direction control point");
+            }
+            point.direction = directionNode->cameraDirection;
+            point.length = floatAttribute(node, "Length");
+            point.visibleLength =
+                floatAttribute(node, "VisiableLength", -1.0F);
+            point.verticalAngleDegrees = floatAttribute(node, "AngleV");
+            point.horizontalAngleDegrees = floatAttribute(node, "AngleH");
+            point.exitSpeed = floatAttribute(node, "OutSpeed");
+            point.cannotControl =
+                booleanAttribute(node, "CanNotControl", false);
+            point.targetWaypointId =
+                integerAttribute(node, "^Target^WayPoint");
+            point.targetSlideId = integerAttribute(node, "^Target^Slide");
+            if (point.targetWaypointId >= 0) {
+                const assets::IrrSceneNode* targetNode = findLevelNode(
+                    mainScene_, rooms_, point.targetWaypointId);
+                if (targetNode == nullptr ||
+                    targetNode->gameType != "WayPoint") {
+                    return Result::failure("Web grab point " +
+                                           std::to_string(point.objectId) +
+                                           " has no valid target waypoint");
+                }
+                point.hasTargetWaypoint = true;
+                point.targetWaypointPosition = worldPosition(*targetNode);
+            }
+            webGrabPoints_.push_back(std::move(point));
+        }
+        return Result::success();
+    };
+    result = appendWebGrabPoints(mainScene_);
+    if (!result) {
+        webGrabPoints_.clear();
+        return result;
+    }
+    for (const LevelRoomAsset& room : rooms_) {
+        result = appendWebGrabPoints(room.scene);
+        if (!result) {
+            webGrabPoints_.clear();
+            return result;
+        }
     }
 
     for (const LevelRoomAsset& room : rooms_) {
