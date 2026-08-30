@@ -675,6 +675,28 @@ its original duration on higher-refresh displays. Deterministic regressions
 cover command validation, hold/ramp timing, transition audio cues, alternating
 decay, and explicit shake cancellation.
 
+## Cinematic particle effects
+
+`EffectPresetDatabase` reconstructs the particle records loaded by
+`EffectManager::LoadEffectPresets` at `0x003925c4` from the original
+`effects.xml`, `effects.bsprite`, and shared `effects.tga` atlas. The portable
+runtime handles `CCinematicThread::PlayEffect` at `0x003712f8`, preserves each
+authored emitter's delay, lifetime, box, direction, size/color variation,
+gravity, fade, size curve, sprite frame, and material type, and exposes only
+renderer-neutral billboard state. The deterministic generator keeps test and
+capture results stable without importing Irrlicht particle objects.
+
+The D3D11 backend expands those states into camera-facing sprite quads and
+separates standard vertex-alpha particles from `trans_add` particles. Ghidra's
+preserved
+`CCommonGLMaterialRenderer_TRANSPARENT_ADD_COLOR::onSetMaterial` at
+`0x004559b0` calls `glBlendFunc(GL_SRC_ALPHA, GL_ONE)`, which maps directly to
+the native additive blend state. A dedicated effect pixel shader retains the
+world vertex shader's full interpolant signature; the HUD shader cannot be
+shared because its compact signature assigns texture coordinates and color to
+different compiled registers. WARP regressions verify preset decoding,
+deterministic expiry, and a visible authored hit-splash frame.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

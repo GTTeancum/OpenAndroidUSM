@@ -4,6 +4,7 @@
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelEffectRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 
 #include <algorithm>
@@ -105,6 +106,8 @@ int main() {
         assert(playerStates.load(dataRoot));
         captureIfRequested(levelOne.hud().interfaceTexture.image(),
                            "interface-atlas.bmp");
+        captureIfRequested(levelOne.effects().texture.image(),
+                           "effects-atlas.bmp");
         for (std::size_t textureIndex = 0;
              textureIndex < levelOne.introSky().textures.size();
              ++textureIndex) {
@@ -204,13 +207,55 @@ int main() {
             levelOne.introCameraAnimation().durationMilliseconds()));
         assert(gameRenderer.updateLevelOnePlayer(
             levelOne, *idleClip, 0, levelOne.player().worldTransform));
-        assert(gameRenderer.setCamera(
-            gameplayCamera.sample(levelOne.player().position)));
+        const auto gameplayPose =
+            gameplayCamera.sample(levelOne.player().position);
+        assert(gameRenderer.setCamera(gameplayPose));
         gameRenderer.renderFrame();
         RgbaImage gameplayFrame;
         assert(gameRenderer.readBackImage(gameplayFrame));
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
+        usm::game::LevelEffectRuntime effects;
+        assert(effects.initialize(levelOne.effects().presets));
+        usm::game::CinematicCommand playEffect;
+        playEffect.name = "PlayEffect";
+        playEffect.attributes.push_back(
+            {"string", "$EffectType", "cartoon_hit_splash_big"});
+        const auto& effectPosition = gameplayPose.target;
+        playEffect.attributes.push_back(
+            {"vector3d", "abspos",
+             std::to_string(effectPosition.x) + "," +
+                 std::to_string(effectPosition.y) + "," +
+                 std::to_string(effectPosition.z)});
+        assert(effects.applyCinematicCommand(playEffect));
+        effects.update(1);
+        assert(!effects.particles().empty());
+        assert(std::all_of(effects.particles().begin(),
+                           effects.particles().end(),
+                           [](const usm::game::EffectParticleState& particle) {
+                               return (particle.color >> 24U) != 0;
+                           }));
+        assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
+                                                   effects));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayEffectFrame;
+        assert(gameRenderer.readBackImage(gameplayEffectFrame));
+        captureIfRequested(gameplayEffectFrame, "gameplay-hit-effect.bmp");
+        std::size_t effectChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < gameplayEffectFrame.pixels.size(); component += 4) {
+            effectChangedPixels +=
+                gameplayEffectFrame.pixels[component] !=
+                    gameplayFrame.pixels[component] ||
+                gameplayEffectFrame.pixels[component + 1] !=
+                    gameplayFrame.pixels[component + 1] ||
+                gameplayEffectFrame.pixels[component + 2] !=
+                    gameplayFrame.pixels[component + 2];
+        }
+        assert(effectChangedPixels > 2);
+        effects.update(300);
+        assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
+                                                   effects));
         const auto beforeBossCinematic = std::find_if(
             levelOne.cinematics().begin(), levelOne.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {

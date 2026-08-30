@@ -168,6 +168,10 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = effectRuntime_.initialize(levelOne_.effects().presets);
+    if (!result) {
+        return fail(result.message());
+    }
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints());
     quickTimeEvent_.bind(levelOne_.buttonConfigs());
@@ -250,6 +254,7 @@ int Application::run(HINSTANCE instance) {
         // is therefore paced by real 50 ms ticks, not the scaled game delta.
         levelCinematicRuntime_.advanceCameraShake(realDeltaMilliseconds);
         objectRuntime_.advanceAnimations(gameDeltaMilliseconds);
+        effectRuntime_.update(gameDeltaMilliseconds);
         audio_.update();
         keyRouter_.beginFrame();
         controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
@@ -429,6 +434,10 @@ int Application::run(HINSTANCE instance) {
                         }
                         if (commandResult) {
                             commandResult =
+                                effectRuntime_.applyCinematicCommand(command);
+                        }
+                        if (commandResult) {
+                            commandResult =
                                 quickTimeEvent_.applyCommand(command);
                         }
                         if (commandResult) {
@@ -573,6 +582,10 @@ int Application::run(HINSTANCE instance) {
         if (result) {
             result = renderer_.updateLevelOneObjects(levelOne_,
                                                      objectRuntime_);
+        }
+        if (result) {
+            result = renderer_.updateLevelOneEffects(
+                levelOne_.effects(), effectRuntime_);
         }
         cinematicUi_.update(
             gameDeltaMilliseconds,

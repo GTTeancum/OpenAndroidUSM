@@ -6,6 +6,7 @@
 #include "game/CinematicUiRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelEffectRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "renderer/IRenderer.hpp"
 
@@ -59,6 +60,9 @@ public:
         const assets::Vector3& attachPosition = {});
     [[nodiscard]] Result updateEnemyGunLines(
         std::span<const game::EnemyGunLineState> gunLines);
+    [[nodiscard]] Result updateLevelOneEffects(
+        const game::LevelEffectAsset& assets,
+        const game::LevelEffectRuntime& effects);
     [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
@@ -138,6 +142,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> colorPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> effectPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> hudVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> hudPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
@@ -146,13 +151,16 @@ private:
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
     Microsoft::WRL::ComPtr<ID3D11BlendState> alphaBlendState_;
+    Microsoft::WRL::ComPtr<ID3D11BlendState> additiveBlendState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthWriteState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthReadState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthDisabledState_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> hudVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> webLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> enemyGunLineVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> effectVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> effectTexture_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> whiteTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
@@ -172,11 +180,16 @@ private:
     std::uint32_t hudVertexCapacity_{};
     std::uint32_t webLineVertexCount_{};
     std::uint32_t enemyGunLineVertexCount_{};
+    std::uint32_t effectAlphaVertexCount_{};
+    std::uint32_t effectAdditiveVertexCount_{};
+    std::uint32_t effectVertexCapacity_{};
     std::u16string cinematicUiText_;
     bool cinematicUiTextCentered_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};
+    assets::Vector3 cameraRight_{1.0F, 0.0F, 0.0F};
+    assets::Vector3 cameraUp_{0.0F, 0.0F, 1.0F};
     std::uint32_t width_{};
     std::uint32_t height_{};
 };

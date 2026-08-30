@@ -188,7 +188,10 @@ Result SpriteAtlas::load(std::span<const std::byte> bytes) {
         }
     }
     for (const SpriteAnimationFrame& frame : animationFrames_) {
-        if (frame.frameIndex >= frames_.size()) {
+        // Effect-only atlases use 0xffff as an intentionally empty animation
+        // slot; CSprite consumers skip it and address static frames directly.
+        if (frame.frameIndex != std::numeric_limits<std::uint16_t>::max() &&
+            frame.frameIndex >= frames_.size()) {
             return Result::failure("Sprite animation references an invalid frame");
         }
     }

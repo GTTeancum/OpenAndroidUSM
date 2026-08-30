@@ -334,6 +334,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     objectArchetypes_.clear();
     objects_.clear();
     hud_ = {};
+    effects_ = {};
     Result result = attackConfigs_.load(gameDataRoot);
     if (!result) {
         return Result::failure("Could not load attack configs: " +
@@ -410,6 +411,37 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     result = hud_.interfaceTexture.load(resource);
     if (!result) {
         return Result::failure("Could not decode interface sprite texture: " +
+                               result.message());
+    }
+
+    result = entityArchive.read("effects.xml", resource);
+    if (!result) {
+        return Result::failure("Could not load effect presets: " +
+                               result.message());
+    }
+    result = effects_.presets.load(resource);
+    if (!result) {
+        return Result::failure("Could not parse effect presets: " +
+                               result.message());
+    }
+    result = spriteArchive.read("effects.bsprite", resource);
+    if (!result) {
+        return Result::failure("Could not load effect sprite metadata: " +
+                               result.message());
+    }
+    result = effects_.atlas.load(resource);
+    if (!result) {
+        return Result::failure("Could not parse effect sprite metadata: " +
+                               result.message());
+    }
+    result = spriteArchive.read("effects.tga", resource);
+    if (!result) {
+        return Result::failure("Could not load effect sprite texture: " +
+                               result.message());
+    }
+    result = effects_.texture.load(resource);
+    if (!result) {
+        return Result::failure("Could not decode effect sprite texture: " +
                                result.message());
     }
 

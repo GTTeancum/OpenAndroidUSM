@@ -17,6 +17,7 @@
 #include "game/EnemyAttackIntervalConfig.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/EnemySpecialActionConfig.hpp"
+#include "game/EffectPreset.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/LocalizedStringTable.hpp"
 
@@ -238,6 +239,12 @@ struct LevelHudAsset {
     assets::DdsAtcTexture interfaceTexture;
 };
 
+struct LevelEffectAsset {
+    EffectPresetDatabase presets;
+    assets::SpriteAtlas atlas;
+    assets::DdsAtcTexture texture;
+};
+
 class LevelOneBootstrap final {
 public:
     [[nodiscard]] Result load(const std::filesystem::path& gameDataRoot);
@@ -352,6 +359,9 @@ public:
         return enemyAttackIntervalConfigs_;
     }
     [[nodiscard]] const LevelHudAsset& hud() const noexcept { return hud_; }
+    [[nodiscard]] const LevelEffectAsset& effects() const noexcept {
+        return effects_;
+    }
     [[nodiscard]] const LevelTextCatalog& textCatalog() const noexcept {
         return textCatalog_;
     }
@@ -385,6 +395,7 @@ private:
     EnemyAttackIntervalConfigDatabase enemyAttackIntervalConfigs_;
     EnemyRangeAttackConfigDatabase enemyRangeAttackConfigs_;
     LevelHudAsset hud_;
+    LevelEffectAsset effects_;
     LevelTextCatalog textCatalog_;
 };
 

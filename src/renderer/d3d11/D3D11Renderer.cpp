@@ -118,6 +118,23 @@ float4 main(PixelInput input) : SV_TARGET {
 }
 )hlsl";
 
+constexpr std::string_view kEffectPixelShader = R"hlsl(
+Texture2D EffectTexture : register(t0);
+SamplerState EffectSampler : register(s0);
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    return EffectTexture.Sample(EffectSampler, input.textureCoordinate) *
+           input.color;
+}
+)hlsl";
+
 constexpr std::string_view kAlphaTestPixelShader = R"hlsl(
 Texture2D DiffuseTexture : register(t0);
 SamplerState DiffuseSampler : register(s0);
@@ -553,6 +570,18 @@ Result D3D11Renderer::createPipeline() {
         return hresultFailure("ID3D11Device::CreatePixelShader(color)",
                               callResult);
     }
+    ComPtr<ID3DBlob> effectPixelBytecode;
+    result = compileShader(kEffectPixelShader, "ps_5_0", effectPixelBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreatePixelShader(
+        effectPixelBytecode->GetBufferPointer(),
+        effectPixelBytecode->GetBufferSize(), nullptr, &effectPixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreatePixelShader(effect)",
+                              callResult);
+    }
     ComPtr<ID3DBlob> alphaTestPixelBytecode;
     result = compileShader(kAlphaTestPixelShader, "ps_5_0",
                            alphaTestPixelBytecode);
@@ -695,6 +724,14 @@ Result D3D11Renderer::createPipeline() {
                                             &alphaBlendState_);
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreateBlendState(alpha)",
+                              callResult);
+    }
+    blendDescription.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+    blendDescription.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    callResult = device_->CreateBlendState(&blendDescription,
+                                            &additiveBlendState_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateBlendState(additive)",
                               callResult);
     }
 
@@ -930,7 +967,24 @@ Result D3D11Renderer::uploadLevelOneScene(
         }
         gpuMeshes_.back().visible = enemy.visible;
     }
-    return uploadHudTexture(levelOne.hud());
+    result = uploadHudTexture(levelOne.hud());
+    if (!result) {
+        return result;
+    }
+    effectTexture_.Reset();
+    effectVertexBuffer_.Reset();
+    effectAlphaVertexCount_ = 0;
+    effectAdditiveVertexCount_ = 0;
+    effectVertexCapacity_ = 0;
+    const assets::RgbaImage& effectImage = levelOne.effects().texture.image();
+    if (effectImage.width == 0 || effectImage.height == 0 ||
+        effectImage.pixels.size() !=
+            static_cast<std::size_t>(effectImage.width) *
+                effectImage.height * 4) {
+        return Result::failure("Effect texture image is invalid");
+    }
+    return createTextureView(
+        std::span<const assets::RgbaImage>(&effectImage, 1), effectTexture_);
 }
 
 Result D3D11Renderer::updateLevelOneActors(
@@ -1315,6 +1369,145 @@ Result D3D11Renderer::updateEnemyGunLines(
                 vertices.size() * sizeof(GpuVertex));
     context_->Unmap(enemyGunLineVertexBuffer_.Get(), 0);
     enemyGunLineVertexCount_ = static_cast<std::uint32_t>(vertices.size());
+    return Result::success();
+}
+
+Result D3D11Renderer::updateLevelOneEffects(
+    const game::LevelEffectAsset& assets,
+    const game::LevelEffectRuntime& effects) {
+    effectAlphaVertexCount_ = 0;
+    effectAdditiveVertexCount_ = 0;
+    if (!device_ || !context_ || !effectTexture_) {
+        return Result::failure("Effect GPU resources are incomplete");
+    }
+    const assets::SpriteAtlas& atlas = assets.atlas;
+    const assets::RgbaImage& texture = assets.texture.image();
+    if (texture.width < 2 || texture.height < 2) {
+        return Result::failure("Effect atlas dimensions are invalid");
+    }
+
+    std::vector<GpuVertex> alphaVertices;
+    std::vector<GpuVertex> additiveVertices;
+    const auto appendParticle = [&](const game::EffectParticleState& particle,
+                                    std::vector<GpuVertex>& vertices,
+                                    bool& valid) {
+        const auto modules = atlas.modulesForFrame(
+            static_cast<std::size_t>(particle.frameId));
+        if (particle.frameId < 0 || modules.empty()) {
+            valid = false;
+            return;
+        }
+        const float radians =
+            particle.rotationDegrees * 0.017453292519943295F;
+        const float cosine = std::cos(radians);
+        const float sine = std::sin(radians);
+        const auto point = [&](float localX, float localY) {
+            const float rotatedX = localX * cosine - localY * sine;
+            const float rotatedY = localX * sine + localY * cosine;
+            return DirectX::XMFLOAT3{
+                particle.position.x + cameraRight_.x * rotatedX +
+                    cameraUp_.x * rotatedY,
+                particle.position.y + cameraRight_.y * rotatedX +
+                    cameraUp_.y * rotatedY,
+                particle.position.z + cameraRight_.z * rotatedX +
+                    cameraUp_.z * rotatedY};
+        };
+        for (const assets::SpriteFrameModule& frameModule : modules) {
+            if (frameModule.moduleIndex >= atlas.modules().size()) {
+                valid = false;
+                continue;
+            }
+            const assets::SpriteModule& module =
+                atlas.modules()[frameModule.moduleIndex];
+            constexpr std::uint8_t horizontalFlip = 0x01;
+            constexpr std::uint8_t verticalFlip = 0x02;
+            if (module.imageIndex != 0 ||
+                (frameModule.flags & ~(horizontalFlip | verticalFlip)) != 0) {
+                valid = false;
+                continue;
+            }
+            float u0 = static_cast<float>(module.x) /
+                       static_cast<float>(texture.width);
+            float v0 = static_cast<float>(module.y) /
+                       static_cast<float>(texture.height);
+            float u1 = static_cast<float>(module.x + module.width) /
+                       static_cast<float>(texture.width);
+            float v1 = static_cast<float>(module.y + module.height) /
+                       static_cast<float>(texture.height);
+            if ((frameModule.flags & horizontalFlip) != 0) {
+                std::swap(u0, u1);
+            }
+            if ((frameModule.flags & verticalFlip) != 0) {
+                std::swap(v0, v1);
+            }
+            const float halfWidth = particle.width * 0.5F;
+            const float halfHeight = particle.height * 0.5F;
+            const std::uint32_t color = rgbaVertexColor(particle.color);
+            const GpuVertex topLeft{point(-halfWidth, halfHeight), {},
+                                    {u0, v0}, color};
+            const GpuVertex topRight{point(halfWidth, halfHeight), {},
+                                     {u1, v0}, color};
+            const GpuVertex bottomLeft{point(-halfWidth, -halfHeight), {},
+                                       {u0, v1}, color};
+            const GpuVertex bottomRight{point(halfWidth, -halfHeight), {},
+                                        {u1, v1}, color};
+            vertices.insert(vertices.end(),
+                            {topLeft, topRight, bottomLeft, topRight,
+                             bottomRight, bottomLeft});
+        }
+    };
+
+    bool valid = true;
+    for (const game::EffectParticleState& particle : effects.particles()) {
+        appendParticle(particle,
+                       particle.additive ? additiveVertices : alphaVertices,
+                       valid);
+    }
+    if (!valid) {
+        return Result::failure(
+            "Effect particle references an unsupported sprite frame");
+    }
+    const std::size_t totalVertexCount =
+        alphaVertices.size() + additiveVertices.size();
+    if (totalVertexCount > std::numeric_limits<std::uint32_t>::max()) {
+        return Result::failure("Effect vertex count exceeds D3D11 limits");
+    }
+    if (totalVertexCount > effectVertexCapacity_) {
+        effectVertexBuffer_.Reset();
+        effectVertexCapacity_ = static_cast<std::uint32_t>(
+            std::max<std::size_t>(totalVertexCount, 256));
+        D3D11_BUFFER_DESC description{};
+        description.ByteWidth =
+            effectVertexCapacity_ * static_cast<UINT>(sizeof(GpuVertex));
+        description.Usage = D3D11_USAGE_DYNAMIC;
+        description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        description.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        const HRESULT createResult = device_->CreateBuffer(
+            &description, nullptr, &effectVertexBuffer_);
+        if (FAILED(createResult)) {
+            effectVertexCapacity_ = 0;
+            return hresultFailure("ID3D11Device::CreateBuffer(effects)",
+                                  createResult);
+        }
+    }
+    effectAlphaVertexCount_ =
+        static_cast<std::uint32_t>(alphaVertices.size());
+    effectAdditiveVertexCount_ =
+        static_cast<std::uint32_t>(additiveVertices.size());
+    if (totalVertexCount == 0) {
+        return Result::success();
+    }
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    const HRESULT mapResult = context_->Map(
+        effectVertexBuffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (FAILED(mapResult)) {
+        return hresultFailure("ID3D11DeviceContext::Map(effects)", mapResult);
+    }
+    auto* destination = static_cast<GpuVertex*>(mapped.pData);
+    std::copy(alphaVertices.begin(), alphaVertices.end(), destination);
+    std::copy(additiveVertices.begin(), additiveVertices.end(),
+              destination + alphaVertices.size());
+    context_->Unmap(effectVertexBuffer_.Get(), 0);
     return Result::success();
 }
 
@@ -1743,6 +1936,18 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
     }
     const DirectX::XMMATRIX view =
         buildOriginalLookAtMatrix(position, target, up);
+    const DirectX::XMVECTOR forward =
+        DirectX::XMVector3Normalize(direction);
+    const DirectX::XMVECTOR billboardRight = DirectX::XMVector3Normalize(
+        DirectX::XMVector3Cross(forward, up));
+    const DirectX::XMVECTOR billboardUp =
+        DirectX::XMVector3Cross(billboardRight, forward);
+    cameraRight_ = {DirectX::XMVectorGetX(billboardRight),
+                    DirectX::XMVectorGetY(billboardRight),
+                    DirectX::XMVectorGetZ(billboardRight)};
+    cameraUp_ = {DirectX::XMVectorGetX(billboardUp),
+                 DirectX::XMVectorGetY(billboardUp),
+                 DirectX::XMVectorGetZ(billboardUp)};
     const DirectX::XMMATRIX skyView = buildOriginalLookAtMatrix(
         DirectX::XMVectorZero(), direction, up);
     const DirectX::XMMATRIX projection = DirectX::XMMatrixPerspectiveFovLH(
@@ -2145,6 +2350,42 @@ void D3D11Renderer::renderFrame() {
         context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
         context_->RSSetState(rasterizerState_.Get());
         context_->Draw(enemyGunLineVertexCount_, 0);
+    }
+
+    if ((effectAlphaVertexCount_ != 0 ||
+         effectAdditiveVertexCount_ != 0) &&
+        effectVertexBuffer_ && effectTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                    &worldViewProjection_, 0, 0);
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(0, 1,
+                                     effectVertexBuffer_.GetAddressOf(),
+                                     &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        const std::array<ID3D11Buffer*, 2> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
+        context_->PSSetShader(effectPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(0, 1, effectTexture_.GetAddressOf());
+        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        if (effectAlphaVertexCount_ != 0) {
+            context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                      0xffffffffU);
+            context_->Draw(effectAlphaVertexCount_, 0);
+        }
+        if (effectAdditiveVertexCount_ != 0) {
+            context_->OMSetBlendState(additiveBlendState_.Get(), nullptr,
+                                      0xffffffffU);
+            context_->Draw(effectAdditiveVertexCount_,
+                           effectAlphaVertexCount_);
+        }
     }
 
     if (hudVertexCount_ != 0 && hudVertexBuffer_ && hudTexture_) {

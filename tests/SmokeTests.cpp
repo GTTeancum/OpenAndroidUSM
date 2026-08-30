@@ -20,6 +20,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelEffectRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/PlayerHudHealthState.hpp"
@@ -692,6 +693,59 @@ int main() {
         assert(bootstrap.player().textures.size() == 2);
         assert(bootstrap.player().animationBank.tracks().size() == 46);
         assert(bootstrap.player().animationBank.clips().size() == 242);
+        assert(bootstrap.effects().presets.find("explode_new") != nullptr);
+        assert(bootstrap.effects().presets.find("explode_new")
+                   ->emitters.size() == 4);
+        assert(bootstrap.effects().presets.find("rock_splash") != nullptr);
+        assert(bootstrap.effects().presets.find("cartoon_hit_splash_big") !=
+               nullptr);
+        assert(bootstrap.effects().atlas.modules().size() == 16);
+        assert(bootstrap.effects().atlas.frames().size() == 16);
+        assert(bootstrap.effects().texture.image().width == 256);
+        assert(bootstrap.effects().texture.image().height == 256);
+        usm::game::LevelEffectRuntime effectRuntime;
+        assert(effectRuntime.initialize(bootstrap.effects().presets));
+        usm::game::CinematicCommand playHitEffect;
+        playHitEffect.name = "PlayEffect";
+        playHitEffect.attributes = {
+            {"string", "$EffectType", "cartoon_hit_splash_big"},
+            {"vector3d", "abspos", "10.0, 20.0, 30.0"},
+        };
+        assert(effectRuntime.applyCinematicCommand(playHitEffect));
+        effectRuntime.update(1);
+        assert(effectRuntime.particles().size() == 2);
+        assert(effectRuntime.particles().front().frameId == 2);
+        assert(effectRuntime.particles().front().width > 0.0F);
+        effectRuntime.update(300);
+        assert(effectRuntime.particles().empty());
+        playHitEffect.attributes.front().value = "missing_effect";
+        assert(!effectRuntime.applyCinematicCommand(playHitEffect));
+        std::size_t authoredEffectCommandCount = 0;
+        const auto validateEffectCommands =
+            [&](const usm::game::CinematicScript& script) {
+                for (const auto& thread : script.threads()) {
+                    for (const auto& command : thread.commands) {
+                        if (command.name != "PlayEffect") {
+                            continue;
+                        }
+                        ++authoredEffectCommandCount;
+                        const auto* type =
+                            command.findAttribute("$EffectType");
+                        assert(type != nullptr);
+                        assert(command.findAttribute("abspos") != nullptr);
+                        assert(bootstrap.effects().presets.find(type->value) !=
+                               nullptr);
+                    }
+                }
+            };
+        validateEffectCommands(bootstrap.introScript());
+        validateEffectCommands(bootstrap.introStartScript());
+        for (const auto& cinematic : bootstrap.cinematics()) {
+            if (cinematic.scriptAvailable) {
+                validateEffectCommands(cinematic.script);
+            }
+        }
+        assert(authoredEffectCommandCount > 0);
         assert(bootstrap.objects().size() == 106);
         assert(!bootstrap.objectArchetypes().empty());
         usm::game::LevelObjectRuntime objectRuntime;

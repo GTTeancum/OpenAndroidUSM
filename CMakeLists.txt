@@ -107,11 +107,13 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/EnemyAttackIntervalConfig.cpp
     src/game/EnemyRangeAttackConfig.cpp
     src/game/EnemySpecialActionConfig.cpp
+    src/game/EffectPreset.cpp
     src/game/GameplayCamera.cpp
     src/game/GameplayPlayer.cpp
     src/game/LevelCollision.cpp
     src/game/LevelCinematicRuntime.cpp
     src/game/LevelEnemyRuntime.cpp
+    src/game/LevelEffectRuntime.cpp
     src/game/LevelObjectRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
     src/game/LevelOneBootstrap.cpp
