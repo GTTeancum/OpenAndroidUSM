@@ -76,19 +76,25 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
     frameLog_.open(outputPath_ / "frames.csv", std::ios::trunc);
     enemyLog_.open(outputPath_ / "enemies.csv", std::ios::trunc);
     eventLog_.open(outputPath_ / "events.csv", std::ios::trunc);
-    if (!frameLog_ || !enemyLog_ || !eventLog_) {
+    cinematicAssetLog_.open(outputPath_ / "cinematics.csv", std::ios::trunc);
+    if (!frameLog_ || !enemyLog_ || !eventLog_ || !cinematicAssetLog_) {
         return Result::failure("Could not create autoplay trace files");
     }
     frameLog_ << "frame,real_ms,game_ms,phase,controls,player_x,player_y,"
                  "player_z,facing_x,facing_y,facing_z,health,animation,"
                  "animation_ms,state_id,state_name,punch_transition_ready,"
-                 "camera_area,cinematic,qte,restore,"
+                 "camera_area,cinematic,qte,tutorial,restore,"
                  "restore_alpha,visible_rooms,input_right,input_forward,"
                  "camera_x,camera_y,camera_z,target_x,target_y,target_z\n";
     enemyLog_ << "frame,real_ms,object_id,type_id,x,y,z,health,visible,ai,"
                  "detected,behavior,animation,animation_ms,animation_speed,"
-                 "animation_loop,animation_reverse\n";
+                 "animation_loop,animation_reverse,collision_radius,"
+                 "collision_height,vertical_velocity,grounded\n";
     eventLog_ << "real_ms,frame,type,detail\n";
+    cinematicAssetLog_
+        << "cinematic_id,cinematic_name,script_file,thread_type,"
+           "thread_object_id,thread_name,command_ms,command_id,command_name,"
+           "attributes\n";
     recordEvent(0, "harness_start",
                 "script=" + scriptPath.generic_string());
     return Result::success();
@@ -181,6 +187,31 @@ Result AutoplayHarness::parseScript(
                 step.radius <= 0.0F) {
                 return invalid("move_to requires x y z radius timeout");
             }
+        } else if (command == "move_until_cinematic") {
+            step.kind = StepKind::MoveUntilCinematic;
+            std::int32_t cinematicId = -1;
+            if (!(tokens >> step.position.x >> step.position.y >>
+                  step.position.z >> cinematicId >>
+                  step.durationOrTimeoutMilliseconds) ||
+                cinematicId < 0) {
+                return invalid(
+                    "move_until_cinematic requires x y z cinematic_id timeout");
+            }
+            step.objectIds.push_back(cinematicId);
+        } else if (command == "wait_enemies_grounded") {
+            step.kind = StepKind::WaitEnemiesGrounded;
+            if (!(tokens >> step.durationOrTimeoutMilliseconds)) {
+                return invalid(
+                    "wait_enemies_grounded requires timeout and enemy IDs");
+            }
+            std::int32_t objectId = -1;
+            while (tokens >> objectId) {
+                step.objectIds.push_back(objectId);
+            }
+            if (step.objectIds.empty()) {
+                return invalid(
+                    "wait_enemies_grounded requires at least one enemy ID");
+            }
         } else if (command == "attack") {
             step.kind = StepKind::Attack;
             if (!(tokens >> step.durationOrTimeoutMilliseconds >>
@@ -251,7 +282,8 @@ AutoplayFrameInput AutoplayHarness::update(
     lastTimeMilliseconds_ = snapshot.realTimeMilliseconds;
     lastFrameIndex_ = snapshot.frameIndex;
     AutoplayFrameInput input;
-    input.quickTimeEventPressed = snapshot.quickTimeEventActive;
+    input.quickTimeEventPressed =
+        snapshot.quickTimeEventActive || snapshot.tutorialVisible;
     if (complete_ || failed_) {
         lastMotionInput_ = input.motion;
         return input;
@@ -270,7 +302,8 @@ AutoplayFrameInput AutoplayHarness::update(
             beginStep(snapshot, step);
         }
         input = updateActiveStep(snapshot, step);
-        input.quickTimeEventPressed = snapshot.quickTimeEventActive;
+        input.quickTimeEventPressed =
+            snapshot.quickTimeEventActive || snapshot.tutorialVisible;
         const bool immediate = step.kind == StepKind::Jump ||
                                step.kind == StepKind::WebOn ||
                                step.kind == StepKind::WebOff ||
@@ -324,6 +357,38 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
             input.motion = steerToward(snapshot, step.position);
         }
         break;
+    case StepKind::MoveUntilCinematic:
+        if (!step.objectIds.empty() &&
+            snapshot.activeCinematicId == step.objectIds.front()) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step,
+                     "intended cinematic did not start");
+        } else if (snapshot.gameplayActive && snapshot.controlsEnabled) {
+            input.motion = steerToward(snapshot, step.position);
+        }
+        break;
+    case StepKind::WaitEnemiesGrounded: {
+        const bool allGrounded = std::all_of(
+            step.objectIds.begin(), step.objectIds.end(),
+            [&snapshot](std::int32_t objectId) {
+                const auto match = std::find_if(
+                    snapshot.enemies.begin(), snapshot.enemies.end(),
+                    [objectId](const game::LevelEnemyState& enemy) {
+                        return enemy.asset != nullptr &&
+                               enemy.asset->objectId == objectId;
+                    });
+                return match != snapshot.enemies.end() && match->visible &&
+                       match->grounded;
+            });
+        if (allGrounded) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step,
+                     "enemies did not become visible and grounded");
+        }
+        break;
+    }
     case StepKind::Attack: {
         const game::LevelEnemyState* target = nullptr;
         float targetDistance = std::numeric_limits<float>::max();
@@ -339,6 +404,13 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                 continue;
             }
             anyAlive = true;
+            const float playerTop = snapshot.playerPosition.z + 140.0F;
+            const float enemyTop = match->position.z +
+                                   match->collisionHeight;
+            if (!match->visible || playerTop < match->position.z ||
+                enemyTop < snapshot.playerPosition.z) {
+                continue;
+            }
             const float candidateDistance =
                 distance2D(snapshot.playerPosition, match->position);
             if (candidateDistance < targetDistance) {
@@ -528,7 +600,8 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                                 enemy.aiEnabled,
                                 enemy.playerDetected,
                                 enemy.behavior,
-                                enemy.activeAnimation};
+                                enemy.activeAnimation,
+                                enemy.grounded};
         auto [entry, inserted] = previousEnemies_.try_emplace(
             enemy.asset->objectId, current);
         if (!inserted &&
@@ -537,7 +610,8 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
              entry->second.aiEnabled != current.aiEnabled ||
              entry->second.playerDetected != current.playerDetected ||
              entry->second.behavior != current.behavior ||
-             entry->second.animation != current.animation)) {
+             entry->second.animation != current.animation ||
+             entry->second.grounded != current.grounded)) {
             transition("enemy_state",
                        "id=" + std::to_string(enemy.asset->objectId) +
                            ";health=" + std::to_string(current.health) +
@@ -546,7 +620,12 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                            ";detected=" +
                            std::to_string(current.playerDetected) +
                            ";behavior=" + behaviorName(current.behavior) +
-                           ";animation=" + current.animation);
+                           ";animation=" + current.animation +
+                           ";grounded=" +
+                           std::to_string(current.grounded) +
+                           ";z=" + std::to_string(enemy.position.z) +
+                           ";vertical_velocity=" +
+                           std::to_string(enemy.verticalVelocity));
             entry->second = std::move(current);
         }
     }
@@ -571,6 +650,7 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
               << snapshot.playerPunchTransitionReady << ','
               << snapshot.cameraAreaId << ',' << snapshot.activeCinematicId
               << ',' << snapshot.quickTimeEventActive << ','
+              << snapshot.tutorialVisible << ','
               << snapshot.restoreActive << ',' << snapshot.restoreAlpha << ','
               << csv(visibleRooms) << ',' << lastMotionInput_.right << ','
               << lastMotionInput_.forward << ',' << snapshot.camera.position.x
@@ -592,7 +672,9 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << ',' << csv(enemy.activeAnimation) << ','
                   << enemy.animationTimeMilliseconds << ','
                   << enemy.animationSpeed << ',' << enemy.animationLoops << ','
-                  << enemy.animationReversed << '\n';
+                  << enemy.animationReversed << ',' << enemy.collisionRadius
+                  << ',' << enemy.collisionHeight << ','
+                  << enemy.verticalVelocity << ',' << enemy.grounded << '\n';
     }
     frameLog_.flush();
     enemyLog_.flush();
@@ -620,6 +702,45 @@ void AutoplayHarness::recordCommand(
         detail += ";" + attribute.name + "=" + attribute.value;
     }
     recordEvent(timeMilliseconds, "cinematic_command", detail);
+}
+
+void AutoplayHarness::recordCinematicAssets(
+    std::span<const game::LevelCinematicAsset> cinematics) {
+    if (!cinematicAssetLog_) {
+        return;
+    }
+    for (const game::LevelCinematicAsset& cinematic : cinematics) {
+        for (const game::CinematicThread& thread :
+             cinematic.script.threads()) {
+            if (thread.commands.empty()) {
+                cinematicAssetLog_
+                    << cinematic.objectId << ',' << csv(cinematic.name) << ','
+                    << csv(cinematic.scriptFile) << ',' << thread.type << ','
+                    << thread.objectId << ',' << csv(thread.name)
+                    << ",,,,,\n";
+                continue;
+            }
+            for (const game::CinematicCommand& command : thread.commands) {
+                std::string attributes;
+                for (const game::CinematicAttribute& attribute :
+                     command.attributes) {
+                    if (!attributes.empty()) {
+                        attributes += ';';
+                    }
+                    attributes += attribute.type + ":" + attribute.name +
+                                  "=" + attribute.value;
+                }
+                cinematicAssetLog_
+                    << cinematic.objectId << ',' << csv(cinematic.name) << ','
+                    << csv(cinematic.scriptFile) << ',' << thread.type << ','
+                    << thread.objectId << ',' << csv(thread.name) << ','
+                    << command.timestampMilliseconds << ',' << command.id
+                    << ',' << csv(command.name) << ',' << csv(attributes)
+                    << '\n';
+            }
+        }
+    }
+    cinematicAssetLog_.flush();
 }
 
 void AutoplayHarness::recordAudio(std::uint64_t timeMilliseconds,
@@ -715,6 +836,8 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::WaitGameplay: return "wait_gameplay";
     case StepKind::Wait: return "wait";
     case StepKind::MoveTo: return "move_to";
+    case StepKind::MoveUntilCinematic: return "move_until_cinematic";
+    case StepKind::WaitEnemiesGrounded: return "wait_enemies_grounded";
     case StepKind::Attack: return "attack";
     case StepKind::Jump: return "jump";
     case StepKind::WebOn: return "web_on";

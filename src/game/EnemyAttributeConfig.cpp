@@ -26,6 +26,21 @@ public:
         return true;
     }
 
+    [[nodiscard]] bool s32(std::int32_t& value) noexcept {
+        if (bytes_.size() - offset_ < sizeof(std::uint32_t)) {
+            return false;
+        }
+        std::uint32_t bits{};
+        for (std::size_t index = 0; index < sizeof(bits); ++index) {
+            bits |= static_cast<std::uint32_t>(
+                        std::to_integer<unsigned char>(bytes_[offset_ + index]))
+                    << (index * 8);
+        }
+        offset_ += sizeof(bits);
+        value = static_cast<std::int32_t>(bits);
+        return true;
+    }
+
     [[nodiscard]] bool skip(std::size_t count) noexcept {
         if (count > bytes_.size() - offset_) {
             return false;
@@ -55,11 +70,11 @@ private:
     std::size_t offset_{};
 };
 
-// EnemyAttributeFile::ReadAttributeInfo (0x0033bf00) reads 52 bytes between
-// the exported name and ranged-attack vector, then 48 bytes, a string, and
-// two final 32-bit flags. Those unrelated fields remain deliberately opaque
-// until their consumers provide defensible names.
-constexpr std::size_t kFieldsBeforeRangedAttacks = 52;
+// CEnemy::InitEntityAttribute (0x003373e8) consumes the first two signed
+// 32-bit fields after the exported name as the collision radius and height.
+// ReadAttributeInfo (0x0033bf00) converts both to float in memory. The next
+// 44 bytes remain opaque until their consumers provide defensible names.
+constexpr std::size_t kOpaqueFieldsBeforeRangedAttacks = 44;
 constexpr std::size_t kFieldsBeforeTrailingString = 48;
 constexpr std::size_t kTrailingFlags = 8;
 
@@ -88,16 +103,22 @@ Result EnemyAttributeConfigDatabase::load(std::span<const std::byte> bytes) {
     for (std::int16_t enemyTypeId = 0; enemyTypeId < count; ++enemyTypeId) {
         EnemyAttributeDefinition definition;
         definition.enemyTypeId = enemyTypeId;
+        std::int32_t collisionRadius{};
+        std::int32_t collisionHeight{};
         std::int16_t rangedAttackCount{};
         std::string trailingResourceName;
         if (!reader.s16(definition.exportedId) ||
             !reader.string(definition.name) ||
-            !reader.skip(kFieldsBeforeRangedAttacks) ||
+            !reader.s32(collisionRadius) || !reader.s32(collisionHeight) ||
+            collisionRadius <= 0 || collisionHeight <= 0 ||
+            !reader.skip(kOpaqueFieldsBeforeRangedAttacks) ||
             !reader.s16(rangedAttackCount) || rangedAttackCount < 0 ||
             rangedAttackCount > 1024) {
             definitions_.clear();
             return Result::failure("Enemy attribute config is truncated");
         }
+        definition.collisionRadius = static_cast<float>(collisionRadius);
+        definition.collisionHeight = static_cast<float>(collisionHeight);
         definition.rangedAttackTypeMapIndices.reserve(
             static_cast<std::size_t>(rangedAttackCount));
         for (std::int16_t index = 0; index < rangedAttackCount; ++index) {

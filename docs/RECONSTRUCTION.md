@@ -17,18 +17,27 @@ and captured state wherever practical.
 loop with a fixed synthetic clock and the real level loader, cinematic
 players, gameplay runtimes, D3D11 renderer, and readback path. It does not
 inject OS input. Scenario steps express reconstruction goals (`wait_gameplay`,
-`move_to`, `attack`, `jump`, `web_on`, `web_off`, `teleport`, `capture`, and
-assertions) while directives select the fixed tick, trace/capture cadence,
-render size, and maximum run time. `start_time_ms` fast-forwards persistent
-intro world commands for focused probes while suppressing transient historical
-subtitles and audio that should not be replayed at the skip destination.
+`move_to`, `move_until_cinematic`, `wait_enemies_grounded`, `attack`, `jump`,
+`web_on`, `web_off`, `teleport`, `capture`, and assertions) while directives
+select the fixed tick, trace/capture cadence, render size, and maximum run time.
+`move_until_cinematic` proves that movement crossed the intended authored
+trigger instead of merely reaching a coordinate. `start_time_ms` fast-forwards
+persistent intro world commands for focused probes while suppressing transient
+historical subtitles and audio that should not be replayed at the skip
+destination. The harness acknowledges an active tutorial just as it already
+acknowledges an active QTE, preventing an infinite tutorial timer from masking
+the gameplay state under test; normal user input remains unchanged.
 
 Every sampled frame records player pose, health, animation clock, accepted
 input axes, gameplay camera area and pose, cinematic ownership, restore/QTE
 state, and visible rooms. A companion enemy table records every mutable enemy
 state. The event stream records script steps, trigger and cinematic starts,
 every dispatched cinematic command with attributes, player impacts, state
-transitions, audio requests, teleports, and captures. Scenario completion and
+transitions, audio requests, teleports, and captures. `enemies.csv` also records
+each native collision cylinder, vertical velocity, and grounded state, while
+`cinematics.csv` provides a complete static census of every loaded thread,
+command, timestamp, and typed attribute. Trigger/enemy asset events include
+their complete authored transforms and spawn flags. Scenario completion and
 failures are machine-readable in `summary.txt`. Explicit capture steps and
 periodic D3D11 readbacks make visual regressions timestamp-addressable; review
 still examines those frames in chronological order.
@@ -270,6 +279,41 @@ unrelated 466 ms `punch_right_to_idle` clip. Repeated presses can chain after
 the native frame-3 gate, and every linked state emits its own hit and sound
 frames. Autoplay traces record the active state ID/name and wait until all
 impacts have fired before issuing the next deterministic combo request.
+
+Melee overlap is likewise three-dimensional rather than a planar distance
+shortcut. `EnemyAttributeFile::ReadAttributeInfo` (`0x0033bf00`) reads the
+first two signed fields after each exported enemy name and converts them to
+the collision radius and height consumed by `CEnemy::InitEntityAttribute`
+(`0x003373e8`). Level-one knife, bat, and gun thugs use a 40-by-150 cm
+cylinder, big and hammer thugs use 60-by-180 cm, and Sandman uses 100-by-200
+cm. The portable sector test follows the vertical-cylinder/pie relationship
+of `Physics::testCylinderPie` (`0x003d38f8`) and
+`Physics::testPieCollision` (`0x003d5434`), including target-radius expansion
+at the angular edges. Both player and enemy attacks now require overlapping
+vertical spans, so a staged enemy one storey above the player cannot be hit
+through the ceiling.
+
+`WaitSpawn` is an actual lifecycle flag, not a request to render an enemy at
+its scene coordinate. `CEnemy::ProcessUserAttr` (`0x00332870`) stores the flag
+and initially calls `SetVisible(false)`; `CEnemy::SetVisible` (`0x00330858`)
+clears it when a script reveals the actor. `Unit::UpdatePhysicsWithVisible`
+(`0x00323748`) activates physics only for visible units, and `CEnemy::EnableAI`
+(`0x00330914`) activates the enemy physics entity. `LevelEnemyRuntime` now
+starts those actors hidden, applies the recovered 1000 cm/s-squared downward
+acceleration once visible, and settles their authored cylinders onto the real
+level collision before allowing pursuit or attacks.
+
+The Room 2 regression follows the complete authored chain. Crossing oriented
+trigger 973 starts cinematic 974, which stages the rooftop spider-sense
+exchange, kills temporary actor 400, reveals enemies 398, 399, and 401 at
+4000 ms, shows the temporary web wall, and starts watcher cinematic 1140.
+The three enemies fall from their serialized rooftop staging positions to the
+street under runtime physics. Cinematic 1140 waits for all three native enemy
+death states before opening the web wall and advancing the checkpoint. The
+autoplay probe approaches the trigger from outside, waits for cinematic 974,
+waits for all three enemies to be both visible and grounded, and only then
+uses ordinary authored melee. This keeps route traversal separate while still
+testing the real spawn, presentation, physics, combat, and completion path.
 
 ## Authored room objects
 

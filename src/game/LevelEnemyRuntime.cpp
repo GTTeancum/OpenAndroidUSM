@@ -13,6 +13,9 @@ namespace usm::game {
 namespace {
 
 constexpr float kRadiansToDegrees = 57.29577951308232F;
+constexpr float kPlayerCollisionRadiusCentimeters = 50.0F;
+constexpr float kPlayerCollisionHeightCentimeters = 140.0F;
+constexpr float kEnemyGravityCentimetersPerSecondSquared = 1000.0F;
 constexpr float kGunLineSpeedCentimetersPerSecond = 1500.0F;
 constexpr std::uint32_t kGunLineLifetimeMilliseconds = 2000;
 constexpr float kGunLinePlayerRadiusCentimeters = 60.0F;
@@ -193,6 +196,58 @@ bool crossedLoopEvent(std::uint32_t previousTime,
     return nextOccurrence <= currentTime;
 }
 
+// Physics::testPieCollision (0x003d5434) and testCylinderPie
+// (0x003d38f8) test a vertical cylinder against the attacker's 3D pie
+// volume. Positions are the feet/bottom of each gameplay cylinder.
+bool cylinderSectorIntersects(const assets::Vector3& attackPosition,
+                              float attackHeight,
+                              const assets::Vector3& attackDirection,
+                              float attackRadius,
+                              float minimumAngleDegrees,
+                              float maximumAngleDegrees,
+                              const assets::Vector3& targetPosition,
+                              float targetRadius,
+                              float targetHeight) noexcept {
+    if (attackHeight <= 0.0F || attackRadius <= 0.0F ||
+        targetRadius < 0.0F || targetHeight <= 0.0F) {
+        return false;
+    }
+    const float attackTop = attackPosition.z + attackHeight;
+    const float targetTop = targetPosition.z + targetHeight;
+    if (attackTop < targetPosition.z || targetTop < attackPosition.z) {
+        return false;
+    }
+
+    const float x = targetPosition.x - attackPosition.x;
+    const float y = targetPosition.y - attackPosition.y;
+    const float distance = std::hypot(x, y);
+    if (distance > attackRadius + targetRadius) {
+        return false;
+    }
+    if (distance <= targetRadius ||
+        distance <= std::numeric_limits<float>::epsilon()) {
+        return true;
+    }
+
+    const float directionLength =
+        std::hypot(attackDirection.x, attackDirection.y);
+    if (directionLength <= std::numeric_limits<float>::epsilon()) {
+        return true;
+    }
+    const float forward =
+        (attackDirection.x * x + attackDirection.y * y) /
+        (directionLength * distance);
+    const float side =
+        (attackDirection.x * y - attackDirection.y * x) /
+        (directionLength * distance);
+    const float centerAngle = std::atan2(side, forward) * kRadiansToDegrees;
+    const float angularRadius =
+        std::asin(std::clamp(targetRadius / distance, 0.0F, 1.0F)) *
+        kRadiansToDegrees;
+    return centerAngle + angularRadius >= minimumAngleDegrees &&
+           centerAngle - angularRadius <= maximumAngleDegrees;
+}
+
 } // namespace
 
 Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
@@ -208,6 +263,13 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
             states_.clear();
             return Result::failure("Enemy archetype index is invalid");
         }
+        const EnemyAttributeDefinition* attributes =
+            level.enemyAttributeConfigs().find(enemy.enemyTypeId);
+        if (attributes == nullptr || attributes->collisionRadius <= 0.0F ||
+            attributes->collisionHeight <= 0.0F) {
+            states_.clear();
+            return Result::failure("Enemy collision dimensions are invalid");
+        }
         states_.push_back({&enemy,
                            enemy.position,
                            facingFromMatrix(enemy.worldTransform),
@@ -217,8 +279,12 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
                            1.0F,
                            true,
                            false,
+                           attributes->collisionRadius,
+                           attributes->collisionHeight,
+                           0.0F,
+                           false,
                            enemy.health,
-                           enemy.visible,
+                           enemy.visible && !enemy.waitSpawn,
                            enemy.aiEnabled,
                            false,
                            enemy.aiEnabled ? EnemyBehaviorState::Idle
@@ -302,7 +368,57 @@ void LevelEnemyRuntime::updateGameplay(
             enemy.animationLoops = true;
             enemy.animationReversed = false;
         }
-        if (!enemy.visible || !enemy.aiEnabled) {
+        if (!enemy.visible) {
+            enemy.behavior = EnemyBehaviorState::Disabled;
+            continue;
+        }
+
+        // WaitSpawn enemies begin hidden in CEnemy::ProcessUserAttr
+        // (0x00332870). Once CEnemy::SetVisible (0x00330858) reveals them,
+        // Unit::UpdatePhysicsWithVisible (0x00323748) activates their capsule
+        // and Bullet gravity settles it onto level collision.
+        if (collision != nullptr) {
+            const float seconds =
+                static_cast<float>(elapsedMilliseconds) / 1000.0F;
+            float supportHeight = 0.0F;
+            const bool alreadySupported =
+                enemy.verticalVelocity <= 0.0F &&
+                collision->groundHeight(enemy.position, 5.0F, 5.0F,
+                                        supportHeight) &&
+                std::abs(enemy.position.z - supportHeight) <= 5.0F;
+            if (alreadySupported) {
+                enemy.position.z = supportHeight;
+                enemy.verticalVelocity = 0.0F;
+                enemy.grounded = true;
+            } else {
+                const float nextVelocity =
+                    enemy.verticalVelocity -
+                    kEnemyGravityCentimetersPerSecondSquared * seconds;
+                assets::Vector3 desired = enemy.position;
+                desired.z +=
+                    (enemy.verticalVelocity + nextVelocity) * 0.5F * seconds;
+                const float fallDistance =
+                    std::max(enemy.position.z - desired.z, 0.0F);
+                const bool crossedSupport = collision->groundHeight(
+                    desired, fallDistance + 5.0F, 5.0F, supportHeight);
+                if (crossedSupport && supportHeight <= enemy.position.z + 5.0F &&
+                    desired.z <= supportHeight) {
+                    enemy.position.z = supportHeight;
+                    enemy.verticalVelocity = 0.0F;
+                    enemy.grounded = true;
+                } else {
+                    enemy.position = desired;
+                    enemy.verticalVelocity = nextVelocity;
+                    enemy.grounded = false;
+                }
+            }
+            setFacing(enemy, enemy.facing);
+            if (!enemy.grounded) {
+                enemy.behavior = EnemyBehaviorState::Idle;
+                continue;
+            }
+        }
+        if (!enemy.aiEnabled) {
             enemy.behavior = EnemyBehaviorState::Disabled;
             continue;
         }
@@ -441,15 +557,10 @@ std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
         return std::nullopt;
     }
     LevelEnemyState* nearest = nullptr;
-    float nearestDistanceSquared = radius * radius;
-    const float directionLength = std::hypot(attackDirection.x,
-                                             attackDirection.y);
-    const float directionX = directionLength > 1e-5F
-                                 ? attackDirection.x / directionLength
-                                 : 0.0F;
-    const float directionY = directionLength > 1e-5F
-                                 ? attackDirection.y / directionLength
-                                 : 0.0F;
+    float nearestDistanceSquared = std::numeric_limits<float>::max();
+    const float halfAngleDegrees =
+        std::acos(std::clamp(minimumForwardDot, -1.0F, 1.0F)) *
+        kRadiansToDegrees;
     for (LevelEnemyState& enemy : states_) {
         if (enemy.asset == nullptr || !enemy.visible || enemy.health <= 0.0F) {
             continue;
@@ -457,15 +568,12 @@ std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
         const float x = enemy.position.x - attackPosition.x;
         const float y = enemy.position.y - attackPosition.y;
         const float distanceSquared = x * x + y * y;
-        if (distanceSquared > 1e-5F && directionLength > 1e-5F) {
-            const float inverseDistance = 1.0F / std::sqrt(distanceSquared);
-            const float forwardDot =
-                (x * directionX + y * directionY) * inverseDistance;
-            if (forwardDot < minimumForwardDot) {
-                continue;
-            }
-        }
-        if (distanceSquared <= nearestDistanceSquared) {
+        if (cylinderSectorIntersects(
+                attackPosition, kPlayerCollisionHeightCentimeters,
+                attackDirection, radius, -halfAngleDegrees, halfAngleDegrees,
+                enemy.position, enemy.collisionRadius,
+                enemy.collisionHeight) &&
+            distanceSquared <= nearestDistanceSquared) {
             nearest = &enemy;
             nearestDistanceSquared = distanceSquared;
         }
@@ -609,25 +717,13 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
         if (attack == nullptr) {
             continue;
         }
-        const float toPlayerX = playerPosition.x - enemy.position.x;
-        const float toPlayerY = playerPosition.y - enemy.position.y;
-        const float distance = std::hypot(toPlayerX, toPlayerY);
-        if (distance > attack->maximumReach()) {
+        if (!cylinderSectorIntersects(
+                enemy.position, enemy.collisionHeight, enemy.facing,
+                attack->maximumReach(), attack->minimumAngleDegrees,
+                attack->maximumAngleDegrees, playerPosition,
+                kPlayerCollisionRadiusCentimeters,
+                kPlayerCollisionHeightCentimeters)) {
             continue;
-        }
-        if (distance > std::numeric_limits<float>::epsilon()) {
-            const float inverseDistance = 1.0F / distance;
-            const float forwardDot =
-                enemy.facing.x * toPlayerX * inverseDistance +
-                enemy.facing.y * toPlayerY * inverseDistance;
-            const float side = enemy.facing.x * toPlayerY * inverseDistance -
-                               enemy.facing.y * toPlayerX * inverseDistance;
-            const float angleDegrees =
-                std::atan2(side, forwardDot) * kRadiansToDegrees;
-            if (angleDegrees < attack->minimumAngleDegrees ||
-                angleDegrees > attack->maximumAngleDegrees) {
-                continue;
-            }
         }
         pendingPlayerHits_.push_back(
             {enemy.asset->objectId, attackId, attack->damage});
@@ -814,6 +910,10 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         const CinematicAttribute* visible = command.findAttribute("Visible");
         enemy->visible =
             visible == nullptr ? true : parseBool(visible->value, true);
+        if (enemy->visible) {
+            enemy->verticalVelocity = 0.0F;
+            enemy->grounded = false;
+        }
         return Result::success();
     }
     if (command.name == "SetAnim") {
@@ -853,6 +953,8 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         } else if (local != nullptr) {
             enemy->position = parseVector3(local->value, enemy->position);
         }
+        enemy->verticalVelocity = 0.0F;
+        enemy->grounded = false;
         const assets::Quaternion orientation =
             rotation == nullptr ? enemy->asset->rotation
                                 : parseQuaternion(rotation->value);

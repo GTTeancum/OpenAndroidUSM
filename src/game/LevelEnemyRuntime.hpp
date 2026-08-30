@@ -34,6 +34,10 @@ struct LevelEnemyState {
     float animationSpeed{1.0F};
     bool animationLoops{true};
     bool animationReversed{};
+    float collisionRadius{};
+    float collisionHeight{};
+    float verticalVelocity{};
+    bool grounded{};
     float health{};
     bool visible{};
     bool aiEnabled{};

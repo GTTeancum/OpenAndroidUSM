@@ -1,21 +1,19 @@
-# Isolated room-two probe. The teleport removes route navigation from this
-# experiment while retaining normal combat, animation, cinematic, rendering,
-# and traced audio behavior.
+# Enter room two through authored trigger 973. Cinematic 974 performs the
+# rooftop spider-sense exchange, kills actor 400, reveals the three staged
+# enemies, and activates their physics before combat begins.
 fixed_step_ms 50
 sample_interval_ms 50
-capture_interval_ms 2500
-max_time_ms 105000
+capture_interval_ms 1000
+max_time_ms 120000
 start_time_ms 53033
 render_size 1280 720
 
 wait_gameplay 60000
-teleport 7575 -6305 1042 0 1 0
-capture second-encounter-start
-attack 12000 135 398
-teleport 8022 -6188 1037 0 -1 0
-attack 12000 135 399
-teleport 7511 -5996 1037 0 1 0
-attack 12000 135 401
+teleport 8800 -5860 7 -1 0 0
+move_until_cinematic 8430 -5710 7 974 5000
+wait_enemies_grounded 10000 398 399 401
+capture second-encounter-landed
+attack 30000 135 398 399 401
 capture second-encounter-cleared
 assert_health_above 0
 finish

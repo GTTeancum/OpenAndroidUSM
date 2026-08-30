@@ -26,6 +26,7 @@ struct AutoplaySnapshot {
     bool gameplayActive{};
     bool controlsEnabled{};
     bool quickTimeEventActive{};
+    bool tutorialVisible{};
     bool restoreActive{};
     float restoreAlpha{};
     std::int32_t cameraAreaId{-1};
@@ -74,6 +75,8 @@ public:
     void recordCommand(std::uint64_t timeMilliseconds,
                        std::int32_t threadObjectId,
                        const game::CinematicCommand& command);
+    void recordCinematicAssets(
+        std::span<const game::LevelCinematicAsset> cinematics);
     void recordAudio(std::uint64_t timeMilliseconds, std::string_view action,
                      std::string_view eventName, bool loop = false,
                      bool spatial = false);
@@ -113,6 +116,8 @@ private:
         WaitGameplay,
         Wait,
         MoveTo,
+        MoveUntilCinematic,
+        WaitEnemiesGrounded,
         Attack,
         Jump,
         WebOn,
@@ -143,6 +148,7 @@ private:
         bool playerDetected{};
         game::EnemyBehaviorState behavior{game::EnemyBehaviorState::Disabled};
         std::string animation;
+        bool grounded{};
     };
 
     [[nodiscard]] Result parseScript(const std::filesystem::path& scriptPath);
@@ -164,6 +170,7 @@ private:
     std::ofstream frameLog_;
     std::ofstream enemyLog_;
     std::ofstream eventLog_;
+    std::ofstream cinematicAssetLog_;
     std::vector<Step> steps_;
     std::size_t activeStepIndex_{};
     std::optional<std::uint64_t> activeStepStartMilliseconds_;

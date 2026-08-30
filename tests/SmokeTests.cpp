@@ -96,6 +96,7 @@ int main() {
                   "render_size 320 180\n"
                   "wait_gameplay 50\n"
                   "teleport 1 2 3 0 1 0\n"
+                  "move_until_cinematic 4 5 6 974 50\n"
                   "capture smoke-frame\n"
                   "finish\n";
     }
@@ -110,17 +111,21 @@ int main() {
     autoplaySnapshot.gameplayActive = true;
     autoplaySnapshot.controlsEnabled = true;
     autoplaySnapshot.playerHealth = 100.0F;
+    autoplaySnapshot.tutorialVisible = true;
     autoplaySnapshot.realTimeMilliseconds = 100;
-    (void)autoplayHarness.update(autoplaySnapshot);
+    assert(autoplayHarness.update(autoplaySnapshot).quickTimeEventPressed);
     autoplaySnapshot.realTimeMilliseconds = 125;
     const auto teleportInput = autoplayHarness.update(autoplaySnapshot);
     assert(teleportInput.teleport.has_value());
     assert(teleportInput.teleport->position.x == 1.0F);
     autoplaySnapshot.realTimeMilliseconds = 150;
+    autoplaySnapshot.activeCinematicId = 974;
+    (void)autoplayHarness.update(autoplaySnapshot);
+    autoplaySnapshot.realTimeMilliseconds = 175;
     const auto captureInput = autoplayHarness.update(autoplaySnapshot);
     assert(captureInput.captureLabels.size() == 1);
     assert(captureInput.captureLabels.front() == "smoke-frame");
-    autoplaySnapshot.realTimeMilliseconds = 175;
+    autoplaySnapshot.realTimeMilliseconds = 200;
     (void)autoplayHarness.update(autoplaySnapshot);
     assert(autoplayHarness.complete());
     autoplayHarness.finish(true, "smoke complete");
@@ -1680,15 +1685,23 @@ int main() {
         assert(enemyAttributes.definitions().size() == 25);
         const auto* gunThugAttributes = enemyAttributes.find(3);
         const auto* bigThugAttributes = enemyAttributes.find(4);
+        const auto* sandmanAttributes = enemyAttributes.find(16);
         assert(gunThugAttributes != nullptr &&
                gunThugAttributes->exportedId == 3 &&
                gunThugAttributes->name == "THUG_GUN" &&
+               gunThugAttributes->collisionRadius == 40.0F &&
+               gunThugAttributes->collisionHeight == 150.0F &&
                gunThugAttributes->rangedAttackTypeMapIndices ==
                    std::vector<std::int32_t>{4});
         assert(bigThugAttributes != nullptr &&
                bigThugAttributes->name == "THUG_BIG" &&
+               bigThugAttributes->collisionRadius == 60.0F &&
+               bigThugAttributes->collisionHeight == 180.0F &&
                bigThugAttributes->rangedAttackTypeMapIndices ==
                    std::vector<std::int32_t>{6});
+        assert(sandmanAttributes != nullptr &&
+               sandmanAttributes->collisionRadius == 100.0F &&
+               sandmanAttributes->collisionHeight == 200.0F);
         assert(usm::game::resolveEnemyRangeWeaponType(4) == 13);
         assert(usm::game::resolveEnemyRangeWeaponType(6) == 17);
         const auto& attackIntervals = bootstrap.enemyAttackIntervalConfigs();
@@ -2463,6 +2476,42 @@ int main() {
         enemySoundCues = enemyAttackRuntime.consumeSoundCues();
         assert(enemySoundCues.size() == 1);
         assert(enemySoundCues.front().voxSoundId == 178);
+        usm::game::LevelEnemyRuntime spawnRuntime;
+        assert(spawnRuntime.initialize(bootstrap));
+        assert(!spawnRuntime.find(398)->visible);
+        assert(!spawnRuntime.find(399)->visible);
+        assert(!spawnRuntime.find(400)->visible);
+        assert(!spawnRuntime.find(401)->visible);
+        const auto secondEncounterCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 974;
+            });
+        assert(secondEncounterCinematic != bootstrap.cinematics().end());
+        usm::game::CinematicPlayer secondEncounterPlayer;
+        assert(secondEncounterPlayer.start(secondEncounterCinematic->script));
+        usm::Result secondEncounterResult = usm::Result::success();
+        assert(secondEncounterPlayer.advanceTo(
+            4000, [&](const usm::game::CinematicThread& thread,
+                      const usm::game::CinematicCommand& command) {
+                if (secondEncounterResult) {
+                    secondEncounterResult =
+                        spawnRuntime.applyCinematicCommand(
+                            bootstrap, thread, command);
+                }
+            }));
+        assert(secondEncounterResult);
+        usm::game::LevelCollision spawnCollision;
+        assert(spawnCollision.build(bootstrap.rooms()));
+        for (int frame = 0; frame < 40; ++frame) {
+            spawnRuntime.updateGameplay(50, {}, &spawnCollision);
+        }
+        for (const std::int32_t objectId : {398, 399, 401}) {
+            const auto* spawnedEnemy = spawnRuntime.find(objectId);
+            assert(spawnedEnemy != nullptr && spawnedEnemy->visible);
+            assert(spawnedEnemy->grounded);
+            assert(spawnedEnemy->position.z < 100.0F);
+        }
         usm::game::LevelEnemyRuntime damageRuntime;
         assert(damageRuntime.initialize(bootstrap));
         const auto* damageTarget = damageRuntime.find(394);
@@ -2470,6 +2519,12 @@ int main() {
         const usm::assets::Vector3 damagePosition = damageTarget->position;
         const usm::assets::Vector3 attackPosition{
             damagePosition.x - 100.0F, damagePosition.y, damagePosition.z};
+        const usm::assets::Vector3 verticallySeparatedAttackPosition{
+            attackPosition.x, attackPosition.y,
+            attackPosition.z + 1000.0F};
+        assert(!damageRuntime.applyPlayerMeleeHit(
+            verticallySeparatedAttackPosition, {1.0F, 0.0F, 0.0F},
+            200.0F, 100.0F));
         assert(!damageRuntime.applyPlayerMeleeHit(
             attackPosition, {-1.0F, 0.0F, 0.0F}, 200.0F, 100.0F));
         const auto firstHit = damageRuntime.applyPlayerMeleeHit(

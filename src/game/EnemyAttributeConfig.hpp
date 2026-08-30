@@ -17,6 +17,8 @@ struct EnemyAttributeDefinition {
     std::int16_t exportedId{-1};
     std::int16_t enemyTypeId{-1};
     std::string name;
+    float collisionRadius{};
+    float collisionHeight{};
     std::vector<std::int32_t> rangedAttackTypeMapIndices;
 };
 

@@ -153,6 +153,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         return fail(result.message());
     }
     if (autoplay) {
+        autoplay->recordCinematicAssets(levelOne_.cinematics());
         for (const game::LevelTriggerAsset& trigger : levelOne_.triggers()) {
             autoplay->recordEvent(
                 0, "trigger_asset",
@@ -165,6 +166,15 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     ";size_x=" + std::to_string(trigger.sizes.x) +
                     ";size_y=" + std::to_string(trigger.sizes.y) +
                     ";size_z=" + std::to_string(trigger.sizes.z) +
+                    ";scale_x=" + std::to_string(trigger.scale.x) +
+                    ";scale_y=" + std::to_string(trigger.scale.y) +
+                    ";scale_z=" + std::to_string(trigger.scale.z) +
+                    ";rotation_x=" + std::to_string(trigger.rotation.x) +
+                    ";rotation_y=" + std::to_string(trigger.rotation.y) +
+                    ";rotation_z=" + std::to_string(trigger.rotation.z) +
+                    ";rotation_w=" + std::to_string(trigger.rotation.w) +
+                    ";oriented=" +
+                    std::to_string(trigger.orientedBox) +
                     ";enabled=" + std::to_string(trigger.enabled) +
                     ";auto_disabled=" +
                     std::to_string(trigger.autoDisabled) +
@@ -178,12 +188,28 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     std::to_string(trigger.whileOutsideCinematicId));
         }
         for (const game::LevelEnemyAsset& enemy : levelOne_.enemies()) {
+            const game::EnemyAttributeDefinition* attributes =
+                levelOne_.enemyAttributeConfigs().find(enemy.enemyTypeId);
             autoplay->recordEvent(
                 0, "enemy_asset",
-                "object=" + std::to_string(enemy.objectId) +
-                    ";room=" + std::to_string(enemy.roomId) +
-                    ";type=" + std::to_string(enemy.enemyTypeId) +
-                    ";visible=" + std::to_string(enemy.visible) +
+                 "object=" + std::to_string(enemy.objectId) +
+                     ";room=" + std::to_string(enemy.roomId) +
+                     ";type=" + std::to_string(enemy.enemyTypeId) +
+                     ";x=" + std::to_string(enemy.position.x) +
+                     ";y=" + std::to_string(enemy.position.y) +
+                     ";z=" + std::to_string(enemy.position.z) +
+                     ";scale_x=" + std::to_string(enemy.scale.x) +
+                     ";scale_y=" + std::to_string(enemy.scale.y) +
+                     ";scale_z=" + std::to_string(enemy.scale.z) +
+                     ";radius=" +
+                     std::to_string(attributes == nullptr
+                                        ? 0.0F
+                                        : attributes->collisionRadius) +
+                     ";height=" +
+                     std::to_string(attributes == nullptr
+                                        ? 0.0F
+                                        : attributes->collisionHeight) +
+                     ";visible=" + std::to_string(enemy.visible) +
                     ";ai=" + std::to_string(enemy.aiEnabled) +
                     ";wait_spawn=" + std::to_string(enemy.waitSpawn));
         }
@@ -653,6 +679,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayActive,
                  harnessControlsEnabled,
                  quickTimeEvent_.active(),
+                 cinematicUi_.tutorialVisible(),
                  restoreRuntime_.active(),
                  restoreRuntime_.blackOverlayAlpha(),
                  gameplayCamera_.currentAreaId(),
@@ -1392,6 +1419,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayActive,
                  finalControlsEnabled,
                  quickTimeEvent_.active(),
+                 cinematicUi_.tutorialVisible(),
                  restoreRuntime_.active(),
                  restoreRuntime_.blackOverlayAlpha(),
                  gameplayCamera_.currentAreaId(),
