@@ -405,6 +405,52 @@ int main() {
                     encounterFrame.pixels[component + 2];
         }
         assert(chaseChangedPixels > 100);
+
+        const usm::assets::Vector3 enemyHitOrigin{
+            chasingEnemy->position.x - 100.0F, chasingEnemy->position.y,
+            chasingEnemy->position.z};
+        assert(enemies.applyPlayerMeleeHit(
+            enemyHitOrigin, {1.0F, 0.0F, 0.0F}, 200.0F, 35.0F));
+        chasingEnemy = enemies.find(394);
+        assert(chasingEnemy->behavior ==
+               usm::game::EnemyBehaviorState::Hurt);
+        const auto* hurtClip =
+            levelOne.enemyArchetypes()[chasingEnemy->asset->archetypeIndex]
+                .animationBank.findClip(chasingEnemy->activeAnimation);
+        assert(hurtClip != nullptr);
+        enemies.advanceAnimations(hurtClip->durationMilliseconds() / 2U);
+        assert(gameRenderer.updateLevelOneEnemies(levelOne, enemies));
+        gameRenderer.renderFrame();
+        RgbaImage hurtFrame;
+        assert(gameRenderer.readBackImage(hurtFrame));
+        captureIfRequested(hurtFrame, "gameplay-enemy-hurt.bmp");
+
+        assert(enemies.applyPlayerMeleeHit(
+            enemyHitOrigin, {1.0F, 0.0F, 0.0F}, 200.0F, 1000.0F));
+        chasingEnemy = enemies.find(394);
+        assert(chasingEnemy->behavior ==
+               usm::game::EnemyBehaviorState::Dead);
+        const auto* deathClip =
+            levelOne.enemyArchetypes()[chasingEnemy->asset->archetypeIndex]
+                .animationBank.findClip(chasingEnemy->activeAnimation);
+        assert(deathClip != nullptr);
+        enemies.advanceAnimations(deathClip->durationMilliseconds() + 500U);
+        assert(gameRenderer.updateLevelOneEnemies(levelOne, enemies));
+        gameRenderer.renderFrame();
+        RgbaImage deathFrame;
+        assert(gameRenderer.readBackImage(deathFrame));
+        captureIfRequested(deathFrame, "gameplay-enemy-death.bmp");
+        std::size_t deathChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < deathFrame.pixels.size(); component += 4) {
+            deathChangedPixels +=
+                deathFrame.pixels[component] != hurtFrame.pixels[component] ||
+                deathFrame.pixels[component + 1] !=
+                    hurtFrame.pixels[component + 1] ||
+                deathFrame.pixels[component + 2] !=
+                    hurtFrame.pixels[component + 2];
+        }
+        assert(deathChangedPixels > 100);
     }
     return 0;
 }

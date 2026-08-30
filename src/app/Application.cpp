@@ -74,6 +74,13 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    constexpr std::array<std::int16_t, 2> firstLevelEnemyTypes{0, 1};
+    result = enemySounds_.preload(
+        levelOne_.enemyBehaviorConfigs(), levelOne_.enemySpecialActions(),
+        voxSounds_, soundCatalog_, firstLevelEnemyTypes);
+    if (!result) {
+        return fail(result.message());
+    }
     result = introSounds_.preload(levelOne_.introScript(), soundCatalog_);
     if (!result) {
         return fail(result.message());
@@ -251,6 +258,14 @@ int Application::run(HINSTANCE instance) {
             enemyRuntime_.updateGameplay(deltaMilliseconds,
                                          gameplayPlayer_.position(),
                                          &levelCollision_);
+            for (const game::EnemySoundCue& cue :
+                 enemyRuntime_.consumeSoundCues()) {
+                result = enemySounds_.dispatch(cue.voxSoundId,
+                                               playGameplaySound);
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
             for (const game::EnemyMeleeHit& hit :
                  enemyRuntime_.consumePlayerHits()) {
                 if (gameplayPlayer_.applyDamage(hit.damage)) {

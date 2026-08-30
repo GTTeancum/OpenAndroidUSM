@@ -2,6 +2,7 @@
 
 #include "audio/xaudio2/XAudio2System.hpp"
 #include "audio/CinematicSoundBank.hpp"
+#include "audio/EnemyBehaviorSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
 #include "audio/VoxSoundTable.hpp"
 #include "audio/PlayerStateSoundBank.hpp"
@@ -37,6 +38,7 @@ private:
     audio::VoxSoundTable voxSounds_;
     audio::SoundEventCatalog soundCatalog_;
     audio::PlayerStateSoundBank playerSounds_;
+    audio::EnemyBehaviorSoundBank enemySounds_;
     audio::CinematicSoundBank introSounds_;
     game::CinematicPlayer introPlayer_;
     game::GameplayCamera gameplayCamera_;

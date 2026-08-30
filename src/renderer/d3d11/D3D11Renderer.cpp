@@ -794,8 +794,11 @@ Result D3D11Renderer::updateLevelOneEnemies(
         const std::uint32_t localTime =
             clip->durationMilliseconds() == 0
                 ? 0
-                : enemy.animationTimeMilliseconds %
-                      clip->durationMilliseconds();
+                : enemy.animationLoops
+                      ? enemy.animationTimeMilliseconds %
+                            clip->durationMilliseconds()
+                      : std::min(enemy.animationTimeMilliseconds,
+                                 clip->durationMilliseconds());
         std::vector<assets::ColladaGeometry> animatedGeometry;
         Result result = assets::evaluateColladaPose(
             archetype.mesh, archetype.animationBank,

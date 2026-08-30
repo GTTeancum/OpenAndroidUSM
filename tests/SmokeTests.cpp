@@ -7,6 +7,7 @@
 #include "assets/IrrScene.hpp"
 #include "assets/SpriteAtlas.hpp"
 #include "audio/OggAudio.hpp"
+#include "audio/EnemyBehaviorSoundBank.hpp"
 #include "audio/PlayerStateSoundBank.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
@@ -450,6 +451,38 @@ int main() {
         assert(normalAttack->minimumAngleDegrees == -90.0F);
         assert(normalAttack->maximumAngleDegrees == 90.0F);
         assert(bootstrap.enemySpecialActions().actions().size() == 230);
+        const auto& behaviorConfigs = bootstrap.enemyBehaviorConfigs();
+        assert(behaviorConfigs.animationMaps().size() == 239);
+        assert(behaviorConfigs.animationLists().size() == 202);
+        assert(behaviorConfigs.soundMaps().size() == 63);
+        assert(behaviorConfigs.states().size() == 221);
+        const auto* commonHurtState = behaviorConfigs.findState(
+            "ENEMY_BEHAVIOR_HURT_STATE_COMMON");
+        assert(commonHurtState != nullptr);
+        assert(commonHurtState->id == 49);
+        assert(commonHurtState->animationListIds ==
+               std::vector<std::int16_t>{28});
+        assert(commonHurtState->soundMapIds ==
+               (std::vector<std::int16_t>{12, 13, 14}));
+        assert(behaviorConfigs.resolveStateAnimationNames(
+                   commonHurtState->name, 0) ==
+               (std::vector<std::string_view>{"idle_hurt_idle",
+                                               "idle_hurt_left_idle",
+                                               "idle_hurt_right_idle"}));
+        assert(behaviorConfigs.resolveStateSoundIds(commonHurtState->name,
+                                                    0) ==
+               (std::vector<std::int32_t>{185, 186, 187}));
+        assert(behaviorConfigs.resolveStateSoundIds(commonHurtState->name,
+                                                    1) ==
+               (std::vector<std::int32_t>{189, 190, 191}));
+        assert(behaviorConfigs.resolveStateAnimationNames(
+                   "ENEMY_BEHAVIOR_DEAD_STATE", 0) ==
+               std::vector<std::string_view>{"idle_onground"});
+        assert(behaviorConfigs.resolveStateSoundIds(
+                   "ENEMY_BEHAVIOR_DEAD_STATE", 0) ==
+               std::vector<std::int32_t>{188});
+        assert(behaviorConfigs.resolveSoundMap(16, 0) == 178);
+        assert(behaviorConfigs.resolveSoundMap(16, 1) == 178);
         const auto knifeAttackEvents =
             bootstrap.enemySpecialActions().findAttackEvents(
                 0, "idle_knife_at_idle");
@@ -457,8 +490,8 @@ int main() {
         assert(knifeAttackEvents[0]->name == "THUG_KNIFE_01");
         assert(knifeAttackEvents[0]->keyFramePercent == 45);
         assert(knifeAttackEvents[0]->attackId == 6);
-        assert(knifeAttackEvents[0]->nextActionIds.size() == 1);
-        assert(knifeAttackEvents[0]->nextActionIds.front() == 16);
+        assert(knifeAttackEvents[0]->soundMapIds.size() == 1);
+        assert(knifeAttackEvents[0]->soundMapIds.front() == 16);
         assert(knifeAttackEvents[1]->keyFramePercent == 75);
         const auto batAttackEvents =
             bootstrap.enemySpecialActions().findAttackEvents(
@@ -467,6 +500,23 @@ int main() {
         assert(batAttackEvents.front()->name == "THUG_BAT_01");
         assert(batAttackEvents.front()->keyFramePercent == 47);
         assert(batAttackEvents.front()->attackId == 7);
+        usm::audio::EnemyBehaviorSoundBank enemySounds;
+        constexpr std::array<std::int16_t, 2> firstLevelEnemyTypes{0, 1};
+        assert(enemySounds.preload(behaviorConfigs,
+                                   bootstrap.enemySpecialActions(),
+                                   voxSounds, soundCatalog,
+                                   firstLevelEnemyTypes));
+        assert(enemySounds.decodedSoundCount() == 9);
+        std::size_t enemySoundPlayCount = 0;
+        assert(enemySounds.dispatch(
+            185, [&enemySoundPlayCount](const usm::audio::PcmAudio& clip,
+                                        bool loop) {
+                assert(clip.frameCount() > 0);
+                assert(!loop);
+                ++enemySoundPlayCount;
+                return usm::Result::success();
+            }));
+        assert(enemySoundPlayCount == 1);
         assert(bootstrap.triggers().size() == 15);
         const auto firstEncounterTrigger = std::find_if(
             bootstrap.triggers().begin(), bootstrap.triggers().end(),
@@ -633,6 +683,10 @@ int main() {
         assert(firstKnifeHit != enemyHits.end());
         assert(firstKnifeHit->attackId == 6);
         assert(firstKnifeHit->damage == 25.0F);
+        auto enemySoundCues = enemyAttackRuntime.consumeSoundCues();
+        assert(enemySoundCues.size() == 1);
+        assert(enemySoundCues.front().sourceObjectId == 394);
+        assert(enemySoundCues.front().voxSoundId == 178);
         enemyAttackRuntime.updateGameplay(secondKnifeImpact - firstKnifeImpact,
                                           knifeVictim);
         enemyHits = enemyAttackRuntime.consumePlayerHits();
@@ -644,6 +698,9 @@ int main() {
         assert(secondKnifeHit != enemyHits.end());
         assert(secondKnifeHit->attackId == 6);
         assert(secondKnifeHit->damage == 25.0F);
+        enemySoundCues = enemyAttackRuntime.consumeSoundCues();
+        assert(enemySoundCues.size() == 1);
+        assert(enemySoundCues.front().voxSoundId == 178);
         usm::game::LevelEnemyRuntime damageRuntime;
         assert(damageRuntime.initialize(bootstrap));
         const auto* damageTarget = damageRuntime.find(394);
@@ -657,6 +714,13 @@ int main() {
             attackPosition, {1.0F, 0.0F, 0.0F}, 200.0F, 100.0F);
         assert(firstHit && *firstHit == 394);
         assert(damageRuntime.find(394)->health == 400.0F);
+        assert(damageRuntime.find(394)->behavior ==
+               usm::game::EnemyBehaviorState::Hurt);
+        assert(damageRuntime.find(394)->activeAnimation == "idle_hurt_idle");
+        assert(!damageRuntime.find(394)->animationLoops);
+        enemySoundCues = damageRuntime.consumeSoundCues();
+        assert(enemySoundCues.size() == 1);
+        assert(enemySoundCues.front().voxSoundId == 185);
         for (int hit = 0; hit < 4; ++hit) {
             assert(damageRuntime.applyPlayerMeleeHit(
                 attackPosition, {1.0F, 0.0F, 0.0F}, 200.0F, 100.0F));
@@ -664,7 +728,14 @@ int main() {
         damageTarget = damageRuntime.find(394);
         assert(damageTarget->health == 0.0F);
         assert(damageTarget->behavior == usm::game::EnemyBehaviorState::Dead);
-        assert(damageTarget->activeAnimation == "knockback_to_onground");
+        assert(damageTarget->activeAnimation == "idle_onground");
+        assert(!damageTarget->animationLoops);
+        enemySoundCues = damageRuntime.consumeSoundCues();
+        assert(enemySoundCues.size() == 4);
+        assert(enemySoundCues[0].voxSoundId == 186);
+        assert(enemySoundCues[1].voxSoundId == 187);
+        assert(enemySoundCues[2].voxSoundId == 185);
+        assert(enemySoundCues[3].voxSoundId == 188);
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(bootstrap.introRooms()));
         assert(levelCollision.triangleCount() > 100);

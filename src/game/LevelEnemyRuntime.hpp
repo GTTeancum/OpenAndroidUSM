@@ -20,6 +20,7 @@ enum class EnemyBehaviorState {
     Idle,
     Chasing,
     AttackRange,
+    Hurt,
     Dead,
 };
 
@@ -31,17 +32,25 @@ struct LevelEnemyState {
     std::string activeAnimation;
     std::uint32_t animationTimeMilliseconds{};
     float animationSpeed{1.0F};
+    bool animationLoops{true};
     float health{};
     bool visible{};
     bool aiEnabled{};
     bool playerDetected{};
     EnemyBehaviorState behavior{EnemyBehaviorState::Disabled};
+    std::uint32_t hurtVariantCursor{};
+    std::uint32_t soundVariantCursor{};
 };
 
 struct EnemyMeleeHit {
     std::int32_t sourceObjectId{-1};
     std::int16_t attackId{-1};
     float damage{};
+};
+
+struct EnemySoundCue {
+    std::int32_t sourceObjectId{-1};
+    std::int32_t voxSoundId{-1};
 };
 
 // Mutable native state for the authored enemy objects. Cinematic command names
@@ -58,6 +67,7 @@ public:
         const assets::Vector3& attackDirection, float radius, float damage,
         float minimumForwardDot = 0.0F) noexcept;
     [[nodiscard]] std::vector<EnemyMeleeHit> consumePlayerHits() noexcept;
+    [[nodiscard]] std::vector<EnemySoundCue> consumeSoundCues() noexcept;
     [[nodiscard]] Result applyCinematicCommand(
         const LevelOneBootstrap& level, const CinematicThread& thread,
         const CinematicCommand& command);
@@ -75,9 +85,15 @@ private:
     void queueAuthoredAttackEvents(LevelEnemyState& enemy,
                                    std::uint32_t previousTimeMilliseconds,
                                    const assets::Vector3& playerPosition);
+    void queueStateSound(LevelEnemyState& enemy,
+                         std::string_view behaviorStateName);
+    void selectStateAnimation(LevelEnemyState& enemy,
+                              std::string_view behaviorStateName,
+                              bool loop);
 
     std::vector<LevelEnemyState> states_;
     std::vector<EnemyMeleeHit> pendingPlayerHits_;
+    std::vector<EnemySoundCue> pendingSoundCues_;
     const LevelOneBootstrap* level_{};
 };
 

@@ -177,6 +177,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Could not load enemy special actions: " +
                                result.message());
     }
+    result = enemyBehaviorConfigs_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load enemy behavior configs: " +
+                               result.message());
+    }
     filesystem::GbmpArchive levelArchive;
     result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {

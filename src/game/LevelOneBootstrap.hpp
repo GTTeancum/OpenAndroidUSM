@@ -10,6 +10,7 @@
 #include "game/CinematicScript.hpp"
 #include "game/AttackConfig.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/EnemyBehaviorConfig.hpp"
 #include "game/EnemySpecialActionConfig.hpp"
 #include "game/GameplayCamera.hpp"
 
@@ -205,6 +206,10 @@ public:
     enemySpecialActions() const noexcept {
         return enemySpecialActions_;
     }
+    [[nodiscard]] const EnemyBehaviorConfigDatabase& enemyBehaviorConfigs()
+        const noexcept {
+        return enemyBehaviorConfigs_;
+    }
     [[nodiscard]] const LevelHudAsset& hud() const noexcept { return hud_; }
 
 private:
@@ -225,6 +230,7 @@ private:
     std::vector<LevelEnemyAsset> enemies_;
     AttackConfigDatabase attackConfigs_;
     EnemySpecialActionConfigDatabase enemySpecialActions_;
+    EnemyBehaviorConfigDatabase enemyBehaviorConfigs_;
     LevelHudAsset hud_;
 };
 

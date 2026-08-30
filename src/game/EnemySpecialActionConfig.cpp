@@ -102,7 +102,7 @@ Result EnemySpecialActionConfigDatabase::load(
             actions_.clear();
             return Result::failure("Enemy special-action config is truncated");
         }
-        action.nextActionIds.reserve(static_cast<std::size_t>(nextActionCount));
+        action.soundMapIds.reserve(static_cast<std::size_t>(nextActionCount));
         for (std::int16_t nextIndex = 0; nextIndex < nextActionCount;
              ++nextIndex) {
             std::int16_t nextAction{};
@@ -111,7 +111,7 @@ Result EnemySpecialActionConfigDatabase::load(
                 return Result::failure(
                     "Enemy special-action successor list is truncated");
             }
-            action.nextActionIds.push_back(nextAction);
+            action.soundMapIds.push_back(nextAction);
         }
         if (!reader.readString(action.effectName)) {
             actions_.clear();

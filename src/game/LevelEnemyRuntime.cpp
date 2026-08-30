@@ -157,6 +157,7 @@ bool crossedLoopEvent(std::uint32_t previousTime,
 Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
     states_.clear();
     pendingPlayerHits_.clear();
+    pendingSoundCues_.clear();
     level_ = &level;
     states_.reserve(level.enemies().size());
     for (const LevelEnemyAsset& enemy : level.enemies()) {
@@ -171,12 +172,15 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
                            enemy.initialAnimation,
                            0,
                            1.0F,
+                           true,
                            enemy.health,
                            enemy.visible,
                            enemy.aiEnabled,
                            false,
                            enemy.aiEnabled ? EnemyBehaviorState::Idle
-                                           : EnemyBehaviorState::Disabled});
+                                           : EnemyBehaviorState::Disabled,
+                           0,
+                           0});
     }
     return Result::success();
 }
@@ -206,6 +210,24 @@ void LevelEnemyRuntime::updateGameplay(
         if (enemy.health <= 0.0F) {
             enemy.behavior = EnemyBehaviorState::Dead;
             continue;
+        }
+        if (enemy.behavior == EnemyBehaviorState::Hurt) {
+            const EnemyArchetypeAsset& archetype =
+                level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+            const assets::ColladaAnimationClip* clip =
+                archetype.animationBank.findClip(enemy.activeAnimation);
+            if (clip != nullptr &&
+                enemy.animationTimeMilliseconds <
+                    clip->durationMilliseconds()) {
+                continue;
+            }
+            enemy.behavior = EnemyBehaviorState::Idle;
+            enemy.activeAnimation =
+                enemy.asset->gameType == "MeleeThugEnemy_knife"
+                    ? "idle_knife_at_idle"
+                    : "idle_at1_idle";
+            enemy.animationTimeMilliseconds = 0;
+            enemy.animationLoops = true;
         }
         if (!enemy.visible || !enemy.aiEnabled) {
             enemy.behavior = EnemyBehaviorState::Disabled;
@@ -244,6 +266,7 @@ void LevelEnemyRuntime::updateGameplay(
                 previousBehavior != EnemyBehaviorState::AttackRange) {
                 enemy.activeAnimation = idleAnimation;
                 enemy.animationTimeMilliseconds = 0;
+                enemy.animationLoops = true;
             }
             continue;
         }
@@ -276,6 +299,7 @@ void LevelEnemyRuntime::updateGameplay(
         if (enemy.activeAnimation != "run") {
             enemy.activeAnimation = "run";
             enemy.animationTimeMilliseconds = 0;
+            enemy.animationLoops = true;
         }
     }
     std::vector<std::uint32_t> previousAnimationTimes;
@@ -338,8 +362,13 @@ std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
     if (nearest->health == 0.0F) {
         nearest->aiEnabled = false;
         nearest->behavior = EnemyBehaviorState::Dead;
-        nearest->activeAnimation = "knockback_to_onground";
-        nearest->animationTimeMilliseconds = 0;
+        selectStateAnimation(*nearest, "ENEMY_BEHAVIOR_DEAD_STATE", false);
+        queueStateSound(*nearest, "ENEMY_BEHAVIOR_DEAD_STATE");
+    } else {
+        nearest->behavior = EnemyBehaviorState::Hurt;
+        selectStateAnimation(*nearest, "ENEMY_BEHAVIOR_HURT_STATE_COMMON",
+                             false);
+        queueStateSound(*nearest, "ENEMY_BEHAVIOR_HURT_STATE_COMMON");
     }
     return nearest->asset->objectId;
 }
@@ -348,6 +377,12 @@ std::vector<EnemyMeleeHit> LevelEnemyRuntime::consumePlayerHits() noexcept {
     std::vector<EnemyMeleeHit> hits = std::move(pendingPlayerHits_);
     pendingPlayerHits_.clear();
     return hits;
+}
+
+std::vector<EnemySoundCue> LevelEnemyRuntime::consumeSoundCues() noexcept {
+    std::vector<EnemySoundCue> cues = std::move(pendingSoundCues_);
+    pendingSoundCues_.clear();
+    return cues;
 }
 
 float LevelEnemyRuntime::maximumAttackReach(
@@ -406,6 +441,15 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
                               clip->durationMilliseconds(), eventTime)) {
             continue;
         }
+        for (const std::int16_t soundMapId : event->soundMapIds) {
+            const std::int32_t voxSoundId =
+                level_->enemyBehaviorConfigs().resolveSoundMap(
+                    soundMapId, enemy.asset->enemyTypeId);
+            if (voxSoundId >= 0) {
+                pendingSoundCues_.push_back(
+                    {enemy.asset->objectId, voxSoundId});
+            }
+        }
         const auto attackId = static_cast<std::int16_t>(event->attackId);
         const AttackDefinition* attack = level_->attackConfigs().find(attackId);
         if (attack == nullptr) {
@@ -434,6 +478,44 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
         pendingPlayerHits_.push_back(
             {enemy.asset->objectId, attackId, attack->damage});
     }
+}
+
+void LevelEnemyRuntime::queueStateSound(
+    LevelEnemyState& enemy, std::string_view behaviorStateName) {
+    if (level_ == nullptr || enemy.asset == nullptr) {
+        return;
+    }
+    const auto soundIds = level_->enemyBehaviorConfigs().resolveStateSoundIds(
+        behaviorStateName, enemy.asset->enemyTypeId);
+    if (soundIds.empty()) {
+        return;
+    }
+    const std::size_t selected =
+        enemy.soundVariantCursor % soundIds.size();
+    enemy.soundVariantCursor = static_cast<std::uint32_t>(
+        (selected + 1) % soundIds.size());
+    pendingSoundCues_.push_back(
+        {enemy.asset->objectId, soundIds[selected]});
+}
+
+void LevelEnemyRuntime::selectStateAnimation(
+    LevelEnemyState& enemy, std::string_view behaviorStateName, bool loop) {
+    if (level_ == nullptr || enemy.asset == nullptr) {
+        return;
+    }
+    const auto animationNames =
+        level_->enemyBehaviorConfigs().resolveStateAnimationNames(
+            behaviorStateName, enemy.asset->enemyTypeId);
+    if (animationNames.empty()) {
+        return;
+    }
+    const std::size_t selected =
+        enemy.hurtVariantCursor % animationNames.size();
+    enemy.hurtVariantCursor = static_cast<std::uint32_t>(
+        (selected + 1) % animationNames.size());
+    enemy.activeAnimation = animationNames[selected];
+    enemy.animationTimeMilliseconds = 0;
+    enemy.animationLoops = loop;
 }
 
 Result LevelEnemyRuntime::applyCinematicCommand(
@@ -469,6 +551,7 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         }
         enemy->activeAnimation = animation->value;
         enemy->animationTimeMilliseconds = 0;
+        enemy->animationLoops = true;
         const CinematicAttribute* speed = command.findAttribute("speed");
         enemy->animationSpeed =
             speed == nullptr ? 1.0F : parseFloat(speed->value, 1.0F);

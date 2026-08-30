@@ -91,6 +91,30 @@ each crossed looping key frame, queues a named `EnemyMeleeHit`, and applies it
 to player health. Core regressions exercise both knife impact frames and
 verify their recovered 25-point damage.
 
+`EnemyBehaviorConfigDatabase` reconstructs the four tables used by
+`BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation
+lists from `BehaviorAnimList.bin`, 63 sound maps from
+`BehaviorSoundMapList.bin`, and 221 states from `BehaviorState.bin`. The
+layouts follow `ReadAnimList` (`0x0033a2b0`), `ReadStateInfoList`
+(`0x0033a3d8`), `ReadSoundMapInfos` (`0x0033a868`), and the original 25 enemy
+type columns. This establishes that state 49,
+`ENEMY_BEHAVIOR_HURT_STATE_COMMON`, randomly selects the three authored hurt
+maps and sound rows 12--14, while state 71, `ENEMY_BEHAVIOR_DEAD_STATE`, uses
+the `idle_onground` animation and sound row 15. Type columns zero and one map
+those rows to the exact knife/bat Vox IDs 185--192.
+
+The vector formerly labeled as a special action's successor list is now
+identified as its behavior sound-map list: `IBehaviorBase::SpecialAnimActionCheck`
+at `0x003a8c60` resolves and plays one entry when the authored animation key
+frame is crossed. Knife and bat attack records both select sound map 16, which
+resolves to Vox ID 178, `SFX_THUG_SWOOSH`. The native runtime queues these
+key-frame cues even when an attack misses, rotates hurt variants
+deterministically, and emits the corresponding death cue. Hurt and death
+animations are one-shot states; D3D11 clamps them at the final authored pose
+instead of wrapping. `EnemyBehaviorSoundBank` predecodes the nine level-one
+thug sounds before gameplay. WARP captures cover a mid-hurt pose and the
+final prone death pose.
+
 Player combat audio is likewise state-driven. `PlayerStateConfigDatabase`
 follows `StateFile::ReadBasicState` (`0x0033d294`) and
 `StateFile::ReadSoundConfig` (`0x0033d5f8`) to decode all 131 `MC_STATE.bin`

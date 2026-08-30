@@ -81,6 +81,7 @@ endif()
 
 add_library(OpenAndroidUSM.Core STATIC
     src/audio/CinematicSoundBank.cpp
+    src/audio/EnemyBehaviorSoundBank.cpp
     src/audio/OggAudio.cpp
     src/audio/PlayerStateSoundBank.cpp
     src/audio/SoundEventCatalog.cpp
@@ -98,6 +99,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/AttackConfig.cpp
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
+    src/game/EnemyBehaviorConfig.cpp
     src/game/EnemySpecialActionConfig.cpp
     src/game/GameplayCamera.cpp
     src/game/GameplayPlayer.cpp

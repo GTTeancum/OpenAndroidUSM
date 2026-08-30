@@ -20,7 +20,9 @@ struct EnemyAnimationSpecialAction {
     std::int32_t actionType{};
     std::int32_t keyFramePercent{};
     std::int32_t attackId{-1};
-    std::vector<std::int16_t> nextActionIds;
+    // BehaviorSoundMapList row IDs, resolved by the original
+    // IBehaviorBase::SpecialAnimActionCheck at 0x003a8c60.
+    std::vector<std::int16_t> soundMapIds;
     std::string effectName;
 };
 
