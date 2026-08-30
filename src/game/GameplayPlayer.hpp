@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <span>
 
@@ -23,6 +24,15 @@ class LevelCollision;
 struct PlayerMotionInput {
     float right{};
     float forward{};
+};
+
+struct PlayerMeleeImpact {
+    std::uint16_t stateId{};
+    std::string_view stateName;
+    float damage{};
+    float maximumReach{};
+    float minimumAngleDegrees{};
+    float maximumAngleDegrees{};
 };
 
 // Portable, renderer-independent reconstruction of the normal ground movement
@@ -54,8 +64,9 @@ public:
         const CinematicThread& thread, const CinematicCommand& command);
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
-    [[nodiscard]] bool consumePunchImpact() noexcept;
-    [[nodiscard]] bool consumePunchSoundFrame() noexcept;
+    [[nodiscard]] std::optional<PlayerMeleeImpact>
+    consumeMeleeImpact() noexcept;
+    [[nodiscard]] std::string_view consumeAttackFrameSound() noexcept;
     [[nodiscard]] std::string_view consumeEnteredState() noexcept;
 
     [[nodiscard]] const assets::Vector3& position() const noexcept {
@@ -82,18 +93,14 @@ public:
     }
     [[nodiscard]] bool airborne() const noexcept;
     [[nodiscard]] std::uint16_t activeStateId() const noexcept;
+    [[nodiscard]] std::string_view activeStateName() const noexcept;
+    [[nodiscard]] bool punchTransitionReadyAfterImpact() const noexcept;
     [[nodiscard]] float animatedFootHeight() const noexcept;
     [[nodiscard]] bool webLineActive() const noexcept;
     [[nodiscard]] assets::Vector3 webLineAnchor() const noexcept;
     [[nodiscard]] assets::Vector3 webLineAttachPosition() const noexcept;
 
 private:
-    enum class AttackState {
-        None,
-        PunchRight,
-        Recover,
-    };
-
     enum class LocomotionState {
         Grounded,
         JumpStart,
@@ -109,6 +116,15 @@ private:
 
     void setAnimation(std::string_view animation) noexcept;
     void queueEnteredState(std::string_view stateName) noexcept;
+    [[nodiscard]] bool enterAttackState(
+        const PlayerStateDefinition& state) noexcept;
+    void cancelAttack() noexcept;
+    void updateAttack(std::uint32_t elapsedMilliseconds) noexcept;
+    void queueAttackFrameEvents(std::uint32_t previousMilliseconds,
+                                std::uint32_t currentMilliseconds) noexcept;
+    [[nodiscard]] const PlayerStateDefinition*
+    punchTransition() const noexcept;
+    [[nodiscard]] bool attackInputWindowOpen() const noexcept;
     void enterLocomotionState(LocomotionState state) noexcept;
     void updateJump(const PlayerMotionInput& input, const CameraPose& camera,
                     std::uint32_t elapsedMilliseconds) noexcept;
@@ -137,6 +153,8 @@ private:
     std::uint64_t animationTimeMilliseconds_{};
     const LevelCollision* collision_{};
     const assets::ColladaAnimationFile* animationBank_{};
+    const PlayerStateConfigDatabase* stateDatabase_{};
+    const PlayerStateDefinition* initialPunchState_{};
     const PlayerStateDefinition* jumpStartState_{};
     const PlayerStateDefinition* jumpFallState_{};
     const PlayerStateDefinition* sustainedFallState_{};
@@ -160,12 +178,13 @@ private:
     const LevelWebGrabPointAsset* selectedWebGrabPoint_{};
     bool swingUsesLeftHand_{};
     bool webReleaseRequested_{};
-    AttackState attackState_{AttackState::None};
-    bool punchImpactPending_{};
-    bool punchImpactEmitted_{};
-    bool punchSoundFramePending_{};
-    bool punchSoundFrameEmitted_{};
-    std::uint32_t punchSoundFrameMilliseconds_{300};
+    const PlayerStateDefinition* activeAttackState_{};
+    std::size_t nextAttackImpactFrameIndex_{};
+    bool attackFrameSoundEmitted_{};
+    std::array<PlayerMeleeImpact, 8> pendingMeleeImpacts_{};
+    std::size_t pendingMeleeImpactCount_{};
+    std::array<std::string_view, 4> pendingAttackFrameSounds_{};
+    std::size_t pendingAttackFrameSoundCount_{};
     std::uint32_t hurtReactionRemainingMilliseconds_{};
     std::array<std::string_view, 4> enteredStates_{};
     std::size_t enteredStateCount_{};

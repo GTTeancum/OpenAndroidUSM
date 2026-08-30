@@ -62,4 +62,6 @@ without playback by default; pass `--autoplay-audio` when audible output is
 useful. The tracked scenarios cover the opening, the first encounter, an
 isolated later encounter, and a short non-aliasing enemy-animation probe. They
 are reconstruction probes, not a claim that the campaign is ready for manual
-playtesting.
+playtesting. Frame telemetry includes the active player state ID/name and
+deterministic combo readiness; melee-impact events retain each state's authored
+damage, reach, and angular limits.

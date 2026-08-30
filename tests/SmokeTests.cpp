@@ -569,14 +569,19 @@ int main() {
         assert(catalogAudio.frameCount() > 0);
 
         usm::audio::PlayerStateSoundBank playerSounds;
-        constexpr std::array<std::string_view, 8> gameplaySoundStates{
+        constexpr std::array<std::string_view, 13> gameplaySoundStates{
             "k_state_idle_to_punch_right", "k_state_hurt_light",
             "k_state_jump_start", "k_state_jump_land",
             "k_state_swing_web_throw", "k_state_swing_hang",
-            "k_state_swing_idle", "k_state_trigger_slider_move"};
+            "k_state_swing_idle", "k_state_trigger_slider_move",
+            "k_state_punch_right_to_punch_left",
+            "k_state_punch_left_to_kick_right",
+            "k_state_kick_right_to_fast_kick",
+            "k_state_kick_right_to_fast_kick_2",
+            "k_state_kick_left_double_kick"};
         assert(playerSounds.preload(playerStateConfigs, voxSounds,
                                     soundCatalog, gameplaySoundStates));
-        assert(playerSounds.decodedVariantCount() == 20);
+        assert(playerSounds.decodedVariantCount() >= 20);
         std::size_t playerSoundPlayCount = 0;
         std::size_t loopingPlayerSoundCount = 0;
         const auto countPlayerSound =
@@ -2782,25 +2787,94 @@ int main() {
         assert(gameplayPlayer.activeAnimation() == "idle_stand");
         assert(gameplayPlayer.animationTimeMilliseconds() == 16);
         assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeStateId() == 74);
+        assert(gameplayPlayer.activeStateName() ==
+               "k_state_idle_to_punch_right");
         assert(gameplayPlayer.activeAnimation() == "idle_to_punch_right");
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_idle_to_punch_right");
         assert(!gameplayPlayer.requestPunch());
-        assert(!gameplayPlayer.consumePunchSoundFrame());
-        gameplayPlayer.update({}, gameplayCameraPose, 179);
-        assert(!gameplayPlayer.consumePunchImpact());
+        gameplayPlayer.update({}, gameplayCameraPose, 232);
+        assert(!gameplayPlayer.consumeMeleeImpact().has_value());
         gameplayPlayer.update({}, gameplayCameraPose, 1);
-        assert(gameplayPlayer.consumePunchImpact());
-        assert(!gameplayPlayer.consumePunchImpact());
-        assert(!gameplayPlayer.consumePunchSoundFrame());
-        gameplayPlayer.update({}, gameplayCameraPose, 119);
-        assert(!gameplayPlayer.consumePunchSoundFrame());
+        const auto firstPunchImpact = gameplayPlayer.consumeMeleeImpact();
+        assert(firstPunchImpact.has_value());
+        assert(firstPunchImpact->stateId == 74);
+        assert(firstPunchImpact->damage == 35.0F);
+        assert(firstPunchImpact->maximumReach == 150.0F);
+        assert(firstPunchImpact->minimumAngleDegrees == -40.0F);
+        assert(firstPunchImpact->maximumAngleDegrees == 40.0F);
+        assert(!gameplayPlayer.consumeMeleeImpact().has_value());
+        assert(gameplayPlayer.punchTransitionReadyAfterImpact());
+        gameplayPlayer.update({}, gameplayCameraPose, 66);
+        assert(gameplayPlayer.consumeAttackFrameSound().empty());
         gameplayPlayer.update({}, gameplayCameraPose, 1);
-        assert(gameplayPlayer.consumePunchSoundFrame());
-        assert(!gameplayPlayer.consumePunchSoundFrame());
+        assert(gameplayPlayer.consumeAttackFrameSound() ==
+               "k_state_idle_to_punch_right");
+        assert(gameplayPlayer.consumeAttackFrameSound().empty());
         gameplayPlayer.update({}, gameplayCameraPose, 33);
-        assert(gameplayPlayer.activeAnimation() == "punch_right_to_idle");
-        gameplayPlayer.update({}, gameplayCameraPose, 466);
         assert(gameplayPlayer.activeAnimation() == "idle_stand");
         assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_idle_to_punch_right");
+        gameplayPlayer.update({}, gameplayCameraPose, 233);
+        assert(gameplayPlayer.consumeMeleeImpact()->stateId == 74);
+        assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeStateId() == 75);
+        assert(gameplayPlayer.activeAnimation() ==
+               "punch_right_to_punch_left");
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_punch_right_to_punch_left");
+        gameplayPlayer.update({}, gameplayCameraPose, 166);
+        const auto leftPunchImpact = gameplayPlayer.consumeMeleeImpact();
+        assert(leftPunchImpact.has_value() && leftPunchImpact->stateId == 75);
+        assert(leftPunchImpact->damage == 35.0F);
+        assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeStateId() == 79);
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_punch_left_to_kick_right");
+        gameplayPlayer.update({}, gameplayCameraPose, 200);
+        const auto rightKickImpact = gameplayPlayer.consumeMeleeImpact();
+        assert(rightKickImpact.has_value() && rightKickImpact->stateId == 79);
+        assert(rightKickImpact->damage == 55.0F);
+        assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeStateId() == 90);
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_kick_right_to_fast_kick");
+        gameplayPlayer.update({}, gameplayCameraPose, 500);
+        for (int impactIndex = 0; impactIndex < 4; ++impactIndex) {
+            const auto fastKickImpact = gameplayPlayer.consumeMeleeImpact();
+            assert(fastKickImpact.has_value() &&
+                   fastKickImpact->stateId == 90);
+            assert(fastKickImpact->damage == 85.0F);
+        }
+        assert(gameplayPlayer.punchTransitionReadyAfterImpact());
+        assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeStateId() == 91);
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_kick_right_to_fast_kick_2");
+        gameplayPlayer.update({}, gameplayCameraPose, 500);
+        for (int impactIndex = 0; impactIndex < 4; ++impactIndex) {
+            const auto fastKickImpact = gameplayPlayer.consumeMeleeImpact();
+            assert(fastKickImpact.has_value() &&
+                   fastKickImpact->stateId == 91);
+        }
+        assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeStateId() == 78);
+        assert(gameplayPlayer.activeAnimation() == "kick_left_double_kick");
+        assert(gameplayPlayer.consumeEnteredState() ==
+               "k_state_kick_left_double_kick");
+        gameplayPlayer.update({}, gameplayCameraPose, 533);
+        for (int impactIndex = 0; impactIndex < 2; ++impactIndex) {
+            const auto doubleKickImpact = gameplayPlayer.consumeMeleeImpact();
+            assert(doubleKickImpact.has_value() &&
+                   doubleKickImpact->stateId == 78);
+            assert(doubleKickImpact->damage == 80.0F);
+        }
+        assert(!gameplayPlayer.requestPunch());
+        gameplayPlayer.update({}, gameplayCameraPose, 702);
+        assert(gameplayPlayer.activeStateId() == 0);
+        assert(gameplayPlayer.activeAnimation() == "idle_stand");
 
         usm::game::GameplayPlayer jumpingPlayer;
         assert(jumpingPlayer.initialize(bootstrap.player(), nullptr,

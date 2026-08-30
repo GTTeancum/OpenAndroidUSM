@@ -81,7 +81,8 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
     }
     frameLog_ << "frame,real_ms,game_ms,phase,controls,player_x,player_y,"
                  "player_z,facing_x,facing_y,facing_z,health,animation,"
-                 "animation_ms,camera_area,cinematic,qte,restore,"
+                 "animation_ms,state_id,state_name,punch_transition_ready,"
+                 "camera_area,cinematic,qte,restore,"
                  "restore_alpha,visible_rooms,input_right,input_forward,"
                  "camera_x,camera_y,camera_z,target_x,target_y,target_z\n";
     enemyLog_ << "frame,real_ms,object_id,type_id,x,y,z,health,visible,ai,"
@@ -362,7 +363,8 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                     ? (snapshot.playerFacing.x * toTargetX +
                        snapshot.playerFacing.y * toTargetY) / length
                     : 1.0F;
-                if (facingDot >= 0.92F) {
+                if (facingDot >= 0.92F &&
+                    snapshot.playerPunchTransitionReady) {
                     input.motion = {};
                     input.punchPressed = true;
                 } else {
@@ -564,6 +566,9 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
               << snapshot.playerFacing.z << ',' << snapshot.playerHealth << ','
               << csv(snapshot.playerAnimation) << ','
               << snapshot.playerAnimationTimeMilliseconds << ','
+              << snapshot.playerStateId << ','
+              << csv(snapshot.playerStateName) << ','
+              << snapshot.playerPunchTransitionReady << ','
               << snapshot.cameraAreaId << ',' << snapshot.activeCinematicId
               << ',' << snapshot.quickTimeEventActive << ','
               << snapshot.restoreActive << ',' << snapshot.restoreAlpha << ','

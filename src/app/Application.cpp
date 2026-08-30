@@ -209,11 +209,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             autoplay->recordEvent(0, "camera_area_asset", detail);
         }
     }
-    const game::AttackDefinition* normalPunchAttack =
-        levelOne_.attackConfigs().find(7);
-    if (normalPunchAttack == nullptr) {
-        return fail("ATTACK_HIT_NORMAL is missing from the combat config");
-    }
     result = voxSounds_.load(gameDataRoot);
     if (!result) {
         return fail(result.message());
@@ -252,11 +247,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::string_view, 9> gameplaySoundStates{
+    constexpr std::array<std::string_view, 14> gameplaySoundStates{
         "k_state_idle_to_punch_right", "k_state_hurt_light",
         "k_state_hurt_heavy", "k_state_jump_start", "k_state_jump_land",
         "k_state_swing_web_throw", "k_state_swing_hang",
-        "k_state_swing_idle", "k_state_trigger_slider_move"};
+        "k_state_swing_idle", "k_state_trigger_slider_move",
+        "k_state_punch_right_to_punch_left",
+        "k_state_punch_left_to_kick_right",
+        "k_state_kick_right_to_fast_kick",
+        "k_state_kick_right_to_fast_kick_2",
+        "k_state_kick_left_double_kick"};
     result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
                                    soundCatalog_, gameplaySoundStates);
     if (!result) {
@@ -662,6 +662,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.health(),
                  gameplayPlayer_.activeAnimation(),
                  gameplayPlayer_.animationTimeMilliseconds(),
+                 gameplayPlayer_.activeStateId(),
+                 gameplayPlayer_.activeStateName(),
+                 gameplayPlayer_.punchTransitionReadyAfterImpact(),
                  harnessCamera,
                  renderer_.roomVisibility(),
                  enemyRuntime_.states()});
@@ -812,13 +815,12 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             if (controlsEnabled && punchPressed &&
                 gameplayPlayer_.requestPunch()) {
                 if (autoplay) {
-                    autoplay->recordEvent(syntheticElapsedMilliseconds,
-                                          "player_action", "punch_accepted");
-                }
-                result = playerSounds_.dispatchStateEnter(
-                    "k_state_idle_to_punch_right", playGameplaySound);
-                if (!result) {
-                    return fail(result.message());
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "player_action",
+                        "punch_accepted;state=" +
+                            std::to_string(gameplayPlayer_.activeStateId()) +
+                            ";name=" +
+                            std::string(gameplayPlayer_.activeStateName()));
                 }
             }
             const auto cameraBeforeMovement =
@@ -858,28 +860,43 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     return fail(result.message());
                 }
             }
-            if (gameplayPlayer_.consumePunchSoundFrame()) {
-                result = playerSounds_.dispatchStateFrame(
-                    "k_state_idle_to_punch_right", playGameplaySound);
+            for (std::string_view frameSoundState =
+                     gameplayPlayer_.consumeAttackFrameSound();
+                 !frameSoundState.empty();
+                 frameSoundState =
+                     gameplayPlayer_.consumeAttackFrameSound()) {
+                result = playerSounds_.dispatchStateFrame(frameSoundState,
+                                                          playGameplaySound);
                 if (!result) {
                     return fail(result.message());
                 }
             }
-            if (gameplayPlayer_.consumePunchImpact()) {
+            for (std::optional<game::PlayerMeleeImpact> impact =
+                     gameplayPlayer_.consumeMeleeImpact();
+                 impact.has_value();
+                 impact = gameplayPlayer_.consumeMeleeImpact()) {
                 const float sectorHalfAngle = std::max(
-                    std::abs(normalPunchAttack->minimumAngleDegrees),
-                    std::abs(normalPunchAttack->maximumAngleDegrees));
+                    std::abs(impact->minimumAngleDegrees),
+                    std::abs(impact->maximumAngleDegrees));
                 const float minimumForwardDot =
                     std::cos(sectorHalfAngle * 0.017453292519943295F);
                 const auto hitEnemy = enemyRuntime_.applyPlayerMeleeHit(
                     gameplayPlayer_.position(), gameplayPlayer_.facing(),
-                    normalPunchAttack->maximumReach(),
-                    normalPunchAttack->damage, minimumForwardDot);
+                    impact->maximumReach, impact->damage,
+                    minimumForwardDot);
                 if (autoplay) {
+                    std::string detail =
+                        "state=" + std::to_string(impact->stateId) +
+                        ";name=" + std::string(impact->stateName) +
+                        ";damage=" + std::to_string(impact->damage) +
+                        ";reach=" + std::to_string(impact->maximumReach) +
+                        ";result=";
+                    detail += hitEnemy
+                        ? "enemy=" + std::to_string(*hitEnemy)
+                        : "miss";
                     autoplay->recordEvent(
-                        syntheticElapsedMilliseconds, "player_punch_impact",
-                        hitEnemy ? "enemy=" + std::to_string(*hitEnemy)
-                                 : "miss");
+                        syntheticElapsedMilliseconds,
+                        "player_melee_impact", detail);
                 }
             }
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
@@ -1384,6 +1401,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.health(),
                  gameplayPlayer_.activeAnimation(),
                  gameplayPlayer_.animationTimeMilliseconds(),
+                 gameplayPlayer_.activeStateId(),
+                 gameplayPlayer_.activeStateName(),
+                 gameplayPlayer_.punchTransitionReadyAfterImpact(),
                  presentedCameraPose,
                  renderer_.roomVisibility(),
                  enemyRuntime_.states()});

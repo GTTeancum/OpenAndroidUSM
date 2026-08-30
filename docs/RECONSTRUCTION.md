@@ -253,8 +253,23 @@ states and 38 `MC_SOUND.bin` configurations. The recovered
 `k_mc_sfx_punch_impact` at authored frame 9; those configurations select Vox
 IDs 60/61 and 58/59 respectively. `k_state_hurt_light` selects the three
 authored player-hurt variants on entry. `PlayerStateSoundBank` predecodes the
-seven required clips, rotates variants deterministically, and dispatches them
+required clips, rotates variants deterministically, and dispatches them
 to XAudio2 from the native gameplay state rather than filename heuristics.
+
+Ground melee now follows that same state table instead of a local two-clip
+approximation. `Player::UpdateKeyTrigger` (`0x0034d0a4`) reads each state's
+button, predicate, and target-state triples only inside the two authored input
+window frames. `Player::UpdateAttackParam` (`0x00340fa0`) advances the state's
+hit-frame list, `Player::CheckAttackTarget` (`0x0034fca0`) consumes the four
+motion parameters as damage, reach, and minimum/maximum angles, and
+`Player::UpdateAttacks` (`0x00351204`) follows `nextStateId` when the current
+clip ends. The normal-suit Square graph is therefore the shipped
+`74 -> 75 -> 79 -> 90 -> 91 -> 78` chain. A lone state-74 punch hits at frame 7
+and returns directly to idle after its 333 ms clip; it no longer enters the
+unrelated 466 ms `punch_right_to_idle` clip. Repeated presses can chain after
+the native frame-3 gate, and every linked state emits its own hit and sound
+frames. Autoplay traces record the active state ID/name and wait until all
+impacts have fired before issuing the next deterministic combo request.
 
 ## Authored room objects
 

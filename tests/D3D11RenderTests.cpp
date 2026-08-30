@@ -823,7 +823,8 @@ int main() {
         usm::game::GameplayPlayer gameplayPlayer;
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(levelOne.rooms()));
-        assert(gameplayPlayer.initialize(levelOne.player(), &levelCollision));
+        assert(gameplayPlayer.initialize(levelOne.player(), &levelCollision,
+                                         &playerStates));
         gameplayPlayer.update({0.0F, 1.0F},
                               gameplayCamera.sample(gameplayPlayer.position()),
                               750);

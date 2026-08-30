@@ -35,6 +35,9 @@ struct AutoplaySnapshot {
     float playerHealth{};
     std::string_view playerAnimation;
     std::uint32_t playerAnimationTimeMilliseconds{};
+    std::uint16_t playerStateId{};
+    std::string_view playerStateName;
+    bool playerPunchTransitionReady{};
     game::CameraPose camera;
     std::span<const bool> visibleRooms;
     std::span<const game::LevelEnemyState> enemies;

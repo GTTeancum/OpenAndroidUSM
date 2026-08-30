@@ -15,7 +15,13 @@ constexpr float kMaximumRunSpeedCentimetersPerSecond = 700.0F;
 // `consts` image address 0x004c6a78, read by Player::SetNextStateId
 // (0x003491d0) when entering k_state_jump_fall_idle.
 constexpr float kSustainedFallSpeedCentimetersPerSecond = -1200.0F;
-constexpr std::uint32_t kPunchImpactMilliseconds = 180;
+// MC_STATE transition records store the controller action in field zero and
+// the native UpdateKeyTrigger predicate in field one. Button 6 is Square;
+// predicate 101 is an ordinary press and 150 is the normal-suit press path.
+constexpr std::int16_t kPunchButton = 6;
+constexpr std::int16_t kPressedTransition = 101;
+constexpr std::int16_t kNormalSuitPressedTransition = 150;
+constexpr std::uint32_t kAuthoredAnimationFramesPerSecond = 30;
 
 float length2D(float x, float y) noexcept { return std::sqrt(x * x + y * y); }
 
@@ -188,11 +194,9 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
                                   std::span<const LevelWayPointAsset>
                                       waypoints) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
-        asset.animationBank.findClip("run") == nullptr ||
-        asset.animationBank.findClip("idle_to_punch_right") == nullptr ||
-        asset.animationBank.findClip("punch_right_to_idle") == nullptr) {
+        asset.animationBank.findClip("run") == nullptr) {
         return Result::failure(
-            "Player animation bank is missing movement or punch clips");
+            "Player animation bank is missing movement clips");
     }
     position_ = asset.position;
     objectId_ = asset.objectId;
@@ -218,6 +222,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     animationTimeMilliseconds_ = 0;
     collision_ = collision;
     animationBank_ = &asset.animationBank;
+    stateDatabase_ = states;
+    initialPunchState_ = nullptr;
     jumpStartState_ = nullptr;
     jumpFallState_ = nullptr;
     sustainedFallState_ = nullptr;
@@ -241,12 +247,11 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     selectedWebGrabPoint_ = nullptr;
     swingUsesLeftHand_ = false;
     webReleaseRequested_ = false;
-    attackState_ = AttackState::None;
-    punchImpactPending_ = false;
-    punchImpactEmitted_ = false;
-    punchSoundFramePending_ = false;
-    punchSoundFrameEmitted_ = false;
-    punchSoundFrameMilliseconds_ = 300;
+    activeAttackState_ = nullptr;
+    nextAttackImpactFrameIndex_ = 0;
+    attackFrameSoundEmitted_ = false;
+    pendingMeleeImpactCount_ = 0;
+    pendingAttackFrameSoundCount_ = 0;
     hurtReactionRemainingMilliseconds_ = 0;
     enteredStateCount_ = 0;
     if (states != nullptr) {
@@ -293,16 +298,24 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
             return Result::failure(
                 "Player hurt states have invalid animation IDs");
         }
-        const PlayerStateDefinition* punchState =
+        initialPunchState_ =
             states->findState("k_state_idle_to_punch_right");
-        if (punchState == nullptr || punchState->soundTriggerFrame < 0) {
-            return Result::failure(
-                "Player punch state has no sound trigger frame");
+        constexpr std::array<std::string_view, 6> normalGroundComboStates{
+            "k_state_idle_to_punch_right",
+            "k_state_punch_right_to_punch_left",
+            "k_state_punch_left_to_kick_right",
+            "k_state_kick_right_to_fast_kick",
+            "k_state_kick_right_to_fast_kick_2",
+            "k_state_kick_left_double_kick",
+        };
+        for (const std::string_view stateName : normalGroundComboStates) {
+            const PlayerStateDefinition* state = states->findState(stateName);
+            if (state == nullptr || state->stateClass != 4 ||
+                stateClip(animationBank_, state) == nullptr) {
+                return Result::failure(
+                    "Player ground-combo state has invalid animation data");
+            }
         }
-        // CheckFrame consumes the authored 30 Hz state frame number.
-        punchSoundFrameMilliseconds_ =
-            static_cast<std::uint32_t>(punchState->soundTriggerFrame) * 1000U /
-            30U;
     }
     maximumHealth_ = std::max(asset.health, 1.0F);
     health_ = maximumHealth_;
@@ -320,22 +333,23 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
 }
 
 bool GameplayPlayer::requestPunch() noexcept {
-    if (attackState_ != AttackState::None ||
-        locomotionState_ != LocomotionState::Grounded || dead() ||
+    if (locomotionState_ != LocomotionState::Grounded || dead() ||
         hurtReactionRemainingMilliseconds_ != 0) {
         return false;
     }
-    attackState_ = AttackState::PunchRight;
-    punchImpactPending_ = false;
-    punchImpactEmitted_ = false;
-    punchSoundFramePending_ = false;
-    punchSoundFrameEmitted_ = false;
-    setAnimation("idle_to_punch_right");
-    return true;
+    if (activeAttackState_ == nullptr) {
+        return initialPunchState_ != nullptr &&
+               enterAttackState(*initialPunchState_);
+    }
+    if (!attackInputWindowOpen()) {
+        return false;
+    }
+    const PlayerStateDefinition* transition = punchTransition();
+    return transition != nullptr && enterAttackState(*transition);
 }
 
 bool GameplayPlayer::requestJump() noexcept {
-    if (attackState_ != AttackState::None ||
+    if (activeAttackState_ != nullptr ||
         locomotionState_ != LocomotionState::Grounded || dead() ||
         jumpStartState_ == nullptr ||
         hurtReactionRemainingMilliseconds_ != 0) {
@@ -415,7 +429,7 @@ bool GameplayPlayer::applyDamage(
     if (!dead() && !cinematicDriven_ &&
         locomotionState_ == LocomotionState::Grounded &&
         hurtClip != nullptr) {
-        attackState_ = AttackState::None;
+        cancelAttack();
         setAnimation(hurtClip->name);
         hurtReactionRemainingMilliseconds_ = std::max(
             minimumReactionMilliseconds, hurtClip->durationMilliseconds());
@@ -452,7 +466,7 @@ void GameplayPlayer::restoreAt(const assets::Vector3& position,
     selectedWebGrabPoint_ = nullptr;
     webSwingRuntime_ = {};
     webReleaseRequested_ = false;
-    attackState_ = AttackState::None;
+    cancelAttack();
     hurtReactionRemainingMilliseconds_ = 0;
     setAnimation("idle_stand");
     updateWorldTransform(facing_);
@@ -465,7 +479,7 @@ Result GameplayPlayer::applyCinematicCommand(
     }
     if (command.name == "DisableAI") {
         cinematicDriven_ = true;
-        attackState_ = AttackState::None;
+        cancelAttack();
         return Result::success();
     }
     if (command.name == "EnableAI") {
@@ -572,33 +586,8 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
         }
         return;
     }
-    if (attackState_ != AttackState::None) {
-        animationTimeMilliseconds_ += elapsedMilliseconds;
-        if (attackState_ == AttackState::PunchRight) {
-            if (!punchSoundFrameEmitted_ &&
-                animationTimeMilliseconds_ >= punchSoundFrameMilliseconds_) {
-                punchSoundFramePending_ = true;
-                punchSoundFrameEmitted_ = true;
-            }
-            if (!punchImpactEmitted_ &&
-                animationTimeMilliseconds_ >= kPunchImpactMilliseconds) {
-                punchImpactPending_ = true;
-                punchImpactEmitted_ = true;
-            }
-            // The authored clip spans 333 ms in spiderman_anim.bdae.
-            if (animationTimeMilliseconds_ >= 333) {
-                const std::uint64_t carry = animationTimeMilliseconds_ - 333;
-                attackState_ = AttackState::Recover;
-                setAnimation("punch_right_to_idle");
-                animationTimeMilliseconds_ = carry;
-            }
-        }
-        // The authored recovery clip spans 466 ms.
-        if (attackState_ == AttackState::Recover &&
-            animationTimeMilliseconds_ >= 466) {
-            attackState_ = AttackState::None;
-            setAnimation("idle_stand");
-        }
+    if (activeAttackState_ != nullptr) {
+        updateAttack(elapsedMilliseconds);
         return;
     }
     if ((locomotionState_ == LocomotionState::JumpFall ||
@@ -1176,16 +1165,197 @@ void GameplayPlayer::updateJump(const PlayerMotionInput& input,
     }
 }
 
-bool GameplayPlayer::consumePunchImpact() noexcept {
-    const bool pending = punchImpactPending_;
-    punchImpactPending_ = false;
-    return pending;
+bool GameplayPlayer::enterAttackState(
+    const PlayerStateDefinition& state) noexcept {
+    const assets::ColladaAnimationClip* clip =
+        stateClip(animationBank_, &state);
+    if (clip == nullptr) {
+        return false;
+    }
+    activeAttackState_ = &state;
+    nextAttackImpactFrameIndex_ = 0;
+    attackFrameSoundEmitted_ = false;
+    activeAnimation_ = clip->name;
+    animationTimeMilliseconds_ = 0;
+    queueEnteredState(state.name);
+    return true;
 }
 
-bool GameplayPlayer::consumePunchSoundFrame() noexcept {
-    const bool pending = punchSoundFramePending_;
-    punchSoundFramePending_ = false;
-    return pending;
+void GameplayPlayer::cancelAttack() noexcept {
+    activeAttackState_ = nullptr;
+    nextAttackImpactFrameIndex_ = 0;
+    attackFrameSoundEmitted_ = false;
+    pendingMeleeImpactCount_ = 0;
+    pendingAttackFrameSoundCount_ = 0;
+}
+
+void GameplayPlayer::updateAttack(
+    std::uint32_t elapsedMilliseconds) noexcept {
+    std::uint32_t remaining = elapsedMilliseconds;
+    while (activeAttackState_ != nullptr && remaining != 0) {
+        const assets::ColladaAnimationClip* clip =
+            stateClip(animationBank_, activeAttackState_);
+        if (clip == nullptr || clip->durationMilliseconds() == 0) {
+            cancelAttack();
+            setAnimation("idle_stand");
+            return;
+        }
+        const std::uint32_t duration = clip->durationMilliseconds();
+        const std::uint32_t previous = static_cast<std::uint32_t>(
+            std::min<std::uint64_t>(animationTimeMilliseconds_, duration));
+        const std::uint32_t step =
+            std::min(remaining, duration - previous);
+        const std::uint32_t current = previous + step;
+        animationTimeMilliseconds_ = current;
+        remaining -= step;
+        queueAttackFrameEvents(previous, current);
+        if (current < duration) {
+            return;
+        }
+
+        const std::int16_t nextStateId = activeAttackState_->nextStateId;
+        const PlayerStateDefinition* nextState = nullptr;
+        if (stateDatabase_ != nullptr && nextStateId > 0 &&
+            static_cast<std::size_t>(nextStateId) <
+                stateDatabase_->states().size()) {
+            const PlayerStateDefinition& candidate =
+                stateDatabase_->states()[static_cast<std::size_t>(nextStateId)];
+            if (candidate.id == static_cast<std::uint16_t>(nextStateId) &&
+                candidate.stateClass == 4) {
+                nextState = &candidate;
+            }
+        }
+        if (nextState == nullptr || !enterAttackState(*nextState)) {
+            activeAttackState_ = nullptr;
+            nextAttackImpactFrameIndex_ = 0;
+            attackFrameSoundEmitted_ = false;
+            setAnimation("idle_stand");
+            return;
+        }
+    }
+}
+
+void GameplayPlayer::queueAttackFrameEvents(
+    std::uint32_t previousMilliseconds,
+    std::uint32_t currentMilliseconds) noexcept {
+    if (activeAttackState_ == nullptr) {
+        return;
+    }
+    const auto& hitFrames = activeAttackState_->auxiliaryIdLists[0];
+    while (nextAttackImpactFrameIndex_ < hitFrames.size()) {
+        const std::int16_t frame = hitFrames[nextAttackImpactFrameIndex_];
+        if (frame < 0) {
+            ++nextAttackImpactFrameIndex_;
+            continue;
+        }
+        const std::uint32_t threshold =
+            static_cast<std::uint32_t>(frame) * 1000U /
+            kAuthoredAnimationFramesPerSecond;
+        if (threshold > currentMilliseconds) {
+            break;
+        }
+        if (threshold >= previousMilliseconds &&
+            pendingMeleeImpactCount_ < pendingMeleeImpacts_.size()) {
+            pendingMeleeImpacts_[pendingMeleeImpactCount_++] = {
+                activeAttackState_->id,
+                activeAttackState_->name,
+                activeAttackState_->motionParameters[0],
+                activeAttackState_->motionParameters[1],
+                activeAttackState_->motionParameters[2],
+                activeAttackState_->motionParameters[3],
+            };
+        }
+        ++nextAttackImpactFrameIndex_;
+    }
+
+    if (!attackFrameSoundEmitted_ &&
+        activeAttackState_->soundTriggerFrame >= 0) {
+        const std::uint32_t threshold =
+            static_cast<std::uint32_t>(
+                activeAttackState_->soundTriggerFrame) *
+            1000U / kAuthoredAnimationFramesPerSecond;
+        if (threshold >= previousMilliseconds &&
+            threshold <= currentMilliseconds) {
+            if (pendingAttackFrameSoundCount_ <
+                pendingAttackFrameSounds_.size()) {
+                pendingAttackFrameSounds_[pendingAttackFrameSoundCount_++] =
+                    activeAttackState_->name;
+            }
+            attackFrameSoundEmitted_ = true;
+        }
+    }
+}
+
+const PlayerStateDefinition* GameplayPlayer::punchTransition() const noexcept {
+    if (activeAttackState_ == nullptr || stateDatabase_ == nullptr) {
+        return nullptr;
+    }
+    const std::size_t transitionCount =
+        std::min({activeAttackState_->transitionFields[0].size(),
+                  activeAttackState_->transitionFields[1].size(),
+                  activeAttackState_->transitionFields[2].size()});
+    for (std::size_t index = 0; index < transitionCount; ++index) {
+        const std::int16_t button =
+            activeAttackState_->transitionFields[0][index];
+        const std::int16_t predicate =
+            activeAttackState_->transitionFields[1][index];
+        const std::int16_t target =
+            activeAttackState_->transitionFields[2][index];
+        if (button != kPunchButton ||
+            (predicate != kPressedTransition &&
+             predicate != kNormalSuitPressedTransition) ||
+            target < 0 || static_cast<std::size_t>(target) >=
+                              stateDatabase_->states().size()) {
+            continue;
+        }
+        const PlayerStateDefinition& state =
+            stateDatabase_->states()[static_cast<std::size_t>(target)];
+        if (state.id == static_cast<std::uint16_t>(target)) {
+            return &state;
+        }
+    }
+    return nullptr;
+}
+
+bool GameplayPlayer::attackInputWindowOpen() const noexcept {
+    if (activeAttackState_ == nullptr) {
+        return false;
+    }
+    const std::uint32_t frame = static_cast<std::uint32_t>(
+        animationTimeMilliseconds_ * kAuthoredAnimationFramesPerSecond /
+        1000U);
+    const std::int16_t firstFrame =
+        activeAttackState_->auxiliaryParameters[0];
+    const std::int16_t lastFrame =
+        activeAttackState_->auxiliaryParameters[1];
+    return (firstFrame < 0 || frame >= static_cast<std::uint32_t>(firstFrame)) &&
+           (lastFrame < 0 || frame <= static_cast<std::uint32_t>(lastFrame));
+}
+
+std::optional<PlayerMeleeImpact>
+GameplayPlayer::consumeMeleeImpact() noexcept {
+    if (pendingMeleeImpactCount_ == 0) {
+        return std::nullopt;
+    }
+    PlayerMeleeImpact impact = pendingMeleeImpacts_[0];
+    for (std::size_t index = 1; index < pendingMeleeImpactCount_; ++index) {
+        pendingMeleeImpacts_[index - 1] = pendingMeleeImpacts_[index];
+    }
+    --pendingMeleeImpactCount_;
+    return impact;
+}
+
+std::string_view GameplayPlayer::consumeAttackFrameSound() noexcept {
+    if (pendingAttackFrameSoundCount_ == 0) {
+        return {};
+    }
+    const std::string_view stateName = pendingAttackFrameSounds_[0];
+    for (std::size_t index = 1; index < pendingAttackFrameSoundCount_; ++index) {
+        pendingAttackFrameSounds_[index - 1] =
+            pendingAttackFrameSounds_[index];
+    }
+    --pendingAttackFrameSoundCount_;
+    return stateName;
 }
 
 std::string_view GameplayPlayer::consumeEnteredState() noexcept {
@@ -1216,8 +1386,28 @@ bool GameplayPlayer::airborne() const noexcept {
 }
 
 std::uint16_t GameplayPlayer::activeStateId() const noexcept {
+    if (activeAttackState_ != nullptr) {
+        return activeAttackState_->id;
+    }
     return activeLocomotionState_ == nullptr ? 0U
                                              : activeLocomotionState_->id;
+}
+
+std::string_view GameplayPlayer::activeStateName() const noexcept {
+    if (activeAttackState_ != nullptr) {
+        return activeAttackState_->name;
+    }
+    return activeLocomotionState_ == nullptr ? std::string_view{"k_state_idle"}
+                                             : activeLocomotionState_->name;
+}
+
+bool GameplayPlayer::punchTransitionReadyAfterImpact() const noexcept {
+    if (activeAttackState_ == nullptr) {
+        return true;
+    }
+    return attackInputWindowOpen() && punchTransition() != nullptr &&
+           nextAttackImpactFrameIndex_ >=
+               activeAttackState_->auxiliaryIdLists[0].size();
 }
 
 float GameplayPlayer::animatedFootHeight() const noexcept {
