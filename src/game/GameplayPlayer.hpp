@@ -25,11 +25,16 @@ class GameplayPlayer final {
 public:
     [[nodiscard]] Result initialize(const LevelPlayerAsset& asset,
                                     const LevelCollision* collision = nullptr);
+    [[nodiscard]] bool requestPunch() noexcept;
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
+    [[nodiscard]] bool consumePunchImpact() noexcept;
 
     [[nodiscard]] const assets::Vector3& position() const noexcept {
         return position_;
+    }
+    [[nodiscard]] const assets::Vector3& facing() const noexcept {
+        return facing_;
     }
     [[nodiscard]] const std::array<float, 16>& worldTransform() const noexcept {
         return worldTransform_;
@@ -40,6 +45,12 @@ public:
     [[nodiscard]] std::uint32_t animationTimeMilliseconds() const noexcept;
 
 private:
+    enum class AttackState {
+        None,
+        PunchRight,
+        Recover,
+    };
+
     void setAnimation(std::string_view animation) noexcept;
     void updateWorldTransform(const assets::Vector3& facing) noexcept;
 
@@ -50,6 +61,9 @@ private:
     std::string_view activeAnimation_{"idle_stand"};
     std::uint64_t animationTimeMilliseconds_{};
     const LevelCollision* collision_{};
+    AttackState attackState_{AttackState::None};
+    bool punchImpactPending_{};
+    bool punchImpactEmitted_{};
 };
 
 } // namespace usm::game

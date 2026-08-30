@@ -242,6 +242,57 @@ void LevelEnemyRuntime::updateGameplay(
     advanceAnimations(elapsedMilliseconds);
 }
 
+std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
+    const assets::Vector3& attackPosition,
+    const assets::Vector3& attackDirection, float radius, float damage,
+    float minimumForwardDot) noexcept {
+    if (radius <= 0.0F || damage <= 0.0F) {
+        return std::nullopt;
+    }
+    LevelEnemyState* nearest = nullptr;
+    float nearestDistanceSquared = radius * radius;
+    const float directionLength = std::hypot(attackDirection.x,
+                                             attackDirection.y);
+    const float directionX = directionLength > 1e-5F
+                                 ? attackDirection.x / directionLength
+                                 : 0.0F;
+    const float directionY = directionLength > 1e-5F
+                                 ? attackDirection.y / directionLength
+                                 : 0.0F;
+    for (LevelEnemyState& enemy : states_) {
+        if (enemy.asset == nullptr || !enemy.visible || enemy.health <= 0.0F) {
+            continue;
+        }
+        const float x = enemy.position.x - attackPosition.x;
+        const float y = enemy.position.y - attackPosition.y;
+        const float distanceSquared = x * x + y * y;
+        if (distanceSquared > 1e-5F && directionLength > 1e-5F) {
+            const float inverseDistance = 1.0F / std::sqrt(distanceSquared);
+            const float forwardDot =
+                (x * directionX + y * directionY) * inverseDistance;
+            if (forwardDot < minimumForwardDot) {
+                continue;
+            }
+        }
+        if (distanceSquared <= nearestDistanceSquared) {
+            nearest = &enemy;
+            nearestDistanceSquared = distanceSquared;
+        }
+    }
+    if (nearest == nullptr) {
+        return std::nullopt;
+    }
+    nearest->health = std::max(0.0F, nearest->health - damage);
+    nearest->playerDetected = true;
+    if (nearest->health == 0.0F) {
+        nearest->aiEnabled = false;
+        nearest->behavior = EnemyBehaviorState::Dead;
+        nearest->activeAnimation = "knockback_to_onground";
+        nearest->animationTimeMilliseconds = 0;
+    }
+    return nearest->asset->objectId;
+}
+
 Result LevelEnemyRuntime::applyCinematicCommand(
     const LevelOneBootstrap& level, const CinematicThread& thread,
     const CinematicCommand& command) {

@@ -437,6 +437,27 @@ int main() {
         assert(chasingKnife->behavior ==
                usm::game::EnemyBehaviorState::AttackRange);
         assert(chasingKnife->activeAnimation == "idle_knife_at_idle");
+        usm::game::LevelEnemyRuntime damageRuntime;
+        assert(damageRuntime.initialize(bootstrap));
+        const auto* damageTarget = damageRuntime.find(394);
+        assert(damageTarget != nullptr);
+        const usm::assets::Vector3 damagePosition = damageTarget->position;
+        const usm::assets::Vector3 attackPosition{
+            damagePosition.x - 100.0F, damagePosition.y, damagePosition.z};
+        assert(!damageRuntime.applyPlayerMeleeHit(
+            attackPosition, {-1.0F, 0.0F, 0.0F}, 200.0F, 100.0F));
+        const auto firstHit = damageRuntime.applyPlayerMeleeHit(
+            attackPosition, {1.0F, 0.0F, 0.0F}, 200.0F, 100.0F);
+        assert(firstHit && *firstHit == 394);
+        assert(damageRuntime.find(394)->health == 400.0F);
+        for (int hit = 0; hit < 4; ++hit) {
+            assert(damageRuntime.applyPlayerMeleeHit(
+                attackPosition, {1.0F, 0.0F, 0.0F}, 200.0F, 100.0F));
+        }
+        damageTarget = damageRuntime.find(394);
+        assert(damageTarget->health == 0.0F);
+        assert(damageTarget->behavior == usm::game::EnemyBehaviorState::Dead);
+        assert(damageTarget->activeAnimation == "knockback_to_onground");
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(bootstrap.introRooms()));
         assert(levelCollision.triangleCount() > 100);
@@ -509,6 +530,19 @@ int main() {
         gameplayPlayer.update({}, gameplayCameraPose, 16);
         assert(gameplayPlayer.activeAnimation() == "idle_stand");
         assert(gameplayPlayer.animationTimeMilliseconds() == 16);
+        assert(gameplayPlayer.requestPunch());
+        assert(gameplayPlayer.activeAnimation() == "idle_to_punch_right");
+        assert(!gameplayPlayer.requestPunch());
+        gameplayPlayer.update({}, gameplayCameraPose, 179);
+        assert(!gameplayPlayer.consumePunchImpact());
+        gameplayPlayer.update({}, gameplayCameraPose, 1);
+        assert(gameplayPlayer.consumePunchImpact());
+        assert(!gameplayPlayer.consumePunchImpact());
+        gameplayPlayer.update({}, gameplayCameraPose, 153);
+        assert(gameplayPlayer.activeAnimation() == "punch_right_to_idle");
+        gameplayPlayer.update({}, gameplayCameraPose, 466);
+        assert(gameplayPlayer.activeAnimation() == "idle_stand");
+        assert(gameplayPlayer.requestPunch());
 
         auto makeCameraArea = [](std::int32_t id, float minimumX,
                                  float maximumX) {

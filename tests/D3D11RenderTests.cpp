@@ -227,6 +227,34 @@ int main() {
         }
         assert(gameplayChangedPixels > 100);
 
+        assert(gameplayPlayer.requestPunch());
+        gameplayPlayer.update({},
+                              gameplayCamera.sample(gameplayPlayer.position()),
+                              180);
+        const auto* punchClip = levelOne.player().animationBank.findClip(
+            gameplayPlayer.activeAnimation());
+        assert(punchClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *punchClip,
+            gameplayPlayer.animationTimeMilliseconds(),
+            gameplayPlayer.worldTransform()));
+        gameRenderer.renderFrame();
+        RgbaImage playerPunchFrame;
+        assert(gameRenderer.readBackImage(playerPunchFrame));
+        captureIfRequested(playerPunchFrame, "gameplay-player-punch.bmp");
+        std::size_t punchChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < playerPunchFrame.pixels.size(); component += 4) {
+            punchChangedPixels +=
+                playerPunchFrame.pixels[component] !=
+                    gameplayRunningFrame.pixels[component] ||
+                playerPunchFrame.pixels[component + 1] !=
+                    gameplayRunningFrame.pixels[component + 1] ||
+                playerPunchFrame.pixels[component + 2] !=
+                    gameplayRunningFrame.pixels[component + 2];
+        }
+        assert(punchChangedPixels > 100);
+
         const auto encounterCinematic = std::find_if(
             levelOne.cinematics().begin(), levelOne.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {

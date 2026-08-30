@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -45,6 +46,10 @@ public:
     void updateGameplay(std::uint32_t elapsedMilliseconds,
                         const assets::Vector3& playerPosition,
                         const LevelCollision* collision = nullptr) noexcept;
+    [[nodiscard]] std::optional<std::int32_t> applyPlayerMeleeHit(
+        const assets::Vector3& attackPosition,
+        const assets::Vector3& attackDirection, float radius, float damage,
+        float minimumForwardDot = 0.0F) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
         const LevelOneBootstrap& level, const CinematicThread& thread,
         const CinematicCommand& command);

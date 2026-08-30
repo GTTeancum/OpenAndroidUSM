@@ -10,6 +10,7 @@ namespace usm::game {
 namespace {
 
 constexpr float kMaximumRunSpeedCentimetersPerSecond = 700.0F;
+constexpr std::uint32_t kPunchImpactMilliseconds = 180;
 
 float length2D(float x, float y) noexcept { return std::sqrt(x * x + y * y); }
 
@@ -18,9 +19,11 @@ float length2D(float x, float y) noexcept { return std::sqrt(x * x + y * y); }
 Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
                                   const LevelCollision* collision) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
-        asset.animationBank.findClip("run") == nullptr) {
+        asset.animationBank.findClip("run") == nullptr ||
+        asset.animationBank.findClip("idle_to_punch_right") == nullptr ||
+        asset.animationBank.findClip("punch_right_to_idle") == nullptr) {
         return Result::failure(
-            "Player animation bank is missing idle_stand or run");
+            "Player animation bank is missing movement or punch clips");
     }
     position_ = asset.position;
     worldTransform_ = asset.worldTransform;
@@ -39,6 +42,9 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     activeAnimation_ = "idle_stand";
     animationTimeMilliseconds_ = 0;
     collision_ = collision;
+    attackState_ = AttackState::None;
+    punchImpactPending_ = false;
+    punchImpactEmitted_ = false;
     if (collision_ != nullptr) {
         assets::Vector3 grounded;
         (void)collision_->resolveGroundMotion(position_, position_, grounded,
@@ -51,9 +57,44 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     return Result::success();
 }
 
+bool GameplayPlayer::requestPunch() noexcept {
+    if (attackState_ != AttackState::None) {
+        return false;
+    }
+    attackState_ = AttackState::PunchRight;
+    punchImpactPending_ = false;
+    punchImpactEmitted_ = false;
+    setAnimation("idle_to_punch_right");
+    return true;
+}
+
 void GameplayPlayer::update(const PlayerMotionInput& input,
                             const CameraPose& camera,
                             std::uint32_t elapsedMilliseconds) noexcept {
+    if (attackState_ != AttackState::None) {
+        animationTimeMilliseconds_ += elapsedMilliseconds;
+        if (attackState_ == AttackState::PunchRight) {
+            if (!punchImpactEmitted_ &&
+                animationTimeMilliseconds_ >= kPunchImpactMilliseconds) {
+                punchImpactPending_ = true;
+                punchImpactEmitted_ = true;
+            }
+            // The authored clip spans 333 ms in spiderman_anim.bdae.
+            if (animationTimeMilliseconds_ >= 333) {
+                const std::uint64_t carry = animationTimeMilliseconds_ - 333;
+                attackState_ = AttackState::Recover;
+                setAnimation("punch_right_to_idle");
+                animationTimeMilliseconds_ = carry;
+            }
+        }
+        // The authored recovery clip spans 466 ms.
+        if (attackState_ == AttackState::Recover &&
+            animationTimeMilliseconds_ >= 466) {
+            attackState_ = AttackState::None;
+            setAnimation("idle_stand");
+        }
+        return;
+    }
     float inputMagnitude = length2D(input.right, input.forward);
     if (inputMagnitude <= 1e-4F || elapsedMilliseconds == 0) {
         setAnimation("idle_stand");
@@ -107,6 +148,12 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     updateWorldTransform(facing_);
     setAnimation("run");
     animationTimeMilliseconds_ += elapsedMilliseconds;
+}
+
+bool GameplayPlayer::consumePunchImpact() noexcept {
+    const bool pending = punchImpactPending_;
+    punchImpactPending_ = false;
+    return pending;
 }
 
 std::uint32_t GameplayPlayer::animationTimeMilliseconds() const noexcept {

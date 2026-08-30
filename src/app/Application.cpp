@@ -142,12 +142,23 @@ int Application::run(HINSTANCE instance) {
                 motion.forward = static_cast<float>(input.moveUp.held) -
                                  static_cast<float>(input.moveDown.held);
             }
+            if (keyRouter_.state().punch.pressed) {
+                (void)gameplayPlayer_.requestPunch();
+            }
             const auto cameraBeforeMovement =
                 gameplayCamera_.sample(gameplayPlayer_.position());
             const auto deltaMilliseconds = static_cast<std::uint32_t>(
                 std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    deltaMilliseconds);
+            if (gameplayPlayer_.consumePunchImpact()) {
+                // Unit::DecreaseHealth (0x002fe890): ATTACK_HIT_NORMAL in
+                // EnemysAttackConfigs.bin authors 35 damage, 200 cm extents,
+                // and a -90..90 degree forward attack sector.
+                (void)enemyRuntime_.applyPlayerMeleeHit(
+                    gameplayPlayer_.position(), gameplayPlayer_.facing(),
+                    200.0F, 35.0F, 0.0F);
+            }
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
                                              deltaMilliseconds);
             const auto triggerEvents =
