@@ -91,6 +91,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp
     src/game/CinematicScript.cpp
+    src/game/AttackConfig.cpp
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
     src/game/GameplayCamera.cpp

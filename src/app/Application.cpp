@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <filesystem>
 #include <limits>
@@ -47,6 +48,11 @@ int Application::run(HINSTANCE instance) {
     result = levelOne_.load(gameDataRoot);
     if (!result) {
         return fail(result.message());
+    }
+    const game::AttackDefinition* normalPunchAttack =
+        levelOne_.attackConfigs().find(7);
+    if (normalPunchAttack == nullptr) {
+        return fail("ATTACK_HIT_NORMAL is missing from the combat config");
     }
     result = soundCatalog_.index(gameDataRoot / "sound");
     if (!result) {
@@ -152,12 +158,15 @@ int Application::run(HINSTANCE instance) {
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    deltaMilliseconds);
             if (gameplayPlayer_.consumePunchImpact()) {
-                // Unit::DecreaseHealth (0x002fe890): ATTACK_HIT_NORMAL in
-                // EnemysAttackConfigs.bin authors 35 damage, 200 cm extents,
-                // and a -90..90 degree forward attack sector.
+                const float sectorHalfAngle = std::max(
+                    std::abs(normalPunchAttack->minimumAngleDegrees),
+                    std::abs(normalPunchAttack->maximumAngleDegrees));
+                const float minimumForwardDot =
+                    std::cos(sectorHalfAngle * 0.017453292519943295F);
                 (void)enemyRuntime_.applyPlayerMeleeHit(
                     gameplayPlayer_.position(), gameplayPlayer_.facing(),
-                    200.0F, 35.0F, 0.0F);
+                    normalPunchAttack->maximumReach(),
+                    normalPunchAttack->damage, minimumForwardDot);
             }
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
                                              deltaMilliseconds);

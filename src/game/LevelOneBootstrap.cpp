@@ -166,8 +166,13 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     cinematics_.clear();
     enemyArchetypes_.clear();
     enemies_.clear();
+    Result result = attackConfigs_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load attack configs: " +
+                               result.message());
+    }
     filesystem::GbmpArchive levelArchive;
-    Result result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
+    result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {
         return result;
     }

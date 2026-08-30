@@ -299,6 +299,14 @@ int main() {
                usm::assets::ColladaAnimationProperty::Translation);
         assert(bootstrap.player().animationBank.tracks()[44].property ==
                usm::assets::ColladaAnimationProperty::TranslationX);
+        assert(bootstrap.attackConfigs().attacks().size() == 85);
+        const auto* normalAttack = bootstrap.attackConfigs().find(7);
+        assert(normalAttack != nullptr);
+        assert(normalAttack->name == "ATTACK_HIT_NORMAL");
+        assert(normalAttack->damage == 35.0F);
+        assert(normalAttack->maximumReach() == 200.0F);
+        assert(normalAttack->minimumAngleDegrees == -90.0F);
+        assert(normalAttack->maximumAngleDegrees == 90.0F);
         assert(bootstrap.triggers().size() == 15);
         const auto firstEncounterTrigger = std::find_if(
             bootstrap.triggers().begin(), bootstrap.triggers().end(),

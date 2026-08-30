@@ -6,6 +6,7 @@
 #include "assets/IrrScene.hpp"
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
+#include "game/AttackConfig.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/GameplayCamera.hpp"
 
@@ -187,6 +188,9 @@ public:
     [[nodiscard]] const std::vector<LevelEnemyAsset>& enemies() const noexcept {
         return enemies_;
     }
+    [[nodiscard]] const AttackConfigDatabase& attackConfigs() const noexcept {
+        return attackConfigs_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -204,6 +208,7 @@ private:
     std::vector<LevelCinematicAsset> cinematics_;
     std::vector<EnemyArchetypeAsset> enemyArchetypes_;
     std::vector<LevelEnemyAsset> enemies_;
+    AttackConfigDatabase attackConfigs_;
 };
 
 } // namespace usm::game
