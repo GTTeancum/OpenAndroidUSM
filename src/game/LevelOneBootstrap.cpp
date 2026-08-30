@@ -100,6 +100,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     introSky_ = {};
     introActors_.clear();
     player_ = {};
+    cameraAreas_.clear();
     filesystem::GbmpArchive levelArchive;
     Result result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {
@@ -172,6 +173,43 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     }
     if (player_.animationBank.findClip(player_.initialAnimation) == nullptr) {
         return Result::failure("Player initial animation is not in its bank");
+    }
+
+    for (const assets::IrrSceneNode& areaNode : mainScene_.nodes()) {
+        if (areaNode.gameType != "CameraArea") {
+            continue;
+        }
+        CameraArea area;
+        area.objectId = areaNode.id;
+        area.nextAreaIds = areaNode.nextCameraAreaIds;
+        area.farPlaneOffset = areaNode.cameraFarPlaneOffset;
+        for (std::size_t index = 0; index < area.controlPoints.size();
+             ++index) {
+            const assets::IrrSceneNode* controlNode =
+                mainScene_.findNode(areaNode.cameraControlPointIds[index]);
+            if (controlNode == nullptr ||
+                controlNode->gameType != "CamCtrlPoint" ||
+                controlNode->cameraDistance <= 0.0F) {
+                cameraAreas_.clear();
+                return Result::failure("Camera area " + areaNode.name +
+                                       " has an invalid control point");
+            }
+            area.controlPoints[index] = {
+                controlNode->id,
+                controlNode->position,
+                controlNode->cameraDirection,
+                controlNode->cameraDistance,
+                controlNode->cameraTargetOffset,
+                controlNode->cameraTargetHeightOffset,
+            };
+        }
+        cameraAreas_.push_back(std::move(area));
+    }
+    GameplayCamera gameplayCamera;
+    result = gameplayCamera.bind(cameraAreas_, player_.initialCameraAreaId);
+    if (!result) {
+        cameraAreas_.clear();
+        return result;
     }
 
     introRooms_.reserve(5);

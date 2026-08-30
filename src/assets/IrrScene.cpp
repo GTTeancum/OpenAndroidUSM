@@ -103,6 +103,53 @@ void collectSceneNodes(const pugi::xml_node& parent,
                 findNamedAttribute(userAttributes, "^EndGame^Cinematic")
                     .attribute("value")
                     .as_int(-1);
+            for (std::size_t index = 0;
+                 index < node.cameraControlPointIds.size(); ++index) {
+                const std::string suffix = std::to_string(index + 1);
+                node.cameraControlPointIds[index] =
+                    findNamedAttribute(userAttributes,
+                                       "^Point" + suffix + "^CamCtrlPoint")
+                        .attribute("value")
+                        .as_int(-1);
+                node.nextCameraAreaIds[index] =
+                    findNamedAttribute(userAttributes,
+                                       "^Next" + suffix + "^CameraArea")
+                        .attribute("value")
+                        .as_int(-1);
+            }
+            node.cameraDirection = {
+                findNamedAttribute(userAttributes, "dx")
+                    .attribute("value")
+                    .as_float(),
+                findNamedAttribute(userAttributes, "dy")
+                    .attribute("value")
+                    .as_float(),
+                findNamedAttribute(userAttributes, "dz")
+                    .attribute("value")
+                    .as_float(),
+            };
+            node.cameraDistance = findNamedAttribute(userAttributes, "dis")
+                                      .attribute("value")
+                                      .as_float();
+            node.cameraTargetOffset = {
+                findNamedAttribute(userAttributes, "targetOffsetX")
+                    .attribute("value")
+                    .as_float(),
+                findNamedAttribute(userAttributes, "targetOffsetY")
+                    .attribute("value")
+                    .as_float(),
+                findNamedAttribute(userAttributes, "targetOffsetZ")
+                    .attribute("value")
+                    .as_float(),
+            };
+            node.cameraTargetHeightOffset =
+                findNamedAttribute(userAttributes, "targetHeightOff")
+                    .attribute("value")
+                    .as_float();
+            node.cameraFarPlaneOffset =
+                findNamedAttribute(userAttributes, "farPlaneOffset")
+                    .attribute("value")
+                    .as_float();
             node.parentId = findNamedAttribute(userAttributes, "#ParentID")
                                 .attribute("value")
                                 .as_int(-1);

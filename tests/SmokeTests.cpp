@@ -249,6 +249,35 @@ int main() {
         assert(bootstrap.player().textures.size() == 2);
         assert(bootstrap.player().animationBank.tracks().size() == 46);
         assert(bootstrap.player().animationBank.clips().size() == 242);
+        if (bootstrap.cameraAreas().empty()) {
+            std::cerr << "No gameplay camera areas were reconstructed\n";
+            return 1;
+        }
+        usm::game::GameplayCamera gameplayCamera;
+        const usm::Result gameplayCameraResult = gameplayCamera.bind(
+            bootstrap.cameraAreas(), bootstrap.player().initialCameraAreaId);
+        if (!gameplayCameraResult || gameplayCamera.currentAreaId() != 283) {
+            std::cerr << "Initial gameplay camera could not bind: "
+                      << gameplayCameraResult.message() << '\n';
+            return 1;
+        }
+        const auto gameplayCameraPose =
+            gameplayCamera.sample(bootstrap.player().position);
+        if (std::abs(gameplayCameraPose.target.x - 14688.7148F) >= 0.1F ||
+            std::abs(gameplayCameraPose.target.y - -9614.6006F) >= 0.1F ||
+            std::abs(gameplayCameraPose.target.z - 126.8340F) >= 0.1F ||
+            std::abs(gameplayCameraPose.position.x - 15133.0039F) >= 0.1F ||
+            std::abs(gameplayCameraPose.position.y - -10275.4551F) >= 0.1F ||
+            std::abs(gameplayCameraPose.position.z - 203.5090F) >= 0.1F) {
+            std::cerr << "Unexpected initial gameplay camera pose: target "
+                      << gameplayCameraPose.target.x << ' '
+                      << gameplayCameraPose.target.y << ' '
+                      << gameplayCameraPose.target.z << ", position "
+                      << gameplayCameraPose.position.x << ' '
+                      << gameplayCameraPose.position.y << ' '
+                      << gameplayCameraPose.position.z << '\n';
+            return 1;
+        }
         assert(bootstrap.introRooms().size() == 5);
         assert(bootstrap.introRooms()[4].name == "Room5");
         assert(!bootstrap.introRooms()[4].geometry.geometries().empty());

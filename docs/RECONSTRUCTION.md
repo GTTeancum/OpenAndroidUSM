@@ -57,6 +57,18 @@ scene metadata selects `spiderman_mesh.bdae`, `spiderman_anim.bdae`, initial
 clip `kick_left_double_kick`, collision, initial camera area 283, linked intro
 cinematic 1265, and end-level cinematic 1267. `LevelPlayerAsset` loads those
 references from the scene rather than hard-coding parallel asset choices.
+The level's `CameraArea` and `CamCtrlPoint` records are likewise typed. Each
+area names four polygon control points; each point supplies its camera
+direction, distance, target offset, and target-height offset.
+
+`game::GameplayCamera` reconstructs `CCameraArea::ComputeAverageValues`
+(original `0x002e4ec4`, image `0x002f4ec4`): it projects the player onto the
+control plane, blends the polygon edges by reciprocal distance, distributes
+those weights to their endpoints, and normalizes the blended direction. It
+then follows `CGameCamera::Update` (original `0x002e327c`) by placing the
+camera at `target - direction * distance` and adding the preserved 120-unit
+vertical target offset. The initial area 283 pose is regression-tested from
+Spider-Man's serialized level-one start position.
 
 ## Collada mesh layout
 

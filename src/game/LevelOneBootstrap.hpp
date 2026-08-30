@@ -7,6 +7,7 @@
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/GameplayCamera.hpp"
 
 #include <array>
 #include <cstdint>
@@ -115,6 +116,9 @@ public:
     [[nodiscard]] const LevelPlayerAsset& player() const noexcept {
         return player_;
     }
+    [[nodiscard]] const std::vector<CameraArea>& cameraAreas() const noexcept {
+        return cameraAreas_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -127,6 +131,7 @@ private:
     CinematicCamera introCamera_;
     std::vector<CinematicActorAsset> introActors_;
     LevelPlayerAsset player_;
+    std::vector<CameraArea> cameraAreas_;
 };
 
 } // namespace usm::game

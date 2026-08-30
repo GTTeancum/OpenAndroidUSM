@@ -42,6 +42,13 @@ struct IrrSceneNode {
     std::int32_t initialCameraAreaId{-1};
     std::int32_t linkedCinematicId{-1};
     std::int32_t endGameCinematicId{-1};
+    std::array<std::int32_t, 4> cameraControlPointIds{{-1, -1, -1, -1}};
+    std::array<std::int32_t, 4> nextCameraAreaIds{{-1, -1, -1, -1}};
+    Vector3 cameraDirection;
+    float cameraDistance{};
+    Vector3 cameraTargetOffset;
+    float cameraTargetHeightOffset{};
+    float cameraFarPlaneOffset{};
 };
 
 // Parser for the UTF-16 Irrlicht scene files stored in the level archives.
