@@ -129,6 +129,15 @@ every frame; the D3D11 sky path implements the equivalent translation-free
 view matrix. This keeps the 8.8k-unit skyline dome centered around the moving
 cinematic camera instead of exposing the clear color outside Room 1.
 
+The sky has three evidenced material layers: opaque `01_sky_2.tga`, opaque
+`caodi02.tga`, and variable-alpha `sky_01.tga`. D3D11 uses standard source-alpha
+blending with depth reads but no depth writes for variable-alpha diffuse
+materials, while keeping the recovered 0.5 alpha-test path separate. This
+removes the skyline layer's transparent white background without treating
+cutout foliage as blended geometry. The pale horizon stripes still visible in
+some angles are pixels present in the shipped `01_sky_2.tga`, not the clear
+color or missing room meshes.
+
 The eight `PlayDAEAnim` commands are resolved through their CFF object IDs to
 named Irrlicht scene nodes: Spider-Man (288), three thugs (1257–1259), the
 hostage (1260), cop (1261), police car (1262), and web rope (1277).

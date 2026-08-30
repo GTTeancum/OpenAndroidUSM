@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <string>
 #include <string_view>
 
 namespace {
@@ -84,6 +85,13 @@ int main() {
     if (std::filesystem::exists(dataRoot / "levelnew_01.pack")) {
         usm::game::LevelOneBootstrap levelOne;
         assert(levelOne.load(dataRoot));
+        for (std::size_t textureIndex = 0;
+             textureIndex < levelOne.introSky().textures.size();
+             ++textureIndex) {
+            captureIfRequested(
+                levelOne.introSky().textures[textureIndex].mipLevels().front(),
+                "sky-texture-" + std::to_string(textureIndex) + ".bmp");
+        }
 
         usm::renderer::D3D11Renderer gameRenderer;
         const std::uint32_t captureSize =

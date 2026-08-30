@@ -147,6 +147,20 @@ std::uint32_t rgbaVertexColor(std::uint32_t argb) noexcept {
     return red | (green << 8) | (blue << 16) | (alpha << 24);
 }
 
+bool textureHasTransparency(const assets::BtexTexture& texture) noexcept {
+    if (texture.mipLevels().empty()) {
+        return false;
+    }
+    const std::vector<std::uint8_t>& pixels =
+        texture.mipLevels().front().pixels;
+    for (std::size_t alpha = 3; alpha < pixels.size(); alpha += 4) {
+        if (pixels[alpha] != 255) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 Result D3D11Renderer::initialize(HWND window, std::uint32_t width,
@@ -396,6 +410,42 @@ Result D3D11Renderer::createPipeline() {
     callResult = device_->CreateSamplerState(&samplerDescription, &sampler_);
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreateSamplerState", callResult);
+    }
+
+    D3D11_BLEND_DESC blendDescription{};
+    blendDescription.RenderTarget[0].BlendEnable = TRUE;
+    blendDescription.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    blendDescription.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    blendDescription.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    blendDescription.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    blendDescription.RenderTarget[0].DestBlendAlpha =
+        D3D11_BLEND_INV_SRC_ALPHA;
+    blendDescription.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    blendDescription.RenderTarget[0].RenderTargetWriteMask =
+        D3D11_COLOR_WRITE_ENABLE_ALL;
+    callResult = device_->CreateBlendState(&blendDescription,
+                                            &alphaBlendState_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateBlendState(alpha)",
+                              callResult);
+    }
+
+    D3D11_DEPTH_STENCIL_DESC depthDescription{};
+    depthDescription.DepthEnable = TRUE;
+    depthDescription.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depthDescription.DepthFunc = D3D11_COMPARISON_LESS;
+    callResult = device_->CreateDepthStencilState(&depthDescription,
+                                                   &depthWriteState_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateDepthStencilState(write)",
+                              callResult);
+    }
+    depthDescription.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+    callResult = device_->CreateDepthStencilState(&depthDescription,
+                                                   &depthReadState_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateDepthStencilState(read)",
+                              callResult);
     }
 
     D3D11_RASTERIZER_DESC rasterizerDescription{};
@@ -690,6 +740,12 @@ Result D3D11Renderer::uploadGeometrySet(
     gpuMesh.vertexCount = static_cast<std::uint32_t>(vertices.size());
     gpuMesh.dynamicVertices = dynamicVertices;
 
+    std::vector<bool> transparentTextures(textures.size());
+    for (std::size_t textureIndex = 0; textureIndex < textures.size();
+         ++textureIndex) {
+        transparentTextures[textureIndex] =
+            textureHasTransparency(textures[textureIndex]);
+    }
     std::vector<std::uint16_t> indices;
     std::uint32_t baseVertex = 0;
     for (const assets::ColladaGeometry& geometry : geometries) {
@@ -718,6 +774,11 @@ Result D3D11Renderer::uploadGeometrySet(
                 if (material != nullptr) {
                     batch.alphaTest = material->id.starts_with("alphatest") ||
                                       material->name.starts_with("alphatest");
+                    batch.alphaBlend =
+                        !batch.alphaTest && material->diffuseImageIndex &&
+                        *material->diffuseImageIndex <
+                            transparentTextures.size() &&
+                        transparentTextures[*material->diffuseImageIndex];
                 }
             }
             gpuMesh.drawBatches.push_back(batch);
@@ -888,6 +949,13 @@ void D3D11Renderer::renderFrame() {
             context_->IASetIndexBuffer(gpuMesh.indexBuffer.Get(),
                                        DXGI_FORMAT_R16_UINT, 0);
             for (const DrawBatch& batch : gpuMesh.drawBatches) {
+                context_->OMSetBlendState(
+                    batch.alphaBlend ? alphaBlendState_.Get() : nullptr,
+                    nullptr, 0xffffffffU);
+                context_->OMSetDepthStencilState(
+                    batch.alphaBlend ? depthReadState_.Get()
+                                     : depthWriteState_.Get(),
+                    0);
                 context_->PSSetShader(
                     batch.alphaTest ? alphaTestPixelShader_.Get()
                                     : pixelShader_.Get(),

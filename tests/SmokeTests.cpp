@@ -192,6 +192,18 @@ int main() {
         assert(!bootstrap.introRooms()[4].geometry.geometries().empty());
         assert(bootstrap.introSky().cameraRelative);
         assert(!bootstrap.introSky().geometry.geometries().empty());
+        assert(bootstrap.introSky().geometry.images().size() == 3);
+        const auto* skyMaterial =
+            bootstrap.introSky().geometry.findMaterial("sky");
+        assert(skyMaterial != nullptr);
+        assert(skyMaterial->diffuseImageIndex == 2);
+        const auto& skyPixels =
+            bootstrap.introSky().textures[2].mipLevels().front().pixels;
+        bool skyHasTransparency = false;
+        for (std::size_t alpha = 3; alpha < skyPixels.size(); alpha += 4) {
+            skyHasTransparency |= skyPixels[alpha] != 255;
+        }
+        assert(skyHasTransparency);
         assert(bootstrap.firstRoom().nodes().size() == 60);
         assert(!bootstrap.previewGeometry().vertices.empty());
         assert(!bootstrap.previewTexture().mipLevels().empty());

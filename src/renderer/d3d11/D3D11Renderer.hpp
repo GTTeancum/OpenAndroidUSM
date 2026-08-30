@@ -49,6 +49,7 @@ private:
         std::int32_t baseVertex{};
         std::uint32_t textureIndex{};
         bool alphaTest{};
+        bool alphaBlend{};
     };
 
     struct GpuMesh {
@@ -98,6 +99,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
+    Microsoft::WRL::ComPtr<ID3D11BlendState> alphaBlendState_;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthWriteState_;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthReadState_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
