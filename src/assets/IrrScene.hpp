@@ -66,10 +66,15 @@ public:
     [[nodiscard]] const std::vector<IrrSceneNode>& nodes() const noexcept {
         return nodes_;
     }
+    [[nodiscard]] const std::vector<std::string>& linkedSceneFiles() const
+        noexcept {
+        return linkedSceneFiles_;
+    }
     [[nodiscard]] const IrrSceneNode* findNode(std::int32_t id) const noexcept;
 
 private:
     std::vector<IrrSceneNode> nodes_;
+    std::vector<std::string> linkedSceneFiles_;
 };
 
 } // namespace usm::assets

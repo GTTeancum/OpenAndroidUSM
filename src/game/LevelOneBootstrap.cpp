@@ -82,11 +82,28 @@ assets::Vector3 vectorAttribute(const assets::IrrSceneNode& node,
     return result;
 }
 
-const assets::IrrSceneNode* findLevelNode(const assets::IrrScene& mainScene,
-                                          const assets::IrrScene& firstRoom,
-                                          std::int32_t id) noexcept {
+assets::Vector3 worldPosition(const assets::IrrSceneNode& node) noexcept {
+    return node.absoluteTransform[15] == 0.0F
+               ? node.position
+               : assets::Vector3{node.absoluteTransform[12],
+                                 node.absoluteTransform[13],
+                                 node.absoluteTransform[14]};
+}
+
+const assets::IrrSceneNode* findLevelNode(
+    const assets::IrrScene& mainScene,
+    std::span<const LevelRoomAsset> rooms, std::int32_t id) noexcept {
     const assets::IrrSceneNode* node = mainScene.findNode(id);
-    return node != nullptr ? node : firstRoom.findNode(id);
+    if (node != nullptr) {
+        return node;
+    }
+    for (const LevelRoomAsset& room : rooms) {
+        node = room.scene.findNode(id);
+        if (node != nullptr) {
+            return node;
+        }
+    }
+    return nullptr;
 }
 
 Result loadTextures(filesystem::GbmpArchive& primaryArchive,
@@ -157,7 +174,7 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
 } // namespace
 
 Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
-    introRooms_.clear();
+    rooms_.clear();
     introSky_ = {};
     introActors_.clear();
     player_ = {};
@@ -284,63 +301,25 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Player initial animation is not in its bank");
     }
 
-    for (const assets::IrrSceneNode& areaNode : mainScene_.nodes()) {
-        if (areaNode.gameType != "CameraArea") {
-            continue;
-        }
-        CameraArea area;
-        area.objectId = areaNode.id;
-        area.nextAreaIds = areaNode.nextCameraAreaIds;
-        area.switchTimeUnits = areaNode.cameraAreaSwitchTimeUnits;
-        area.inverseNormal = areaNode.cameraAreaInverseNormal;
-        area.height = areaNode.cameraAreaHeight;
-        area.zFollowRate = areaNode.cameraAreaZFollowRate;
-        area.disabled = areaNode.cameraAreaDisabled;
-        area.farPlaneOffset = areaNode.cameraFarPlaneOffset;
-        for (std::size_t index = 0; index < area.controlPoints.size();
-             ++index) {
-            const assets::IrrSceneNode* controlNode =
-                mainScene_.findNode(areaNode.cameraControlPointIds[index]);
-            if (controlNode == nullptr ||
-                controlNode->gameType != "CamCtrlPoint" ||
-                controlNode->cameraDistance <= 0.0F) {
-                cameraAreas_.clear();
-                return Result::failure("Camera area " + areaNode.name +
-                                       " has an invalid control point");
-            }
-            area.controlPoints[index] = {
-                controlNode->id,
-                controlNode->position,
-                controlNode->cameraDirection,
-                controlNode->cameraDistance,
-                controlNode->cameraTargetOffset,
-                controlNode->cameraTargetHeightOffset,
-            };
-        }
-        cameraAreas_.push_back(std::move(area));
+    if (mainScene_.linkedSceneFiles().empty()) {
+        return Result::failure("Level 1 scene has no linked rooms");
     }
-    GameplayCamera gameplayCamera;
-    result = gameplayCamera.bind(cameraAreas_, player_.initialCameraAreaId);
-    if (!result) {
-        cameraAreas_.clear();
-        return result;
-    }
-
-    introRooms_.reserve(5);
-    for (std::uint32_t roomNumber = 1; roomNumber <= 5; ++roomNumber) {
+    rooms_.reserve(mainScene_.linkedSceneFiles().size());
+    for (const std::string& roomFile : mainScene_.linkedSceneFiles()) {
         LevelRoomAsset room;
-        room.name = "Room" + std::to_string(roomNumber);
-        const std::string roomFile =
-            "levelnew_01_" + std::to_string(roomNumber - 1) + "_" +
-            room.name + ".irr";
+        room.sceneFile = roomFile;
         result = levelArchive.read(roomFile, resource);
         if (!result) {
             return result;
         }
         result = room.scene.load(resource);
         if (!result) {
-            return Result::failure("Could not parse " + room.name + ": " +
+            return Result::failure("Could not parse " + roomFile + ": " +
                                    result.message());
+        }
+        room.name = room.scene.nodes().front().name;
+        if (room.name.empty()) {
+            room.name = std::filesystem::path(roomFile).stem().string();
         }
         const auto geometryNode = std::find_if(
             room.scene.nodes().begin(), room.scene.nodes().end(),
@@ -399,16 +378,74 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             return Result::failure("Could not load navigation mesh for " +
                                    room.name + ": " + result.message());
         }
-        introRooms_.push_back(std::move(room));
+        rooms_.push_back(std::move(room));
     }
 
-    for (const LevelRoomAsset& room : introRooms_) {
+    const auto appendCameraAreas = [this](const assets::IrrScene& scene)
+        -> Result {
+        for (const assets::IrrSceneNode& areaNode : scene.nodes()) {
+            if (areaNode.gameType != "CameraArea") {
+                continue;
+            }
+            CameraArea area;
+            area.objectId = areaNode.id;
+            area.nextAreaIds = areaNode.nextCameraAreaIds;
+            area.switchTimeUnits = areaNode.cameraAreaSwitchTimeUnits;
+            area.inverseNormal = areaNode.cameraAreaInverseNormal;
+            area.height = areaNode.cameraAreaHeight;
+            area.zFollowRate = areaNode.cameraAreaZFollowRate;
+            area.disabled = areaNode.cameraAreaDisabled;
+            area.farPlaneOffset = areaNode.cameraFarPlaneOffset;
+            for (std::size_t index = 0; index < area.controlPoints.size();
+                 ++index) {
+                const assets::IrrSceneNode* controlNode = findLevelNode(
+                    mainScene_, rooms_,
+                    areaNode.cameraControlPointIds[index]);
+                if (controlNode == nullptr ||
+                    controlNode->gameType != "CamCtrlPoint" ||
+                    controlNode->cameraDistance <= 0.0F) {
+                    return Result::failure("Camera area " + areaNode.name +
+                                           " has an invalid control point");
+                }
+                area.controlPoints[index] = {
+                    controlNode->id,
+                    worldPosition(*controlNode),
+                    controlNode->cameraDirection,
+                    controlNode->cameraDistance,
+                    controlNode->cameraTargetOffset,
+                    controlNode->cameraTargetHeightOffset,
+                };
+            }
+            cameraAreas_.push_back(std::move(area));
+        }
+        return Result::success();
+    };
+    result = appendCameraAreas(mainScene_);
+    if (!result) {
+        cameraAreas_.clear();
+        return result;
+    }
+    for (const LevelRoomAsset& room : rooms_) {
+        result = appendCameraAreas(room.scene);
+        if (!result) {
+            cameraAreas_.clear();
+            return result;
+        }
+    }
+    GameplayCamera gameplayCamera;
+    result = gameplayCamera.bind(cameraAreas_, player_.initialCameraAreaId);
+    if (!result) {
+        cameraAreas_.clear();
+        return result;
+    }
+
+    for (const LevelRoomAsset& room : rooms_) {
         for (const assets::IrrSceneNode& node : room.scene.nodes()) {
             if (node.gameType == "Trigger") {
                 LevelTriggerAsset trigger;
                 trigger.objectId = node.id;
                 trigger.name = node.name;
-                trigger.position = node.position;
+                trigger.position = worldPosition(node);
                 trigger.rotation = node.rotation;
                 trigger.scale = node.scale;
                 trigger.worldTransform = node.absoluteTransform;
@@ -441,12 +478,20 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                 cinematic.name = node.name;
                 cinematic.scriptFile = normalizeArchivePath(
                     std::string(scriptFile));
+                if (levelArchive.find(cinematic.scriptFile) == nullptr) {
+                    // Room 13 contains an orphaned editor cinematic 1239 but
+                    // the shipped archive has no matching CFF. Preserve the
+                    // authored object while leaving it non-runnable.
+                    cinematics_.push_back(std::move(cinematic));
+                    continue;
+                }
                 result = levelArchive.read(cinematic.scriptFile, resource);
                 if (!result || !(result = cinematic.script.load(resource))) {
                     return Result::failure("Could not load cinematic " +
                                            cinematic.name + ": " +
                                            result.message());
                 }
+                cinematic.scriptAvailable = true;
                 cinematics_.push_back(std::move(cinematic));
                 continue;
             }
@@ -517,7 +562,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                         : "idle_at1_idle";
             }
             enemy.archetypeIndex = archetypeIndex;
-            enemy.position = node.position;
+            enemy.position = worldPosition(node);
             enemy.rotation = node.rotation;
             enemy.scale = node.scale;
             enemy.worldTransform = node.absoluteTransform;
@@ -617,8 +662,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             const CinematicAttribute* animationFile =
                 command.findAttribute("AnimFile");
             const assets::IrrSceneNode* sceneNode =
-                findLevelNode(mainScene_, introRooms_.front().scene,
-                              thread.objectId);
+                findLevelNode(mainScene_, rooms_, thread.objectId);
             if (animationFile == nullptr || sceneNode == nullptr ||
                 sceneNode->meshFile.empty()) {
                 introActors_.clear();

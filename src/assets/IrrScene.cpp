@@ -191,6 +191,7 @@ void collectSceneNodes(const pugi::xml_node& parent,
 
 Result IrrScene::load(std::span<const std::byte> bytes) {
     nodes_.clear();
+    linkedSceneFiles_.clear();
     if (bytes.empty()) {
         return Result::failure("Irrlicht scene is empty");
     }
@@ -205,6 +206,13 @@ Result IrrScene::load(std::span<const std::byte> bytes) {
     }
 
     collectSceneNodes(document, nodes_);
+    for (const pugi::xpath_node linked : document.select_nodes("//link")) {
+        const std::string fileName = normalizeResourcePath(
+            linked.node().attribute("fileName").value());
+        if (!fileName.empty()) {
+            linkedSceneFiles_.push_back(fileName);
+        }
+    }
     if (nodes_.empty()) {
         return Result::failure("Irrlicht scene contains no nodes");
     }

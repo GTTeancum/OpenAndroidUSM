@@ -517,7 +517,7 @@ int main() {
                 return usm::Result::success();
             }));
         assert(enemySoundPlayCount == 1);
-        assert(bootstrap.triggers().size() == 15);
+        assert(bootstrap.triggers().size() == 27);
         const auto firstEncounterTrigger = std::find_if(
             bootstrap.triggers().begin(), bootstrap.triggers().end(),
             [](const usm::game::LevelTriggerAsset& trigger) {
@@ -552,7 +552,22 @@ int main() {
         assert(encounterEvents.front().cinematicId == 1162);
         assert(encounterEvents.front().kind ==
                usm::game::TriggerEventKind::WhileOutside);
-        assert(bootstrap.cinematics().size() == 20);
+        assert(bootstrap.cinematics().size() == 43);
+        const auto unavailableCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return !cinematic.scriptAvailable;
+            });
+        assert(unavailableCinematic != bootstrap.cinematics().end());
+        assert(unavailableCinematic->objectId == 1239);
+        assert(unavailableCinematic->scriptFile ==
+               "cinematics/levelnew_01_1239_cinematic.cff");
+        assert(std::count_if(
+                   bootstrap.cinematics().begin(),
+                   bootstrap.cinematics().end(),
+                   [](const usm::game::LevelCinematicAsset& cinematic) {
+                       return cinematic.scriptAvailable;
+                   }) == 42);
         const auto firstEncounterCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {
@@ -616,7 +631,7 @@ int main() {
         assert(enemyRuntime.find(395)->aiEnabled);
         assert(enemyRuntime.find(397)->aiEnabled);
         assert(bootstrap.enemyArchetypes().size() == 2);
-        assert(bootstrap.enemies().size() == 14);
+        assert(bootstrap.enemies().size() == 28);
         const auto firstKnifeEnemy = std::find_if(
             bootstrap.enemies().begin(), bootstrap.enemies().end(),
             [](const usm::game::LevelEnemyAsset& enemy) {
@@ -737,7 +752,7 @@ int main() {
         assert(enemySoundCues[2].voxSoundId == 185);
         assert(enemySoundCues[3].voxSoundId == 188);
         usm::game::LevelCollision levelCollision;
-        assert(levelCollision.build(bootstrap.introRooms()));
+        assert(levelCollision.build(bootstrap.rooms()));
         assert(levelCollision.triangleCount() > 100);
         float initialGroundHeight = 0.0F;
         assert(levelCollision.groundHeight(bootstrap.player().position,
@@ -885,9 +900,25 @@ int main() {
         const auto cameraAfterSwitch =
             switchingCamera.sample({15.0F, 5.0F, 0.0F});
         assert(std::abs(cameraAfterSwitch.position.x - -185.0F) < 0.01F);
-        assert(bootstrap.introRooms().size() == 5);
-        assert(bootstrap.introRooms()[4].name == "Room5");
-        assert(!bootstrap.introRooms()[4].geometry.geometries().empty());
+        assert(bootstrap.rooms().size() == 13);
+        assert(bootstrap.mainScene().linkedSceneFiles().size() == 13);
+        assert(bootstrap.mainScene().linkedSceneFiles().front() ==
+               "levelnew_01_0_Room1.irr");
+        assert(bootstrap.mainScene().linkedSceneFiles().back() ==
+               "levelnew_01_13_Room13.irr");
+        assert(bootstrap.rooms()[4].name == "Room5");
+        assert(!bootstrap.rooms()[4].geometry.geometries().empty());
+        assert(bootstrap.rooms().back().name == "Room13");
+        assert(bootstrap.rooms().back().sceneFile ==
+               "levelnew_01_13_Room13.irr");
+        assert(bootstrap.cameraAreas().size() == 44);
+        const auto finalCameraArea = std::find_if(
+            bootstrap.cameraAreas().begin(), bootstrap.cameraAreas().end(),
+            [](const usm::game::CameraArea& area) {
+                return area.objectId == 10100;
+            });
+        assert(finalCameraArea != bootstrap.cameraAreas().end());
+        assert(finalCameraArea->controlPoints.front().position.x < -16000.0F);
         assert(bootstrap.introSky().cameraRelative);
         assert(!bootstrap.introSky().geometry.geometries().empty());
         assert(bootstrap.introSky().geometry.images().size() == 3);

@@ -645,7 +645,7 @@ Result D3D11Renderer::uploadLevelOneScene(
     gpuMeshes_.clear();
     environmentMeshCount_ = 0;
     Result result = Result::success();
-    for (const game::LevelRoomAsset& room : levelOne.introRooms()) {
+    for (const game::LevelRoomAsset& room : levelOne.rooms()) {
         result = uploadGeometrySet(room.geometry.sceneGeometries(),
                                    &room.geometry, room.textures, {});
         if (!result) {

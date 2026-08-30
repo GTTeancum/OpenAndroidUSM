@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -217,7 +218,7 @@ int main() {
 
         usm::game::GameplayPlayer gameplayPlayer;
         usm::game::LevelCollision levelCollision;
-        assert(levelCollision.build(levelOne.introRooms()));
+        assert(levelCollision.build(levelOne.rooms()));
         assert(gameplayPlayer.initialize(levelOne.player(), &levelCollision));
         gameplayPlayer.update({0.0F, 1.0F},
                               gameplayCamera.sample(gameplayPlayer.position()),
@@ -451,6 +452,52 @@ int main() {
                     hurtFrame.pixels[component + 2];
         }
         assert(deathChangedPixels > 100);
+
+        const auto& finalRoom = levelOne.rooms().back();
+        usm::assets::Vector3 minimum{
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max()};
+        usm::assets::Vector3 maximum{
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::lowest()};
+        for (const usm::assets::ColladaGeometry& geometry :
+             finalRoom.geometry.sceneGeometries()) {
+            for (const usm::assets::ColladaVertex& vertex :
+                 geometry.vertices) {
+                minimum.x = std::min(minimum.x, vertex.position.x);
+                minimum.y = std::min(minimum.y, vertex.position.y);
+                minimum.z = std::min(minimum.z, vertex.position.z);
+                maximum.x = std::max(maximum.x, vertex.position.x);
+                maximum.y = std::max(maximum.y, vertex.position.y);
+                maximum.z = std::max(maximum.z, vertex.position.z);
+            }
+        }
+        const float finalRoomExtent =
+            std::max({maximum.x - minimum.x, maximum.y - minimum.y,
+                      maximum.z - minimum.z});
+        assert(finalRoomExtent > 100.0F);
+        const auto finalCameraArea = std::find_if(
+            levelOne.cameraAreas().begin(), levelOne.cameraAreas().end(),
+            [](const usm::game::CameraArea& area) {
+                return area.objectId == 10100;
+            });
+        assert(finalCameraArea != levelOne.cameraAreas().end());
+        usm::assets::Vector3 finalRoomFocus{};
+        for (const auto& point : finalCameraArea->controlPoints) {
+            finalRoomFocus.x += point.position.x * 0.25F;
+            finalRoomFocus.y += point.position.y * 0.25F;
+            finalRoomFocus.z += point.position.z * 0.25F;
+        }
+        usm::game::GameplayCamera finalRoomCamera;
+        assert(finalRoomCamera.bind(levelOne.cameraAreas(), 10100));
+        const auto finalRoomPose = finalRoomCamera.sample(finalRoomFocus);
+        assert(gameRenderer.setCamera(finalRoomPose));
+        gameRenderer.renderFrame();
+        RgbaImage finalRoomFrame;
+        assert(gameRenderer.readBackImage(finalRoomFrame));
+        captureIfRequested(finalRoomFrame, "gameplay-room13-overview.bmp");
     }
     return 0;
 }

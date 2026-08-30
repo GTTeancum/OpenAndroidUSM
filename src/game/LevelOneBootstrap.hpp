@@ -39,6 +39,7 @@ struct CinematicActorAsset {
 
 struct LevelRoomAsset {
     std::string name;
+    std::string sceneFile;
     assets::IrrScene scene;
     assets::ColladaMeshFile geometry;
     assets::ColladaMeshFile collision;
@@ -92,6 +93,7 @@ struct LevelCinematicAsset {
     std::int32_t objectId{-1};
     std::string name;
     std::string scriptFile;
+    bool scriptAvailable{};
     CinematicScript script;
 };
 
@@ -137,24 +139,23 @@ public:
         return mainScene_;
     }
     [[nodiscard]] const assets::IrrScene& firstRoom() const noexcept {
-        return introRooms_.front().scene;
+        return rooms_.front().scene;
     }
     [[nodiscard]] const assets::ColladaGeometry& previewGeometry() const noexcept {
-        return introRooms_.front().geometry.geometries().front();
+        return rooms_.front().geometry.geometries().front();
     }
     [[nodiscard]] const assets::BtexTexture& previewTexture() const noexcept {
-        return introRooms_.front().textures.front();
+        return rooms_.front().textures.front();
     }
     [[nodiscard]] const assets::ColladaMeshFile& roomGeometry() const noexcept {
-        return introRooms_.front().geometry;
+        return rooms_.front().geometry;
     }
     [[nodiscard]] const std::vector<assets::BtexTexture>& roomTextures() const
         noexcept {
-        return introRooms_.front().textures;
+        return rooms_.front().textures;
     }
-    [[nodiscard]] const std::vector<LevelRoomAsset>& introRooms() const
-        noexcept {
-        return introRooms_;
+    [[nodiscard]] const std::vector<LevelRoomAsset>& rooms() const noexcept {
+        return rooms_;
     }
     [[nodiscard]] const LevelStaticMeshAsset& introSky() const noexcept {
         return introSky_;
@@ -214,7 +215,7 @@ public:
 
 private:
     assets::IrrScene mainScene_;
-    std::vector<LevelRoomAsset> introRooms_;
+    std::vector<LevelRoomAsset> rooms_;
     LevelStaticMeshAsset introSky_;
     CinematicScript introStartScript_;
     CinematicScript introScript_;

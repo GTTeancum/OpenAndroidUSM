@@ -59,7 +59,11 @@ cinematic 1265, and end-level cinematic 1267. `LevelPlayerAsset` loads those
 references from the scene rather than hard-coding parallel asset choices.
 The level's `CameraArea` and `CamCtrlPoint` records are likewise typed. Each
 area names four polygon control points; each point supplies its camera
-direction, distance, target offset, and target-height offset.
+direction, distance, target offset, and target-height offset. Thirty areas
+live in the main scene and fourteen more live in linked room scenes. The
+bootstrap resolves all 44 as one graph and converts room-local control points
+through their serialized absolute transforms; this preserves the authored
+route from initial area 283 through final boss area 10100.
 
 `game::GameplayCamera` reconstructs `CCameraArea::ComputeAverageValues`
 (original `0x002e4ec4`, image `0x002f4ec4`): it projects the player onto the
@@ -74,7 +78,7 @@ Spider-Man's serialized level-one start position.
 
 `GameplayPlayer` implements renderer-independent ground movement, collision,
 camera-relative controller input, named punch clips, authored impact timing,
-and health. `LevelEnemyRuntime` owns the mutable state of all 14 level-one
+and health. `LevelEnemyRuntime` owns the mutable state of all 28 level-one
 thugs. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
 `MoveObject` commands feed that state directly; enabled enemies acquire the
 player using their scene-authored awareness radius and chase at the authored
@@ -219,10 +223,24 @@ than component-wise interpolation. Joint-local matrices also follow
 coherent but inverted skeleton. The recovered `idle_stand` pose now remains
 grounded with a 136-unit vertical extent, covered by a core pose regression.
 
-The intro's `MustBeVisible` command names Rooms 1 through 5. The native level
-bootstrap loads those five authored room scenes, their `geometry01` through
-`geometry05` BDAEs, and every referenced texture as separate D3D11 resources.
-It also loads `lvl01_sky.bdae`. The preserved `CSkyBoxObject::Update` at
+The intro's `MustBeVisible` command names Rooms 1 through 5, but the main
+scene's link table names all thirteen playable room scenes. The native level
+bootstrap follows that table instead of a hard-coded intro subset and loads
+all thirteen geometry, collision, navigation, scene, and texture sets as
+separate D3D11 resources. The linked scenes contribute 27 triggers, 28 melee
+enemies, and 43 cinematic objects. Forty-two cinematic scripts are present;
+Room 13's unreferenced editor object 1239 names a CFF absent from the shipped
+archive, so it is retained as explicitly unavailable and never dispatched.
+Room-owned trigger, enemy, and camera-control positions use their serialized
+absolute transforms rather than room-local editor coordinates.
+
+The D3D11 WARP regression also renders Room 13 through authored final camera
+area 10100. Its collapsed asphalt slabs, exposed pipes, wreckage, and open
+below-street background are geometry in the shipped final boss room rather
+than a missing linked-room transform.
+
+The bootstrap also loads `lvl01_sky.bdae`. The preserved
+`CSkyBoxObject::Update` at
 `0x0031b6f4` replaces the sky object's position with the active camera position
 every frame; the D3D11 sky path implements the equivalent translation-free
 view matrix. This keeps the 8.8k-unit skyline dome centered around the moving

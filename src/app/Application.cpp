@@ -102,7 +102,7 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    result = levelCollision_.build(levelOne_.introRooms());
+    result = levelCollision_.build(levelOne_.rooms());
     if (!result) {
         return fail(result.message());
     }
@@ -220,7 +220,8 @@ int Application::run(HINSTANCE instance) {
                         levelOne_.cinematics().begin(),
                         levelOne_.cinematics().end(),
                         [&event](const game::LevelCinematicAsset& candidate) {
-                            return candidate.objectId == event.cinematicId;
+                            return candidate.objectId == event.cinematicId &&
+                                   candidate.scriptAvailable;
                         });
                     if (cinematic == levelOne_.cinematics().end()) {
                         continue;
