@@ -118,6 +118,21 @@ float4 main(PixelInput input) : SV_TARGET {
 }
 )hlsl";
 
+// The screen-space HUD vertex shader has a compact interpolant signature.
+// Keeping its color shader separate prevents COLOR0 from being read from the
+// register assigned to NORMAL by the world-space vertex shader.
+constexpr std::string_view kHudColorPixelShader = R"hlsl(
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    return input.color;
+}
+)hlsl";
+
 constexpr std::string_view kEffectPixelShader = R"hlsl(
 Texture2D EffectTexture : register(t0);
 SamplerState EffectSampler : register(s0);
@@ -568,6 +583,20 @@ Result D3D11Renderer::createPipeline() {
         colorPixelBytecode->GetBufferSize(), nullptr, &colorPixelShader_);
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreatePixelShader(color)",
+                              callResult);
+    }
+    ComPtr<ID3DBlob> hudColorPixelBytecode;
+    result = compileShader(kHudColorPixelShader, "ps_5_0",
+                           hudColorPixelBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreatePixelShader(
+        hudColorPixelBytecode->GetBufferPointer(),
+        hudColorPixelBytecode->GetBufferSize(), nullptr,
+        &hudColorPixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreatePixelShader(HUD color)",
                               callResult);
     }
     ComPtr<ID3DBlob> effectPixelBytecode;
@@ -2314,6 +2343,11 @@ Result D3D11Renderer::updateCinematicUi(
                                      (1.0F - frame.quickTimeEventProgress),
                         -0.45F, 0xfff0c030U);
     }
+    if (frame.blackOverlayAlpha > 0.0F) {
+        const auto alpha = static_cast<std::uint32_t>(std::lround(
+            std::clamp(frame.blackOverlayAlpha, 0.0F, 1.0F) * 255.0F));
+        appendColorQuad(-1.0F, 1.0F, 1.0F, -1.0F, alpha << 24U);
+    }
     if (!colorVertices.empty()) {
         D3D11_BUFFER_DESC description{};
         description.ByteWidth = static_cast<UINT>(colorVertices.size() *
@@ -2941,7 +2975,7 @@ void D3D11Renderer::renderFrame() {
         context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
-        context_->PSSetShader(colorPixelShader_.Get(), nullptr, 0);
+        context_->PSSetShader(hudColorPixelShader_.Get(), nullptr, 0);
         context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
                                   0xffffffffU);
         context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);

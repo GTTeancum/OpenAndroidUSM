@@ -29,6 +29,7 @@
 #include "game/LevelHintRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
+#include "game/LevelRestoreRuntime.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
@@ -787,6 +788,40 @@ int main() {
             assert(damage.damage == 30.0F);
             assert(damage.damageType == 0);
         }
+        assert(bootstrap.restoreTriggers().size() == 11);
+        assert(bootstrap.restorePoints().size() == 11);
+        assert(bootstrap.restoreTriggers().front().objectId == 539);
+        assert(bootstrap.restoreTriggers().front().damage == 200.0F);
+        assert(bootstrap.restoreTriggers()[1].objectId == 1176);
+        assert(bootstrap.restoreTriggers()[1].damage == 50.0F);
+        const std::array<usm::game::LevelRestorePointAsset, 1>
+            testRestorePoints{{{20, 1, {500.0F, 0.0F, 0.0F},
+                                {0.0F, 1.0F, 0.0F}}}};
+        const std::array<usm::game::LevelRestoreTriggerAsset, 1>
+            testRestoreTriggers{{{10, 1, 20, {}, {},
+                                  {1.0F, 1.0F, 1.0F},
+                                  {200.0F, 200.0F, 200.0F}, 200.0F}}};
+        usm::game::LevelRestoreRuntime restoreRuntime;
+        assert(restoreRuntime.bind(testRestoreTriggers, testRestorePoints));
+        restoreRuntime.update({}, 1);
+        assert(restoreRuntime.active());
+        assert(restoreRuntime.blackOverlayAlpha() == 0.0F);
+        restoreRuntime.update({}, 640);
+        assert(restoreRuntime.blackOverlayAlpha() > 0.49F);
+        assert(restoreRuntime.blackOverlayAlpha() < 0.51F);
+        restoreRuntime.update({}, 639);
+        assert(restoreRuntime.consumeEvents().empty());
+        restoreRuntime.update({}, 1);
+        auto restoreEvents = restoreRuntime.consumeEvents();
+        assert(restoreEvents.size() == 1);
+        assert(restoreEvents.front().trigger->objectId == 10);
+        assert(restoreEvents.front().restorePoint->objectId == 20);
+        assert(restoreRuntime.blackOverlayAlpha() == 1.0F);
+        restoreRuntime.update({}, 511);
+        assert(restoreRuntime.active());
+        restoreRuntime.update({}, 1);
+        assert(!restoreRuntime.active());
+        assert(restoreRuntime.blackOverlayAlpha() == 0.0F);
         usm::game::LevelDamageAsset testDamage;
         testDamage.objectId = 10;
         testDamage.position = {};
@@ -2223,6 +2258,13 @@ int main() {
         hurtReactionPlayer.update({}, {}, hurtDuration - 1);
         assert(hurtReactionPlayer.activeAnimation() == hurtClip.name);
         hurtReactionPlayer.update({}, {}, 1);
+        assert(hurtReactionPlayer.activeAnimation() == "idle_stand");
+        hurtReactionPlayer.restoreAt({500.0F, 600.0F, 700.0F},
+                                     {0.0F, 1.0F, 0.0F});
+        assert(hurtReactionPlayer.position().x == 500.0F);
+        assert(hurtReactionPlayer.position().y == 600.0F);
+        assert(hurtReactionPlayer.position().z == 700.0F);
+        assert(hurtReactionPlayer.worldTransform()[12] == 500.0F);
         assert(hurtReactionPlayer.activeAnimation() == "idle_stand");
         usm::game::GameplayPlayer cinematicDamagePlayer;
         assert(cinematicDamagePlayer.initialize(bootstrap.player(),

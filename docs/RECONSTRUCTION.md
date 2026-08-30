@@ -891,6 +891,26 @@ and attacks while the corresponding packaged animation advances. Core tests
 cover all four real records, containment, cooldown, health, and animation
 timing; WARP verifies that the hurt pose changes the rendered player frame.
 
+## Fall restore and black-screen transition
+
+The 13 linked rooms contain 11 `TriggerRestore` volumes, each paired with a
+`RestorePoint`. `CTriggerRestore::ProcessAttr` at `0x0036c170` constructs an
+oriented fall volume from the absolute transform and `Sizes`; the first-level
+pairs carry 200 damage except trigger 1176, which carries 50. The restore
+point returns the player to its authored absolute position and facing, resets
+ordinary locomotion, and lets the nearest camera-area update select the new
+room view.
+
+The normal state-2 path in `CTriggerRestore::Update` at `0x0036bf50` and
+`Draw2D` at `0x0036bb84` is preserved exactly: black alpha advances with
+`elapsed * 256 / 1280`, the player is damaged and restored once at 1280 ms,
+the opaque frame is held through 1792 ms, and then controls and alpha reset.
+`LevelRestoreRuntime` owns that timing and containment independently of D3D11;
+the application suppresses ordinary input and additional hazard hits during
+the transition. The renderer adds the resulting alpha as a final full-screen
+color quad. Deterministic tests cover every shipped link and exact transition
+boundaries, while WARP verifies the fully opaque frame is black.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

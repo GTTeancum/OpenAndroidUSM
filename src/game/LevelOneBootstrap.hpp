@@ -304,6 +304,24 @@ struct LevelDamageAsset {
     bool enabled{true};
 };
 
+struct LevelRestorePointAsset {
+    std::int32_t objectId{-1};
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    assets::Vector3 facing{1.0F, 0.0F, 0.0F};
+};
+
+struct LevelRestoreTriggerAsset {
+    std::int32_t objectId{-1};
+    std::int32_t roomId{-1};
+    std::int32_t restorePointId{-1};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    assets::Vector3 sizes;
+    float damage{};
+};
+
 struct LevelDropAreaAsset {
     std::int32_t objectId{-1};
     std::int32_t roomId{-1};
@@ -468,6 +486,14 @@ public:
         noexcept {
         return damageVolumes_;
     }
+    [[nodiscard]] const std::vector<LevelRestoreTriggerAsset>&
+    restoreTriggers() const noexcept {
+        return restoreTriggers_;
+    }
+    [[nodiscard]] const std::vector<LevelRestorePointAsset>& restorePoints()
+        const noexcept {
+        return restorePoints_;
+    }
     [[nodiscard]] const std::vector<LevelDropAreaAsset>& dropAreas() const
         noexcept {
         return dropAreas_;
@@ -518,6 +544,8 @@ private:
     std::vector<LevelBonusAsset> bonuses_;
     std::vector<LevelHintAsset> hints_;
     std::vector<LevelDamageAsset> damageVolumes_;
+    std::vector<LevelRestoreTriggerAsset> restoreTriggers_;
+    std::vector<LevelRestorePointAsset> restorePoints_;
     std::vector<LevelDropAreaAsset> dropAreas_;
     std::vector<LevelDropObjectAsset> dropObjects_;
     std::vector<LevelTriggerSoundAsset> triggerSounds_;

@@ -160,6 +160,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> colorPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> hudColorPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> effectPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> hudVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> hudPixelShader_;

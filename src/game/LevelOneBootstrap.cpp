@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <iterator>
 #include <optional>
@@ -393,6 +394,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     bonuses_.clear();
     hints_.clear();
     damageVolumes_.clear();
+    restoreTriggers_.clear();
+    restorePoints_.clear();
     dropAreas_.clear();
     dropObjects_.clear();
     triggerSounds_.clear();
@@ -745,6 +748,44 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                 damageVolumes_.push_back(std::move(damage));
                 continue;
             }
+            if (node.gameType == "RestorePoint") {
+                LevelRestorePointAsset point;
+                point.objectId = node.id;
+                point.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                point.position = worldPosition(node);
+                const float facingLength = std::sqrt(
+                    node.absoluteTransform[4] * node.absoluteTransform[4] +
+                    node.absoluteTransform[5] * node.absoluteTransform[5]);
+                if (facingLength > 1e-6F) {
+                    point.facing = {
+                        -node.absoluteTransform[4] / facingLength,
+                        -node.absoluteTransform[5] / facingLength, 0.0F};
+                }
+                restorePoints_.push_back(std::move(point));
+                continue;
+            }
+            if (node.gameType == "TriggerRestore") {
+                LevelRestoreTriggerAsset trigger;
+                trigger.objectId = node.id;
+                trigger.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                trigger.restorePointId =
+                    integerAttribute(node, "^Link^RestorePoint");
+                trigger.position = worldPosition(node);
+                trigger.rotation = node.rotation;
+                trigger.scale = node.scale;
+                trigger.sizes = vectorAttribute(node, "Sizes");
+                trigger.damage = floatAttribute(node, "Damage", 0.0F);
+                if (trigger.restorePointId < 0 ||
+                    trigger.sizes.x == 0.0F ||
+                    trigger.sizes.y == 0.0F ||
+                    trigger.sizes.z == 0.0F || trigger.damage < 0.0F) {
+                    return Result::failure("TriggerRestore " +
+                                           std::to_string(node.id) +
+                                           " has invalid attributes");
+                }
+                restoreTriggers_.push_back(std::move(trigger));
+                continue;
+            }
             if (node.gameType == "DropArea") {
                 LevelDropAreaAsset area;
                 area.objectId = node.id;
@@ -785,6 +826,17 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                     booleanAttribute(node, "IsAABBox", false);
                 triggerSounds_.push_back(std::move(sound));
             }
+        }
+    }
+
+    for (const LevelRestoreTriggerAsset& trigger : restoreTriggers_) {
+        if (std::none_of(
+                restorePoints_.begin(), restorePoints_.end(),
+                [&trigger](const LevelRestorePointAsset& point) {
+                    return point.objectId == trigger.restorePointId;
+                })) {
+            return Result::failure(
+                "TriggerRestore references a missing restore point");
         }
     }
 

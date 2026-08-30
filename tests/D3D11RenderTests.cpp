@@ -797,6 +797,20 @@ int main() {
                     gameplayHudFrame.pixels[component + 2];
         }
         assert(tutorialUiChangedPixels > 100);
+        usm::game::CinematicUiFrame restoreFadeUi;
+        restoreFadeUi.blackOverlayAlpha = 1.0F;
+        assert(gameRenderer.updateCinematicUi(restoreFadeUi));
+        gameRenderer.renderFrame();
+        RgbaImage restoreFadeFrame;
+        assert(gameRenderer.readBackImage(restoreFadeFrame));
+        captureIfRequested(restoreFadeFrame, "gameplay-restore-black.bmp");
+        const std::size_t restoreCenter =
+            ((restoreFadeFrame.height / 2U) * restoreFadeFrame.width +
+             restoreFadeFrame.width / 2U) *
+            4U;
+        assert(restoreFadeFrame.pixels[restoreCenter] < 3);
+        assert(restoreFadeFrame.pixels[restoreCenter + 1] < 3);
+        assert(restoreFadeFrame.pixels[restoreCenter + 2] < 3);
         assert(gameRenderer.updateCinematicUi({}));
         assert(gameRenderer.updateLevelOnePlayer(
             levelOne, *idleClip, idleClip->durationMilliseconds() / 2,

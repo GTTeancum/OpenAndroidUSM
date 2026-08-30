@@ -48,6 +48,8 @@ public:
         std::uint32_t minimumReactionMilliseconds = 0) noexcept;
     void addHealth(float health) noexcept;
     void addSkillPoints(std::int32_t points) noexcept;
+    void restoreAt(const assets::Vector3& position,
+                   const assets::Vector3& facing) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
         const CinematicThread& thread, const CinematicCommand& command);
     void update(const PlayerMotionInput& input, const CameraPose& camera,

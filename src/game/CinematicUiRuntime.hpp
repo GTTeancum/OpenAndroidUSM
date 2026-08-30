@@ -16,6 +16,7 @@ struct CinematicUiFrame {
     bool dimBackground{};
     bool quickTimeEventVisible{};
     float quickTimeEventProgress{};
+    float blackOverlayAlpha{};
 };
 
 // Portable state behind CCinematicThread::OnTutorial (0x003710d4),

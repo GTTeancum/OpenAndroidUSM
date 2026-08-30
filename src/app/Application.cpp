@@ -192,6 +192,11 @@ int Application::run(HINSTANCE instance) {
     triggerRuntime_.bind(levelOne_.triggers());
     triggerSoundRuntime_.bind(levelOne_.triggerSounds());
     levelDamageRuntime_.bind(levelOne_.damageVolumes());
+    result = restoreRuntime_.bind(levelOne_.restoreTriggers(),
+                                  levelOne_.restorePoints());
+    if (!result) {
+        return fail(result.message());
+    }
     result = enemyRuntime_.initialize(levelOne_);
     if (!result) {
         return fail(result.message());
@@ -521,6 +526,7 @@ int Application::run(HINSTANCE instance) {
             const bool controlsEnabled =
                 levelCinematicRuntime_.controlsEnabled() &&
                 !gameplayPlayer_.cinematicDriven() &&
+                !restoreRuntime_.active() &&
                 !quickTimeEvent_.active() &&
                 !(activeGameplayCinematic_ != nullptr &&
                   activeGameplayCinematic_->hasColladaPlayback());
@@ -548,6 +554,19 @@ int Application::run(HINSTANCE instance) {
                 gameplayCamera_.sample(gameplayPlayer_.position());
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    gameDeltaMilliseconds);
+            restoreRuntime_.update(gameplayPlayer_.position(),
+                                   gameDeltaMilliseconds);
+            for (const game::LevelRestoreEvent& event :
+                 restoreRuntime_.consumeEvents()) {
+                if (event.trigger == nullptr || event.restorePoint == nullptr) {
+                    return fail("TriggerRestore emitted an invalid event");
+                }
+                (void)gameplayPlayer_.applyDamage(event.trigger->damage);
+                if (!gameplayPlayer_.dead()) {
+                    gameplayPlayer_.restoreAt(event.restorePoint->position,
+                                              event.restorePoint->facing);
+                }
+            }
             for (std::string_view enteredState =
                      gameplayPlayer_.consumeEnteredState();
                  !enteredState.empty();
@@ -777,7 +796,8 @@ int Application::run(HINSTANCE instance) {
             }
             for (const game::EnemyPlayerHit& hit :
                  enemyRuntime_.consumePlayerHits()) {
-                if (gameplayPlayer_.applyDamage(hit.damage)) {
+                if (!restoreRuntime_.active() &&
+                    gameplayPlayer_.applyDamage(hit.damage)) {
                     result = playerSounds_.dispatchStateEnter(
                         "k_state_hurt_light", playGameplaySound);
                     if (!result) {
@@ -785,8 +805,10 @@ int Application::run(HINSTANCE instance) {
                     }
                 }
             }
-            levelDamageRuntime_.update(gameplayPlayer_.position(),
-                                       gameDeltaMilliseconds);
+            if (!restoreRuntime_.active()) {
+                levelDamageRuntime_.update(gameplayPlayer_.position(),
+                                           gameDeltaMilliseconds);
+            }
             for (const game::LevelDamageEvent& event :
                  levelDamageRuntime_.consumeEvents()) {
                 if (gameplayPlayer_.applyDamage(event.damage,
@@ -837,7 +859,8 @@ int Application::run(HINSTANCE instance) {
                     }
                 } else if (event.kind ==
                            game::LevelDropEventKind::HitPlayer) {
-                    if (gameplayPlayer_.applyDamage(event.damage)) {
+                    if (!restoreRuntime_.active() &&
+                        gameplayPlayer_.applyDamage(event.damage)) {
                         result = playerSounds_.dispatchStateEnter(
                             "k_state_hurt_light", playGameplaySound);
                         if (!result) {
@@ -982,8 +1005,10 @@ int Application::run(HINSTANCE instance) {
                           quickTimeEvent_.durationMilliseconds())
                 : 0.0F;
         if (result) {
-            result = renderer_.updateCinematicUi(cinematicUi_.frame(
-                quickTimeEvent_.active(), qteProgress));
+            game::CinematicUiFrame uiFrame = cinematicUi_.frame(
+                quickTimeEvent_.active(), qteProgress);
+            uiFrame.blackOverlayAlpha = restoreRuntime_.blackOverlayAlpha();
+            result = renderer_.updateCinematicUi(uiFrame);
         }
         if (result) {
             for (const game::SlowMotionSoundCue cue :

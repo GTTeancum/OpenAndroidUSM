@@ -435,6 +435,29 @@ void GameplayPlayer::addSkillPoints(std::int32_t points) noexcept {
     }
 }
 
+void GameplayPlayer::restoreAt(const assets::Vector3& position,
+                               const assets::Vector3& facing) noexcept {
+    position_ = position;
+    renderPosition_ = position;
+    jumpAnchorHeight_ = position.z;
+    const float facingLength = length2D(facing.x, facing.y);
+    if (facingLength > std::numeric_limits<float>::epsilon()) {
+        facing_ = {facing.x / facingLength, facing.y / facingLength, 0.0F};
+    }
+    activeLocomotionState_ = nullptr;
+    locomotionState_ = LocomotionState::Grounded;
+    verticalVelocityCentimetersPerSecond_ = 0.0F;
+    swingReleaseVelocity_ = {};
+    swingReleaseHasTarget_ = false;
+    selectedWebGrabPoint_ = nullptr;
+    webSwingRuntime_ = {};
+    webReleaseRequested_ = false;
+    attackState_ = AttackState::None;
+    hurtReactionRemainingMilliseconds_ = 0;
+    setAnimation("idle_stand");
+    updateWorldTransform(facing_);
+}
+
 Result GameplayPlayer::applyCinematicCommand(
     const CinematicThread& thread, const CinematicCommand& command) {
     if (thread.objectId != objectId_) {

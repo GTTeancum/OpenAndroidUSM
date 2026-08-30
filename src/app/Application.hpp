@@ -21,6 +21,7 @@
 #include "game/LevelHintRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
+#include "game/LevelRestoreRuntime.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/LevelTriggerSoundRuntime.hpp"
@@ -80,6 +81,7 @@ private:
     game::LevelHintRuntime hintRuntime_;
     game::LevelMusicRuntime levelMusicRuntime_;
     game::LevelObjectRuntime objectRuntime_;
+    game::LevelRestoreRuntime restoreRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;
     game::QuickTimeEventRuntime quickTimeEvent_;
     const game::LevelCinematicAsset* activeGameplayCinematic_{};

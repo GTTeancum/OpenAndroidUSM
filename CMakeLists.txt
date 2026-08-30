@@ -122,6 +122,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelHintRuntime.cpp
     src/game/LevelMusicRuntime.cpp
     src/game/LevelObjectRuntime.cpp
+    src/game/LevelRestoreRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
     src/game/LevelTriggerSoundRuntime.cpp
     src/game/LevelOneBootstrap.cpp
