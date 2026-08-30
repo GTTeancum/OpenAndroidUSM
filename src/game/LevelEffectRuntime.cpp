@@ -115,6 +115,12 @@ struct LevelEffectRuntime::PersistentEmitter {
 };
 
 struct LevelEffectRuntime::Particle {
+    struct SizeTarget {
+        float width{};
+        float height{};
+        bool initialized{};
+    };
+
     const EffectEmitterPreset* preset{};
     assets::Vector3 position;
     assets::Vector3 velocity;
@@ -124,6 +130,7 @@ struct LevelEffectRuntime::Particle {
     std::uint32_t lifetimeMilliseconds{};
     float initialWidth{};
     float initialHeight{};
+    std::vector<SizeTarget> sizeTargets;
     float rotationDegrees{};
     float spinBaseRotationDegrees{};
     float spinDeltaDegrees{};
@@ -339,7 +346,7 @@ void LevelEffectRuntime::update(
 
     renderParticles_.clear();
     renderParticles_.reserve(particles_.size());
-    for (const Particle& particle : particles_) {
+    for (Particle& particle : particles_) {
         const EffectEmitterPreset& preset = *particle.preset;
         const float lifeProgress =
             static_cast<float>(particle.ageMilliseconds) /
@@ -365,21 +372,42 @@ void LevelEffectRuntime::update(
         }
         float width = particle.initialWidth;
         float height = particle.initialHeight;
-        if (preset.targetWidth > 0.0F && preset.targetHeight > 0.0F) {
+        for (std::size_t index = 0; index < preset.sizeAffectors.size();
+             ++index) {
+            const EffectSizeAffector& affector = preset.sizeAffectors[index];
             const float sizeStart =
-                static_cast<float>(preset.sizeStartPercent) / 100.0F;
+                static_cast<float>(affector.startPercent) / 100.0F;
+            if (lifeProgress < sizeStart ||
+                index >= particle.sizeTargets.size()) {
+                break;
+            }
+            Particle::SizeTarget& target = particle.sizeTargets[index];
+            if (!target.initialized) {
+                float targetScale = 1.0F;
+                if (affector.variationPercent > 0) {
+                    targetScale +=
+                        std::floor(randomRange(
+                            -static_cast<float>(affector.variationPercent),
+                            static_cast<float>(affector.variationPercent))) /
+                        100.0F;
+                }
+                target.width = affector.targetWidth * targetScale;
+                target.height = affector.targetHeight * targetScale;
+                target.initialized = true;
+            }
             const float sizeEnd =
-                static_cast<float>(preset.sizeEndPercent) / 100.0F;
+                static_cast<float>(affector.endPercent) / 100.0F;
             const float sizeProgress =
                 sizeEnd <= sizeStart
                     ? 1.0F
                     : std::clamp((lifeProgress - sizeStart) /
                                      (sizeEnd - sizeStart),
                                  0.0F, 1.0F);
-            width += (preset.targetWidth * preset.scale.x - width) *
-                     sizeProgress;
-            height += (preset.targetHeight * preset.scale.y - height) *
-                      sizeProgress;
+            width += (target.width - width) * sizeProgress;
+            height += (target.height - height) * sizeProgress;
+            if (lifeProgress < sizeEnd) {
+                break;
+            }
         }
         renderParticles_.push_back(
             {particle.position, width, height, particle.rotationDegrees,
@@ -450,10 +478,14 @@ void LevelEffectRuntime::spawnParticle(
         1.0F + randomRange(-static_cast<float>(preset.sizeVariationPercent),
                            static_cast<float>(preset.sizeVariationPercent)) /
                    100.0F;
-    particle.initialWidth =
-        preset.particleWidth * preset.scale.x * sizeScale;
-    particle.initialHeight =
-        preset.particleHeight * preset.scale.y * sizeScale;
+    // CFpsParticleSystemSceneNode::render (0x0039ff5c) reads the particle's
+    // width and height at SFpsParticle offsets 0x50/0x54 directly. The scene
+    // node's authored Scale affects its transform, not those billboard
+    // dimensions. Applying it here inflated big_firesomke's 100 -> 230 smoke
+    // curve into a 500 -> 1150 world-unit quad.
+    particle.initialWidth = preset.particleWidth * sizeScale;
+    particle.initialHeight = preset.particleHeight * sizeScale;
+    particle.sizeTargets.resize(preset.sizeAffectors.size());
     particle.rotationDegrees = randomRange(
         static_cast<float>(preset.initialRotationMinimumDegrees),
         static_cast<float>(preset.initialRotationMaximumDegrees));

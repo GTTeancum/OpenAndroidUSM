@@ -381,7 +381,9 @@ int main() {
         assert(gameRenderer.readBackImage(environmentEffectBaseline));
         captureIfRequested(environmentEffectBaseline,
                            "gameplay-environment-baseline.bmp");
-        environmentEffects.update(100);
+        // Let both persistent emitters reach visible color/size stages so this
+        // readback covers the authored fire/smoke billboard dimensions.
+        environmentEffects.update(1000);
         assert(!environmentEffects.particles().empty());
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
                                                    environmentEffects,
@@ -403,7 +405,12 @@ int main() {
                 environmentEffectFrame.pixels[component + 2] !=
                     environmentEffectBaseline.pixels[component + 2];
         }
-        assert(environmentEffectChangedPixels > 2);
+        const std::size_t environmentEffectPixelCount =
+            environmentEffectFrame.pixels.size() / 4;
+        assert(environmentEffectChangedPixels >
+               environmentEffectPixelCount / 512);
+        assert(environmentEffectChangedPixels <
+               environmentEffectPixelCount / 32);
 
         usm::game::LevelEffectRuntime bonusEffects;
         assert(bonusEffects.initialize(levelOne.effects().presets));

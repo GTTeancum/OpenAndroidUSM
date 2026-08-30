@@ -150,6 +150,8 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                     currentAffector = value.attribute("value").as_string();
                     if (currentAffector == "FadeOut") {
                         emitter.colorAffectors.push_back({});
+                    } else if (currentAffector == "Size") {
+                        emitter.sizeAffectors.push_back({});
                     }
                 } else if (currentAffector == "FadeOut") {
                     if (field == "TargetColor") {
@@ -199,16 +201,19 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                     }
                 } else if (currentAffector == "Size") {
                     if (field == "TargetWidth") {
-                        emitter.targetWidth =
+                        emitter.sizeAffectors.back().targetWidth =
                             value.attribute("value").as_float();
                     } else if (field == "TargetHeight") {
-                        emitter.targetHeight =
+                        emitter.sizeAffectors.back().targetHeight =
                             value.attribute("value").as_float();
+                    } else if (field == "Variation") {
+                        emitter.sizeAffectors.back().variationPercent =
+                            value.attribute("value").as_int();
                     } else if (field == "StartTime(%)") {
-                        emitter.sizeStartPercent =
+                        emitter.sizeAffectors.back().startPercent =
                             value.attribute("value").as_int();
                     } else if (field == "EndTime(%)") {
-                        emitter.sizeEndPercent =
+                        emitter.sizeAffectors.back().endPercent =
                             value.attribute("value").as_int(100);
                     }
                 }
@@ -225,6 +230,12 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                 emitter.colorAffectors.end(),
                 [](const EffectColorAffector& first,
                    const EffectColorAffector& second) {
+                    return first.startPercent < second.startPercent;
+                });
+            std::stable_sort(
+                emitter.sizeAffectors.begin(), emitter.sizeAffectors.end(),
+                [](const EffectSizeAffector& first,
+                   const EffectSizeAffector& second) {
                     return first.startPercent < second.startPercent;
                 });
             preset.emitters.push_back(std::move(emitter));

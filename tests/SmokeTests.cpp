@@ -1229,6 +1229,60 @@ int main() {
         assert(ambientFirePreset->emitters.front()
                    .colorAffectors.back()
                    .startPercent == 80);
+        const auto* ambientSmoke = findEmitter(*ambientFirePreset, "smoke");
+        assert(ambientSmoke != nullptr);
+        assert(ambientSmoke->particleWidth == 100.0F);
+        assert(ambientSmoke->particleHeight == 100.0F);
+        assert(ambientSmoke->sizeAffectors.size() == 1);
+        assert(ambientSmoke->sizeAffectors.front().targetWidth == 230.0F);
+        assert(ambientSmoke->sizeAffectors.front().targetHeight == 230.0F);
+        assert(ambientSmoke->scale.x == 5.0F);
+        assert(ambientSmoke->scale.y == 5.0F);
+        assert(ambientSmoke->sizeVariationPercent == 0);
+        usm::game::LevelEffectRuntime ambientScaleRuntime;
+        assert(ambientScaleRuntime.initialize(bootstrap.effects().presets));
+        assert(ambientScaleRuntime.playEffect("big_firesomke", {}, 1));
+        ambientScaleRuntime.update(1);
+        const auto ambientSmokeParticle = std::find_if(
+            ambientScaleRuntime.particles().begin(),
+            ambientScaleRuntime.particles().end(),
+            [](const auto& particle) { return particle.frameId == 0; });
+        assert(ambientSmokeParticle != ambientScaleRuntime.particles().end());
+        assert(ambientSmokeParticle->width >= 100.0F &&
+               ambientSmokeParticle->width < 101.0F);
+        assert(ambientSmokeParticle->height >= 100.0F &&
+               ambientSmokeParticle->height < 101.0F);
+        const auto* bigFirePreset =
+            bootstrap.effects().presets.find("bigfire_xp");
+        assert(bigFirePreset != nullptr);
+        const auto* bigFireSmoke = findEmitter(*bigFirePreset, "smoke");
+        assert(bigFireSmoke != nullptr);
+        assert(bigFireSmoke->sizeAffectors.size() == 2);
+        assert(bigFireSmoke->sizeAffectors[0].targetWidth == 50.0F);
+        assert(bigFireSmoke->sizeAffectors[0].variationPercent == 0);
+        assert(bigFireSmoke->sizeAffectors[0].startPercent == 0);
+        assert(bigFireSmoke->sizeAffectors[0].endPercent == 10);
+        assert(bigFireSmoke->sizeAffectors[1].targetWidth == 200.0F);
+        assert(bigFireSmoke->sizeAffectors[1].variationPercent == 50);
+        assert(bigFireSmoke->sizeAffectors[1].startPercent == 10);
+        assert(bigFireSmoke->sizeAffectors[1].endPercent == 100);
+        usm::game::LevelEffectRuntime stagedSizeRuntime;
+        assert(stagedSizeRuntime.initialize(bootstrap.effects().presets));
+        assert(stagedSizeRuntime.playEffect("bigfire_xp", {}, 1));
+        stagedSizeRuntime.update(1);
+        const auto stagedSmokeWidth = [&stagedSizeRuntime]() {
+            const auto particle = std::find_if(
+                stagedSizeRuntime.particles().begin(),
+                stagedSizeRuntime.particles().end(),
+                [](const auto& state) { return state.frameId == 0; });
+            assert(particle != stagedSizeRuntime.particles().end());
+            return particle->width;
+        };
+        stagedSizeRuntime.update(149);
+        assert(std::abs(stagedSmokeWidth() - 50.0F) < 0.01F);
+        stagedSizeRuntime.update(450);
+        assert(stagedSmokeWidth() > 60.0F);
+        assert(stagedSmokeWidth() < 140.0F);
         assert(bootstrap.effects().atlas.modules().size() == 16);
         assert(bootstrap.effects().atlas.frames().size() == 16);
         assert(bootstrap.effects().texture.image().width == 256);
@@ -1304,17 +1358,19 @@ int main() {
         assert(effectRuntime.particles().size() == 2);
         assert(effectRuntime.particles().front().frameId == 2);
         assert(effectRuntime.particles().front().width > 0.0F);
-        const auto movingHitParticle = std::find_if(
-            effectRuntime.particles().begin(), effectRuntime.particles().end(),
-            [](const auto& particle) { return particle.height > 25.0F; });
-        assert(movingHitParticle != effectRuntime.particles().end());
-        const std::size_t movingHitIndex = static_cast<std::size_t>(
-            movingHitParticle - effectRuntime.particles().begin());
-        const float movingHitStartZ = movingHitParticle->position.z;
+        std::vector<float> hitStartHeights;
+        for (const auto& particle : effectRuntime.particles()) {
+            hitStartHeights.push_back(particle.position.z);
+        }
         effectRuntime.update(50);
-        assert(effectRuntime.particles()[movingHitIndex].position.z -
-                   movingHitStartZ >
-               95.0F);
+        assert(effectRuntime.particles().size() == hitStartHeights.size());
+        bool hitParticleMoved = false;
+        for (std::size_t index = 0; index < hitStartHeights.size(); ++index) {
+            hitParticleMoved |= effectRuntime.particles()[index].position.z -
+                                    hitStartHeights[index] >
+                                95.0F;
+        }
+        assert(hitParticleMoved);
         effectRuntime.update(250);
         assert(effectRuntime.particles().empty());
         assert(effectRuntime.initialize(bootstrap.effects().presets));

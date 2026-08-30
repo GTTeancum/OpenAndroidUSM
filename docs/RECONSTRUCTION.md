@@ -875,6 +875,21 @@ deterministic motion and expiry, and visible frames for all three effect types
 authored by level one: `cartoon_hit_splash_big`, `explode_new`, and
 `rock_splash`.
 
+Particle width and height remain independent of the emitter scene-node scale.
+`CFpsParticleSystemSceneNode::render` at `0x0039ff5c` reads the two dimensions
+directly from `SFpsParticle` offsets `0x50/0x54` while submitting the billboard
+vertices with an identity or translation-only world transform. The runtime
+therefore applies the authored `ParticleWidth`/`ParticleHeight` and size-affector
+targets without multiplying them by `Scale`. In particular, `big_firesomke`
+now follows its native 100-to-230-unit smoke curve instead of producing the
+incorrect 500-to-1150-unit red sheets. Core tests pin the decoded dimensions,
+and a mature WARP fire/smoke readback bounds the effect's screen coverage.
+Size affectors are also retained as an ordered list rather than collapsed into
+one emitter-wide target. `CFpsParticleSizeAffector::affect` at `0x0039e41c`
+captures the size at each interval boundary and selects that affector's target
+variation once. This restores the authored 0–10% and 10–100% stages used by
+`bigfire_xp` and `fire_on_wall` smoke.
+
 ## Room visibility and terminal cinematics
 
 `CLevel::UpdateRooms` at `0x00381f24` combines the active camera frustum with

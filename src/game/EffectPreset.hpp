@@ -18,6 +18,14 @@ struct EffectColorAffector {
     std::int32_t endPercent{100};
 };
 
+struct EffectSizeAffector {
+    float targetWidth{};
+    float targetHeight{};
+    std::int32_t variationPercent{};
+    std::int32_t startPercent{};
+    std::int32_t endPercent{100};
+};
+
 struct EffectEmitterPreset {
     std::string name;
     assets::Vector3 position;
@@ -34,8 +42,6 @@ struct EffectEmitterPreset {
     std::int32_t maximumParticlesPerSecond{};
     float particleWidth{};
     float particleHeight{};
-    float targetWidth{};
-    float targetHeight{};
     std::int32_t sizeVariationPercent{};
     std::uint32_t minimumStartColor{0xffffffffU};
     std::uint32_t maximumStartColor{0xffffffffU};
@@ -44,8 +50,6 @@ struct EffectEmitterPreset {
     std::int32_t speedVariationPercent{};
     std::int32_t initialRotationMinimumDegrees{};
     std::int32_t initialRotationMaximumDegrees{};
-    std::int32_t sizeStartPercent{};
-    std::int32_t sizeEndPercent{100};
     std::int32_t gravityStartPercent{};
     std::int32_t gravityEndPercent{100};
     std::int32_t spinMinimumDegrees{};
@@ -58,6 +62,7 @@ struct EffectEmitterPreset {
     bool hasSpin{};
     bool additive{};
     std::vector<EffectColorAffector> colorAffectors;
+    std::vector<EffectSizeAffector> sizeAffectors;
 };
 
 struct EffectPreset {
