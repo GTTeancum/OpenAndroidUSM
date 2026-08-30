@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace usm::assets {
@@ -38,6 +39,7 @@ struct IrrSceneNode {
     std::string meshFile;
     std::string animationFile;
     std::string initialAnimation;
+    std::unordered_map<std::string, std::string> userAttributes;
     bool hasCollision{};
     std::int32_t initialCameraAreaId{-1};
     std::int32_t linkedCinematicId{-1};

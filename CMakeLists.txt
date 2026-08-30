@@ -96,6 +96,8 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/GameplayCamera.cpp
     src/game/GameplayPlayer.cpp
     src/game/LevelCollision.cpp
+    src/game/LevelEnemyRuntime.cpp
+    src/game/LevelTriggerRuntime.cpp
     src/game/LevelOneBootstrap.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )

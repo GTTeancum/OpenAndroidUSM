@@ -7,6 +7,8 @@
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
+#include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelTriggerRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
@@ -34,6 +36,11 @@ private:
     game::GameplayCamera gameplayCamera_;
     game::LevelCollision levelCollision_;
     game::GameplayPlayer gameplayPlayer_;
+    game::LevelTriggerRuntime triggerRuntime_;
+    game::LevelEnemyRuntime enemyRuntime_;
+    game::CinematicPlayer gameplayCinematicPlayer_;
+    const game::LevelCinematicAsset* activeGameplayCinematic_{};
+    std::uint32_t gameplayCinematicTimeMilliseconds_{};
 };
 
 } // namespace usm

@@ -4,6 +4,7 @@
 #include "assets/BtexTexture.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/LevelEnemyRuntime.hpp"
 #include "renderer/IRenderer.hpp"
 
 #include <DirectXMath.h>
@@ -39,6 +40,9 @@ public:
         const assets::ColladaAnimationClip& clip,
         std::uint32_t clipTimeMilliseconds,
         const std::array<float, 16>& worldTransform);
+    [[nodiscard]] Result updateLevelOneEnemies(
+        const game::LevelOneBootstrap& levelOne,
+        const game::LevelEnemyRuntime& enemies);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -117,6 +121,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthReadState_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
+    std::size_t enemyMeshStart_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};

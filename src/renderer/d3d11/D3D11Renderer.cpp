@@ -621,6 +621,39 @@ Result D3D11Renderer::uploadLevelOneScene(
         }
         gpuMeshes_.back().visible = actor.animationStartMilliseconds == 0;
     }
+    enemyMeshStart_ = gpuMeshes_.size();
+    for (const game::LevelEnemyAsset& enemy : levelOne.enemies()) {
+        if (enemy.archetypeIndex >= levelOne.enemyArchetypes().size()) {
+            gpuMeshes_.clear();
+            return Result::failure("Enemy archetype index is invalid");
+        }
+        const game::EnemyArchetypeAsset& archetype =
+            levelOne.enemyArchetypes()[enemy.archetypeIndex];
+        const assets::ColladaAnimationClip* clip =
+            archetype.animationBank.findClip(enemy.initialAnimation);
+        if (clip == nullptr) {
+            gpuMeshes_.clear();
+            return Result::failure("Enemy initial animation is missing");
+        }
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        result = assets::evaluateColladaPose(
+            archetype.mesh, archetype.animationBank, clip->startMilliseconds,
+            animatedGeometry);
+        if (!result) {
+            gpuMeshes_.clear();
+            return Result::failure("Could not evaluate enemy " + enemy.name +
+                                   ": " + result.message());
+        }
+        result = uploadGeometrySet(animatedGeometry, &archetype.mesh,
+                                   archetype.textures, {},
+                                   &enemy.worldTransform, true);
+        if (!result) {
+            gpuMeshes_.clear();
+            return Result::failure("Could not upload enemy " + enemy.name +
+                                   ": " + result.message());
+        }
+        gpuMeshes_.back().visible = enemy.visible;
+    }
     return Result::success();
 }
 
@@ -628,7 +661,8 @@ Result D3D11Renderer::updateLevelOneActors(
     const game::LevelOneBootstrap& levelOne,
     std::uint32_t timestampMilliseconds) {
     if (gpuMeshes_.size() !=
-        levelOne.introActors().size() + environmentMeshCount_) {
+        levelOne.introActors().size() + levelOne.enemies().size() +
+            environmentMeshCount_) {
         return Result::failure("Level-one actor GPU resources are incomplete");
     }
     for (std::size_t actorIndex = 0;
@@ -661,6 +695,53 @@ Result D3D11Renderer::updateLevelOneActors(
         if (!result) {
             return Result::failure("Could not update actor " +
                                    actor.sceneNodeName + ": " +
+                                   result.message());
+        }
+    }
+    return Result::success();
+}
+
+Result D3D11Renderer::updateLevelOneEnemies(
+    const game::LevelOneBootstrap& levelOne,
+    const game::LevelEnemyRuntime& enemies) {
+    if (enemies.states().size() != levelOne.enemies().size() ||
+        enemyMeshStart_ + enemies.states().size() > gpuMeshes_.size()) {
+        return Result::failure("Level-one enemy GPU resources are incomplete");
+    }
+    for (std::size_t index = 0; index < enemies.states().size(); ++index) {
+        const game::LevelEnemyState& enemy = enemies.states()[index];
+        if (enemy.asset == nullptr ||
+            enemy.asset->archetypeIndex >= levelOne.enemyArchetypes().size()) {
+            return Result::failure("Enemy runtime archetype is invalid");
+        }
+        const game::EnemyArchetypeAsset& archetype =
+            levelOne.enemyArchetypes()[enemy.asset->archetypeIndex];
+        const assets::ColladaAnimationClip* clip =
+            archetype.animationBank.findClip(enemy.activeAnimation);
+        if (clip == nullptr) {
+            return Result::failure("Enemy runtime animation is missing");
+        }
+        const std::uint32_t localTime =
+            clip->durationMilliseconds() == 0
+                ? 0
+                : enemy.animationTimeMilliseconds %
+                      clip->durationMilliseconds();
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        Result result = assets::evaluateColladaPose(
+            archetype.mesh, archetype.animationBank,
+            clip->startMilliseconds + localTime, animatedGeometry);
+        if (!result) {
+            return Result::failure("Could not animate enemy " +
+                                   enemy.asset->name + ": " +
+                                   result.message());
+        }
+        GpuMesh& gpuMesh = gpuMeshes_[enemyMeshStart_ + index];
+        gpuMesh.visible = enemy.visible;
+        result = updateDynamicMesh(gpuMesh, animatedGeometry,
+                                   &enemy.worldTransform);
+        if (!result) {
+            return Result::failure("Could not update enemy " +
+                                   enemy.asset->name + ": " +
                                    result.message());
         }
     }

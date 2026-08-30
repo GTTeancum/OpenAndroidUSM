@@ -3,6 +3,9 @@
 #include "filesystem/GbmpArchive.hpp"
 
 #include <algorithm>
+#include <charconv>
+#include <cstdlib>
+#include <iterator>
 #include <string_view>
 #include <vector>
 
@@ -19,6 +22,64 @@ std::string normalizeArchivePath(std::string path) {
         path.erase(0, entityPrefix.size());
     }
     return path;
+}
+
+std::string_view userAttribute(const assets::IrrSceneNode& node,
+                               std::string_view name) noexcept {
+    const auto match = node.userAttributes.find(std::string(name));
+    return match == node.userAttributes.end() ? std::string_view{}
+                                               : match->second;
+}
+
+std::int32_t integerAttribute(const assets::IrrSceneNode& node,
+                              std::string_view name,
+                              std::int32_t fallback = -1) noexcept {
+    const std::string_view value = userAttribute(node, name);
+    std::int32_t parsed = fallback;
+    const auto result = std::from_chars(value.data(), value.data() + value.size(),
+                                        parsed);
+    return result.ec == std::errc{} ? parsed : fallback;
+}
+
+float floatAttribute(const assets::IrrSceneNode& node, std::string_view name,
+                     float fallback = 0.0F) noexcept {
+    const std::string_view value = userAttribute(node, name);
+    if (value.empty()) {
+        return fallback;
+    }
+    std::string storage(value);
+    char* end = nullptr;
+    const float parsed = std::strtof(storage.c_str(), &end);
+    return end == storage.c_str() ? fallback : parsed;
+}
+
+bool booleanAttribute(const assets::IrrSceneNode& node, std::string_view name,
+                      bool fallback = false) noexcept {
+    const std::string_view value = userAttribute(node, name);
+    if (value == "true" || value == "1") {
+        return true;
+    }
+    if (value == "false" || value == "0") {
+        return false;
+    }
+    return fallback;
+}
+
+assets::Vector3 vectorAttribute(const assets::IrrSceneNode& node,
+                                std::string_view name) noexcept {
+    std::string storage(userAttribute(node, name));
+    std::replace(storage.begin(), storage.end(), ',', ' ');
+    const char* cursor = storage.c_str();
+    char* end = nullptr;
+    assets::Vector3 result;
+    for (float* component : {&result.x, &result.y, &result.z}) {
+        *component = std::strtof(cursor, &end);
+        if (end == cursor) {
+            return {};
+        }
+        cursor = end;
+    }
+    return result;
 }
 
 const assets::IrrSceneNode* findLevelNode(const assets::IrrScene& mainScene,
@@ -101,6 +162,10 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     introActors_.clear();
     player_ = {};
     cameraAreas_.clear();
+    triggers_.clear();
+    cinematics_.clear();
+    enemyArchetypes_.clear();
+    enemies_.clear();
     filesystem::GbmpArchive levelArchive;
     Result result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {
@@ -291,6 +356,140 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                                    room.name + ": " + result.message());
         }
         introRooms_.push_back(std::move(room));
+    }
+
+    for (const LevelRoomAsset& room : introRooms_) {
+        for (const assets::IrrSceneNode& node : room.scene.nodes()) {
+            if (node.gameType == "Trigger") {
+                LevelTriggerAsset trigger;
+                trigger.objectId = node.id;
+                trigger.name = node.name;
+                trigger.position = node.position;
+                trigger.rotation = node.rotation;
+                trigger.scale = node.scale;
+                trigger.worldTransform = node.absoluteTransform;
+                trigger.sizes = vectorAttribute(node, "Sizes");
+                trigger.orientedBox =
+                    booleanAttribute(node, "IsOBBox", false);
+                trigger.enabled = booleanAttribute(node, "Enabled", true);
+                trigger.autoDisabled =
+                    booleanAttribute(node, "AutoDisabled", false);
+                trigger.outToInCinematicId =
+                    integerAttribute(node, "^OutToIn^Cinematic");
+                trigger.inToOutCinematicId =
+                    integerAttribute(node, "^InToOut^Cinematic");
+                trigger.whileInsideCinematicId =
+                    integerAttribute(node, "^WhileIn^Cinematic");
+                trigger.whileOutsideCinematicId =
+                    integerAttribute(node, "^WhileOut^Cinematic");
+                triggers_.push_back(std::move(trigger));
+                continue;
+            }
+            if (node.gameType == "Cinematic") {
+                const std::string_view scriptFile =
+                    userAttribute(node, "!ScriptFile");
+                if (scriptFile.empty()) {
+                    return Result::failure("Cinematic " + node.name +
+                                           " has no script file");
+                }
+                LevelCinematicAsset cinematic;
+                cinematic.objectId = node.id;
+                cinematic.name = node.name;
+                cinematic.scriptFile = normalizeArchivePath(
+                    std::string(scriptFile));
+                result = levelArchive.read(cinematic.scriptFile, resource);
+                if (!result || !(result = cinematic.script.load(resource))) {
+                    return Result::failure("Could not load cinematic " +
+                                           cinematic.name + ": " +
+                                           result.message());
+                }
+                cinematics_.push_back(std::move(cinematic));
+                continue;
+            }
+            if (!node.gameType.starts_with("MeleeThugEnemy_")) {
+                continue;
+            }
+
+            std::string resolvedAnimationFile = node.animationFile;
+            if (entityArchive.find(
+                    normalizeArchivePath(resolvedAnimationFile)) == nullptr &&
+                node.gameType == "MeleeThugEnemy_knife") {
+                // Level 1 authors knife enemies with a nonexistent
+                // thug_knife_anim.bdae. The shipped archive and cinematic
+                // knife actor both use the shared bat/knife animation bank.
+                resolvedAnimationFile =
+                    "../entities/meshes_bin/thug_bat_anim.bdae";
+            }
+            const auto archetype = std::find_if(
+                enemyArchetypes_.begin(), enemyArchetypes_.end(),
+                [&node, &resolvedAnimationFile](
+                    const EnemyArchetypeAsset& candidate) {
+                    return candidate.meshFile == node.meshFile &&
+                           candidate.animationFile == resolvedAnimationFile;
+                });
+            std::size_t archetypeIndex = 0;
+            if (archetype == enemyArchetypes_.end()) {
+                EnemyArchetypeAsset asset;
+                asset.gameType = node.gameType;
+                asset.meshFile = node.meshFile;
+                asset.animationFile = resolvedAnimationFile;
+                result = entityArchive.read(
+                    normalizeArchivePath(asset.meshFile), resource);
+                if (!result || !(result = asset.mesh.load(resource))) {
+                    return Result::failure("Could not load enemy mesh " +
+                                           asset.meshFile + ": " +
+                                           result.message());
+                }
+                result = loadTextures(entityArchive, nullptr, asset.mesh,
+                                      asset.textures, asset.gameType);
+                if (!result) {
+                    return result;
+                }
+                result = entityArchive.read(
+                    normalizeArchivePath(asset.animationFile), resource);
+                if (!result || !(result = asset.animationBank.load(resource))) {
+                    return Result::failure("Could not load enemy animation " +
+                                           asset.animationFile + ": " +
+                                           result.message());
+                }
+                enemyArchetypes_.push_back(std::move(asset));
+                archetypeIndex = enemyArchetypes_.size() - 1;
+            } else {
+                archetypeIndex = static_cast<std::size_t>(
+                    std::distance(enemyArchetypes_.begin(), archetype));
+            }
+
+            LevelEnemyAsset enemy;
+            enemy.objectId = node.id;
+            enemy.name = node.name;
+            enemy.gameType = node.gameType;
+            enemy.initialAnimation = node.initialAnimation;
+            if (enemy.initialAnimation.empty()) {
+                enemy.initialAnimation =
+                    node.gameType == "MeleeThugEnemy_knife"
+                        ? "idle_knife_at_idle"
+                        : "idle_at1_idle";
+            }
+            enemy.archetypeIndex = archetypeIndex;
+            enemy.position = node.position;
+            enemy.rotation = node.rotation;
+            enemy.scale = node.scale;
+            enemy.worldTransform = node.absoluteTransform;
+            enemy.health = floatAttribute(node, "Health");
+            enemy.visible = node.visible;
+            enemy.aiEnabled = booleanAttribute(node, "AI_Enable", true);
+            enemy.waitSpawn = booleanAttribute(node, "WaitSpawn", false);
+            enemy.awarenessRadius = floatAttribute(node, "Aware_Radius");
+            enemy.awarenessAngleDegrees =
+                floatAttribute(node, "Aware_Angle");
+            if (enemyArchetypes_[archetypeIndex].animationBank.findClip(
+                    enemy.initialAnimation) == nullptr) {
+                return Result::failure("Enemy " + std::to_string(enemy.objectId) +
+                                       " initial animation " +
+                                       enemy.initialAnimation + " is missing");
+            }
+            enemies_.push_back(std::move(enemy));
+        }
     }
 
     introSky_.name = "Level 1 sky";

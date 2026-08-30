@@ -82,6 +82,14 @@ void collectSceneNodes(const pugi::xml_node& parent,
             node.visible = !visible || visible.attribute("value").as_bool(true);
             node.name = valueOf(userAttributes, "Name");
             node.gameType = valueOf(userAttributes, "!GameType");
+            for (const pugi::xml_node attribute : userAttributes.children()) {
+                const std::string attributeName =
+                    attribute.attribute("name").value();
+                if (!attributeName.empty()) {
+                    node.userAttributes.emplace(
+                        attributeName, attribute.attribute("value").value());
+                }
+            }
             node.meshFile =
                 normalizeResourcePath(valueOf(userAttributes, "MeshFile"));
             node.animationFile = normalizeResourcePath(

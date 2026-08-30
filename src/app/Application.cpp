@@ -81,6 +81,11 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    triggerRuntime_.bind(levelOne_.triggers());
+    result = enemyRuntime_.initialize(levelOne_);
+    if (!result) {
+        return fail(result.message());
+    }
 
     const auto introStart = std::chrono::steady_clock::now();
     auto previousFrame = introStart;
@@ -145,6 +150,50 @@ int Application::run(HINSTANCE instance) {
                                    deltaMilliseconds);
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
                                              deltaMilliseconds);
+            const auto triggerEvents =
+                triggerRuntime_.update(gameplayPlayer_.position());
+            if (activeGameplayCinematic_ == nullptr) {
+                for (const game::TriggerEvent& event : triggerEvents) {
+                    const auto cinematic = std::find_if(
+                        levelOne_.cinematics().begin(),
+                        levelOne_.cinematics().end(),
+                        [&event](const game::LevelCinematicAsset& candidate) {
+                            return candidate.objectId == event.cinematicId;
+                        });
+                    if (cinematic == levelOne_.cinematics().end()) {
+                        continue;
+                    }
+                    activeGameplayCinematic_ = &*cinematic;
+                    gameplayCinematicTimeMilliseconds_ = 0;
+                    result = gameplayCinematicPlayer_.start(cinematic->script);
+                    break;
+                }
+            }
+            if (result && activeGameplayCinematic_ != nullptr) {
+                gameplayCinematicTimeMilliseconds_ =
+                    std::min<std::uint32_t>(
+                        gameplayCinematicTimeMilliseconds_ +
+                            deltaMilliseconds,
+                        gameplayCinematicPlayer_.durationMilliseconds());
+                Result commandResult = Result::success();
+                result = gameplayCinematicPlayer_.advanceTo(
+                    gameplayCinematicTimeMilliseconds_,
+                    [this, &commandResult](
+                        const game::CinematicThread& thread,
+                        const game::CinematicCommand& command) {
+                        if (commandResult) {
+                            commandResult = enemyRuntime_.applyCinematicCommand(
+                                levelOne_, thread, command);
+                        }
+                    });
+                if (result && !commandResult) {
+                    result = commandResult;
+                }
+                if (result && gameplayCinematicPlayer_.finished()) {
+                    activeGameplayCinematic_ = nullptr;
+                }
+            }
+            enemyRuntime_.update(deltaMilliseconds);
             const assets::ColladaAnimationClip* activeClip =
                 levelOne_.player().animationBank.findClip(
                     gameplayPlayer_.activeAnimation());
@@ -155,6 +204,10 @@ int Application::run(HINSTANCE instance) {
                 levelOne_, *activeClip,
                 gameplayPlayer_.animationTimeMilliseconds(),
                 gameplayPlayer_.worldTransform());
+            if (result) {
+                result = renderer_.updateLevelOneEnemies(levelOne_,
+                                                         enemyRuntime_);
+            }
             if (result) {
                 result = renderer_.setCamera(
                     gameplayCamera_.sample(gameplayPlayer_.position()));

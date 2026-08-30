@@ -12,6 +12,8 @@
 #include "game/LevelOneBootstrap.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
+#include "game/LevelEnemyRuntime.hpp"
+#include "game/LevelTriggerRuntime.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -297,6 +299,98 @@ int main() {
                usm::assets::ColladaAnimationProperty::Translation);
         assert(bootstrap.player().animationBank.tracks()[44].property ==
                usm::assets::ColladaAnimationProperty::TranslationX);
+        assert(bootstrap.triggers().size() == 15);
+        const auto firstEncounterTrigger = std::find_if(
+            bootstrap.triggers().begin(), bootstrap.triggers().end(),
+            [](const usm::game::LevelTriggerAsset& trigger) {
+                return trigger.objectId == 534;
+            });
+        assert(firstEncounterTrigger != bootstrap.triggers().end());
+        assert(firstEncounterTrigger->name == "Trigger_3thugs");
+        assert(firstEncounterTrigger->whileOutsideCinematicId == 1162);
+        assert(!firstEncounterTrigger->autoDisabled);
+        assert(firstEncounterTrigger->sizes.y == 1664.575195F);
+        usm::game::LevelTriggerRuntime initialTriggerRuntime;
+        initialTriggerRuntime.bind(
+            std::span<const usm::game::LevelTriggerAsset>(
+                &*firstEncounterTrigger, 1));
+        const auto initialEncounterEvents =
+            initialTriggerRuntime.update(bootstrap.player().position);
+        assert(initialEncounterEvents.size() == 1);
+        assert(initialEncounterEvents.front().cinematicId == 1162);
+        usm::game::LevelTriggerRuntime triggerRuntime;
+        triggerRuntime.bind(std::span<const usm::game::LevelTriggerAsset>(
+            &*firstEncounterTrigger, 1));
+        const usm::assets::Vector3 triggerCenter{
+            firstEncounterTrigger->worldTransform[12],
+            firstEncounterTrigger->worldTransform[13],
+            firstEncounterTrigger->worldTransform[14]};
+        assert(triggerRuntime.update(triggerCenter).empty());
+        const auto encounterEvents = triggerRuntime.update(
+            {triggerCenter.x + firstEncounterTrigger->sizes.x + 10.0F,
+             triggerCenter.y, triggerCenter.z});
+        assert(encounterEvents.size() == 1);
+        assert(encounterEvents.front().triggerId == 534);
+        assert(encounterEvents.front().cinematicId == 1162);
+        assert(encounterEvents.front().kind ==
+               usm::game::TriggerEventKind::WhileOutside);
+        assert(bootstrap.cinematics().size() == 20);
+        const auto firstEncounterCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 1162;
+            });
+        assert(firstEncounterCinematic != bootstrap.cinematics().end());
+        assert(firstEncounterCinematic->scriptFile ==
+               "cinematics/levelnew_01_1162_cinematic.cff");
+        assert(firstEncounterCinematic->script.commandCount() > 0);
+        usm::game::LevelEnemyRuntime enemyRuntime;
+        assert(enemyRuntime.initialize(bootstrap));
+        usm::game::CinematicPlayer encounterPlayer;
+        assert(encounterPlayer.start(firstEncounterCinematic->script));
+        usm::Result encounterCommandResult = usm::Result::success();
+        assert(encounterPlayer.advanceTo(
+            0, [&bootstrap, &enemyRuntime, &encounterCommandResult](
+                   const usm::game::CinematicThread& thread,
+                   const usm::game::CinematicCommand& command) {
+                if (encounterCommandResult) {
+                    encounterCommandResult = enemyRuntime.applyCinematicCommand(
+                        bootstrap, thread, command);
+                }
+            }));
+        assert(encounterCommandResult);
+        const auto* scriptedKnifeEnemy = enemyRuntime.find(394);
+        assert(scriptedKnifeEnemy != nullptr);
+        assert(!scriptedKnifeEnemy->aiEnabled);
+        assert(scriptedKnifeEnemy->activeAnimation == "idle_knife_at_idle");
+        assert(std::abs(scriptedKnifeEnemy->position.x - 13266.816406F) <
+               0.01F);
+        assert(encounterPlayer.advanceTo(
+            1600, [&bootstrap, &enemyRuntime, &encounterCommandResult](
+                      const usm::game::CinematicThread& thread,
+                      const usm::game::CinematicCommand& command) {
+                if (encounterCommandResult) {
+                    encounterCommandResult = enemyRuntime.applyCinematicCommand(
+                        bootstrap, thread, command);
+                }
+            }));
+        assert(encounterCommandResult);
+        assert(enemyRuntime.find(394)->visible);
+        assert(bootstrap.enemyArchetypes().size() == 2);
+        assert(bootstrap.enemies().size() == 14);
+        const auto firstKnifeEnemy = std::find_if(
+            bootstrap.enemies().begin(), bootstrap.enemies().end(),
+            [](const usm::game::LevelEnemyAsset& enemy) {
+                return enemy.objectId == 394;
+            });
+        assert(firstKnifeEnemy != bootstrap.enemies().end());
+        assert(firstKnifeEnemy->health == 500.0F);
+        assert(firstKnifeEnemy->aiEnabled);
+        assert(firstKnifeEnemy->awarenessRadius == 1500.0F);
+        assert(firstKnifeEnemy->initialAnimation == "idle_knife_at_idle");
+        assert(bootstrap.enemyArchetypes()[firstKnifeEnemy->archetypeIndex]
+                   .animationFile ==
+               "../entities/meshes_bin/thug_bat_anim.bdae");
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(bootstrap.introRooms()));
         assert(levelCollision.triangleCount() > 100);

@@ -65,6 +65,57 @@ struct LevelPlayerAsset {
     assets::ColladaAnimationFile animationBank;
 };
 
+struct LevelTriggerAsset {
+    std::int32_t objectId{-1};
+    std::string name;
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::array<float, 16> worldTransform{};
+    assets::Vector3 sizes;
+    bool orientedBox{};
+    bool enabled{};
+    bool autoDisabled{};
+    std::int32_t outToInCinematicId{-1};
+    std::int32_t inToOutCinematicId{-1};
+    std::int32_t whileInsideCinematicId{-1};
+    std::int32_t whileOutsideCinematicId{-1};
+};
+
+struct LevelCinematicAsset {
+    std::int32_t objectId{-1};
+    std::string name;
+    std::string scriptFile;
+    CinematicScript script;
+};
+
+struct EnemyArchetypeAsset {
+    std::string gameType;
+    std::string meshFile;
+    std::string animationFile;
+    assets::ColladaMeshFile mesh;
+    std::vector<assets::BtexTexture> textures;
+    assets::ColladaAnimationFile animationBank;
+};
+
+struct LevelEnemyAsset {
+    std::int32_t objectId{-1};
+    std::string name;
+    std::string gameType;
+    std::string initialAnimation;
+    std::size_t archetypeIndex{};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::array<float, 16> worldTransform{};
+    float health{};
+    bool visible{true};
+    bool aiEnabled{};
+    bool waitSpawn{};
+    float awarenessRadius{};
+    float awarenessAngleDegrees{};
+};
+
 class LevelOneBootstrap final {
 public:
     [[nodiscard]] Result load(const std::filesystem::path& gameDataRoot);
@@ -121,6 +172,20 @@ public:
     [[nodiscard]] const std::vector<CameraArea>& cameraAreas() const noexcept {
         return cameraAreas_;
     }
+    [[nodiscard]] const std::vector<LevelTriggerAsset>& triggers() const noexcept {
+        return triggers_;
+    }
+    [[nodiscard]] const std::vector<LevelCinematicAsset>& cinematics() const
+        noexcept {
+        return cinematics_;
+    }
+    [[nodiscard]] const std::vector<EnemyArchetypeAsset>& enemyArchetypes() const
+        noexcept {
+        return enemyArchetypes_;
+    }
+    [[nodiscard]] const std::vector<LevelEnemyAsset>& enemies() const noexcept {
+        return enemies_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -134,6 +199,10 @@ private:
     std::vector<CinematicActorAsset> introActors_;
     LevelPlayerAsset player_;
     std::vector<CameraArea> cameraAreas_;
+    std::vector<LevelTriggerAsset> triggers_;
+    std::vector<LevelCinematicAsset> cinematics_;
+    std::vector<EnemyArchetypeAsset> enemyArchetypes_;
+    std::vector<LevelEnemyAsset> enemies_;
 };
 
 } // namespace usm::game
