@@ -6,6 +6,7 @@
 #include "game/CinematicScript.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/PlayerStateConfig.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -80,6 +81,8 @@ public:
         std::span<const game::LevelCinematicAsset> cinematics);
     void recordCollisionAssets(
         std::span<const game::LevelRoomAsset> rooms);
+    void recordPlayerStateAssets(
+        const game::PlayerStateConfigDatabase& states);
     void recordAudio(std::uint64_t timeMilliseconds, std::string_view action,
                      std::string_view eventName, bool loop = false,
                      bool spatial = false);
@@ -121,6 +124,7 @@ private:
         MoveTo,
         MoveInput,
         MoveUntilWall,
+        MoveUntilState,
         MoveUntilCinematic,
         WaitEnemiesGrounded,
         Attack,
@@ -177,6 +181,8 @@ private:
     std::ofstream eventLog_;
     std::ofstream cinematicAssetLog_;
     std::ofstream collisionAssetLog_;
+    std::ofstream collisionTriangleLog_;
+    std::ofstream playerStateAssetLog_;
     std::vector<Step> steps_;
     std::size_t activeStepIndex_{};
     std::optional<std::uint64_t> activeStepStartMilliseconds_;

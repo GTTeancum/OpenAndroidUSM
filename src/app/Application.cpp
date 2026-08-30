@@ -294,6 +294,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     if (!result) {
         return fail(result.message());
     }
+    if (autoplay) {
+        autoplay->recordPlayerStateAssets(playerStateConfigs_);
+    }
     constexpr std::array<std::string_view, 22> gameplaySoundStates{
         "k_state_idle_to_punch_right", "k_state_hurt_light",
         "k_state_hurt_heavy", "k_state_jump_start", "k_state_jump_land",

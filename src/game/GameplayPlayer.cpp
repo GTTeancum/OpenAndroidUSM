@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
-#include <limits>
 #include <cstdlib>
+#include <limits>
 
 namespace usm::game {
 namespace {
@@ -362,7 +362,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     if (collision_ != nullptr) {
         assets::Vector3 grounded;
         (void)collision_->resolveGroundMotion(position_, position_, grounded,
-                                              100.0F, 500.0F);
+                                              100.0F, 500.0F,
+                                              LevelPhysicsFlags::JumpWall);
         position_ = grounded;
         renderPosition_ = position_;
         jumpAnchorHeight_ = position_.z;
@@ -809,7 +810,8 @@ void GameplayPlayer::updateAirHorizontalMotion(
     desired.x += movement.x * distance;
     desired.y += movement.y * distance;
     if (collision_ != nullptr) {
-        collision_->resolveAirMotion(position_, desired, position_);
+        collision_->resolveAirMotion(position_, desired, position_,
+                                     LevelPhysicsFlags::JumpWall);
     } else {
         position_ = desired;
     }
@@ -1369,21 +1371,24 @@ void GameplayPlayer::updateWallTraversal(
         position_.x + localX.x * right * travel,
         position_.y + localX.y * right * travel,
         position_.z + upward * travel};
-    if (!reacquireWallAt(candidate)) {
-        if (upward > 0.1F) {
-            wallStateStartPosition_ = position_;
-            enterLocomotionState(LocomotionState::WallExit);
-            if (const auto* clip = clipById(animationBank_, 198)) {
-                setAnimation(clip->name);
-            }
-        } else if (upward < -0.1F) {
-            jumpAnchorHeight_ = position_.z;
-            enterLocomotionState(LocomotionState::SustainedFall);
-        } else {
-            enterLocomotionState(LocomotionState::WallIdle);
+    LevelWallContact edgeContact;
+    if (upward > 0.1F && collision_ != nullptr &&
+        collision_->climbableEdgeContact(candidate, edgeContact)) {
+        wallStateStartPosition_ = position_;
+        enterLocomotionState(LocomotionState::WallExit);
+        if (const auto* clip = clipById(animationBank_, 198)) {
+            setAnimation(clip->name);
         }
         return;
     }
+    LevelWallContact jumpWallContact;
+    if (std::abs(upward) > 0.1F && collision_ != nullptr &&
+        collision_->jumpWallContact(candidate, jumpWallContact)) {
+        candidate.z = position_.z;
+    }
+
+    position_ = candidate;
+    renderPosition_ = candidate;
 
     activeLocomotionState_ = wallMoveState_;
     locomotionState_ = LocomotionState::WallMove;
@@ -1436,7 +1441,8 @@ bool GameplayPlayer::findLandingHeight(float referenceHeight,
     // position so a 100 ms frame cannot tunnel through a platform.
     assets::Vector3 reference = position_;
     reference.z = referenceHeight;
-    return collision_->groundHeight(reference, 20.0F, 5000.0F, height);
+    return collision_->groundHeight(reference, 20.0F, 5000.0F, height,
+                                    LevelPhysicsFlags::JumpWall);
 }
 
 void GameplayPlayer::updateJump(const PlayerMotionInput& input,

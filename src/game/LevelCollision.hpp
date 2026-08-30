@@ -15,6 +15,18 @@
 
 namespace usm::game {
 
+namespace LevelPhysicsFlags {
+constexpr std::uint32_t Ground = 0x01U;
+constexpr std::uint32_t Wall = 0x02U;
+constexpr std::uint32_t JumpWall = 0x10U;
+constexpr std::uint32_t ClimbableWall = 0x20U;
+constexpr std::uint32_t ClimbableEdge = 0x40U;
+} // namespace LevelPhysicsFlags
+
+namespace LevelCollisionConstants {
+constexpr float MinimumGroundNormalZ = 0.70710677F;
+} // namespace LevelCollisionConstants
+
 struct LevelWallContact {
     assets::Vector3 position;
     assets::Vector3 normal;
@@ -34,19 +46,30 @@ public:
 
     [[nodiscard]] bool groundHeight(const assets::Vector3& reference,
                                     float maximumStepUp, float maximumDrop,
-                                    float& height) const noexcept;
+                                    float& height,
+                                    std::uint32_t ignoredPhysicsFlags = 0U)
+        const noexcept;
     [[nodiscard]] bool resolveGroundMotion(
         const assets::Vector3& start, const assets::Vector3& desired,
         assets::Vector3& resolved, float maximumStepUp = 75.0F,
-        float maximumDrop = 150.0F) const noexcept;
+        float maximumDrop = 150.0F,
+        std::uint32_t ignoredPhysicsFlags = 0U) const noexcept;
     void resolveAirMotion(const assets::Vector3& start,
                           const assets::Vector3& desired,
-                          assets::Vector3& resolved) const noexcept;
+                          assets::Vector3& resolved,
+                          std::uint32_t ignoredPhysicsFlags = 0U)
+        const noexcept;
     [[nodiscard]] bool segmentBlocked(
         const assets::Vector3& start,
         const assets::Vector3& end) const noexcept;
     [[nodiscard]] bool climbableWallContact(
         const assets::Vector3& start, const assets::Vector3& end,
+        LevelWallContact& contact) const noexcept;
+    [[nodiscard]] bool climbableEdgeContact(
+        const assets::Vector3& capsuleBase,
+        LevelWallContact& contact) const noexcept;
+    [[nodiscard]] bool jumpWallContact(
+        const assets::Vector3& capsuleBase,
         LevelWallContact& contact) const noexcept;
 
     [[nodiscard]] std::size_t triangleCount() const noexcept {
@@ -73,7 +96,12 @@ private:
     void append(std::span<const assets::ColladaGeometry> geometries);
     void rebuildGrid();
     void resolveWalls(const assets::Vector3& start,
-                      assets::Vector3& desired) const noexcept;
+                      assets::Vector3& desired,
+                      std::uint32_t ignoredPhysicsFlags) const noexcept;
+    [[nodiscard]] bool horizontalSurfaceContact(
+        const assets::Vector3& capsuleBase,
+        std::uint32_t physicsFlags,
+        LevelWallContact& contact) const noexcept;
     [[nodiscard]] static std::int64_t cellKey(std::int32_t x,
                                                std::int32_t y) noexcept;
 

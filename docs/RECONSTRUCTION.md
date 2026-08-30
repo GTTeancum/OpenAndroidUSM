@@ -18,8 +18,8 @@ loop with a fixed synthetic clock and the real level loader, cinematic
 players, gameplay runtimes, D3D11 renderer, and readback path. It does not
 inject OS input. Scenario steps express reconstruction goals (`wait_gameplay`,
 `move_to`, `move_input`, `move_until_wall`, `move_until_cinematic`,
-`wait_enemies_grounded`, `attack`, `jump`, `web_on`, `web_off`, `teleport`,
-`capture`, and assertions)
+`move_until_state`, `wait_enemies_grounded`, `attack`, `jump`, `web_on`,
+`web_off`, `teleport`, `capture`, and assertions)
 while directives select the fixed tick, trace/capture cadence, render size, and
 maximum run time. `move_input` holds explicit right/forward controller axes for
 a deterministic duration, allowing traversal mechanics such as wall climbing
@@ -43,7 +43,11 @@ transitions, audio requests, teleports, and captures. `enemies.csv` also records
 each native collision cylinder, vertical velocity, and grounded state, while
 `cinematics.csv` provides a complete static census of every loaded thread,
 command, timestamp, and typed attribute. `collision-surfaces.csv` records each
-room collision instance, native surface class, and world bounds. Trigger/enemy
+room collision instance, native surface class, and world bounds;
+`collision-triangles.csv` expands every face with its native physics flag,
+world vertices, and normal. `player-states.csv` records the complete loaded
+MC_STATE census, including class, motion type, parameters, animation IDs,
+timings, and next state. Trigger/enemy
 asset events include their complete authored transforms and spawn flags.
 Camera-area asset events include each neighbor and switch time plus the
 area's follow rate and all four control-point positions, directions,
@@ -706,20 +710,41 @@ wall plane. `Player::UpdateMCSpeed` at `0x00346f50` scales each wall axis by
 `PhysicsTriangleMeshShape::addSceneNodeInternal` at `0x003d9e94` assigns the
 surface flags from the original node prefixes: ordinary `wall*` faces use
 `0x20`, `jump_wall*` uses `0x10`, and `edge_wall*` uses `0x40`; unrelated
-collision faces remain flag 2. `PhysicsTriangleMesh::constructMesh` at
+vertical collision uses flag 2 and ground uses flag 1.
+`PhysicsTriangleMesh::constructMesh` at
 `0x003d95d8` further separates regular wall and ground faces at its recovered
 0.70710677 normal threshold. `LevelCollision::climbableWallContact` therefore
 returns only the nearest native `0x20` vertical contact, plus a consistently
 player-facing normal. This prevents invisible boundary collision from being
-misclassified as a climbable wall. `GameplayPlayer` keeps the
-native 50 cm cylinder offset, applies the recovered center-node root
-translations continuously through attach/exit/jump clips in the wall basis,
-and reacquires the wall after each move. Failed attachment reacquisition falls
-back to the airborne state instead of leaving a detached wall idle. A
-synthetic floor-and-wall regression covers attach, idle,
-upward climb, jump selection, exact root displacement, and rejection of
-ground attacks while attached. The autoplay trace exposes `on_wall` and
-`move_input` so real-level probes can diagnose traversal state frame by frame.
+misclassified as a climbable wall.
+
+`Physics::processCollision` at `0x003d5b5c` confirms that the field at native
+`PhysicsEntity + 0x104` is an ignored-surface mask. `Player::SetNextStateId`
+sets bit `0x10` for airborne jump states and conditionally for motion 16 wall
+jumps, so portable airborne movement and landing queries ignore authored
+`jump_wall` faces while ordinary running does not. `Player::CheckJumpWallCanPass`
+at `0x0034284c` maps states 8--11 and 69--72 to up/down/left/right and uses the
+recovered 400 cm vertical and 300 cm lateral clearance constants. The latter
+family is the four on-wall attack states, not a second locomotion family.
+
+Room 8 demonstrates why `jump_wall` is not a synonym for a regular wall. Its
+0x10 faces are horizontal slabs filling gaps between separate 0x20 climb
+segments. Ordinary wall movement stays on the established wall plane and is
+stopped by each slab; `wall_jump_up` root motion crosses it and then reacquires
+the next regular segment. `edge_wall01` is a horizontal 0x40 ledge marker.
+The portable capsule-contact query selects state 7 only when that marker is
+reached, matching `CheckClimbableWall(2)` instead of treating every mesh gap
+as a rooftop.
+
+`GameplayPlayer` keeps the native 50 cm cylinder offset and applies recovered
+center-node root translations continuously through attach, exit, and jump
+clips in the wall basis. Failed attach or jump reacquisition falls back to the
+airborne state. Synthetic regressions cover native flag filtering, jump-wall
+pass-through, edge contacts, attach/idle/climb/jump root displacement, and
+rejection of ground attacks while attached. The `wall-edge-probe` autoplay
+scenario stops at each authored slab, performs both required upward wall
+jumps, and requires state 7 at `edge_wall01`; `move_until_state` makes the
+transition deterministic rather than duration-guessed.
 
 ## Authored web-grab and waypoint traversal
 

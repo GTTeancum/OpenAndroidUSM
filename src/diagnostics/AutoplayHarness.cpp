@@ -1,5 +1,7 @@
 #include "diagnostics/AutoplayHarness.hpp"
 
+#include "game/LevelCollision.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -79,8 +81,13 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
     cinematicAssetLog_.open(outputPath_ / "cinematics.csv", std::ios::trunc);
     collisionAssetLog_.open(outputPath_ / "collision-surfaces.csv",
                             std::ios::trunc);
+    collisionTriangleLog_.open(outputPath_ / "collision-triangles.csv",
+                               std::ios::trunc);
+    playerStateAssetLog_.open(outputPath_ / "player-states.csv",
+                              std::ios::trunc);
     if (!frameLog_ || !enemyLog_ || !eventLog_ || !cinematicAssetLog_ ||
-        !collisionAssetLog_) {
+        !collisionAssetLog_ || !collisionTriangleLog_ ||
+        !playerStateAssetLog_) {
         return Result::failure("Could not create autoplay trace files");
     }
     frameLog_ << "frame,real_ms,game_ms,phase,controls,player_x,player_y,"
@@ -101,6 +108,14 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
            "attributes\n";
     collisionAssetLog_
         << "room,geometry,surface_class,min_x,min_y,min_z,max_x,max_y,max_z\n";
+    collisionTriangleLog_
+        << "room,geometry,triangle,physics_flags,first_x,first_y,first_z,"
+           "second_x,second_y,second_z,third_x,third_y,third_z,"
+           "normal_x,normal_y,normal_z\n";
+    playerStateAssetLog_
+        << "state_id,state_name,state_class,motion_type,motion_0,motion_1,"
+           "motion_2,motion_3,primary_animation,animation_ids,"
+           "sound_trigger_frame,next_state_id,timing_0,timing_1\n";
     recordEvent(0, "harness_start",
                 "script=" + scriptPath.generic_string());
     return Result::success();
@@ -212,6 +227,22 @@ Result AutoplayHarness::parseScript(
                 step.durationOrTimeoutMilliseconds == 0) {
                 return invalid("move_until_wall requires x y z timeout");
             }
+        } else if (command == "move_until_state") {
+            step.kind = StepKind::MoveUntilState;
+            std::int32_t stateId = -1;
+            if (!(tokens >> step.durationOrTimeoutMilliseconds >>
+                  step.position.x >> step.position.y >> stateId) ||
+                step.durationOrTimeoutMilliseconds == 0 || stateId < 0 ||
+                stateId > std::numeric_limits<std::uint16_t>::max() ||
+                !std::isfinite(step.position.x) ||
+                !std::isfinite(step.position.y) ||
+                std::abs(step.position.x) > 1.0F ||
+                std::abs(step.position.y) > 1.0F) {
+                return invalid(
+                    "move_until_state requires timeout right forward "
+                    "state_id");
+            }
+            step.objectIds.push_back(stateId);
         } else if (command == "move_until_cinematic") {
             step.kind = StepKind::MoveUntilCinematic;
             std::int32_t cinematicId = -1;
@@ -396,6 +427,17 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
             failStep(snapshot, step, "player did not attach to a wall");
         } else if (snapshot.gameplayActive && snapshot.controlsEnabled) {
             input.motion = steerToward(snapshot, step.position);
+        }
+        break;
+    case StepKind::MoveUntilState:
+        if (!step.objectIds.empty() &&
+            snapshot.playerStateId == step.objectIds.front()) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step,
+                     "player did not enter the intended state");
+        } else if (snapshot.gameplayActive && snapshot.controlsEnabled) {
+            input.motion = {step.position.x, step.position.y};
         }
         break;
     case StepKind::MoveUntilCinematic:
@@ -753,7 +795,7 @@ void AutoplayHarness::recordCommand(
 
 void AutoplayHarness::recordCollisionAssets(
     std::span<const game::LevelRoomAsset> rooms) {
-    if (!collisionAssetLog_) {
+    if (!collisionAssetLog_ || !collisionTriangleLog_) {
         return;
     }
     for (std::size_t roomIndex = 0; roomIndex < rooms.size(); ++roomIndex) {
@@ -775,9 +817,125 @@ void AutoplayHarness::recordCollisionAssets(
                 << geometry.bounds.maximum.x << ','
                 << geometry.bounds.maximum.y << ','
                 << geometry.bounds.maximum.z << '\n';
+            std::size_t triangleIndex = 0;
+            const auto recordTriangle =
+                [&](std::uint16_t firstIndex,
+                    std::uint16_t secondIndex,
+                    std::uint16_t thirdIndex) {
+                    if (firstIndex >= geometry.vertices.size() ||
+                        secondIndex >= geometry.vertices.size() ||
+                        thirdIndex >= geometry.vertices.size()) {
+                        return;
+                    }
+                    const assets::Vector3& first =
+                        geometry.vertices[firstIndex].position;
+                    const assets::Vector3& second =
+                        geometry.vertices[secondIndex].position;
+                    const assets::Vector3& third =
+                        geometry.vertices[thirdIndex].position;
+                    const assets::Vector3 firstEdge{
+                        second.x - first.x, second.y - first.y,
+                        second.z - first.z};
+                    const assets::Vector3 secondEdge{
+                        third.x - first.x, third.y - first.y,
+                        third.z - first.z};
+                    assets::Vector3 normal{
+                        firstEdge.y * secondEdge.z -
+                            firstEdge.z * secondEdge.y,
+                        firstEdge.z * secondEdge.x -
+                            firstEdge.x * secondEdge.z,
+                        firstEdge.x * secondEdge.y -
+                            firstEdge.y * secondEdge.x};
+                    const float normalLength =
+                        std::sqrt(normal.x * normal.x + normal.y * normal.y +
+                                  normal.z * normal.z);
+                    if (normalLength <=
+                        std::numeric_limits<float>::epsilon()) {
+                        return;
+                    }
+                    normal.x /= normalLength;
+                    normal.y /= normalLength;
+                    normal.z /= normalLength;
+                    const bool vertical =
+                        std::abs(normal.z) <
+                        game::LevelCollisionConstants::MinimumGroundNormalZ;
+                    std::uint32_t physicsFlags =
+                        game::LevelPhysicsFlags::Wall;
+                    if (surfaceClass == "jump_wall") {
+                        physicsFlags = game::LevelPhysicsFlags::JumpWall;
+                    } else if (surfaceClass == "edge_wall") {
+                        physicsFlags =
+                            game::LevelPhysicsFlags::ClimbableEdge;
+                    } else if (surfaceClass == "climbable_wall" &&
+                               vertical) {
+                        physicsFlags =
+                            game::LevelPhysicsFlags::ClimbableWall;
+                    } else {
+                        physicsFlags = vertical
+                                           ? game::LevelPhysicsFlags::Wall
+                                           : game::LevelPhysicsFlags::Ground;
+                    }
+                    collisionTriangleLog_
+                        << (roomIndex + 1) << ',' << csv(geometry.name) << ','
+                        << triangleIndex++ << ',' << physicsFlags << ','
+                        << first.x << ',' << first.y << ',' << first.z << ','
+                        << second.x << ',' << second.y << ',' << second.z
+                        << ',' << third.x << ',' << third.y << ',' << third.z
+                        << ',' << normal.x << ',' << normal.y << ','
+                        << normal.z << '\n';
+                };
+            for (const assets::ColladaMeshBuffer& buffer :
+                 geometry.meshBuffers) {
+                if (buffer.primitive ==
+                    assets::ColladaPrimitive::Triangles) {
+                    for (std::size_t index = 0;
+                         index + 2 < buffer.indices.size(); index += 3) {
+                        recordTriangle(buffer.indices[index],
+                                       buffer.indices[index + 1],
+                                       buffer.indices[index + 2]);
+                    }
+                } else if (buffer.primitive ==
+                           assets::ColladaPrimitive::TriangleStrip) {
+                    for (std::size_t index = 2;
+                         index < buffer.indices.size(); ++index) {
+                        const bool odd = (index & 1U) != 0;
+                        recordTriangle(
+                            buffer.indices[index - (odd ? 0 : 2)],
+                            buffer.indices[index - 1],
+                            buffer.indices[index - (odd ? 2 : 0)]);
+                    }
+                }
+            }
         }
     }
     collisionAssetLog_.flush();
+    collisionTriangleLog_.flush();
+}
+
+void AutoplayHarness::recordPlayerStateAssets(
+    const game::PlayerStateConfigDatabase& states) {
+    if (!playerStateAssetLog_) {
+        return;
+    }
+    for (const game::PlayerStateDefinition& state : states.states()) {
+        std::string animationIds;
+        for (const std::int16_t animationId : state.animationIds) {
+            if (!animationIds.empty()) {
+                animationIds += '|';
+            }
+            animationIds += std::to_string(animationId);
+        }
+        playerStateAssetLog_
+            << state.id << ',' << csv(state.name) << ',' << state.stateClass
+            << ',' << state.motionType << ',' << state.motionParameters[0]
+            << ',' << state.motionParameters[1] << ','
+            << state.motionParameters[2] << ',' << state.motionParameters[3]
+            << ',' << state.primaryAnimationId << ',' << csv(animationIds)
+            << ',' << state.soundTriggerFrame << ',' << state.nextStateId
+            << ',' << state.timingParameters[0] << ','
+            << state.timingParameters[1] << '\n';
+    }
+    playerStateAssetLog_.flush();
 }
 
 void AutoplayHarness::recordCinematicAssets(
@@ -914,6 +1072,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::MoveTo: return "move_to";
     case StepKind::MoveInput: return "move_input";
     case StepKind::MoveUntilWall: return "move_until_wall";
+    case StepKind::MoveUntilState: return "move_until_state";
     case StepKind::MoveUntilCinematic: return "move_until_cinematic";
     case StepKind::WaitEnemiesGrounded: return "wait_enemies_grounded";
     case StepKind::Attack: return "attack";

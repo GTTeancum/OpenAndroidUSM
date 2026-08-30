@@ -15,12 +15,10 @@ using assets::ColladaPrimitive;
 using assets::Vector3;
 
 constexpr float kGridCellSize = 500.0F;
-constexpr float kMinimumWalkableNormalZ = 0.5F;
 // Player::GetRadius (0x0033fdf8) returns the preserved 50 cm `consts` value
 // at image address 0x0056ec90.
 constexpr float kGroundSupportRadius = 50.0F;
 constexpr float kPlayerCollisionHeight = 140.0F;
-constexpr std::uint32_t kClimbableWallPhysicsFlag = 0x20U;
 
 Vector3 subtract(const Vector3& left, const Vector3& right) noexcept {
     return {left.x - right.x, left.y - right.y, left.z - right.z};
@@ -142,20 +140,20 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
         // derives the native triangle flags from collision-node prefixes.
         // constructMesh (0x003d95d8) applies the regular wall flag only to
         // faces below its 0.70710677 ground-normal threshold.
+        const bool vertical =
+            std::abs(triangle.normal.z) <
+            LevelCollisionConstants::MinimumGroundNormalZ;
         if (geometry.name.starts_with("wall")) {
-            triangle.physicsFlags =
-                std::abs(triangle.normal.z) < kMinimumWalkableNormalZ
-                    ? kClimbableWallPhysicsFlag
-                    : 1U;
+            triangle.physicsFlags = vertical
+                                        ? LevelPhysicsFlags::ClimbableWall
+                                        : LevelPhysicsFlags::Ground;
         } else if (geometry.name.starts_with("jump_wall")) {
-            triangle.physicsFlags = 0x10U;
+            triangle.physicsFlags = LevelPhysicsFlags::JumpWall;
         } else if (geometry.name.starts_with("edge_wall")) {
-            triangle.physicsFlags = 0x40U;
+            triangle.physicsFlags = LevelPhysicsFlags::ClimbableEdge;
         } else {
-            triangle.physicsFlags =
-                std::abs(triangle.normal.z) < kMinimumWalkableNormalZ
-                    ? 2U
-                    : 1U;
+            triangle.physicsFlags = vertical ? LevelPhysicsFlags::Wall
+                                             : LevelPhysicsFlags::Ground;
         }
         triangles_.push_back(triangle);
     };
@@ -218,12 +216,16 @@ std::int64_t LevelCollision::cellKey(std::int32_t x,
 
 bool LevelCollision::groundHeight(const Vector3& reference,
                                   float maximumStepUp, float maximumDrop,
-                                  float& height) const noexcept {
+                                  float& height,
+                                  std::uint32_t ignoredPhysicsFlags)
+    const noexcept {
     bool found = false;
     float best = -std::numeric_limits<float>::infinity();
     const auto considerTriangle = [&](std::uint32_t triangleIndex) {
         const Triangle& triangle = triangles_[triangleIndex];
-        if (std::abs(triangle.normal.z) < kMinimumWalkableNormalZ ||
+        if ((triangle.physicsFlags & ignoredPhysicsFlags) != 0U ||
+            std::abs(triangle.normal.z) <
+                LevelCollisionConstants::MinimumGroundNormalZ ||
             reference.x < triangle.minimumX - kGroundSupportRadius ||
             reference.x > triangle.maximumX + kGroundSupportRadius ||
             reference.y < triangle.minimumY - kGroundSupportRadius ||
@@ -304,29 +306,35 @@ bool LevelCollision::resolveGroundMotion(const Vector3& start,
                                          const Vector3& desired,
                                          Vector3& resolved,
                                          float maximumStepUp,
-                                         float maximumDrop) const noexcept {
+                                         float maximumDrop,
+                                         std::uint32_t ignoredPhysicsFlags)
+    const noexcept {
     Vector3 wallResolved = desired;
     if (std::abs(desired.x - start.x) > 1e-4F ||
         std::abs(desired.y - start.y) > 1e-4F) {
-        resolveWalls(start, wallResolved);
+        resolveWalls(start, wallResolved, ignoredPhysicsFlags);
     }
     float height = 0.0F;
-    if (groundHeight(wallResolved, maximumStepUp, maximumDrop, height)) {
+    if (groundHeight(wallResolved, maximumStepUp, maximumDrop, height,
+                     ignoredPhysicsFlags)) {
         resolved = {wallResolved.x, wallResolved.y, height};
         return true;
     }
     Vector3 slide = {wallResolved.x, start.y, start.z};
-    if (groundHeight(slide, maximumStepUp, maximumDrop, height)) {
+    if (groundHeight(slide, maximumStepUp, maximumDrop, height,
+                     ignoredPhysicsFlags)) {
         resolved = {slide.x, slide.y, height};
         return true;
     }
     slide = {start.x, wallResolved.y, start.z};
-    if (groundHeight(slide, maximumStepUp, maximumDrop, height)) {
+    if (groundHeight(slide, maximumStepUp, maximumDrop, height,
+                     ignoredPhysicsFlags)) {
         resolved = {slide.x, slide.y, height};
         return true;
     }
     resolved = start;
-    if (groundHeight(start, maximumStepUp, maximumDrop, height)) {
+    if (groundHeight(start, maximumStepUp, maximumDrop, height,
+                     ignoredPhysicsFlags)) {
         resolved.z = height;
     }
     return false;
@@ -334,11 +342,13 @@ bool LevelCollision::resolveGroundMotion(const Vector3& start,
 
 void LevelCollision::resolveAirMotion(const Vector3& start,
                                       const Vector3& desired,
-                                      Vector3& resolved) const noexcept {
+                                      Vector3& resolved,
+                                      std::uint32_t ignoredPhysicsFlags)
+    const noexcept {
     resolved = desired;
     if (std::abs(desired.x - start.x) > 1e-4F ||
         std::abs(desired.y - start.y) > 1e-4F) {
-        resolveWalls(start, resolved);
+        resolveWalls(start, resolved, ignoredPhysicsFlags);
     }
 }
 
@@ -400,8 +410,9 @@ bool LevelCollision::climbableWallContact(
     bool found = false;
     float nearestFraction = 1.0F + kIntersectionEpsilon;
     for (const Triangle& triangle : triangles_) {
-        if (triangle.physicsFlags != kClimbableWallPhysicsFlag ||
-            std::abs(triangle.normal.z) >= kMinimumWalkableNormalZ ||
+        if (triangle.physicsFlags != LevelPhysicsFlags::ClimbableWall ||
+            std::abs(triangle.normal.z) >=
+                LevelCollisionConstants::MinimumGroundNormalZ ||
             std::max(start.x, end.x) < triangle.minimumX ||
             std::min(start.x, end.x) > triangle.maximumX ||
             std::max(start.y, end.y) < triangle.minimumY ||
@@ -456,8 +467,110 @@ bool LevelCollision::climbableWallContact(
     return found;
 }
 
+bool LevelCollision::climbableEdgeContact(
+    const Vector3& capsuleBase, LevelWallContact& contact) const noexcept {
+    return horizontalSurfaceContact(capsuleBase,
+                                    LevelPhysicsFlags::ClimbableEdge,
+                                    contact);
+}
+
+bool LevelCollision::jumpWallContact(
+    const Vector3& capsuleBase, LevelWallContact& contact) const noexcept {
+    return horizontalSurfaceContact(capsuleBase, LevelPhysicsFlags::JumpWall,
+                                    contact);
+}
+
+bool LevelCollision::horizontalSurfaceContact(
+    const Vector3& capsuleBase, std::uint32_t physicsFlags,
+    LevelWallContact& contact) const noexcept {
+    // CheckClimbableWall(2) (0x0034863c) consumes the player's active 0x40
+    // manifold contact. Jump-wall slabs use the same native manifold path
+    // with flag 0x10. Model both with the 50 cm support radius and 140 cm
+    // player height used by the portable body solver.
+    bool found = false;
+    float nearestVerticalDistance = std::numeric_limits<float>::infinity();
+    for (const Triangle& triangle : triangles_) {
+        if (triangle.physicsFlags != physicsFlags ||
+            std::abs(triangle.normal.z) <
+                LevelCollisionConstants::MinimumGroundNormalZ ||
+            capsuleBase.x < triangle.minimumX - kGroundSupportRadius ||
+            capsuleBase.x > triangle.maximumX + kGroundSupportRadius ||
+            capsuleBase.y < triangle.minimumY - kGroundSupportRadius ||
+            capsuleBase.y > triangle.maximumY + kGroundSupportRadius) {
+            continue;
+        }
+        const float denominator =
+            (triangle.second.y - triangle.third.y) *
+                (triangle.first.x - triangle.third.x) +
+            (triangle.third.x - triangle.second.x) *
+                (triangle.first.y - triangle.third.y);
+        if (std::abs(denominator) <= std::numeric_limits<float>::epsilon()) {
+            continue;
+        }
+        const float firstWeight =
+            ((triangle.second.y - triangle.third.y) *
+                 (capsuleBase.x - triangle.third.x) +
+             (triangle.third.x - triangle.second.x) *
+                 (capsuleBase.y - triangle.third.y)) /
+            denominator;
+        const float secondWeight =
+            ((triangle.third.y - triangle.first.y) *
+                 (capsuleBase.x - triangle.third.x) +
+             (triangle.first.x - triangle.third.x) *
+                 (capsuleBase.y - triangle.third.y)) /
+            denominator;
+        const float thirdWeight = 1.0F - firstWeight - secondWeight;
+        if (firstWeight < -1e-4F || secondWeight < -1e-4F ||
+            thirdWeight < -1e-4F) {
+            const float distanceSquared = std::min(
+                {pointSegmentDistanceSquared(capsuleBase.x, capsuleBase.y,
+                                             triangle.first,
+                                             triangle.second),
+                 pointSegmentDistanceSquared(capsuleBase.x, capsuleBase.y,
+                                             triangle.second,
+                                             triangle.third),
+                 pointSegmentDistanceSquared(capsuleBase.x, capsuleBase.y,
+                                             triangle.third,
+                                             triangle.first)});
+            if (distanceSquared >
+                kGroundSupportRadius * kGroundSupportRadius) {
+                continue;
+            }
+        }
+        const float edgeHeight =
+            triangle.first.z -
+            (triangle.normal.x * (capsuleBase.x - triangle.first.x) +
+             triangle.normal.y * (capsuleBase.y - triangle.first.y)) /
+                triangle.normal.z;
+        if (edgeHeight < capsuleBase.z - 1.0F ||
+            edgeHeight > capsuleBase.z + kPlayerCollisionHeight + 1.0F) {
+            continue;
+        }
+        const float verticalDistance = std::abs(edgeHeight - capsuleBase.z);
+        if (verticalDistance >= nearestVerticalDistance) {
+            continue;
+        }
+        nearestVerticalDistance = verticalDistance;
+        contact.position = {capsuleBase.x, capsuleBase.y, edgeHeight};
+        contact.normal = triangle.normal;
+        if (contact.normal.z < 0.0F) {
+            contact.normal.x = -contact.normal.x;
+            contact.normal.y = -contact.normal.y;
+            contact.normal.z = -contact.normal.z;
+        }
+        contact.segmentFraction = 0.0F;
+        contact.physicsFlags = triangle.physicsFlags;
+        contact.geometryName = triangle.geometryName;
+        contact.materialName = triangle.materialName;
+        found = true;
+    }
+    return found;
+}
+
 void LevelCollision::resolveWalls(const Vector3& start,
-                                  Vector3& desired) const noexcept {
+                                  Vector3& desired,
+                                  std::uint32_t ignoredPhysicsFlags)
+    const noexcept {
     std::vector<std::uint32_t> candidates = broadTriangles_;
     const std::int32_t centerCellX = cellCoordinate(desired.x);
     const std::int32_t centerCellY = cellCoordinate(desired.y);
@@ -479,7 +592,9 @@ void LevelCollision::resolveWalls(const Vector3& start,
         bool corrected = false;
         for (std::uint32_t triangleIndex : candidates) {
             const Triangle& triangle = triangles_[triangleIndex];
-            if (std::abs(triangle.normal.z) >= kMinimumWalkableNormalZ ||
+            if ((triangle.physicsFlags & ignoredPhysicsFlags) != 0U ||
+                std::abs(triangle.normal.z) >=
+                    LevelCollisionConstants::MinimumGroundNormalZ ||
                 triangle.maximumZ < start.z ||
                 triangle.minimumZ > start.z + kPlayerCollisionHeight) {
                 continue;

@@ -265,6 +265,72 @@ int main() {
         {100.0F, 500.0F, 70.0F}, {300.0F, 500.0F, 70.0F},
         wallContact));
 
+    usm::assets::ColladaGeometry jumpWallFixture;
+    jumpWallFixture.name = "jump_wall_fixture";
+    jumpWallFixture.vertices = {
+        {{500.0F, 0.0F, 0.0F}},
+        {{500.0F, 1000.0F, 0.0F}},
+        {{500.0F, 0.0F, 1000.0F}},
+        {{500.0F, 1000.0F, 1000.0F}},
+        {{400.0F, 400.0F, 200.0F}},
+        {{600.0F, 400.0F, 200.0F}},
+        {{600.0F, 600.0F, 200.0F}},
+        {{400.0F, 600.0F, 200.0F}},
+    };
+    usm::assets::ColladaMeshBuffer jumpWallFixtureBuffer;
+    jumpWallFixtureBuffer.indices = {
+        0, 2, 3, 0, 3, 1,
+        4, 5, 6, 4, 6, 7,
+    };
+    jumpWallFixture.meshBuffers.push_back(jumpWallFixtureBuffer);
+    usm::assets::ColladaGeometry edgeWallFixture;
+    edgeWallFixture.name = "edge_wall_fixture";
+    edgeWallFixture.vertices = {
+        {{400.0F, 400.0F, 300.0F}},
+        {{600.0F, 400.0F, 300.0F}},
+        {{600.0F, 600.0F, 300.0F}},
+        {{400.0F, 600.0F, 300.0F}},
+    };
+    usm::assets::ColladaMeshBuffer edgeWallFixtureBuffer;
+    edgeWallFixtureBuffer.indices = {0, 1, 2, 0, 2, 3};
+    edgeWallFixture.meshBuffers.push_back(edgeWallFixtureBuffer);
+    const std::array<usm::assets::ColladaGeometry, 2>
+        authoredTraversalFixtures{jumpWallFixture, edgeWallFixture};
+    usm::game::LevelCollision authoredTraversalWorld;
+    assert(authoredTraversalWorld.build(authoredTraversalFixtures));
+    usm::assets::Vector3 blockedByJumpWall;
+    authoredTraversalWorld.resolveAirMotion(
+        {400.0F, 100.0F, 0.0F}, {600.0F, 100.0F, 0.0F},
+        blockedByJumpWall);
+    assert(std::abs(blockedByJumpWall.x - 450.0F) < 0.01F);
+    usm::assets::Vector3 passedJumpWall;
+    authoredTraversalWorld.resolveAirMotion(
+        {400.0F, 100.0F, 0.0F}, {600.0F, 100.0F, 0.0F}, passedJumpWall,
+        usm::game::LevelPhysicsFlags::JumpWall);
+    assert(std::abs(passedJumpWall.x - 600.0F) < 0.01F);
+    float jumpWallHeight = -1.0F;
+    assert(authoredTraversalWorld.groundHeight(
+        {500.0F, 500.0F, 220.0F}, 50.0F, 100.0F,
+        jumpWallHeight));
+    assert(std::abs(jumpWallHeight - 200.0F) < 0.01F);
+    assert(!authoredTraversalWorld.groundHeight(
+        {500.0F, 500.0F, 220.0F}, 50.0F, 100.0F,
+        jumpWallHeight, usm::game::LevelPhysicsFlags::JumpWall));
+    usm::game::LevelWallContact jumpWallContact;
+    assert(authoredTraversalWorld.jumpWallContact(
+        {500.0F, 500.0F, 100.0F}, jumpWallContact));
+    assert(jumpWallContact.physicsFlags ==
+           usm::game::LevelPhysicsFlags::JumpWall);
+    assert(std::abs(jumpWallContact.position.z - 200.0F) < 0.01F);
+    usm::game::LevelWallContact edgeContact;
+    assert(authoredTraversalWorld.climbableEdgeContact(
+        {500.0F, 500.0F, 200.0F}, edgeContact));
+    assert(edgeContact.physicsFlags ==
+           usm::game::LevelPhysicsFlags::ClimbableEdge);
+    assert(std::abs(edgeContact.position.z - 300.0F) < 0.01F);
+    assert(!authoredTraversalWorld.climbableEdgeContact(
+        {700.0F, 500.0F, 200.0F}, edgeContact));
+
     std::array<usm::game::LevelWebGrabPointAsset, 3> selectionPoints{};
     selectionPoints[0].objectId = 1;
     selectionPoints[0].position = {100.0F, 0.0F, 0.0F};
