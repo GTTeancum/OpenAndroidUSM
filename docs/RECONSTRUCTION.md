@@ -872,6 +872,25 @@ invisible. Core tests cover all five authored links, exact effect names,
 activation/delay transitions, falling motion, spatial sound metadata, and the
 one-shot damage event.
 
+## Authored damage volumes and hurt reactions
+
+`CEffectDamage::ProcessUserAttr` at `0x00368ba4` builds an oriented box from
+the node's absolute transform and `Sizes`, defaults damage values at or below
+0.1 to 30, and retains the authored enable and damage-type fields. Level one
+uses four enabled type-0 volumes: ID 703 in Room 1 and IDs 754, 836, and 837
+along the Room 8 fire walls. They have no renderable mesh; their presentation
+is the player's light-hurt response.
+
+`LevelDamageRuntime` reproduces `CEffectDamage::Update` at `0x00368a80` with
+renderer-independent oriented containment and the native 1000 ms minimum
+reaction window, preventing a player who remains inside a volume from taking
+damage every display frame. A hit subtracts the authored 30 health, selects
+`k_state_hurt_light` for type 0 (`k_state_hurt_heavy` for type 1), plays that
+state's recovered VoxSound entry, and temporarily blocks ordinary movement
+and attacks while the corresponding packaged animation advances. Core tests
+cover all four real records, containment, cooldown, health, and animation
+timing; WARP verifies that the hurt pose changes the rendered player frame.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

@@ -14,6 +14,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelBonusRuntime.hpp"
+#include "game/LevelDamageRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
 #include "game/LevelDropRuntime.hpp"
@@ -72,6 +73,7 @@ private:
     game::LevelTriggerSoundRuntime triggerSoundRuntime_;
     game::LevelCinematicRuntime levelCinematicRuntime_;
     game::LevelBonusRuntime levelBonusRuntime_;
+    game::LevelDamageRuntime levelDamageRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::LevelEffectRuntime effectRuntime_;
     game::LevelDropRuntime dropRuntime_;

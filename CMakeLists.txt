@@ -115,6 +115,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelCollision.cpp
     src/game/LevelCinematicRuntime.cpp
     src/game/LevelBonusRuntime.cpp
+    src/game/LevelDamageRuntime.cpp
     src/game/LevelEnemyRuntime.cpp
     src/game/LevelEffectRuntime.cpp
     src/game/LevelDropRuntime.cpp

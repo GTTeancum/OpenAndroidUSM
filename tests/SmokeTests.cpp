@@ -22,6 +22,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelBonusRuntime.hpp"
+#include "game/LevelDamageRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
 #include "game/LevelDropRuntime.hpp"
@@ -774,6 +775,39 @@ int main() {
                            area.effectType == "explode_new";
                 }));
         }
+        assert(bootstrap.damageVolumes().size() == 4);
+        assert((std::vector<std::int32_t>{
+                    bootstrap.damageVolumes()[0].objectId,
+                    bootstrap.damageVolumes()[1].objectId,
+                    bootstrap.damageVolumes()[2].objectId,
+                    bootstrap.damageVolumes()[3].objectId} ==
+                std::vector<std::int32_t>{703, 754, 836, 837}));
+        for (const auto& damage : bootstrap.damageVolumes()) {
+            assert(damage.enabled);
+            assert(damage.damage == 30.0F);
+            assert(damage.damageType == 0);
+        }
+        usm::game::LevelDamageAsset testDamage;
+        testDamage.objectId = 10;
+        testDamage.position = {};
+        testDamage.sizes = {200.0F, 100.0F, 200.0F};
+        testDamage.damage = 30.0F;
+        testDamage.enabled = true;
+        usm::game::LevelDamageRuntime effectDamageRuntime;
+        effectDamageRuntime.bind({&testDamage, 1});
+        effectDamageRuntime.update({}, 1);
+        auto damageEvents = effectDamageRuntime.consumeEvents();
+        assert(damageEvents.size() == 1);
+        assert(damageEvents.front().objectId == 10);
+        assert(damageEvents.front().damage == 30.0F);
+        assert(effectDamageRuntime.cooldownRemainingMilliseconds() == 1000);
+        effectDamageRuntime.update({}, 999);
+        assert(effectDamageRuntime.consumeEvents().empty());
+        effectDamageRuntime.update({}, 1);
+        damageEvents = effectDamageRuntime.consumeEvents();
+        assert(damageEvents.size() == 1);
+        effectDamageRuntime.update({1000.0F, 0.0F, 0.0F}, 1000);
+        assert(effectDamageRuntime.consumeEvents().empty());
 
         const std::array<usm::game::LevelDropAreaAsset, 1> testDropAreas{{
             {1, 8, {0.0F, 0.0F, 0.0F}, {200.0F, 200.0F, 200.0F},
@@ -2176,6 +2210,20 @@ int main() {
         assert(groundedPlayer.applyDamage(groundedPlayer.maximumHealth()));
         assert(groundedPlayer.dead());
         assert(!groundedPlayer.requestPunch());
+        usm::game::GameplayPlayer hurtReactionPlayer;
+        assert(hurtReactionPlayer.initialize(
+            bootstrap.player(), &levelCollision, &playerStateConfigs));
+        const auto& hurtClip = bootstrap.player().animationBank.clips()[
+            static_cast<std::size_t>(hurtState->primaryAnimationId)];
+        assert(hurtReactionPlayer.applyDamage(30.0F, 0, 1000));
+        assert(hurtReactionPlayer.activeAnimation() == hurtClip.name);
+        assert(!hurtReactionPlayer.requestPunch());
+        const std::uint32_t hurtDuration =
+            std::max<std::uint32_t>(1000, hurtClip.durationMilliseconds());
+        hurtReactionPlayer.update({}, {}, hurtDuration - 1);
+        assert(hurtReactionPlayer.activeAnimation() == hurtClip.name);
+        hurtReactionPlayer.update({}, {}, 1);
+        assert(hurtReactionPlayer.activeAnimation() == "idle_stand");
         usm::game::GameplayPlayer cinematicDamagePlayer;
         assert(cinematicDamagePlayer.initialize(bootstrap.player(),
                                                 &levelCollision));

@@ -292,6 +292,18 @@ struct LevelHintAsset {
     assets::DdsAtcTexture texture;
 };
 
+struct LevelDamageAsset {
+    std::int32_t objectId{-1};
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    assets::Vector3 sizes;
+    float damage{30.0F};
+    std::int32_t damageType{};
+    bool enabled{true};
+};
+
 struct LevelDropAreaAsset {
     std::int32_t objectId{-1};
     std::int32_t roomId{-1};
@@ -452,6 +464,10 @@ public:
     [[nodiscard]] const std::vector<LevelHintAsset>& hints() const noexcept {
         return hints_;
     }
+    [[nodiscard]] const std::vector<LevelDamageAsset>& damageVolumes() const
+        noexcept {
+        return damageVolumes_;
+    }
     [[nodiscard]] const std::vector<LevelDropAreaAsset>& dropAreas() const
         noexcept {
         return dropAreas_;
@@ -501,6 +517,7 @@ private:
     std::vector<LevelEnvironmentEffectAsset> environmentEffects_;
     std::vector<LevelBonusAsset> bonuses_;
     std::vector<LevelHintAsset> hints_;
+    std::vector<LevelDamageAsset> damageVolumes_;
     std::vector<LevelDropAreaAsset> dropAreas_;
     std::vector<LevelDropObjectAsset> dropObjects_;
     std::vector<LevelTriggerSoundAsset> triggerSounds_;

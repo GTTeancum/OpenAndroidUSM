@@ -227,6 +227,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     swingIdleState_ = nullptr;
     sliderLandState_ = nullptr;
     sliderMoveState_ = nullptr;
+    hurtLightState_ = nullptr;
+    hurtHeavyState_ = nullptr;
     activeLocomotionState_ = nullptr;
     locomotionState_ = LocomotionState::Grounded;
     verticalVelocityCentimetersPerSecond_ = 0.0F;
@@ -245,6 +247,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     punchSoundFramePending_ = false;
     punchSoundFrameEmitted_ = false;
     punchSoundFrameMilliseconds_ = 300;
+    hurtReactionRemainingMilliseconds_ = 0;
     enteredStateCount_ = 0;
     if (states != nullptr) {
         jumpStartState_ = states->findState("k_state_jump_start");
@@ -258,6 +261,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
             states->findState("k_state_trigger_slider_move");
         sliderLandState_ =
             states->findState("k_state_trigger_slider_land");
+        hurtLightState_ = states->findState("k_state_hurt_light");
+        hurtHeavyState_ = states->findState("k_state_hurt_heavy");
         if (stateClip(animationBank_, jumpStartState_) == nullptr ||
             stateClip(animationBank_, jumpFallState_) == nullptr ||
             stateClip(animationBank_, sustainedFallState_) == nullptr ||
@@ -282,6 +287,11 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
              stateClip(animationBank_, sliderMoveState_) == nullptr)) {
             return Result::failure(
                 "Player slider states have invalid animation IDs");
+        }
+        if (stateClip(animationBank_, hurtLightState_) == nullptr ||
+            stateClip(animationBank_, hurtHeavyState_) == nullptr) {
+            return Result::failure(
+                "Player hurt states have invalid animation IDs");
         }
         const PlayerStateDefinition* punchState =
             states->findState("k_state_idle_to_punch_right");
@@ -311,7 +321,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
 
 bool GameplayPlayer::requestPunch() noexcept {
     if (attackState_ != AttackState::None ||
-        locomotionState_ != LocomotionState::Grounded || dead()) {
+        locomotionState_ != LocomotionState::Grounded || dead() ||
+        hurtReactionRemainingMilliseconds_ != 0) {
         return false;
     }
     attackState_ = AttackState::PunchRight;
@@ -326,7 +337,8 @@ bool GameplayPlayer::requestPunch() noexcept {
 bool GameplayPlayer::requestJump() noexcept {
     if (attackState_ != AttackState::None ||
         locomotionState_ != LocomotionState::Grounded || dead() ||
-        jumpStartState_ == nullptr) {
+        jumpStartState_ == nullptr ||
+        hurtReactionRemainingMilliseconds_ != 0) {
         return false;
     }
     jumpAnchorHeight_ = position_.z;
@@ -389,11 +401,25 @@ bool GameplayPlayer::releaseWeb() noexcept {
     return true;
 }
 
-bool GameplayPlayer::applyDamage(float damage) noexcept {
+bool GameplayPlayer::applyDamage(
+    float damage, std::int32_t damageType,
+    std::uint32_t minimumReactionMilliseconds) noexcept {
     if (damage <= 0.0F || dead()) {
         return false;
     }
     health_ = std::max(0.0F, health_ - damage);
+    const PlayerStateDefinition* hurtState =
+        damageType == 1 ? hurtHeavyState_ : hurtLightState_;
+    const assets::ColladaAnimationClip* hurtClip =
+        stateClip(animationBank_, hurtState);
+    if (!dead() && !cinematicDriven_ &&
+        locomotionState_ == LocomotionState::Grounded &&
+        hurtClip != nullptr) {
+        attackState_ = AttackState::None;
+        setAnimation(hurtClip->name);
+        hurtReactionRemainingMilliseconds_ = std::max(
+            minimumReactionMilliseconds, hurtClip->durationMilliseconds());
+    }
     return true;
 }
 
@@ -510,6 +536,16 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
                 animationTimeMilliseconds_ = std::min<std::uint64_t>(
                     animationTimeMilliseconds_, finalPoseTime);
             }
+        }
+        return;
+    }
+    if (hurtReactionRemainingMilliseconds_ != 0) {
+        const std::uint32_t step = std::min(
+            elapsedMilliseconds, hurtReactionRemainingMilliseconds_);
+        animationTimeMilliseconds_ += step;
+        hurtReactionRemainingMilliseconds_ -= step;
+        if (hurtReactionRemainingMilliseconds_ == 0) {
+            setAnimation("idle_stand");
         }
         return;
     }

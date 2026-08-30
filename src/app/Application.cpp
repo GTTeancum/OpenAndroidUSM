@@ -108,9 +108,9 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::string_view, 8> gameplaySoundStates{
+    constexpr std::array<std::string_view, 9> gameplaySoundStates{
         "k_state_idle_to_punch_right", "k_state_hurt_light",
-        "k_state_jump_start", "k_state_jump_land",
+        "k_state_hurt_heavy", "k_state_jump_start", "k_state_jump_land",
         "k_state_swing_web_throw", "k_state_swing_hang",
         "k_state_swing_idle", "k_state_trigger_slider_move"};
     result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
@@ -191,6 +191,7 @@ int Application::run(HINSTANCE instance) {
                                 gameplayPlayer_.maximumHealth());
     triggerRuntime_.bind(levelOne_.triggers());
     triggerSoundRuntime_.bind(levelOne_.triggerSounds());
+    levelDamageRuntime_.bind(levelOne_.damageVolumes());
     result = enemyRuntime_.initialize(levelOne_);
     if (!result) {
         return fail(result.message());
@@ -779,6 +780,21 @@ int Application::run(HINSTANCE instance) {
                 if (gameplayPlayer_.applyDamage(hit.damage)) {
                     result = playerSounds_.dispatchStateEnter(
                         "k_state_hurt_light", playGameplaySound);
+                    if (!result) {
+                        return fail(result.message());
+                    }
+                }
+            }
+            levelDamageRuntime_.update(gameplayPlayer_.position(),
+                                       gameDeltaMilliseconds);
+            for (const game::LevelDamageEvent& event :
+                 levelDamageRuntime_.consumeEvents()) {
+                if (gameplayPlayer_.applyDamage(event.damage,
+                                                event.damageType, 1000)) {
+                    result = playerSounds_.dispatchStateEnter(
+                        event.damageType == 1 ? "k_state_hurt_heavy"
+                                              : "k_state_hurt_light",
+                        playGameplaySound);
                     if (!result) {
                         return fail(result.message());
                     }

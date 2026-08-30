@@ -392,6 +392,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     environmentEffects_.clear();
     bonuses_.clear();
     hints_.clear();
+    damageVolumes_.clear();
     dropAreas_.clear();
     dropObjects_.clear();
     triggerSounds_.clear();
@@ -718,6 +719,30 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                                            ": " + result.message());
                 }
                 hints_.push_back(std::move(hint));
+                continue;
+            }
+            if (node.gameType == "EffectDamage") {
+                LevelDamageAsset damage;
+                damage.objectId = node.id;
+                damage.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                damage.position = worldPosition(node);
+                damage.rotation = node.rotation;
+                damage.scale = node.scale;
+                damage.sizes = vectorAttribute(node, "Sizes");
+                damage.damage = floatAttribute(node, "Damage", 30.0F);
+                if (damage.damage <= 0.1F) {
+                    damage.damage = 30.0F;
+                }
+                damage.damageType = integerAttribute(node, "$DamageType", 0);
+                damage.enabled = booleanAttribute(node, "Enable", true);
+                if (damage.sizes.x == 0.0F || damage.sizes.y == 0.0F ||
+                    damage.sizes.z == 0.0F || damage.damageType < 0 ||
+                    damage.damageType > 1) {
+                    return Result::failure("EffectDamage " +
+                                           std::to_string(node.id) +
+                                           " has invalid attributes");
+                }
+                damageVolumes_.push_back(std::move(damage));
                 continue;
             }
             if (node.gameType == "DropArea") {

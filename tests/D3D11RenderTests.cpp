@@ -228,6 +228,39 @@ int main() {
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
 
+        usm::game::GameplayPlayer hurtPlayer;
+        assert(hurtPlayer.initialize(levelOne.player(), nullptr,
+                                     &playerStates));
+        assert(hurtPlayer.applyDamage(30.0F, 0, 1000));
+        const auto* effectDamageHurtClip =
+            levelOne.player().animationBank.findClip(
+                hurtPlayer.activeAnimation());
+        assert(effectDamageHurtClip != nullptr);
+        hurtPlayer.update({}, gameplayPose, 100);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *effectDamageHurtClip,
+            hurtPlayer.animationTimeMilliseconds(),
+            hurtPlayer.worldTransform()));
+        gameRenderer.renderFrame();
+        RgbaImage effectDamageHurtFrame;
+        assert(gameRenderer.readBackImage(effectDamageHurtFrame));
+        captureIfRequested(effectDamageHurtFrame,
+                           "gameplay-player-hurt.bmp");
+        std::size_t hurtChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < gameplayFrame.pixels.size(); component += 4) {
+            hurtChangedPixels +=
+                gameplayFrame.pixels[component] !=
+                    effectDamageHurtFrame.pixels[component] ||
+                gameplayFrame.pixels[component + 1] !=
+                    effectDamageHurtFrame.pixels[component + 1] ||
+                gameplayFrame.pixels[component + 2] !=
+                    effectDamageHurtFrame.pixels[component + 2];
+        }
+        assert(hurtChangedPixels > 50);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *idleClip, 0, levelOne.player().worldTransform));
+
         usm::game::LevelObjectRuntime comicObjects;
         assert(comicObjects.initialize(levelOne));
         for (const auto& object : comicObjects.states()) {

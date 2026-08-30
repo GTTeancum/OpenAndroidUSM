@@ -43,7 +43,9 @@ public:
     [[nodiscard]] bool requestJump() noexcept;
     [[nodiscard]] bool requestWeb() noexcept;
     [[nodiscard]] bool releaseWeb() noexcept;
-    [[nodiscard]] bool applyDamage(float damage) noexcept;
+    [[nodiscard]] bool applyDamage(
+        float damage, std::int32_t damageType = 0,
+        std::uint32_t minimumReactionMilliseconds = 0) noexcept;
     void addHealth(float health) noexcept;
     void addSkillPoints(std::int32_t points) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
@@ -142,6 +144,8 @@ private:
     const PlayerStateDefinition* swingIdleState_{};
     const PlayerStateDefinition* sliderLandState_{};
     const PlayerStateDefinition* sliderMoveState_{};
+    const PlayerStateDefinition* hurtLightState_{};
+    const PlayerStateDefinition* hurtHeavyState_{};
     const PlayerStateDefinition* activeLocomotionState_{};
     LocomotionState locomotionState_{LocomotionState::Grounded};
     float verticalVelocityCentimetersPerSecond_{};
@@ -160,6 +164,7 @@ private:
     bool punchSoundFramePending_{};
     bool punchSoundFrameEmitted_{};
     std::uint32_t punchSoundFrameMilliseconds_{300};
+    std::uint32_t hurtReactionRemainingMilliseconds_{};
     std::array<std::string_view, 4> enteredStates_{};
     std::size_t enteredStateCount_{};
     float health_{1000.0F};
