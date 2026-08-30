@@ -91,7 +91,8 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::int16_t, 3> firstLevelEnemyTypes{0, 1, 4};
+    constexpr std::array<std::int16_t, 6> firstLevelEnemyTypes{
+        0, 1, 3, 4, 5, 16};
     result = enemySounds_.preload(
         levelOne_.enemyBehaviorConfigs(), levelOne_.enemySpecialActions(),
         voxSounds_, soundCatalog_, firstLevelEnemyTypes);

@@ -650,8 +650,12 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             }
             const bool meleeThug =
                 node.gameType.starts_with("MeleeThugEnemy_");
+            const bool gunThug = node.gameType == "MeleeThug_gun";
             const bool bigRangeThug = node.gameType == "RangeThug_big";
-            if (!meleeThug && !bigRangeThug) {
+            const bool hammerThug = node.gameType == "RangeThug_hammer";
+            const bool sandman = node.gameType == "Boss_Sandman";
+            if (!meleeThug && !gunThug && !bigRangeThug && !hammerThug &&
+                !sandman) {
                 continue;
             }
 
@@ -708,19 +712,24 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             enemy.objectId = node.id;
             enemy.name = node.name;
             enemy.gameType = node.gameType;
-            enemy.enemyTypeId = bigRangeThug
-                                    ? 4
-                                    : node.gameType == "MeleeThugEnemy_knife"
-                                          ? 0
-                                          : 1;
+            enemy.enemyTypeId = static_cast<std::int16_t>(integerAttribute(
+                node, sandman ? "Boss_Type" : "Enemy_Type",
+                sandman         ? 16
+                : gunThug       ? 3
+                : bigRangeThug  ? 4
+                : hammerThug    ? 5
+                : node.gameType == "MeleeThugEnemy_knife" ? 0
+                                                           : 1));
             enemy.initialAnimation = node.initialAnimation;
             if (enemy.initialAnimation.empty()) {
-                enemy.initialAnimation = bigRangeThug
-                                             ? "idlebaz"
-                                             : node.gameType ==
-                                                       "MeleeThugEnemy_knife"
-                                                   ? "idle_knife_at_idle"
-                                                   : "idle_at1_idle";
+                enemy.initialAnimation =
+                    bigRangeThug
+                        ? "idlebaz"
+                    : gunThug || hammerThug || sandman
+                        ? "idle"
+                    : node.gameType == "MeleeThugEnemy_knife"
+                        ? "idle_knife_at_idle"
+                        : "idle_at1_idle";
             }
             enemy.archetypeIndex = archetypeIndex;
             enemy.position = worldPosition(node);

@@ -78,7 +78,7 @@ Spider-Man's serialized level-one start position.
 
 `GameplayPlayer` implements renderer-independent ground movement, collision,
 camera-relative controller input, named punch clips, authored impact timing,
-and health. `LevelEnemyRuntime` owns the mutable state of all 29 level-one
+and health. `LevelEnemyRuntime` owns the mutable state of all 34 level-one
 enemies. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
 `MoveObject` commands feed that state directly; enabled enemies acquire the
 player using their scene-authored awareness radius and chase at the authored
@@ -142,8 +142,8 @@ resolves to Vox ID 178, `SFX_THUG_SWOOSH`. The native runtime queues these
 key-frame cues even when an attack misses, rotates hurt variants
 deterministically, and emits the corresponding death cue. Hurt and death
 animations are one-shot states; D3D11 clamps them at the final authored pose
-instead of wrapping. `EnemyBehaviorSoundBank` predecodes all fourteen sounds
-used by level-one enemy types 0, 1, and 4 before gameplay. WARP captures
+instead of wrapping. `EnemyBehaviorSoundBank` predecodes all 32 sounds used
+by level-one enemy types 0, 1, 3, 4, 5, and 16 before gameplay. WARP captures
 cover a mid-hurt pose and the
 final prone death pose.
 
@@ -255,10 +255,13 @@ The intro's `MustBeVisible` command names Rooms 1 through 5, but the main
 scene's link table names all thirteen playable room scenes. The native level
 bootstrap follows that table instead of a hard-coded intro subset and loads
 all thirteen geometry, collision, navigation, scene, and texture sets as
-separate D3D11 resources. The linked scenes contribute 27 triggers, 28 melee
-enemies, the Room 9 `RangeThug_big`, and 43 cinematic objects. The ranged
-thug retains enemy type 4, its 800 health, `idlebaz` idle, and authored
-`idle_death_on__ground_back` terminal pose. Forty-two cinematic scripts are present;
+separate D3D11 resources. The linked scenes contribute 27 triggers, 30 melee
+enemies, the type-4 big thug, type-5 hammer thug, and both type-16 Sandman
+instances, plus 43 cinematic objects. These actors retain their authored
+health, meshes, animation banks, and initial clips; the big thug, for example,
+uses its 800 health, `idlebaz` idle, and
+`idle_death_on__ground_back` terminal pose. Forty-two cinematic scripts are
+present;
 Room 13's unreferenced editor object 1239 names a CFF absent from the shipped
 archive, so it is retained as explicitly unavailable and never dispatched.
 Room-owned trigger, enemy, and camera-control positions use their serialized

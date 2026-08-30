@@ -119,6 +119,11 @@ std::string_view idleAnimation(const LevelEnemyAsset& enemy) noexcept {
     if (enemy.gameType == "RangeThug_big") {
         return "idlebaz";
     }
+    if (enemy.gameType == "MeleeThug_gun" ||
+        enemy.gameType == "RangeThug_hammer" ||
+        enemy.gameType == "Boss_Sandman") {
+        return "idle";
+    }
     return "idle_at1_idle";
 }
 

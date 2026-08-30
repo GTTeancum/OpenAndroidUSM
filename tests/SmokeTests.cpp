@@ -845,12 +845,13 @@ int main() {
         assert(batAttackEvents.front()->keyFramePercent == 47);
         assert(batAttackEvents.front()->attackId == 7);
         usm::audio::EnemyBehaviorSoundBank enemySounds;
-        constexpr std::array<std::int16_t, 3> firstLevelEnemyTypes{0, 1, 4};
+        constexpr std::array<std::int16_t, 6> firstLevelEnemyTypes{
+            0, 1, 3, 4, 5, 16};
         assert(enemySounds.preload(behaviorConfigs,
                                    bootstrap.enemySpecialActions(),
                                    voxSounds, soundCatalog,
                                    firstLevelEnemyTypes));
-        assert(enemySounds.decodedSoundCount() == 14);
+        assert(enemySounds.decodedSoundCount() == 32);
         std::size_t enemySoundPlayCount = 0;
         assert(enemySounds.dispatch(
             185, [&enemySoundPlayCount](const usm::audio::PcmAudio& clip,
@@ -950,9 +951,9 @@ int main() {
         assert(enemyGatePlayer.finished());
         usm::game::LevelEnemyRuntime enemyRuntime;
         assert(enemyRuntime.initialize(bootstrap));
-        constexpr std::array<std::int32_t, 12> conditionEnemyIds{
-            394, 395, 397, 398, 399, 401,
-            488, 489, 505, 506, 1251, 30000,
+        constexpr std::array<std::int32_t, 16> conditionEnemyIds{
+            394, 395, 397, 398, 399, 401, 488, 489,
+            505, 506, 1139, 1199, 1251, 10339, 10340, 30000,
         };
         for (const std::int32_t enemyId : conditionEnemyIds) {
             assert(enemyRuntime.find(enemyId) != nullptr);
@@ -1020,8 +1021,8 @@ int main() {
         assert(enemyRuntime.find(394)->aiEnabled);
         assert(enemyRuntime.find(395)->aiEnabled);
         assert(enemyRuntime.find(397)->aiEnabled);
-        assert(bootstrap.enemyArchetypes().size() == 3);
-        assert(bootstrap.enemies().size() == 29);
+        assert(bootstrap.enemyArchetypes().size() == 6);
+        assert(bootstrap.enemies().size() == 34);
         const auto firstKnifeEnemy = std::find_if(
             bootstrap.enemies().begin(), bootstrap.enemies().end(),
             [](const usm::game::LevelEnemyAsset& enemy) {
@@ -1049,6 +1050,27 @@ int main() {
         assert(bootstrap.enemyArchetypes()[bigRangeEnemy->archetypeIndex]
                    .animationBank.findClip("idle_death_on__ground_back") !=
                nullptr);
+        const auto findEnemyAsset = [&bootstrap](std::int32_t objectId) {
+            return std::find_if(
+                bootstrap.enemies().begin(), bootstrap.enemies().end(),
+                [objectId](const usm::game::LevelEnemyAsset& enemy) {
+                    return enemy.objectId == objectId;
+                });
+        };
+        const auto gunEnemy = findEnemyAsset(10344);
+        const auto hammerEnemy = findEnemyAsset(1139);
+        const auto sandmanBoss = findEnemyAsset(1199);
+        assert(gunEnemy != bootstrap.enemies().end());
+        assert(gunEnemy->enemyTypeId == 3);
+        assert(gunEnemy->initialAnimation == "idle");
+        assert(hammerEnemy != bootstrap.enemies().end());
+        assert(hammerEnemy->enemyTypeId == 5);
+        assert(hammerEnemy->health == 1000.0F);
+        assert(hammerEnemy->initialAnimation == "idle");
+        assert(sandmanBoss != bootstrap.enemies().end());
+        assert(sandmanBoss->enemyTypeId == 16);
+        assert(sandmanBoss->health == 2500.0F);
+        assert(sandmanBoss->initialAnimation == "idle");
         usm::game::LevelEnemyRuntime chaseRuntime;
         assert(chaseRuntime.initialize(bootstrap));
         const auto* chasingKnife = chaseRuntime.find(394);
