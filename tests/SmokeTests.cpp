@@ -3119,6 +3119,43 @@ int main() {
             spiderInfluenceCount += influences.size();
         }
         assert(spiderInfluenceCount == 974);
+        const auto copActor = std::find_if(
+            bootstrap.introActors().begin(), bootstrap.introActors().end(),
+            [](const usm::game::CinematicActorAsset& actor) {
+                return actor.objectId == 1261;
+            });
+        assert(copActor != bootstrap.introActors().end());
+        assert(std::all_of(
+            copActor->animation.tracks().begin(),
+            copActor->animation.tracks().end(), [](const auto& track) {
+                return track.property !=
+                           usm::assets::ColladaAnimationProperty::Rotation ||
+                       track.componentCount == 4;
+            }));
+        const auto findCopTrack = [&copActor](std::string_view id) {
+            return std::find_if(
+                copActor->animation.tracks().begin(),
+                copActor->animation.tracks().end(),
+                [id](const auto& track) { return track.id == id; });
+        };
+        const auto leftForearm =
+            findCopTrack("Bip01_L_Forearm-node-rotation");
+        const auto rightCalf = findCopTrack("Bip01_R_Calf-node-rotation");
+        const auto rightForearm =
+            findCopTrack("Bip01_R_Forearm-node-rotation");
+        assert(leftForearm != copActor->animation.tracks().end());
+        assert(rightCalf != copActor->animation.tracks().end());
+        assert(rightForearm != copActor->animation.tracks().end());
+        assert(std::abs(leftForearm->values[2] - 0.441178F) < 0.00001F);
+        assert(std::abs(leftForearm->values[3] - 0.897420F) < 0.00001F);
+        assert(std::abs(rightCalf->values[2] - 0.240411F) < 0.00001F);
+        assert(std::abs(rightForearm->values[2] - 0.327971F) < 0.00001F);
+        std::vector<usm::assets::ColladaGeometry> copPose;
+        assert(usm::assets::evaluateColladaPose(
+            copActor->mesh, copActor->animation, 0, copPose));
+        assert(copPose.size() == 1);
+        assert(std::abs(copPose.front().bounds.minimum.z - 36.6302F) < 0.01F);
+        assert(std::abs(copPose.front().bounds.maximum.x - 15654.8F) < 0.1F);
         std::vector<usm::assets::ColladaGeometry> spiderStartPose;
         std::vector<usm::assets::ColladaGeometry> spiderLaterPose;
         assert(usm::assets::evaluateColladaPose(

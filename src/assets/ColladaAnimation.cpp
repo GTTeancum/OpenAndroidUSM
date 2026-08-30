@@ -15,6 +15,11 @@ constexpr std::uint32_t kAnimationCountOffset = 0x10;
 constexpr std::uint32_t kAnimationArrayOffset = 0x14;
 constexpr std::uint32_t kAnimationSize = 0x24;
 constexpr std::uint32_t kSourceSize = 0x0c;
+constexpr std::uint32_t kSamplerCountOffset = 0x0c;
+constexpr std::uint32_t kSamplerArrayOffset = 0x10;
+constexpr std::uint32_t kSamplerSize = 0x0c;
+constexpr std::uint32_t kSamplerInputSourceIndexOffset = 0x04;
+constexpr std::uint32_t kSamplerOutputSourceIndexOffset = 0x08;
 constexpr std::uint32_t kTimestampSourceType = 4;
 constexpr std::uint32_t kFloatingPointSourceType = 6;
 constexpr std::uint32_t kAnimationClipCountOffset = 0x1c;
@@ -100,12 +105,18 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     const auto idOffset = view.integer<std::uint32_t>(animationOffset);
     const auto sourceCount = view.integer<std::uint32_t>(animationOffset + 4);
     const auto sourcesOffset = view.integer<std::uint32_t>(animationOffset + 8);
+    const auto samplerCount =
+        view.integer<std::uint32_t>(animationOffset + kSamplerCountOffset);
+    const auto samplersOffset =
+        view.integer<std::uint32_t>(animationOffset + kSamplerArrayOffset);
     const auto channelCount = view.integer<std::uint32_t>(animationOffset + 20);
     const auto channelsOffset = view.integer<std::uint32_t>(animationOffset + 24);
-    if (!idOffset || !sourceCount || !sourcesOffset || !channelCount ||
-        !channelsOffset || *sourceCount < 2 || *channelCount == 0 ||
+    if (!idOffset || !sourceCount || !sourcesOffset || !samplerCount ||
+        !samplersOffset || !channelCount || !channelsOffset ||
+        *sourceCount < 2 || *samplerCount != 1 || *channelCount == 0 ||
         !view.contains(*sourcesOffset,
-                       static_cast<std::uint64_t>(*sourceCount) * kSourceSize)) {
+                       static_cast<std::uint64_t>(*sourceCount) * kSourceSize) ||
+        !view.contains(*samplersOffset, kSamplerSize)) {
         return Result::failure("BDAE animation record is invalid");
     }
     const auto id = view.string(*idOffset);
@@ -119,8 +130,37 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         return Result::failure("BDAE animation target is invalid");
     }
 
-    const std::uint32_t timeSource = *sourcesOffset;
-    const std::uint32_t valueSource = *sourcesOffset + kSourceSize;
+    const auto timeSourceIndex = view.integer<std::uint32_t>(
+        *samplersOffset + kSamplerInputSourceIndexOffset);
+    const auto valueSourceIndex = view.integer<std::uint32_t>(
+        *samplersOffset + kSamplerOutputSourceIndexOffset);
+    if (!timeSourceIndex || !valueSourceIndex ||
+        *timeSourceIndex >= *sourceCount || *valueSourceIndex >= *sourceCount) {
+        return Result::failure("BDAE animation sampler is invalid");
+    }
+    const std::uint32_t timeSource =
+        *sourcesOffset + *timeSourceIndex * kSourceSize;
+    const std::uint32_t valueSource =
+        *sourcesOffset + *valueSourceIndex * kSourceSize;
+    const ColladaAnimationProperty property =
+        propertyFromChannel(*channelType, *id);
+    std::uint32_t componentCount = 0;
+    switch (property) {
+    case ColladaAnimationProperty::Translation:
+        componentCount = 3;
+        break;
+    case ColladaAnimationProperty::TranslationX:
+    case ColladaAnimationProperty::TranslationY:
+    case ColladaAnimationProperty::TranslationZ:
+        componentCount = 1;
+        break;
+    case ColladaAnimationProperty::Rotation:
+        componentCount = 4;
+        break;
+    default:
+        break;
+    }
+
     const auto timeType = view.integer<std::uint32_t>(timeSource);
     const auto timeCount = view.integer<std::uint32_t>(timeSource + 4);
     const auto timesOffset = view.integer<std::uint32_t>(timeSource + 8);
@@ -128,20 +168,40 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     const auto valueCount = view.integer<std::uint32_t>(valueSource + 4);
     const auto valuesOffset = view.integer<std::uint32_t>(valueSource + 8);
     if (!timeType || !timeCount || !timesOffset || !valueType || !valueCount ||
-        !valuesOffset || *timeType != kTimestampSourceType ||
-        *valueType != kFloatingPointSourceType || *timeCount == 0 ||
-        *valueCount % *timeCount != 0 ||
-        !view.contains(*timesOffset,
-                       static_cast<std::uint64_t>(*timeCount) * 4) ||
-        !view.contains(*valuesOffset,
-                       static_cast<std::uint64_t>(*valueCount) * 4)) {
-        return Result::failure("BDAE animation source streams are invalid");
+        !valuesOffset) {
+        return Result::failure("BDAE animation sampler sources are truncated");
     }
-    const std::uint32_t componentCount = *valueCount / *timeCount;
+    const bool compactRotationAngles =
+        property == ColladaAnimationProperty::Rotation &&
+        *valueCount == *timeCount;
+    if (componentCount == 0) {
+        if (*timeCount == 0 || *valueCount % *timeCount != 0) {
+            return Result::failure(
+                "BDAE animation component count is unsupported");
+        }
+        componentCount = *valueCount / *timeCount;
+    }
     if (componentCount == 0 || componentCount > 4) {
         return Result::failure("BDAE animation component count is unsupported");
     }
-
+    const std::uint64_t serializedValueCount =
+        compactRotationAngles
+            ? static_cast<std::uint64_t>(*timeCount)
+            : static_cast<std::uint64_t>(*timeCount) * componentCount;
+    const std::uint64_t decodedValueCount =
+        static_cast<std::uint64_t>(*timeCount) * componentCount;
+    if (*timeType != kTimestampSourceType ||
+        *valueType != kFloatingPointSourceType || *timeCount == 0 ||
+        (*valueCount != *timeCount && *valueCount != decodedValueCount) ||
+        !view.contains(*timesOffset,
+                       static_cast<std::uint64_t>(*timeCount) * 4) ||
+        !view.contains(*valuesOffset,
+                       serializedValueCount * 4)) {
+        return Result::failure(
+            "BDAE animation source streams are invalid (time type " +
+            std::to_string(*timeType) + ", output type " +
+            std::to_string(*valueType) + ")");
+    }
     std::uint32_t firstKey = 0;
     if (*timeCount > 1) {
         const auto firstTimestamp =
@@ -162,7 +222,7 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
 
     output.id = *id;
     output.targetNode = *target;
-    output.property = propertyFromChannel(*channelType, output.id);
+    output.property = property;
     output.componentCount = componentCount;
     output.timestampsMilliseconds.reserve(*timeCount - firstKey);
     for (std::uint32_t index = firstKey; index < *timeCount; ++index) {
@@ -175,14 +235,35 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         }
         output.timestampsMilliseconds.push_back(*timestamp);
     }
-    output.values.reserve(*valueCount - firstKey * componentCount);
-    for (std::uint32_t index = firstKey * componentCount;
-         index < *valueCount; ++index) {
-        const auto value = view.floating(*valuesOffset + index * 4);
-        if (!value || !std::isfinite(*value)) {
-            return Result::failure("BDAE animation values are invalid");
+    output.values.reserve(static_cast<std::size_t>(decodedValueCount) -
+                          firstKey * componentCount);
+    if (compactRotationAngles) {
+        // The BDAE compiler stores rotations constrained to the local Z axis
+        // as one radian angle per key. Expand that compact representation to
+        // the quaternion consumed by CQuaternionEx and the scene nodes.
+        for (std::uint32_t key = firstKey; key < *timeCount; ++key) {
+            const auto angle = view.floating(*valuesOffset + key * 4);
+            if (!angle || !std::isfinite(*angle)) {
+                return Result::failure(
+                    "BDAE compact rotation is invalid for " + *id +
+                    " at key " + std::to_string(key));
+            }
+            const float halfAngle = *angle * 0.5F;
+            output.values.insert(output.values.end(),
+                                 {0.0F, 0.0F, std::sin(halfAngle),
+                                  std::cos(halfAngle)});
         }
-        output.values.push_back(*value);
+    } else {
+        for (std::uint32_t index = firstKey * componentCount;
+             index < decodedValueCount; ++index) {
+            const auto value = view.floating(*valuesOffset + index * 4);
+            if (!value || !std::isfinite(*value)) {
+                return Result::failure(
+                    "BDAE animation values are invalid for " + *id +
+                    " at scalar " + std::to_string(index));
+            }
+            output.values.push_back(*value);
+        }
     }
     return Result::success();
 }
