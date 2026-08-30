@@ -794,6 +794,15 @@ int main() {
         assert(normalAttack->maximumReach() == 200.0F);
         assert(normalAttack->minimumAngleDegrees == -90.0F);
         assert(normalAttack->maximumAngleDegrees == 90.0F);
+        const auto* hammerAttack = bootstrap.attackConfigs().find(19);
+        const auto* bigThugAttack = bootstrap.attackConfigs().find(21);
+        const auto* sandmanAttack = bootstrap.attackConfigs().find(69);
+        assert(hammerAttack != nullptr && hammerAttack->damage == 50.0F &&
+               hammerAttack->maximumReach() == 300.0F);
+        assert(bigThugAttack != nullptr && bigThugAttack->damage == 70.0F &&
+               bigThugAttack->maximumReach() == 500.0F);
+        assert(sandmanAttack != nullptr && sandmanAttack->damage == 75.0F &&
+               sandmanAttack->maximumReach() == 400.0F);
         assert(bootstrap.enemySpecialActions().actions().size() == 230);
         const auto& behaviorConfigs = bootstrap.enemyBehaviorConfigs();
         assert(behaviorConfigs.animationMaps().size() == 239);
@@ -844,6 +853,25 @@ int main() {
         assert(batAttackEvents.front()->name == "THUG_BAT_01");
         assert(batAttackEvents.front()->keyFramePercent == 47);
         assert(batAttackEvents.front()->attackId == 7);
+        const auto bigThugAttackEvents =
+            bootstrap.enemySpecialActions().findAttackEvents(
+                4, "idlebaz_rush_attack_idlebaz");
+        assert(bigThugAttackEvents.size() == 4);
+        assert(bigThugAttackEvents.front()->keyFramePercent == 64);
+        assert(bigThugAttackEvents.back()->keyFramePercent == 76);
+        assert(bigThugAttackEvents.front()->attackId == 21);
+        const auto hammerAttackEvents =
+            bootstrap.enemySpecialActions().findAttackEvents(
+                5, "idle_attack_hammer_idle");
+        assert(hammerAttackEvents.size() == 1);
+        assert(hammerAttackEvents.front()->keyFramePercent == 60);
+        assert(hammerAttackEvents.front()->attackId == 19);
+        const auto sandmanAttackEvents =
+            bootstrap.enemySpecialActions().findAttackEvents(
+                16, "ground_attack1");
+        assert(sandmanAttackEvents.size() == 1);
+        assert(sandmanAttackEvents.front()->keyFramePercent == 50);
+        assert(sandmanAttackEvents.front()->attackId == 69);
         usm::audio::EnemyBehaviorSoundBank enemySounds;
         constexpr std::array<std::int16_t, 6> firstLevelEnemyTypes{
             0, 1, 3, 4, 5, 16};
@@ -1050,6 +1078,33 @@ int main() {
         assert(bootstrap.enemyArchetypes()[bigRangeEnemy->archetypeIndex]
                    .animationBank.findClip("idle_death_on__ground_back") !=
                nullptr);
+        usm::game::LevelEnemyRuntime bigThugAttackRuntime;
+        assert(bigThugAttackRuntime.initialize(bootstrap));
+        usm::game::CinematicThread enableBigThugThread;
+        enableBigThugThread.objectId = 30000;
+        assert(bigThugAttackRuntime.applyCinematicCommand(
+            bootstrap, enableBigThugThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        const auto* attackingBigThug = bigThugAttackRuntime.find(30000);
+        assert(attackingBigThug != nullptr);
+        const auto* bigThugAttackClip =
+            bootstrap.enemyArchetypes()[attackingBigThug->asset->archetypeIndex]
+                .animationBank.findClip("idlebaz_rush_attack_idlebaz");
+        assert(bigThugAttackClip != nullptr);
+        const usm::assets::Vector3 bigThugVictim{
+            attackingBigThug->position.x + 100.0F,
+            attackingBigThug->position.y,
+            attackingBigThug->position.z,
+        };
+        bigThugAttackRuntime.updateGameplay(
+            bigThugAttackClip->durationMilliseconds() * 64U / 100U,
+            bigThugVictim);
+        assert(bigThugAttackRuntime.find(30000)->activeAnimation ==
+               "idlebaz_rush_attack_idlebaz");
+        const auto bigThugHits = bigThugAttackRuntime.consumePlayerHits();
+        assert(bigThugHits.size() == 1);
+        assert(bigThugHits.front().attackId == 21);
+        assert(bigThugHits.front().damage == 70.0F);
         const auto findEnemyAsset = [&bootstrap](std::int32_t objectId) {
             return std::find_if(
                 bootstrap.enemies().begin(), bootstrap.enemies().end(),

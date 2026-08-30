@@ -122,6 +122,14 @@ each crossed looping key frame, queues a named `EnemyMeleeHit`, and applies it
 to player health. Core regressions exercise both knife impact frames and
 verify their recovered 25-point damage.
 
+The same special-action path now drives the heavier level-one actors rather
+than making them harmless chase targets. Type 4 selects
+`idlebaz_rush_attack_idlebaz` and four attack-21 impacts (70 damage, 500 cm
+reach); type 5 selects `idle_attack_hammer_idle` and attack 19 (50 damage,
+300 cm); Sandman type 16 selects `ground_attack1` and attack 69 (75 damage,
+400 cm). Their key percentages, sectors, damage, and reach come from the same
+typed binary tables as the knife/bat attacks.
+
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation
 lists from `BehaviorAnimList.bin`, 63 sound maps from

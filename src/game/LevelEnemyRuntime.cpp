@@ -127,6 +127,19 @@ std::string_view idleAnimation(const LevelEnemyAsset& enemy) noexcept {
     return "idle_at1_idle";
 }
 
+std::string_view attackAnimation(const LevelEnemyAsset& enemy) noexcept {
+    if (enemy.gameType == "RangeThug_big") {
+        return "idlebaz_rush_attack_idlebaz";
+    }
+    if (enemy.gameType == "RangeThug_hammer") {
+        return "idle_attack_hammer_idle";
+    }
+    if (enemy.gameType == "Boss_Sandman") {
+        return "ground_attack1";
+    }
+    return idleAnimation(enemy);
+}
+
 void setFacing(LevelEnemyState& enemy, const assets::Vector3& facing) noexcept {
     if (enemy.asset == nullptr) {
         return;
@@ -265,15 +278,15 @@ void LevelEnemyRuntime::updateGameplay(
             distanceSquared <= attackRange * attackRange) {
             const EnemyBehaviorState previousBehavior = enemy.behavior;
             enemy.behavior = EnemyBehaviorState::AttackRange;
-            const std::string_view idle = idleAnimation(*enemy.asset);
+            const std::string_view attack = attackAnimation(*enemy.asset);
             const float distance = std::sqrt(distanceSquared);
             if (distance > std::numeric_limits<float>::epsilon()) {
                 setFacing(enemy, {toPlayerX / distance, toPlayerY / distance,
                                   0.0F});
             }
-            if (enemy.activeAnimation != idle ||
+            if (enemy.activeAnimation != attack ||
                 previousBehavior != EnemyBehaviorState::AttackRange) {
-                enemy.activeAnimation = idle;
+                enemy.activeAnimation = attack;
                 enemy.animationTimeMilliseconds = 0;
                 enemy.animationLoops = true;
             }
@@ -410,10 +423,7 @@ float LevelEnemyRuntime::maximumAttackReach(
     }
     float maximumReach = 0.0F;
     const auto events = level_->enemySpecialActions().findAttackEvents(
-        enemy.asset->enemyTypeId,
-        enemy.asset->gameType == "MeleeThugEnemy_knife"
-            ? "idle_knife_at_idle"
-            : "idle_at1_idle");
+        enemy.asset->enemyTypeId, attackAnimation(*enemy.asset));
     for (const EnemyAnimationSpecialAction* event : events) {
         if (event == nullptr || event->attackId < 0 ||
             event->attackId > std::numeric_limits<std::int16_t>::max()) {
