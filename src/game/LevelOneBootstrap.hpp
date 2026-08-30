@@ -82,6 +82,9 @@ struct LevelPlayerAsset {
 struct LevelTriggerAsset {
     std::int32_t objectId{-1};
     std::string name;
+    // CTrigger is a CRoom child. Preserve its one-based room ownership so
+    // automatic activation can follow CRoom::SetVisible like the original.
+    std::int32_t roomId{-1};
     assets::Vector3 position;
     assets::Quaternion rotation;
     assets::Vector3 scale{1.0F, 1.0F, 1.0F};

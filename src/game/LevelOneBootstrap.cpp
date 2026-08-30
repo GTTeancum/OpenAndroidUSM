@@ -1223,6 +1223,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                 LevelTriggerAsset trigger;
                 trigger.objectId = node.id;
                 trigger.name = node.name;
+                trigger.roomId = static_cast<std::int32_t>(roomIndex + 1);
                 trigger.position = worldPosition(node);
                 trigger.rotation = node.rotation;
                 trigger.scale = node.scale;

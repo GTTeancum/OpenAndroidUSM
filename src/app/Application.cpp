@@ -1,5 +1,6 @@
 #include "app/Application.hpp"
 
+#include "diagnostics/AutoplayHarness.hpp"
 #include "platform/windows/GameDataLocator.hpp"
 
 #include <Windows.h>
@@ -9,16 +10,23 @@
 #include <charconv>
 #include <chrono>
 #include <cmath>
-#include <string>
 #include <filesystem>
+#include <iostream>
 #include <limits>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace usm {
 namespace {
 
+bool gShowErrorDialogs = true;
+
 int fail(std::string_view message) {
+    if (!gShowErrorDialogs) {
+        std::cerr << "OpenAndroidUSM error: " << message << '\n';
+        return EXIT_FAILURE;
+    }
     const std::wstring wideMessage(message.begin(), message.end());
     MessageBoxW(nullptr, wideMessage.c_str(), L"OpenAndroidUSM error",
                 MB_OK | MB_ICONERROR);
@@ -39,22 +47,101 @@ bool commandInteger(const game::CinematicCommand& command,
 
 } // namespace
 
-int Application::run(HINSTANCE instance) {
-    Result result = window_.create(instance, L"OpenAndroidUSM", 1280, 720);
+int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+    gShowErrorDialogs = !options.autoplayScript.has_value();
+    std::optional<diagnostics::AutoplayHarness> autoplay;
+    Result result = Result::success();
+    if (options.autoplayScript) {
+        autoplay.emplace();
+        result = autoplay->initialize(
+            *options.autoplayScript,
+            options.autoplayOutput.value_or("autoplay-output"));
+        if (result) {
+            result = renderer_.initializeOffscreen(autoplay->renderWidth(),
+                                                   autoplay->renderHeight());
+        }
+    } else {
+        result = window_.create(instance, L"OpenAndroidUSM", 1280, 720);
+        if (result) {
+            result = renderer_.initialize(window_.nativeHandle(),
+                                          window_.clientWidth(),
+                                          window_.clientHeight());
+        }
+    }
     if (!result) {
         return fail(result.message());
     }
 
-    result = renderer_.initialize(window_.nativeHandle(), window_.clientWidth(),
-                                  window_.clientHeight());
+    const bool audioEnabled = !autoplay || options.autoplayAudio;
+    if (audioEnabled) {
+        result = audio_.initialize();
+    }
     if (!result) {
         return fail(result.message());
     }
-
-    result = audio_.initialize();
-    if (!result) {
-        return fail(result.message());
-    }
+    std::uint64_t traceTimeMilliseconds = 0;
+    const auto playAudio =
+        [this, &autoplay, &traceTimeMilliseconds, audioEnabled](
+            const audio::PcmAudio& clip, bool loop,
+            std::string_view diagnosticName = "unnamed_pcm") -> Result {
+        if (autoplay) {
+            autoplay->recordAudio(traceTimeMilliseconds, "play",
+                                  diagnosticName, loop, false);
+        }
+        return audioEnabled ? audio_.play(clip, loop) : Result::success();
+    };
+    const auto playNamedAudio =
+        [this, &autoplay, &traceTimeMilliseconds, audioEnabled](
+            std::string_view eventName, const audio::PcmAudio& clip, bool loop,
+            float volume = 1.0F,
+            std::uint32_t fadeMilliseconds = 0) -> Result {
+        if (autoplay) {
+            autoplay->recordAudio(traceTimeMilliseconds, "play", eventName,
+                                  loop, false);
+        }
+        return audioEnabled
+            ? audio_.playNamed(eventName, clip, loop, volume,
+                               fadeMilliseconds)
+            : Result::success();
+    };
+    const auto playSpatialAudio =
+        [this, &autoplay, &traceTimeMilliseconds, audioEnabled](
+            std::string_view eventName, const audio::PcmAudio& clip,
+            const audio::SpatialSoundSource& source, bool loop = false)
+            -> Result {
+        if (autoplay) {
+            autoplay->recordAudio(traceTimeMilliseconds, "play", eventName,
+                                  loop, true);
+        }
+        return audioEnabled
+            ? audio_.playNamed3D(eventName, clip, source, loop)
+            : Result::success();
+    };
+    const auto stopNamedAudio =
+        [this, &autoplay, &traceTimeMilliseconds, audioEnabled](
+            std::string_view eventName,
+            std::uint32_t fadeMilliseconds = 0) -> Result {
+        if (autoplay) {
+            autoplay->recordAudio(traceTimeMilliseconds, "stop", eventName);
+        }
+        return audioEnabled ? audio_.stopNamed(eventName, fadeMilliseconds)
+                            : Result::success();
+    };
+    const auto setNamedAudioVolume =
+        [this, &autoplay, &traceTimeMilliseconds, audioEnabled](
+            std::string_view eventName, float volume,
+            std::uint32_t fadeMilliseconds = 0) -> Result {
+        if (autoplay) {
+            autoplay->recordEvent(
+                traceTimeMilliseconds, "audio_volume",
+                "event=" + std::string(eventName) + ";volume=" +
+                    std::to_string(volume) + ";fade_ms=" +
+                    std::to_string(fadeMilliseconds));
+        }
+        return audioEnabled
+            ? audio_.setNamedVolume(eventName, volume, fadeMilliseconds)
+            : Result::success();
+    };
 
     std::filesystem::path gameDataRoot;
     result = platform::locateGameData(gameDataRoot);
@@ -64,6 +151,63 @@ int Application::run(HINSTANCE instance) {
     result = levelOne_.load(gameDataRoot);
     if (!result) {
         return fail(result.message());
+    }
+    if (autoplay) {
+        for (const game::LevelTriggerAsset& trigger : levelOne_.triggers()) {
+            autoplay->recordEvent(
+                0, "trigger_asset",
+                "object=" + std::to_string(trigger.objectId) +
+                    ";name=" + trigger.name +
+                    ";room=" + std::to_string(trigger.roomId) +
+                    ";x=" + std::to_string(trigger.position.x) +
+                    ";y=" + std::to_string(trigger.position.y) +
+                    ";z=" + std::to_string(trigger.position.z) +
+                    ";size_x=" + std::to_string(trigger.sizes.x) +
+                    ";size_y=" + std::to_string(trigger.sizes.y) +
+                    ";size_z=" + std::to_string(trigger.sizes.z) +
+                    ";enabled=" + std::to_string(trigger.enabled) +
+                    ";auto_disabled=" +
+                    std::to_string(trigger.autoDisabled) +
+                    ";out_to_in=" +
+                    std::to_string(trigger.outToInCinematicId) +
+                    ";in_to_out=" +
+                    std::to_string(trigger.inToOutCinematicId) +
+                    ";while_in=" +
+                    std::to_string(trigger.whileInsideCinematicId) +
+                    ";while_out=" +
+                    std::to_string(trigger.whileOutsideCinematicId));
+        }
+        for (const game::LevelEnemyAsset& enemy : levelOne_.enemies()) {
+            autoplay->recordEvent(
+                0, "enemy_asset",
+                "object=" + std::to_string(enemy.objectId) +
+                    ";room=" + std::to_string(enemy.roomId) +
+                    ";type=" + std::to_string(enemy.enemyTypeId) +
+                    ";visible=" + std::to_string(enemy.visible) +
+                    ";ai=" + std::to_string(enemy.aiEnabled) +
+                    ";wait_spawn=" + std::to_string(enemy.waitSpawn));
+        }
+        for (const game::CameraArea& area : levelOne_.cameraAreas()) {
+            std::string detail =
+                "object=" + std::to_string(area.objectId) +
+                ";disabled=" + std::to_string(area.disabled) +
+                ";height=" + std::to_string(area.height);
+            for (std::size_t index = 0; index < area.nextAreaIds.size();
+                 ++index) {
+                detail += ";next" + std::to_string(index) + "=" +
+                          std::to_string(area.nextAreaIds[index]);
+            }
+            for (std::size_t index = 0; index < area.controlPoints.size();
+                 ++index) {
+                const assets::Vector3& point =
+                    area.controlPoints[index].position;
+                detail += ";p" + std::to_string(index) + "=" +
+                          std::to_string(point.x) + "|" +
+                          std::to_string(point.y) + "|" +
+                          std::to_string(point.z);
+            }
+            autoplay->recordEvent(0, "camera_area_asset", detail);
+        }
     }
     const game::AttackDefinition* normalPunchAttack =
         levelOne_.attackConfigs().find(7);
@@ -168,8 +312,10 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    audio_.setListener(initialCameraPose.position, initialCameraPose.target,
-                       initialCameraPose.up);
+    if (audioEnabled) {
+        audio_.setListener(initialCameraPose.position, initialCameraPose.target,
+                           initialCameraPose.up);
+    }
     result = gameplayCamera_.bind(levelOne_.cameraAreas(),
                                   levelOne_.player().initialCameraAreaId);
     if (!result) {
@@ -246,6 +392,7 @@ int Application::run(HINSTANCE instance) {
     }
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints());
+    gameplayCinematics_.bind(levelOne_.cinematics());
     quickTimeEvent_.bind(levelOne_.buttonConfigs());
     cinematicUi_.bind(levelOne_.textCatalog());
     game::CinematicPlayer introStartCommands;
@@ -284,14 +431,14 @@ int Application::run(HINSTANCE instance) {
         game::LevelMusicTrack::DowntownCalm;
     constexpr game::LevelMusicTrack mixedMusic =
         game::LevelMusicTrack::DowntownMixed;
-    result = audio_.playNamed(
+    result = playNamedAudio(
         game::LevelMusicRuntime::eventName(calmMusic),
         levelMusicBank_.track(calmMusic), true);
     if (result) {
         // The two downtown files are sample-aligned. Keeping the mixed voice
         // running silently matches the native cursor-preserving transition
         // without restarting the score when combat begins.
-        result = audio_.playNamed(
+        result = playNamedAudio(
             game::LevelMusicRuntime::eventName(mixedMusic),
             levelMusicBank_.track(mixedMusic), true, 0.0F);
     }
@@ -300,13 +447,15 @@ int Application::run(HINSTANCE instance) {
     }
 
     const auto applyMusicTransition =
-        [this](const game::LevelMusicTransition& transition) -> Result {
+        [this, &playNamedAudio, &stopNamedAudio, &setNamedAudioVolume](
+            const game::LevelMusicTransition& transition) -> Result {
         if (transition.from == transition.to) {
             return Result::success();
         }
         const auto setVolume =
-            [this, &transition](game::LevelMusicTrack track, float volume) {
-                return audio_.setNamedVolume(
+            [&transition, &setNamedAudioVolume](
+                game::LevelMusicTrack track, float volume) {
+                return setNamedAudioVolume(
                     game::LevelMusicRuntime::eventName(track), volume,
                     transition.fadeMilliseconds);
             };
@@ -324,11 +473,11 @@ int Application::run(HINSTANCE instance) {
             return transitionResult;
         }
         if (transition.from == game::LevelMusicTrack::BossSandman) {
-            transitionResult = audio_.stopNamed(
+            transitionResult = stopNamedAudio(
                 game::LevelMusicRuntime::eventName(transition.from),
                 transition.fadeMilliseconds);
         } else if (transition.from == game::LevelMusicTrack::Lose) {
-            transitionResult = audio_.stopNamed(
+            transitionResult = stopNamedAudio(
                 game::LevelMusicRuntime::eventName(transition.from),
                 transition.fadeMilliseconds);
         }
@@ -337,7 +486,7 @@ int Application::run(HINSTANCE instance) {
             transition.to == game::LevelMusicTrack::DowntownMixed) {
             return transitionResult;
         }
-        return audio_.playNamed(
+        return playNamedAudio(
             game::LevelMusicRuntime::eventName(transition.to),
             levelMusicBank_.track(transition.to),
             game::LevelMusicRuntime::loops(transition.to), 1.0F,
@@ -345,35 +494,31 @@ int Application::run(HINSTANCE instance) {
     };
 
     const auto startGameplayCinematic =
-        [this](std::int32_t cinematicId) -> Result {
-        const auto cinematic = std::find_if(
-            levelOne_.cinematics().begin(), levelOne_.cinematics().end(),
-            [cinematicId](const game::LevelCinematicAsset& candidate) {
-                return candidate.objectId == cinematicId &&
-                       candidate.scriptAvailable;
-            });
-        if (cinematic == levelOne_.cinematics().end()) {
-            return Result::failure(
-                "Cinematic command references an unavailable script");
+        [this, &autoplay, &traceTimeMilliseconds](
+            std::int32_t cinematicId) -> Result {
+        const bool alreadyActive = gameplayCinematics_.active(cinematicId);
+        Result startResult = gameplayCinematics_.start(cinematicId);
+        if (startResult && autoplay && !alreadyActive) {
+            autoplay->recordEvent(traceTimeMilliseconds, "cinematic_start",
+                                  "cinematic=" +
+                                      std::to_string(cinematicId));
         }
-        activeGameplayCinematic_ = &*cinematic;
-        gameplayCinematicTimeMilliseconds_ = 0;
-        Result startResult = gameplayCinematicPlayer_.start(cinematic->script);
-        if (!startResult) {
-            activeGameplayCinematic_ = nullptr;
-            return startResult;
+        return startResult;
+    };
+    const auto diagnosticCinematicId = [this]() -> std::int32_t {
+        if (const game::GameplayCinematicPlayback* presentation =
+                gameplayCinematics_.presentation()) {
+            return presentation->asset->objectId;
         }
-        gameplayCinematicDurationMilliseconds_ = std::max(
-            gameplayCinematicPlayer_.durationMilliseconds(),
-            cinematic->colladaDurationMilliseconds);
-        return Result::success();
+        const auto activeIds = gameplayCinematics_.activeIds();
+        return activeIds.empty() ? -1 : activeIds.front();
     };
 
     const auto introStart = std::chrono::steady_clock::now();
     auto previousFrame = introStart;
     const auto playGameplaySound =
-        [this](const audio::PcmAudio& clip, bool loop) {
-            return audio_.play(clip, loop);
+        [&playAudio](const audio::PcmAudio& clip, bool loop) {
+            return playAudio(clip, loop, "player_state");
         };
     const auto cinematicSoundPosition =
         [this](std::int32_t objectId)
@@ -392,7 +537,7 @@ int Application::run(HINSTANCE instance) {
         return std::nullopt;
     };
     const auto playSpatialSound =
-        [this, &cinematicSoundPosition](
+        [this, &cinematicSoundPosition, &playSpatialAudio](
             std::int32_t objectId, std::string_view eventName,
             const audio::PcmAudio& clip, bool loop) -> Result {
         const auto position = cinematicSoundPosition(objectId);
@@ -406,28 +551,49 @@ int Application::run(HINSTANCE instance) {
             return Result::failure(
                 "Spatial sound has no VoxSound record");
         }
-        return audio_.playNamed3D(
+        return playSpatialAudio(
             eventName, clip,
             {*position, record->minimumDistance, record->maximumDistance,
              record->distanceCullingEnabled},
             loop);
     };
     float scaledDeltaRemainderMilliseconds = 0.0F;
+    std::uint64_t syntheticElapsedMilliseconds =
+        autoplay ? autoplay->startTimeMilliseconds() : 0;
+    std::uint64_t accumulatedGameMilliseconds = 0;
+    std::uint64_t frameIndex = 0;
     bool gameOverCinematicRequested = false;
+    bool gameplayVisibilityInitialized = false;
     bool exitAfterPresent = false;
-    while (window_.pumpMessages()) {
+    const auto shouldRunFrame = [&] {
+        return autoplay ? !autoplay->complete() && !autoplay->failed()
+                        : window_.pumpMessages();
+    };
+    while (shouldRunFrame()) {
         const auto frameTime = std::chrono::steady_clock::now();
-        const auto frameElapsed =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                frameTime - previousFrame);
-        const auto realDeltaMilliseconds = static_cast<std::uint32_t>(
-            std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
+        std::uint32_t realDeltaMilliseconds = 0;
+        if (autoplay) {
+            realDeltaMilliseconds = autoplay->fixedStepMilliseconds();
+            syntheticElapsedMilliseconds += realDeltaMilliseconds;
+        } else {
+            const auto frameElapsed =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    frameTime - previousFrame);
+            realDeltaMilliseconds = static_cast<std::uint32_t>(
+                std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
+            syntheticElapsedMilliseconds = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    frameTime - introStart)
+                    .count());
+        }
+        traceTimeMilliseconds = syntheticElapsedMilliseconds;
         previousFrame = frameTime;
         scaledDeltaRemainderMilliseconds +=
             levelCinematicRuntime_.updateSlowMotion(
                 static_cast<float>(realDeltaMilliseconds));
         const auto gameDeltaMilliseconds = static_cast<std::uint32_t>(
             std::max(0.0F, std::floor(scaledDeltaRemainderMilliseconds)));
+        accumulatedGameMilliseconds += gameDeltaMilliseconds;
         scaledDeltaRemainderMilliseconds -=
             static_cast<float>(gameDeltaMilliseconds);
         // CGameCamera::UpdateShake counts fixed Application update calls and
@@ -435,26 +601,107 @@ int Application::run(HINSTANCE instance) {
         levelCinematicRuntime_.advanceCameraShake(realDeltaMilliseconds);
         objectRuntime_.advanceAnimations(gameDeltaMilliseconds);
         effectRuntime_.update(gameDeltaMilliseconds);
-        audio_.update();
+        if (audioEnabled) {
+            audio_.update();
+        }
         keyRouter_.beginFrame();
-        controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
-            keyRouter_.route(event, reconstructed::InputContext::Gameplay);
-        });
-        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            frameTime - introStart);
+        if (!autoplay) {
+            controller_.poll(
+                [this](const reconstructed::XperiaKeyEvent& event) {
+                    keyRouter_.route(event,
+                                     reconstructed::InputContext::Gameplay);
+                });
+        }
         const auto introDuration =
             levelOne_.introCameraAnimation().durationMilliseconds();
         const auto timestamp = static_cast<std::uint32_t>(
-            std::min<std::int64_t>(elapsed.count(), introDuration));
+            std::min<std::uint64_t>(syntheticElapsedMilliseconds,
+                                    introDuration));
+        const bool gameplayActive =
+            syntheticElapsedMilliseconds >= introDuration;
+        if (gameplayActive && !gameplayVisibilityInitialized) {
+            // CCinematicThread::MustBeVisibleRoom is an override owned by the
+            // presenting cinematic. It expires with the intro rather than
+            // becoming persistent level state.
+            levelCinematicRuntime_.clearCinematicRoomOverride();
+            renderer_.setCinematicVisibleRooms(
+                levelCinematicRuntime_.forcedVisibleRooms());
+            renderer_.setCameraAreaRoomVisibility(
+                gameplayCamera_.mustInvisibleRooms(),
+                gameplayCamera_.mustVisibleRooms());
+            result = renderer_.setCamera(
+                gameplayCamera_.sample(gameplayPlayer_.position()));
+            if (!result) {
+                return fail(result.message());
+            }
+            gameplayVisibilityInitialized = true;
+        }
+        const bool harnessControlsEnabled =
+            gameplayActive && levelCinematicRuntime_.controlsEnabled() &&
+            !gameplayPlayer_.cinematicDriven() && !restoreRuntime_.active() &&
+            !quickTimeEvent_.active() &&
+            !gameplayCinematics_.hasActiveColladaPlayback();
+        diagnostics::AutoplayFrameInput autoplayInput;
+        if (autoplay) {
+            const game::CameraPose harnessCamera = gameplayActive
+                ? gameplayCamera_.sample(gameplayPlayer_.position())
+                : levelOne_.introCamera().sample(timestamp);
+            autoplayInput = autoplay->update(
+                {frameIndex,
+                 syntheticElapsedMilliseconds,
+                 accumulatedGameMilliseconds,
+                 gameplayActive,
+                 harnessControlsEnabled,
+                 quickTimeEvent_.active(),
+                 restoreRuntime_.active(),
+                 restoreRuntime_.blackOverlayAlpha(),
+                 gameplayCamera_.currentAreaId(),
+                 diagnosticCinematicId(),
+                 gameplayPlayer_.position(),
+                 gameplayPlayer_.facing(),
+                 gameplayPlayer_.health(),
+                 gameplayPlayer_.activeAnimation(),
+                 gameplayPlayer_.animationTimeMilliseconds(),
+                 harnessCamera,
+                 renderer_.roomVisibility(),
+                 enemyRuntime_.states()});
+            if (autoplayInput.teleport) {
+                gameplayPlayer_.restoreAt(autoplayInput.teleport->position,
+                                          autoplayInput.teleport->facing);
+                const bool cameraRelocated =
+                    gameplayCamera_.relocateToContainingArea(
+                        autoplayInput.teleport->position);
+                autoplay->recordEvent(
+                    syntheticElapsedMilliseconds, "teleport",
+                    "x=" + std::to_string(autoplayInput.teleport->position.x) +
+                        ";y=" +
+                        std::to_string(autoplayInput.teleport->position.y) +
+                        ";z=" +
+                        std::to_string(autoplayInput.teleport->position.z) +
+                        ";camera_area=" +
+                        std::to_string(gameplayCamera_.currentAreaId()) +
+                        ";camera_relocated=" +
+                        (cameraRelocated ? "1" : "0"));
+            }
+        }
         Result soundResult = Result::success();
         Result uiResult = Result::success();
+        const bool fastForwardingIntro =
+            autoplay && frameIndex == 0 &&
+            autoplay->startTimeMilliseconds() != 0;
         result = introPlayer_.advanceTo(
             timestamp,
-            [this, &soundResult,
-             &uiResult](const game::CinematicThread& thread,
+            [this, &soundResult, &uiResult, &autoplay,
+             &traceTimeMilliseconds, &playNamedAudio,
+             &stopNamedAudio, fastForwardingIntro](
+                        const game::CinematicThread& thread,
                         const game::CinematicCommand& command) {
                 if (!soundResult || !uiResult) {
                     return;
+                }
+                if (autoplay) {
+                    autoplay->recordCommand(traceTimeMilliseconds,
+                                            thread.objectId, command);
                 }
                 uiResult = objectRuntime_.applyCinematicCommand(
                     levelOne_, thread, command);
@@ -469,16 +716,21 @@ int Application::run(HINSTANCE instance) {
                 if (!uiResult) {
                     return;
                 }
-                uiResult = cinematicUi_.applyCommand(command);
-                soundResult = introSounds_.dispatch(
-                    command,
-                    [this](std::string_view eventName,
-                           const audio::PcmAudio& clip, bool loop) {
-                        return audio_.playNamed(eventName, clip, loop);
-                    },
-                    [this](std::string_view eventName) {
-                        return audio_.stopNamed(eventName);
-                    });
+                if (!fastForwardingIntro) {
+                    uiResult = cinematicUi_.applyCommand(command);
+                }
+                if (!fastForwardingIntro) {
+                    soundResult = introSounds_.dispatch(
+                        command,
+                        [&playNamedAudio](std::string_view eventName,
+                                          const audio::PcmAudio& clip,
+                                          bool loop) {
+                            return playNamedAudio(eventName, clip, loop);
+                        },
+                        [&stopNamedAudio](std::string_view eventName) {
+                            return stopNamedAudio(eventName);
+                        });
+                }
             });
         if (!result) {
             return fail(result.message());
@@ -491,7 +743,8 @@ int Application::run(HINSTANCE instance) {
         if (!result) {
             return fail(result.message());
         }
-        if (elapsed.count() < introDuration) {
+        game::CameraPose presentedCameraPose;
+        if (!gameplayActive) {
             renderer_.setCameraAreaRoomVisibility(
                 gameplayCamera_.mustInvisibleRooms(),
                 gameplayCamera_.mustVisibleRooms());
@@ -500,13 +753,14 @@ int Application::run(HINSTANCE instance) {
             const game::CameraPose cameraPose =
                 levelCinematicRuntime_.applyCameraShake(
                     levelOne_.introCamera().sample(timestamp));
-            audio_.setListener(cameraPose.position, cameraPose.target,
-                               cameraPose.up);
+            presentedCameraPose = cameraPose;
+            if (audioEnabled) {
+                audio_.setListener(cameraPose.position, cameraPose.target,
+                                   cameraPose.up);
+            }
             result = renderer_.setCamera(cameraPose);
         } else {
-            if (gameplayPlayer_.dead() &&
-                activeGameplayCinematic_ == nullptr &&
-                !gameOverCinematicRequested) {
+            if (gameplayPlayer_.dead() && !gameOverCinematicRequested) {
                 result = startGameplayCinematic(
                     levelOne_.player().endGameCinematicId);
                 if (!result) {
@@ -515,8 +769,10 @@ int Application::run(HINSTANCE instance) {
                 gameOverCinematicRequested = true;
             }
             const auto stick = controller_.leftStick();
-            game::PlayerMotionInput motion{stick.x, stick.y};
-            if (motion.right == 0.0F && motion.forward == 0.0F) {
+            game::PlayerMotionInput motion =
+                autoplay ? autoplayInput.motion
+                         : game::PlayerMotionInput{stick.x, stick.y};
+            if (!autoplay && motion.right == 0.0F && motion.forward == 0.0F) {
                 const auto& input = keyRouter_.state();
                 motion.right = static_cast<float>(input.moveRight.held) -
                                static_cast<float>(input.moveLeft.held);
@@ -528,22 +784,37 @@ int Application::run(HINSTANCE instance) {
                 !gameplayPlayer_.cinematicDriven() &&
                 !restoreRuntime_.active() &&
                 !quickTimeEvent_.active() &&
-                !(activeGameplayCinematic_ != nullptr &&
-                  activeGameplayCinematic_->hasColladaPlayback());
+                !gameplayCinematics_.hasActiveColladaPlayback();
             if (!controlsEnabled) {
                 motion = {};
             }
-            if (controlsEnabled && keyRouter_.state().jump.pressed) {
+            const bool jumpPressed = autoplay
+                ? autoplayInput.jumpPressed
+                : keyRouter_.state().jump.pressed;
+            const bool webPressed = autoplay
+                ? autoplayInput.webPressed
+                : keyRouter_.state().web.pressed;
+            const bool webReleased = autoplay
+                ? autoplayInput.webReleased
+                : keyRouter_.state().web.released;
+            const bool punchPressed = autoplay
+                ? autoplayInput.punchPressed
+                : keyRouter_.state().punch.pressed;
+            if (controlsEnabled && jumpPressed) {
                 (void)gameplayPlayer_.requestJump();
             }
-            if (controlsEnabled && keyRouter_.state().web.pressed) {
+            if (controlsEnabled && webPressed) {
                 (void)gameplayPlayer_.requestWeb();
             }
-            if (controlsEnabled && keyRouter_.state().web.released) {
+            if (controlsEnabled && webReleased) {
                 (void)gameplayPlayer_.releaseWeb();
             }
-            if (controlsEnabled && keyRouter_.state().punch.pressed &&
+            if (controlsEnabled && punchPressed &&
                 gameplayPlayer_.requestPunch()) {
+                if (autoplay) {
+                    autoplay->recordEvent(syntheticElapsedMilliseconds,
+                                          "player_action", "punch_accepted");
+                }
                 result = playerSounds_.dispatchStateEnter(
                     "k_state_idle_to_punch_right", playGameplaySound);
                 if (!result) {
@@ -562,6 +833,16 @@ int Application::run(HINSTANCE instance) {
                     return fail("TriggerRestore emitted an invalid event");
                 }
                 (void)gameplayPlayer_.applyDamage(event.trigger->damage);
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "restore",
+                        "trigger=" +
+                            std::to_string(event.trigger->objectId) +
+                            ";point=" +
+                            std::to_string(event.restorePoint->objectId) +
+                            ";damage=" +
+                            std::to_string(event.trigger->damage));
+                }
                 if (!gameplayPlayer_.dead()) {
                     gameplayPlayer_.restoreAt(event.restorePoint->position,
                                               event.restorePoint->facing);
@@ -590,15 +871,31 @@ int Application::run(HINSTANCE instance) {
                     std::abs(normalPunchAttack->maximumAngleDegrees));
                 const float minimumForwardDot =
                     std::cos(sectorHalfAngle * 0.017453292519943295F);
-                (void)enemyRuntime_.applyPlayerMeleeHit(
+                const auto hitEnemy = enemyRuntime_.applyPlayerMeleeHit(
                     gameplayPlayer_.position(), gameplayPlayer_.facing(),
                     normalPunchAttack->maximumReach(),
                     normalPunchAttack->damage, minimumForwardDot);
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "player_punch_impact",
+                        hitEnemy ? "enemy=" + std::to_string(*hitEnemy)
+                                 : "miss");
+                }
             }
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
                                              gameDeltaMilliseconds);
             const auto triggerEvents =
-                triggerRuntime_.update(gameplayPlayer_.position());
+                triggerRuntime_.update(gameplayPlayer_.position(),
+                                       renderer_.roomVisibility());
+            if (autoplay) {
+                for (const game::TriggerEvent& event : triggerEvents) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "trigger",
+                        "trigger=" + std::to_string(event.triggerId) +
+                            ";cinematic=" +
+                            std::to_string(event.cinematicId));
+                }
+            }
             for (const game::TriggerSoundEvent& event :
                  triggerSoundRuntime_.update(gameplayPlayer_.position())) {
                 const auto clip = triggerSoundClips_.find(event.eventName);
@@ -612,38 +909,37 @@ int Application::run(HINSTANCE instance) {
                         voxSounds_.find(event.eventName);
                     const float volume =
                         record != nullptr && record->id == 0xa1 ? 0.5F : 1.0F;
-                    result = audio_.playNamed(voiceName, clip->second, true,
-                                              volume, 500);
+                    result = playNamedAudio(voiceName, clip->second, true,
+                                            volume, 500);
                 } else {
-                    result = audio_.stopNamed(voiceName, 500);
+                    result = stopNamedAudio(voiceName, 500);
                 }
                 if (!result) {
                     return fail(result.message());
                 }
             }
-            if (activeGameplayCinematic_ == nullptr &&
-                !quickTimeEvent_.active()) {
+            if (!quickTimeEvent_.active()) {
                 for (const game::TriggerEvent& event : triggerEvents) {
                     result = startGameplayCinematic(event.cinematicId);
-                    if (result) {
+                    if (!result) {
                         break;
                     }
                 }
             }
-            if (result && activeGameplayCinematic_ != nullptr) {
-                gameplayCinematicTimeMilliseconds_ =
-                    std::min<std::uint32_t>(
-                        gameplayCinematicTimeMilliseconds_ +
-                            gameDeltaMilliseconds,
-                        gameplayCinematicDurationMilliseconds_);
+            if (result) {
                 Result commandResult = Result::success();
                 bool cinematicDamageApplied = false;
-                result = gameplayCinematicPlayer_.advanceToConditional(
-                    gameplayCinematicTimeMilliseconds_,
+                result = gameplayCinematics_.update(
+                    gameDeltaMilliseconds,
                     [this, &commandResult, &cinematicDamageApplied,
-                     &playSpatialSound](
+                     &playSpatialSound, &autoplay, &traceTimeMilliseconds,
+                     &playNamedAudio, &stopNamedAudio](
                         const game::CinematicThread& thread,
                         const game::CinematicCommand& command) {
+                        if (autoplay) {
+                            autoplay->recordCommand(traceTimeMilliseconds,
+                                                    thread.objectId, command);
+                        }
                         if (command.name == "IfEnemyDead") {
                             std::int32_t enemyId = thread.objectId;
                             (void)commandInteger(command, "IDEnemy", enemyId);
@@ -698,14 +994,14 @@ int Application::run(HINSTANCE instance) {
                         if (commandResult) {
                             commandResult = gameplaySounds_.dispatch(
                                 command,
-                                [this](std::string_view eventName,
-                                       const audio::PcmAudio& clip,
-                                       bool loop) {
-                                    return audio_.playNamed(eventName, clip,
-                                                            loop);
+                                [&playNamedAudio](
+                                    std::string_view eventName,
+                                    const audio::PcmAudio& clip, bool loop) {
+                                    return playNamedAudio(eventName, clip,
+                                                          loop);
                                 },
-                                [this](std::string_view eventName) {
-                                    return audio_.stopNamed(eventName);
+                                [&stopNamedAudio](std::string_view eventName) {
+                                    return stopNamedAudio(eventName);
                                 },
                                 [&thread, &playSpatialSound](
                                     std::string_view eventName,
@@ -723,13 +1019,8 @@ int Application::run(HINSTANCE instance) {
                     result = playerSounds_.dispatchStateEnter(
                         "k_state_hurt_light", playGameplaySound);
                 }
-                if (result && gameplayCinematicPlayer_.finished() &&
-                    gameplayCinematicTimeMilliseconds_ >=
-                        gameplayCinematicDurationMilliseconds_) {
-                    const game::LevelCinematicAsset* completedCinematic =
-                        activeGameplayCinematic_;
-                    auto chainedCinematics = levelCinematicRuntime_
-                                                 .consumeCinematicStartRequests();
+                for (const game::LevelCinematicAsset* completedCinematic :
+                     gameplayCinematics_.consumeCompletions()) {
                     const bool terminalCinematic =
                         completedCinematic->levelEndAfterPlayback ||
                         completedCinematic->gameEndAfterPlayback ||
@@ -741,33 +1032,34 @@ int Application::run(HINSTANCE instance) {
                         // level state; this first-level port exits cleanly.
                         exitAfterPresent = true;
                     } else {
-                        activeGameplayCinematic_ = nullptr;
+                        gameplayCinematics_.remove(
+                            completedCinematic->objectId);
                     }
-                    if (!terminalCinematic && chainedCinematics.empty() &&
+                    if (!terminalCinematic &&
                         completedCinematic->nextCinematicId >= 0) {
-                        chainedCinematics.push_back(
-                            completedCinematic->nextCinematicId);
-                    }
-                    if (!terminalCinematic && chainedCinematics.size() > 1) {
-                        result = Result::failure(
-                            "Gameplay cinematic issued multiple simultaneous "
-                            "handoffs");
-                    } else if (!terminalCinematic &&
-                               !chainedCinematics.empty()) {
                         result = startGameplayCinematic(
-                            chainedCinematics.front());
+                            completedCinematic->nextCinematicId);
+                        if (!result) {
+                            break;
+                        }
+                    }
+                }
+                for (const std::int32_t requestedCinematic :
+                     levelCinematicRuntime_.consumeCinematicStartRequests()) {
+                    if (result) {
+                        result = startGameplayCinematic(requestedCinematic);
                     }
                 }
             }
             quickTimeEvent_.update(
                 gameDeltaMilliseconds,
-                keyRouter_.state().quickTimeEvent.pressed);
+                autoplay ? autoplayInput.quickTimeEventPressed
+                         : keyRouter_.state().quickTimeEvent.pressed);
             if (const auto qteCinematic =
                     quickTimeEvent_.consumeCinematicRequest()) {
                 result = startGameplayCinematic(*qteCinematic);
             }
-            if (activeGameplayCinematic_ == nullptr ||
-                !activeGameplayCinematic_->hasColladaPlayback()) {
+            if (!gameplayCinematics_.hasActiveColladaPlayback()) {
                 enemyRuntime_.updateGameplay(gameDeltaMilliseconds,
                                              gameplayPlayer_.position(),
                                              &levelCollision_);
@@ -796,6 +1088,13 @@ int Application::run(HINSTANCE instance) {
             }
             for (const game::EnemyPlayerHit& hit :
                  enemyRuntime_.consumePlayerHits()) {
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "enemy_hit_player",
+                        "enemy=" + std::to_string(hit.sourceObjectId) +
+                            ";attack=" + std::to_string(hit.attackId) +
+                            ";damage=" + std::to_string(hit.damage));
+                }
                 if (!restoreRuntime_.active() &&
                     gameplayPlayer_.applyDamage(hit.damage)) {
                     result = playerSounds_.dispatchStateEnter(
@@ -811,6 +1110,13 @@ int Application::run(HINSTANCE instance) {
             }
             for (const game::LevelDamageEvent& event :
                  levelDamageRuntime_.consumeEvents()) {
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "damage_volume",
+                        "object=" + std::to_string(event.objectId) +
+                            ";damage=" + std::to_string(event.damage) +
+                            ";type=" + std::to_string(event.damageType));
+                }
                 if (gameplayPlayer_.applyDamage(event.damage,
                                                 event.damageType, 1000)) {
                     result = playerSounds_.dispatchStateEnter(
@@ -835,6 +1141,14 @@ int Application::run(HINSTANCE instance) {
             }
             for (const game::LevelDropEvent& event :
                  dropRuntime_.consumeEvents()) {
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "drop_event",
+                        "object=" + std::to_string(event.objectId) +
+                            ";kind=" + std::to_string(
+                                static_cast<std::int32_t>(event.kind)) +
+                            ";damage=" + std::to_string(event.damage));
+                }
                 if (!event.effectType.empty()) {
                     result = effectRuntime_.playEffect(
                         event.effectType, event.position, event.roomId);
@@ -848,7 +1162,7 @@ int Application::run(HINSTANCE instance) {
                     if (record == nullptr) {
                         return fail("Drop-object sound has no VoxSound record");
                     }
-                    result = audio_.playNamed3D(
+                    result = playSpatialAudio(
                         "DropObject:" + std::to_string(event.objectId),
                         dropObjectSound_,
                         {event.position, record->minimumDistance,
@@ -881,14 +1195,21 @@ int Application::run(HINSTANCE instance) {
             }
             for (const game::LevelBonusGrant& grant :
                  levelBonusRuntime_.consumeGrants()) {
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds, "bonus",
+                        "type=" + std::to_string(
+                            static_cast<std::int32_t>(grant.type)) +
+                            ";amount=" + std::to_string(grant.amount));
+                }
                 if (grant.type == game::LevelBonusType::Health) {
                     gameplayPlayer_.addHealth(
                         static_cast<float>(grant.amount));
                 } else if (grant.type == game::LevelBonusType::SkillPoint) {
                     gameplayPlayer_.addSkillPoints(grant.amount);
                 }
-                result = audio_.playNamed("SFX_ORBS_COLLECT",
-                                          bonusCollectSound_);
+                result = playNamedAudio("SFX_ORBS_COLLECT",
+                                        bonusCollectSound_, false);
                 if (!result) {
                     return fail(result.message());
                 }
@@ -930,9 +1251,14 @@ int Application::run(HINSTANCE instance) {
                                                          enemyRuntime_);
             }
             if (result) {
+                const game::GameplayCinematicPlayback* presentation =
+                    gameplayCinematics_.presentation();
                 result = renderer_.updateGameplayCinematicActors(
-                    levelOne_, activeGameplayCinematic_,
-                    gameplayCinematicTimeMilliseconds_);
+                    levelOne_,
+                    presentation != nullptr ? presentation->asset : nullptr,
+                    presentation != nullptr
+                        ? presentation->elapsedMilliseconds
+                        : 0);
             }
             if (result) {
                 result = renderer_.updateEnemyGunLines(
@@ -940,15 +1266,17 @@ int Application::run(HINSTANCE instance) {
             }
             if (result) {
                 game::CameraPose cameraPose;
-                if (activeGameplayCinematic_ != nullptr &&
-                    activeGameplayCinematic_->hasColladaPlayback()) {
+                const game::GameplayCinematicPlayback* presentation =
+                    gameplayCinematics_.presentation();
+                if (presentation != nullptr &&
+                    presentation->asset->hasColladaPlayback()) {
                     cameraPose =
-                        activeGameplayCinematic_->animatedCamera.sample(
-                            gameplayCinematicTimeMilliseconds_);
-                } else if (activeGameplayCinematic_ != nullptr &&
-                           activeGameplayCinematic_->cameraTrack.valid()) {
-                    cameraPose = activeGameplayCinematic_->cameraTrack.sample(
-                        gameplayCinematicTimeMilliseconds_);
+                        presentation->asset->animatedCamera.sample(
+                            presentation->elapsedMilliseconds);
+                } else if (presentation != nullptr &&
+                           presentation->asset->cameraTrack.valid()) {
+                    cameraPose = presentation->asset->cameraTrack.sample(
+                        presentation->elapsedMilliseconds);
                 } else {
                     cameraPose =
                         gameplayCamera_.sample(gameplayPlayer_.position());
@@ -960,9 +1288,12 @@ int Application::run(HINSTANCE instance) {
                     levelCinematicRuntime_.forcedVisibleRooms());
                 const game::CameraPose finalCameraPose =
                     levelCinematicRuntime_.applyCameraShake(cameraPose);
-                audio_.setListener(finalCameraPose.position,
-                                   finalCameraPose.target,
-                                   finalCameraPose.up);
+                presentedCameraPose = finalCameraPose;
+                if (audioEnabled) {
+                    audio_.setListener(finalCameraPose.position,
+                                       finalCameraPose.target,
+                                       finalCameraPose.up);
+                }
                 result = renderer_.setCamera(finalCameraPose);
             }
         }
@@ -996,7 +1327,8 @@ int Application::run(HINSTANCE instance) {
         }
         cinematicUi_.update(
             gameDeltaMilliseconds,
-            keyRouter_.state().quickTimeEvent.pressed);
+            autoplay ? autoplayInput.quickTimeEventPressed
+                     : keyRouter_.state().quickTimeEvent.pressed);
         const float qteProgress =
             quickTimeEvent_.active() &&
                     quickTimeEvent_.durationMilliseconds() != 0
@@ -1013,11 +1345,14 @@ int Application::run(HINSTANCE instance) {
         if (result) {
             for (const game::SlowMotionSoundCue cue :
                  levelCinematicRuntime_.consumeSlowMotionSoundCues()) {
-                result = audio_.play(
+                result = playAudio(
                     cue == game::SlowMotionSoundCue::Enter
                         ? slowMotionEnterSound_
                         : slowMotionExitSound_,
-                    false);
+                    false,
+                    cue == game::SlowMotionSoundCue::Enter
+                        ? "SFX_SPIDER_SENSE_IN"
+                        : "SFX_SPIDER_SENSE_OUT");
                 if (!result) {
                     break;
                 }
@@ -1027,8 +1362,71 @@ int Application::run(HINSTANCE instance) {
             return fail(result.message());
         }
         renderer_.renderFrame();
+        if (autoplay) {
+            const bool finalControlsEnabled =
+                gameplayActive && levelCinematicRuntime_.controlsEnabled() &&
+                !gameplayPlayer_.cinematicDriven() &&
+                !restoreRuntime_.active() && !quickTimeEvent_.active() &&
+                !gameplayCinematics_.hasActiveColladaPlayback();
+            autoplay->recordFrame(
+                {frameIndex,
+                 syntheticElapsedMilliseconds,
+                 accumulatedGameMilliseconds,
+                 gameplayActive,
+                 finalControlsEnabled,
+                 quickTimeEvent_.active(),
+                 restoreRuntime_.active(),
+                 restoreRuntime_.blackOverlayAlpha(),
+                 gameplayCamera_.currentAreaId(),
+                 diagnosticCinematicId(),
+                 gameplayPlayer_.position(),
+                 gameplayPlayer_.facing(),
+                 gameplayPlayer_.health(),
+                 gameplayPlayer_.activeAnimation(),
+                 gameplayPlayer_.animationTimeMilliseconds(),
+                 presentedCameraPose,
+                 renderer_.roomVisibility(),
+                 enemyRuntime_.states()});
+            const bool periodicCapture = autoplay->periodicCaptureDue(
+                syntheticElapsedMilliseconds);
+            if (periodicCapture || !autoplayInput.captureLabels.empty()) {
+                assets::RgbaImage capture;
+                result = renderer_.readBackImage(capture);
+                if (result && periodicCapture) {
+                    result = autoplay->writeCapture(
+                        capture, gameplayActive ? "gameplay" : "intro",
+                        syntheticElapsedMilliseconds);
+                }
+                if (result) {
+                    for (const std::string& label :
+                         autoplayInput.captureLabels) {
+                        result = autoplay->writeCapture(
+                            capture, label, syntheticElapsedMilliseconds);
+                        if (!result) {
+                            break;
+                        }
+                    }
+                }
+                if (!result) {
+                    autoplay->finish(false, result.message());
+                    return fail(result.message());
+                }
+            }
+        }
+        ++frameIndex;
         if (exitAfterPresent) {
             break;
+        }
+    }
+    if (autoplay) {
+        const bool succeeded = autoplay->complete() && !autoplay->failed();
+        const std::string detail = autoplay->failed()
+            ? std::string(autoplay->failureMessage())
+            : autoplay->complete() ? "script completed"
+                                   : "application exited before script completion";
+        autoplay->finish(succeeded, detail);
+        if (!succeeded) {
+            return fail(detail);
         }
     }
     return EXIT_SUCCESS;

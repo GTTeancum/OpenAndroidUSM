@@ -11,6 +11,35 @@ comment or mapping file until the source database can map it automatically.
 Behavior is checked against the original executable using deterministic inputs
 and captured state wherever practical.
 
+## Deterministic application harness
+
+`diagnostics::AutoplayHarness` runs inside the normal Windows application
+loop with a fixed synthetic clock and the real level loader, cinematic
+players, gameplay runtimes, D3D11 renderer, and readback path. It does not
+inject OS input. Scenario steps express reconstruction goals (`wait_gameplay`,
+`move_to`, `attack`, `jump`, `web_on`, `web_off`, `teleport`, `capture`, and
+assertions) while directives select the fixed tick, trace/capture cadence,
+render size, and maximum run time. `start_time_ms` fast-forwards persistent
+intro world commands for focused probes while suppressing transient historical
+subtitles and audio that should not be replayed at the skip destination.
+
+Every sampled frame records player pose, health, animation clock, accepted
+input axes, gameplay camera area and pose, cinematic ownership, restore/QTE
+state, and visible rooms. A companion enemy table records every mutable enemy
+state. The event stream records script steps, trigger and cinematic starts,
+every dispatched cinematic command with attributes, player impacts, state
+transitions, audio requests, teleports, and captures. Scenario completion and
+failures are machine-readable in `summary.txt`. Explicit capture steps and
+periodic D3D11 readbacks make visual regressions timestamp-addressable; review
+still examines those frames in chronological order.
+
+Diagnostic teleports intentionally bypass route traversal but keep gameplay,
+combat, scripts, animation, and rendering live. They also relocalize the
+gameplay camera across the complete authored area set because the native
+neighbor-only camera transition is correct only for continuous movement. This
+keeps route/navigation reconstruction and encounter-state reconstruction as
+separate experiments.
+
 `tools/ghidra/ExportSelectedDisassembly.java` complements the selected
 decompilation exporter with address-stamped ARM instruction listings and the
 adjacent literal pool. It is used when the decompiler elides constants or ABI
@@ -121,6 +150,13 @@ cinematic thread; unrelated threads continue. The condition is retried on
 subsequent updates and releases the authored trigger/cinematic chain only
 after the referenced native enemy state is dead. This is materially different
 from flattening every time-zero command into an unconditional batch.
+`GameplayCinematicScheduler` also preserves the native manager's concurrent
+list semantics recovered from `CCinematicManager::AddCinematic` (original
+`0x0035f9bc`, image `0x0036f9bc`): it rejects a duplicate active asset but
+does not replace unrelated active cinematics. This allows an encounter's
+presentation script and its zero-time `IfEnemyDead` monitor to advance
+simultaneously. Completed ordinary scripts are removed, while a terminal
+presentation may retain its final authored frame.
 `KillObject` and `IfObjectDestroyed` share the same native death transition
 for enemy-backed objects: health reaches zero, AI stops, and the authored
 one-shot death animation and behavior sound are selected. This covers the
@@ -809,6 +845,13 @@ and enemies; D3D11 tests each room bounding box against the current clip
 volume and applies the resulting visibility to all three groups. This avoids
 rendering disconnected level sections while retaining the opening's explicit
 rooms 1-5 override.
+
+Triggers retain their one-based room owner from the linked scene that supplied
+them. `LevelTriggerRuntime` evaluates a trigger only while that room is active,
+matching the original room-child update gate instead of running all 27 linked
+room triggers globally at level start. When the intro releases its explicit
+room override, visibility is immediately recalculated from the gameplay camera
+before the first gameplay trigger update.
 
 Player death now starts the authored cinematic referenced by
 `^EndGame^Cinematic` (1267 in level one). Its Collada camera and four actors,

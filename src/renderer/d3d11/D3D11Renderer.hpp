@@ -84,6 +84,9 @@ public:
     void setCameraAreaRoomVisibility(
         std::span<const bool> invisibleRooms,
         std::span<const bool> visibleRooms) noexcept;
+    [[nodiscard]] std::span<const bool> roomVisibility() const noexcept {
+        return roomVisibility_;
+    }
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,

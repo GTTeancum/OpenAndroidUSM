@@ -45,3 +45,20 @@ powershell -ExecutionPolicy Bypass -File tools/import_game.ps1 `
 The importer extracts the reference ARM library and game data under ignored
 `game/` directories and records hashes for reproducibility.
 
+## Deterministic autoplay diagnostics
+
+The Windows executable can drive the real level-one application loop from a
+text scenario without keyboard, mouse, controller, or window automation:
+
+```powershell
+.\build\windows-msvc\Debug\OpenAndroidUSM.exe `
+  --autoplay .\tests\autoplay\opening-baseline.usmauto `
+  --output .\analysis\generated\opening-baseline
+```
+
+The output directory contains `frames.csv`, `enemies.csv`, `events.csv`, a
+`summary.txt` pass/fail record, and timestamped BMP readbacks. Audio is traced
+without playback by default; pass `--autoplay-audio` when audible output is
+useful. The tracked scenarios cover the opening, the first encounter, and an
+isolated later encounter. They are reconstruction probes, not a claim that
+the campaign is ready for manual playtesting.

@@ -54,6 +54,13 @@ public:
                                       bool enabled) noexcept;
     [[nodiscard]] bool isAreaEnabled(std::int32_t areaId) const noexcept;
     [[nodiscard]] bool setCurrentArea(std::int32_t areaId) noexcept;
+    // Relocates to the enabled area containing the point, or the closest area
+    // when authored area height does not cover a diagnostic destination.
+    // Normal gameplay transitions remain neighbor-only; this is for
+    // discontinuous restore and diagnostic teleports where the previous
+    // area's adjacency is irrelevant.
+    [[nodiscard]] bool relocateToContainingArea(
+        const assets::Vector3& playerPosition) noexcept;
     [[nodiscard]] std::int32_t currentAreaId() const noexcept {
         return currentArea_ == nullptr ? -1 : currentArea_->objectId;
     }

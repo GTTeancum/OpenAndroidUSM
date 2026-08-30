@@ -61,10 +61,18 @@ void LevelTriggerRuntime::bind(std::span<const LevelTriggerAsset> triggers) {
 }
 
 std::vector<TriggerEvent> LevelTriggerRuntime::update(
-    const assets::Vector3& playerPosition) {
+    const assets::Vector3& playerPosition,
+    std::span<const bool> activeRooms) {
     std::vector<TriggerEvent> events;
     for (State& state : states_) {
         if (!state.enabled || state.asset == nullptr) {
+            continue;
+        }
+        if (!activeRooms.empty() && state.asset->roomId >= 1 &&
+            (static_cast<std::size_t>(state.asset->roomId) >
+                 activeRooms.size() ||
+             !activeRooms[static_cast<std::size_t>(
+                 state.asset->roomId - 1)])) {
             continue;
         }
         bool transitionDispatched = false;

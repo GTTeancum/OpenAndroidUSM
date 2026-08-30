@@ -64,6 +64,9 @@ public:
         noexcept {
         return forcedVisibleRooms_;
     }
+    void clearCinematicRoomOverride() noexcept {
+        forcedVisibleRooms_.fill(false);
+    }
 
 private:
     LevelTriggerRuntime* triggers_{};

@@ -1,0 +1,20 @@
+# First authored encounter through the real application loop. This exercises
+# the encounter cinematic and its concurrent death-condition monitor together.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 2500
+max_time_ms 110000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 13266 -5940 10 0 1 0
+capture first-encounter-start
+attack 12000 135 394
+teleport 12598 -6000 10 0 -1 0
+attack 12000 135 395
+teleport 12444 -6380 24 0 -1 0
+attack 12000 135 397
+capture first-encounter-cleared
+assert_health_above 0
+finish

@@ -15,10 +15,12 @@
 #include "audio/VoxSoundTable.hpp"
 #include "audio/SpatialSound.hpp"
 #include "core/Result.hpp"
+#include "diagnostics/AutoplayHarness.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelSlideRuntime.hpp"
 #include "game/GameplayPlayer.hpp"
+#include "game/GameplayCinematicScheduler.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelBonusRuntime.hpp"
@@ -72,6 +74,72 @@ int main() {
     const auto failure = usm::Result::failure("expected failure");
     assert(!static_cast<bool>(failure));
     assert(failure.message() == "expected failure");
+
+    const std::filesystem::path autoplayTestRoot =
+        std::filesystem::temp_directory_path() /
+        "openandroidusm-autoplay-smoke";
+    std::error_code autoplayFilesystemError;
+    std::filesystem::remove_all(autoplayTestRoot,
+                                autoplayFilesystemError);
+    std::filesystem::create_directories(autoplayTestRoot,
+                                        autoplayFilesystemError);
+    assert(!autoplayFilesystemError);
+    const std::filesystem::path autoplayScript =
+        autoplayTestRoot / "smoke.usmauto";
+    {
+        std::ofstream stream(autoplayScript);
+        stream << "fixed_step_ms 25\n"
+                  "sample_interval_ms 50\n"
+                  "capture_interval_ms 0\n"
+                  "max_time_ms 1000\n"
+                  "start_time_ms 100\n"
+                  "render_size 320 180\n"
+                  "wait_gameplay 50\n"
+                  "teleport 1 2 3 0 1 0\n"
+                  "capture smoke-frame\n"
+                  "finish\n";
+    }
+    usm::diagnostics::AutoplayHarness autoplayHarness;
+    assert(autoplayHarness.initialize(autoplayScript,
+                                      autoplayTestRoot / "output"));
+    assert(autoplayHarness.fixedStepMilliseconds() == 25);
+    assert(autoplayHarness.startTimeMilliseconds() == 100);
+    assert(autoplayHarness.renderWidth() == 320);
+    assert(autoplayHarness.renderHeight() == 180);
+    usm::diagnostics::AutoplaySnapshot autoplaySnapshot;
+    autoplaySnapshot.gameplayActive = true;
+    autoplaySnapshot.controlsEnabled = true;
+    autoplaySnapshot.playerHealth = 100.0F;
+    autoplaySnapshot.realTimeMilliseconds = 100;
+    (void)autoplayHarness.update(autoplaySnapshot);
+    autoplaySnapshot.realTimeMilliseconds = 125;
+    const auto teleportInput = autoplayHarness.update(autoplaySnapshot);
+    assert(teleportInput.teleport.has_value());
+    assert(teleportInput.teleport->position.x == 1.0F);
+    autoplaySnapshot.realTimeMilliseconds = 150;
+    const auto captureInput = autoplayHarness.update(autoplaySnapshot);
+    assert(captureInput.captureLabels.size() == 1);
+    assert(captureInput.captureLabels.front() == "smoke-frame");
+    autoplaySnapshot.realTimeMilliseconds = 175;
+    (void)autoplayHarness.update(autoplaySnapshot);
+    assert(autoplayHarness.complete());
+    autoplayHarness.finish(true, "smoke complete");
+    assert(std::filesystem::exists(autoplayTestRoot / "output" /
+                                   "summary.txt"));
+
+    const std::filesystem::path invalidAutoplayScript =
+        autoplayTestRoot / "invalid.usmauto";
+    {
+        std::ofstream stream(invalidAutoplayScript);
+        stream << "max_time_ms 100\n"
+                  "start_time_ms 100\n"
+                  "finish\n";
+    }
+    usm::diagnostics::AutoplayHarness invalidAutoplayHarness;
+    assert(!invalidAutoplayHarness.initialize(
+        invalidAutoplayScript, autoplayTestRoot / "invalid-output"));
+    std::filesystem::remove_all(autoplayTestRoot,
+                                autoplayFilesystemError);
 
     const usm::audio::SpatialSoundSource centeredSource{
         {0.0F, 0.0F, 0.0F}, 100.0F, 2000.0F, false};
@@ -1694,6 +1762,7 @@ int main() {
             });
         assert(firstEncounterTrigger != bootstrap.triggers().end());
         assert(firstEncounterTrigger->name == "Trigger_3thugs");
+        assert(firstEncounterTrigger->roomId == 1);
         assert(firstEncounterTrigger->whileOutsideCinematicId == 1162);
         assert(!firstEncounterTrigger->autoDisabled);
         assert(firstEncounterTrigger->sizes.y == 1664.575195F);
@@ -1710,6 +1779,18 @@ int main() {
             initialTriggerRuntime.update(bootstrap.player().position);
         assert(initialEncounterEvents.size() == 1);
         assert(initialEncounterEvents.front().cinematicId == 1162);
+        std::array<bool, 16> activeRooms{};
+        usm::game::LevelTriggerRuntime roomGatedTriggerRuntime;
+        roomGatedTriggerRuntime.bind(
+            std::span<const usm::game::LevelTriggerAsset>(
+                &*firstEncounterTrigger, 1));
+        assert(roomGatedTriggerRuntime
+                   .update(bootstrap.player().position, activeRooms)
+                   .empty());
+        activeRooms[0] = true;
+        assert(roomGatedTriggerRuntime
+                   .update(bootstrap.player().position, activeRooms)
+                   .size() == 1);
         usm::game::LevelTriggerRuntime triggerRuntime;
         triggerRuntime.bind(std::span<const usm::game::LevelTriggerAsset>(
             &*firstEncounterTrigger, 1));
@@ -1751,6 +1832,25 @@ int main() {
         assert(firstEncounterCinematic->scriptFile ==
                "cinematics/levelnew_01_1162_cinematic.cff");
         assert(firstEncounterCinematic->script.commandCount() > 0);
+        usm::game::GameplayCinematicScheduler cinematicScheduler;
+        cinematicScheduler.bind(bootstrap.cinematics());
+        assert(cinematicScheduler.start(1162));
+        assert(cinematicScheduler.start(20026));
+        assert(cinematicScheduler.start(20026));
+        const auto concurrentCinematics = cinematicScheduler.activeIds();
+        assert(concurrentCinematics.size() == 2);
+        assert(std::find(concurrentCinematics.begin(),
+                         concurrentCinematics.end(), 1162) !=
+               concurrentCinematics.end());
+        assert(std::find(concurrentCinematics.begin(),
+                         concurrentCinematics.end(), 20026) !=
+               concurrentCinematics.end());
+        assert(cinematicScheduler.update(
+            50, [](const usm::game::CinematicThread&,
+                   const usm::game::CinematicCommand& command) {
+                return command.name != "IfEnemyDead";
+            }));
+        assert(cinematicScheduler.active(20026));
         assert(bootstrap.buttonConfigs().definitions().size() == 20);
         const auto* levelOneQteConfig = bootstrap.buttonConfigs().find(6);
         assert(levelOneQteConfig != nullptr);
@@ -2389,6 +2489,12 @@ int main() {
                             [](bool visible) { return visible; }));
         const auto gameplayCameraPose =
             gameplayCamera.sample(bootstrap.player().position);
+        assert(gameplayCamera.relocateToContainingArea(
+            {7575.0F, -6305.0F, 1042.0F}));
+        assert(gameplayCamera.currentAreaId() != 283);
+        assert(gameplayCamera.relocateToContainingArea(
+            bootstrap.player().position));
+        assert(gameplayCamera.currentAreaId() == 283);
         usm::game::LevelCinematicRuntime levelCommandRuntime;
         levelCommandRuntime.bind(triggerRuntime, gameplayCamera,
                                  bootstrap.waypoints());

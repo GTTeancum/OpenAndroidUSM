@@ -111,6 +111,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/EnemySpecialActionConfig.cpp
     src/game/EffectPreset.cpp
     src/game/GameplayCamera.cpp
+    src/game/GameplayCinematicScheduler.cpp
     src/game/GameplayPlayer.cpp
     src/game/LevelCollision.cpp
     src/game/LevelCinematicRuntime.cpp
@@ -133,6 +134,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/QuickTimeEventRuntime.cpp
     src/game/WebGrabPointRuntime.cpp
     src/game/WebSwingRuntime.cpp
+    src/diagnostics/AutoplayHarness.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
@@ -196,6 +198,7 @@ target_link_libraries(OpenAndroidUSM PRIVATE
     d3dcompiler
     xaudio2
     xinput9_1_0
+    shell32
 )
 
 if(MSVC)

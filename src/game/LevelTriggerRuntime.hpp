@@ -28,7 +28,8 @@ class LevelTriggerRuntime final {
 public:
     void bind(std::span<const LevelTriggerAsset> triggers);
     [[nodiscard]] std::vector<TriggerEvent> update(
-        const assets::Vector3& playerPosition);
+        const assets::Vector3& playerPosition,
+        std::span<const bool> activeRooms = {});
     [[nodiscard]] bool setEnabled(std::int32_t triggerId,
                                   bool enabled) noexcept;
     [[nodiscard]] bool isEnabled(std::int32_t triggerId) const noexcept;

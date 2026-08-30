@@ -228,6 +228,61 @@ bool GameplayCamera::setCurrentArea(std::int32_t areaId) noexcept {
     return true;
 }
 
+bool GameplayCamera::relocateToContainingArea(
+    const assets::Vector3& playerPosition) noexcept {
+    auto match = std::find_if(
+        areas_.begin(), areas_.end(),
+        [&playerPosition](const CameraArea& area) {
+            return containsPlayer(area, playerPosition);
+        });
+    if (match == areas_.end()) {
+        float closestDistance = std::numeric_limits<float>::max();
+        for (auto candidate = areas_.begin(); candidate != areas_.end();
+             ++candidate) {
+            if (candidate->disabled) {
+                continue;
+            }
+            const Vector3 projected =
+                projectOnControlPlane(*candidate, playerPosition);
+            float candidateDistance = distance(playerPosition, projected);
+            if (!pointInTriangle(projected,
+                                 candidate->controlPoints[0].position,
+                                 candidate->controlPoints[1].position,
+                                 candidate->controlPoints[2].position) &&
+                !pointInTriangle(projected,
+                                 candidate->controlPoints[0].position,
+                                 candidate->controlPoints[2].position,
+                                 candidate->controlPoints[3].position)) {
+                float edgeDistance = std::numeric_limits<float>::max();
+                for (std::size_t edge = 0; edge < 4; ++edge) {
+                    edgeDistance = std::min(
+                        edgeDistance,
+                        distance(projected,
+                                 closestPointOnSegment(
+                                     projected,
+                                     candidate->controlPoints[edge].position,
+                                     candidate->controlPoints[(edge + 1) % 4]
+                                         .position)));
+                }
+                candidateDistance = std::hypot(candidateDistance,
+                                               edgeDistance);
+            }
+            if (candidateDistance < closestDistance) {
+                closestDistance = candidateDistance;
+                match = candidate;
+            }
+        }
+        if (match == areas_.end()) {
+            return false;
+        }
+    }
+    currentArea_ = &*match;
+    transitionDurationMilliseconds_ = 0;
+    transitionElapsedMilliseconds_ = 0;
+    transitionProgress_ = 1.0F;
+    return true;
+}
+
 const std::array<bool, 16>& GameplayCamera::mustInvisibleRooms() const
     noexcept {
     static constexpr std::array<bool, 16> kNoRooms{};

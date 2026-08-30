@@ -10,6 +10,7 @@
 #include "game/CinematicPlayer.hpp"
 #include "game/CinematicUiRuntime.hpp"
 #include "game/GameplayCamera.hpp"
+#include "game/GameplayCinematicScheduler.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
@@ -35,14 +36,23 @@
 
 #include <Windows.h>
 
+#include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace usm {
 
+struct ApplicationOptions {
+    std::optional<std::filesystem::path> autoplayScript;
+    std::optional<std::filesystem::path> autoplayOutput;
+    bool autoplayAudio{};
+};
+
 class Application final {
 public:
-    [[nodiscard]] int run(HINSTANCE instance);
+    [[nodiscard]] int run(HINSTANCE instance,
+                          const ApplicationOptions& options = {});
 
 private:
     platform::Window window_;
@@ -82,11 +92,8 @@ private:
     game::LevelMusicRuntime levelMusicRuntime_;
     game::LevelObjectRuntime objectRuntime_;
     game::LevelRestoreRuntime restoreRuntime_;
-    game::CinematicPlayer gameplayCinematicPlayer_;
+    game::GameplayCinematicScheduler gameplayCinematics_;
     game::QuickTimeEventRuntime quickTimeEvent_;
-    const game::LevelCinematicAsset* activeGameplayCinematic_{};
-    std::uint32_t gameplayCinematicTimeMilliseconds_{};
-    std::uint32_t gameplayCinematicDurationMilliseconds_{};
 };
 
 } // namespace usm
