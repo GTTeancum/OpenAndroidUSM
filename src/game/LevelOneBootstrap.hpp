@@ -276,6 +276,22 @@ struct LevelBonusAsset {
     bool visible{true};
 };
 
+// Authored world-space Hint billboard. Hint::ProcessUserAttr
+// (0x0033da84) loads the sprite/animation and links it to another scene
+// object; the only linked first-level instance is the spider-sense tutorial
+// cue attached to Spider-Man.
+struct LevelHintAsset {
+    std::int32_t objectId{-1};
+    std::int32_t linkedObjectId{-1};
+    std::int32_t roomId{-1};
+    std::int32_t animationIndex{};
+    std::string spriteFile;
+    assets::Vector3 position;
+    bool visible{};
+    assets::SpriteAtlas atlas;
+    assets::DdsAtcTexture texture;
+};
+
 // Authored CTriggerSound volume. The native object starts a looping 2D Vox
 // emitter while the player's collision box intersects this volume.
 struct LevelTriggerSoundAsset {
@@ -414,6 +430,9 @@ public:
     [[nodiscard]] const std::vector<LevelBonusAsset>& bonuses() const noexcept {
         return bonuses_;
     }
+    [[nodiscard]] const std::vector<LevelHintAsset>& hints() const noexcept {
+        return hints_;
+    }
     [[nodiscard]] const std::vector<LevelTriggerSoundAsset>& triggerSounds()
         const noexcept {
         return triggerSounds_;
@@ -454,6 +473,7 @@ private:
     LevelEffectAsset effects_;
     std::vector<LevelEnvironmentEffectAsset> environmentEffects_;
     std::vector<LevelBonusAsset> bonuses_;
+    std::vector<LevelHintAsset> hints_;
     std::vector<LevelTriggerSoundAsset> triggerSounds_;
     LevelTextCatalog textCatalog_;
 };

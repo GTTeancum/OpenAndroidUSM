@@ -8,6 +8,7 @@
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelHintRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "renderer/IRenderer.hpp"
 
@@ -65,6 +66,8 @@ public:
         const game::LevelEffectAsset& assets,
         const game::LevelEffectRuntime& effects,
         const game::LevelBonusRuntime& bonuses);
+    [[nodiscard]] Result updateLevelOneHints(
+        const game::LevelHintRuntime& hints);
     [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
@@ -174,8 +177,10 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> webLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> enemyGunLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> effectVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> hintVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> effectTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hintTexture_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> whiteTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
@@ -199,6 +204,8 @@ private:
     std::uint32_t effectAlphaVertexCount_{};
     std::uint32_t effectAdditiveVertexCount_{};
     std::uint32_t effectVertexCapacity_{};
+    std::uint32_t hintVertexCount_{};
+    std::uint32_t hintVertexCapacity_{};
     std::u16string cinematicUiText_;
     bool cinematicUiTextCentered_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};

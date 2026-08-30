@@ -810,6 +810,25 @@ first-level target presents that last frame and exits cleanly. WARP
 regressions render both terminal sequences with their object-visibility
 commands and camera-area masks applied.
 
+## World-space tutorial hint
+
+Room 2 contains one authored `Hint` node (ID 1113) linked to Spider-Man (ID
+288). `Hint::ProcessUserAttr` at `0x0033da84` loads animation 0 from
+`hintbb.bsprite`; cinematic 974 makes the node visible from 1900 to 2400 ms
+around the spider-sense tutorial. `HintBase::UpdatePosition` at `0x0033e414`
+anchors it above `Bip01_Head`, while `CSpriteInstance::UpdateSpriteAnim` at
+`0x002e9c10` advances its frame-duration counters in fixed 50 ms ticks and
+pauses completely while the node is hidden.
+
+`LevelHintRuntime` preserves the linked-object ID, cinematic visibility,
+paused animation clock, and exact frame selection independently of the
+renderer. The D3D11 path consumes the packaged sprite atlas and texture as a
+depth-tested, alpha-blended camera-facing billboard, including authored
+animation and frame-module offsets. Core tests prove the recovered frames 6
+and 13 on their exact 100 ms boundary; a WARP regression shows and hides the
+cue through the original `SetVisible` commands and verifies changed pixels
+above the player.
+
 ## Animated environment and comic-cover objects
 
 The generic room-object path now includes all 28 authored `AnimatedObject`

@@ -1093,8 +1093,35 @@ Result D3D11Renderer::uploadLevelOneScene(
                 effectImage.height * 4) {
         return Result::failure("Effect texture image is invalid");
     }
-    return createTextureView(
+    result = createTextureView(
         std::span<const assets::RgbaImage>(&effectImage, 1), effectTexture_);
+    if (!result) {
+        return result;
+    }
+    hintTexture_.Reset();
+    hintVertexBuffer_.Reset();
+    hintVertexCount_ = 0;
+    hintVertexCapacity_ = 0;
+    if (levelOne.hints().empty()) {
+        return Result::success();
+    }
+    const std::string& hintSpriteFile = levelOne.hints().front().spriteFile;
+    if (std::any_of(levelOne.hints().begin(), levelOne.hints().end(),
+                    [&hintSpriteFile](const game::LevelHintAsset& hint) {
+                        return hint.spriteFile != hintSpriteFile;
+                    })) {
+        return Result::failure(
+            "Level hints reference more than one sprite texture");
+    }
+    const assets::RgbaImage& hintImage =
+        levelOne.hints().front().texture.image();
+    if (hintImage.width == 0 || hintImage.height == 0 ||
+        hintImage.pixels.size() !=
+            static_cast<std::size_t>(hintImage.width) * hintImage.height * 4) {
+        return Result::failure("Hint texture image is invalid");
+    }
+    return createTextureView(
+        std::span<const assets::RgbaImage>(&hintImage, 1), hintTexture_);
 }
 
 Result D3D11Renderer::updateLevelOneActors(
@@ -1751,6 +1778,142 @@ Result D3D11Renderer::updateLevelOneEffects(
     std::copy(additiveVertices.begin(), additiveVertices.end(),
               destination + alphaVertices.size());
     context_->Unmap(effectVertexBuffer_.Get(), 0);
+    return Result::success();
+}
+
+Result D3D11Renderer::updateLevelOneHints(
+    const game::LevelHintRuntime& hints) {
+    hintVertexCount_ = 0;
+    if (hints.states().empty()) {
+        return Result::success();
+    }
+    if (!device_ || !context_ || !hintTexture_) {
+        return Result::failure("Hint GPU resources are incomplete");
+    }
+
+    std::vector<GpuVertex> vertices;
+    bool valid = true;
+    for (const game::LevelHintState& state : hints.states()) {
+        if (!state.visible || state.asset == nullptr) {
+            continue;
+        }
+        const game::LevelHintAsset& hint = *state.asset;
+        if (hint.roomId >= 1 &&
+            hint.roomId <= static_cast<std::int32_t>(roomVisibility_.size()) &&
+            !roomVisibility_[static_cast<std::size_t>(hint.roomId - 1)]) {
+            continue;
+        }
+        const assets::SpriteAtlas& atlas = hint.atlas;
+        const assets::RgbaImage& texture = hint.texture.image();
+        if (state.animationFrameIndex < 0 || state.frameIndex < 0 ||
+            static_cast<std::size_t>(state.animationFrameIndex) >=
+                atlas.animationFrames().size() ||
+            texture.width < 2 || texture.height < 2) {
+            valid = false;
+            continue;
+        }
+        const assets::SpriteAnimationFrame& animationFrame =
+            atlas.animationFrames()[
+                static_cast<std::size_t>(state.animationFrameIndex)];
+        const auto modules = atlas.modulesForFrame(
+            static_cast<std::size_t>(state.frameIndex));
+        if (modules.empty()) {
+            valid = false;
+            continue;
+        }
+        const auto point = [&state, this](float right, float up) {
+            return DirectX::XMFLOAT3{
+                state.position.x + cameraRight_.x * right + cameraUp_.x * up,
+                state.position.y + cameraRight_.y * right + cameraUp_.y * up,
+                state.position.z + cameraRight_.z * right + cameraUp_.z * up};
+        };
+        for (const assets::SpriteFrameModule& frameModule : modules) {
+            if (frameModule.moduleIndex >= atlas.modules().size()) {
+                valid = false;
+                continue;
+            }
+            const assets::SpriteModule& module =
+                atlas.modules()[frameModule.moduleIndex];
+            constexpr std::uint8_t horizontalFlip = 0x01;
+            constexpr std::uint8_t verticalFlip = 0x02;
+            const std::uint8_t flags =
+                frameModule.flags ^ animationFrame.flags;
+            if (module.imageIndex != 0 ||
+                (flags & ~(horizontalFlip | verticalFlip)) != 0) {
+                valid = false;
+                continue;
+            }
+            float u0 = static_cast<float>(module.x) /
+                       static_cast<float>(texture.width);
+            float v0 = static_cast<float>(module.y) /
+                       static_cast<float>(texture.height);
+            float u1 = static_cast<float>(module.x + module.width) /
+                       static_cast<float>(texture.width);
+            float v1 = static_cast<float>(module.y + module.height) /
+                       static_cast<float>(texture.height);
+            if ((flags & horizontalFlip) != 0) {
+                std::swap(u0, u1);
+            }
+            if ((flags & verticalFlip) != 0) {
+                std::swap(v0, v1);
+            }
+
+            const float left = static_cast<float>(animationFrame.x +
+                                                  frameModule.x);
+            const float top = -static_cast<float>(animationFrame.y +
+                                                  frameModule.y);
+            const float right = left + static_cast<float>(module.width);
+            const float bottom = top - static_cast<float>(module.height);
+            constexpr std::uint32_t white = 0xffffffffU;
+            const GpuVertex topLeft{point(left, top), {}, {u0, v0}, white};
+            const GpuVertex topRight{point(right, top), {}, {u1, v0}, white};
+            const GpuVertex bottomLeft{point(left, bottom), {}, {u0, v1},
+                                       white};
+            const GpuVertex bottomRight{point(right, bottom), {}, {u1, v1},
+                                        white};
+            vertices.insert(vertices.end(),
+                            {topLeft, topRight, bottomLeft, topRight,
+                             bottomRight, bottomLeft});
+        }
+    }
+    if (!valid) {
+        return Result::failure(
+            "Hint references an unsupported sprite animation frame");
+    }
+    if (vertices.size() > std::numeric_limits<std::uint32_t>::max()) {
+        return Result::failure("Hint vertex count exceeds D3D11 limits");
+    }
+    if (vertices.size() > hintVertexCapacity_) {
+        hintVertexBuffer_.Reset();
+        hintVertexCapacity_ = static_cast<std::uint32_t>(
+            std::max<std::size_t>(vertices.size(), 32));
+        D3D11_BUFFER_DESC description{};
+        description.ByteWidth =
+            hintVertexCapacity_ * static_cast<UINT>(sizeof(GpuVertex));
+        description.Usage = D3D11_USAGE_DYNAMIC;
+        description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        description.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        const HRESULT createResult = device_->CreateBuffer(
+            &description, nullptr, &hintVertexBuffer_);
+        if (FAILED(createResult)) {
+            hintVertexCapacity_ = 0;
+            return hresultFailure("ID3D11Device::CreateBuffer(hints)",
+                                  createResult);
+        }
+    }
+    hintVertexCount_ = static_cast<std::uint32_t>(vertices.size());
+    if (vertices.empty()) {
+        return Result::success();
+    }
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    const HRESULT mapResult = context_->Map(
+        hintVertexBuffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (FAILED(mapResult)) {
+        return hresultFailure("ID3D11DeviceContext::Map(hints)", mapResult);
+    }
+    std::memcpy(mapped.pData, vertices.data(),
+                vertices.size() * sizeof(GpuVertex));
+    context_->Unmap(hintVertexBuffer_.Get(), 0);
     return Result::success();
 }
 
@@ -2720,6 +2883,32 @@ void D3D11Renderer::renderFrame() {
             context_->Draw(effectAdditiveVertexCount_,
                            effectAlphaVertexCount_);
         }
+    }
+
+    if (hintVertexCount_ != 0 && hintVertexBuffer_ && hintTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                    &worldViewProjection_, 0, 0);
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(0, 1,
+                                     hintVertexBuffer_.GetAddressOf(),
+                                     &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        const std::array<ID3D11Buffer*, 2> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
+        context_->PSSetShader(effectPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(0, 1, hintTexture_.GetAddressOf());
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        context_->Draw(hintVertexCount_, 0);
     }
 
     if (hudVertexCount_ != 0 && hudVertexBuffer_ && hudTexture_) {

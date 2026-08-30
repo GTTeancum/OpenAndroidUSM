@@ -391,6 +391,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     objects_.clear();
     environmentEffects_.clear();
     bonuses_.clear();
+    hints_.clear();
     triggerSounds_.clear();
     hud_ = {};
     effects_ = {};
@@ -682,6 +683,39 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                     {node.id, type,
                      static_cast<std::int32_t>(roomIndex + 1),
                      worldPosition(node), node.visible});
+                continue;
+            }
+            if (node.gameType == "Hint") {
+                LevelHintAsset hint;
+                hint.objectId = node.id;
+                hint.linkedObjectId = integerAttribute(node, "^LinkID");
+                hint.roomId = static_cast<std::int32_t>(roomIndex + 1);
+                hint.animationIndex = integerAttribute(node, "AnimIndex", 0);
+                hint.spriteFile =
+                    std::string(userAttribute(node, "SpritesFile"));
+                hint.position = worldPosition(node);
+                hint.visible = booleanAttribute(node, "Visible", node.visible);
+                if (hint.linkedObjectId < 0 || hint.spriteFile.empty()) {
+                    return Result::failure(
+                        "Hint " + std::to_string(node.id) +
+                        " has invalid link or sprite attributes");
+                }
+                result = spriteArchive.read(hint.spriteFile, resource);
+                if (!result || !(result = hint.atlas.load(resource))) {
+                    return Result::failure("Could not load Hint sprite " +
+                                           hint.spriteFile + ": " +
+                                           result.message());
+                }
+                std::filesystem::path texturePath(hint.spriteFile);
+                texturePath.replace_extension(".tga");
+                result = spriteArchive.read(texturePath.generic_string(),
+                                            resource);
+                if (!result || !(result = hint.texture.load(resource))) {
+                    return Result::failure("Could not load Hint texture " +
+                                           texturePath.generic_string() +
+                                           ": " + result.message());
+                }
+                hints_.push_back(std::move(hint));
                 continue;
             }
             if (node.gameType == "TriggerSound") {

@@ -211,6 +211,10 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = hintRuntime_.initialize(levelOne_.hints());
+    if (!result) {
+        return fail(result.message());
+    }
     for (const game::LevelBonusAsset& bonus : levelOne_.bonuses()) {
         const std::string_view effectType =
             bonus.type == game::LevelBonusType::Health
@@ -242,6 +246,10 @@ int Application::run(HINSTANCE instance) {
             if (introStartCommandResult) {
                 introStartCommandResult = objectRuntime_.applyCinematicCommand(
                     levelOne_, thread, command);
+            }
+            if (introStartCommandResult) {
+                introStartCommandResult =
+                    hintRuntime_.applyCinematicCommand(thread, command);
             }
             if (introStartCommandResult) {
                 introStartCommandResult =
@@ -437,6 +445,10 @@ int Application::run(HINSTANCE instance) {
                 if (!uiResult) {
                     return;
                 }
+                uiResult = hintRuntime_.applyCinematicCommand(thread, command);
+                if (!uiResult) {
+                    return;
+                }
                 uiResult = levelCinematicRuntime_.applyCommand(command);
                 if (!uiResult) {
                     return;
@@ -628,6 +640,11 @@ int Application::run(HINSTANCE instance) {
                         if (commandResult) {
                             commandResult = objectRuntime_.applyCinematicCommand(
                                 levelOne_, thread, command);
+                        }
+                        if (commandResult) {
+                            commandResult =
+                                hintRuntime_.applyCinematicCommand(thread,
+                                                                    command);
                         }
                         if (commandResult) {
                             commandResult = enemyRuntime_.applyCinematicCommand(
@@ -857,6 +874,26 @@ int Application::run(HINSTANCE instance) {
         if (result) {
             result = renderer_.updateLevelOneObjects(levelOne_,
                                                      objectRuntime_);
+        }
+        hintRuntime_.update(
+            gameDeltaMilliseconds,
+            [this](std::int32_t objectId)
+                -> std::optional<assets::Vector3> {
+                if (objectId == levelOne_.player().objectId) {
+                    return gameplayPlayer_.position();
+                }
+                if (const game::LevelEnemyState* enemy =
+                        enemyRuntime_.find(objectId)) {
+                    return enemy->position;
+                }
+                if (const game::LevelObjectState* object =
+                        objectRuntime_.find(objectId)) {
+                    return object->position;
+                }
+                return std::nullopt;
+            });
+        if (result) {
+            result = renderer_.updateLevelOneHints(hintRuntime_);
         }
         if (result) {
             result = renderer_.updateLevelOneEffects(

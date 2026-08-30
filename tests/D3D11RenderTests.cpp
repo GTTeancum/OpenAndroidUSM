@@ -5,6 +5,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelHintRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 
 #include <algorithm>
@@ -623,6 +624,38 @@ int main() {
                     gameplayFrame.pixels[component + 2];
         }
         assert(hudChangedPixels > 100);
+        usm::game::LevelHintRuntime hintRuntime;
+        assert(hintRuntime.initialize(levelOne.hints()));
+        assert(gameRenderer.updateLevelOneHints(hintRuntime));
+        cinematicVisibleRooms.fill(false);
+        cinematicVisibleRooms[1] = true;
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        assert(gameRenderer.setCamera(gameplayPose));
+        gameRenderer.renderFrame();
+        RgbaImage hintHiddenFrame;
+        assert(gameRenderer.readBackImage(hintHiddenFrame));
+        usm::game::CinematicThread hintThread;
+        hintThread.objectId = 1113;
+        usm::game::CinematicCommand showHint;
+        showHint.name = "SetVisible";
+        showHint.attributes.push_back({"bool", "Visible", "true"});
+        assert(hintRuntime.applyCinematicCommand(hintThread, showHint));
+        hintRuntime.update(100, [&levelOne](std::int32_t objectId) {
+            assert(objectId == levelOne.player().objectId);
+            return levelOne.player().position;
+        });
+        assert(gameRenderer.updateLevelOneHints(hintRuntime));
+        gameRenderer.renderFrame();
+        RgbaImage hintVisibleFrame;
+        assert(gameRenderer.readBackImage(hintVisibleFrame));
+        captureIfRequested(hintVisibleFrame,
+                           "gameplay-spider-sense-hint.bmp");
+        assert(countChangedPixels(hintHiddenFrame, hintVisibleFrame) > 10);
+        showHint.attributes.front().value = "false";
+        assert(hintRuntime.applyCinematicCommand(hintThread, showHint));
+        assert(gameRenderer.updateLevelOneHints(hintRuntime));
+        cinematicVisibleRooms.fill(false);
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
         const usm::game::LevelBonusPopupState skillPointPopup{
             levelOne.player().position, 5, 0.25F, true};
         assert(gameRenderer.updatePlayerHud(

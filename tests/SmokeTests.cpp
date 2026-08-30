@@ -24,6 +24,7 @@
 #include "game/LevelBonusRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelHintRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
@@ -733,6 +734,51 @@ int main() {
             [](const usm::game::LevelBonusAsset& bonus) {
                 return bonus.type == usm::game::LevelBonusType::WebPower;
             }));
+        assert(bootstrap.hints().size() == 1);
+        const usm::game::LevelHintAsset& spiderSenseHint =
+            bootstrap.hints().front();
+        assert(spiderSenseHint.objectId == 1113);
+        assert(spiderSenseHint.linkedObjectId == 288);
+        assert(spiderSenseHint.roomId == 2);
+        assert(spiderSenseHint.animationIndex == 0);
+        assert(spiderSenseHint.spriteFile == "hintbb.bsprite");
+        assert(!spiderSenseHint.visible);
+        assert(spiderSenseHint.atlas.modules().size() == 20);
+        assert(spiderSenseHint.atlas.frames().size() == 26);
+        assert(spiderSenseHint.atlas.animations().size() == 9);
+        assert(spiderSenseHint.texture.image().width == 256);
+        assert(spiderSenseHint.texture.image().height == 256);
+
+        usm::game::LevelHintRuntime hintRuntime;
+        assert(hintRuntime.initialize(bootstrap.hints()));
+        const auto* hintState = hintRuntime.find(1113);
+        assert(hintState != nullptr && !hintState->visible);
+        assert(hintState->frameIndex == 6);
+        usm::game::CinematicThread hintThread;
+        hintThread.objectId = 1113;
+        usm::game::CinematicCommand showHint;
+        showHint.name = "SetVisible";
+        showHint.attributes.push_back({"bool", "Visible", "true"});
+        assert(hintRuntime.applyCinematicCommand(hintThread, showHint));
+        hintRuntime.update(99, [](std::int32_t objectId) {
+            assert(objectId == 288);
+            return usm::assets::Vector3{10.0F, 20.0F, 30.0F};
+        });
+        hintState = hintRuntime.find(1113);
+        assert(hintState != nullptr && hintState->visible);
+        assert(hintState->frameIndex == 6);
+        assert(hintState->position.x == 10.0F);
+        assert(hintState->position.y == 20.0F);
+        assert(hintState->position.z == 250.0F);
+        hintRuntime.update(1, {});
+        hintState = hintRuntime.find(1113);
+        assert(hintState != nullptr && hintState->frameIndex == 13);
+        showHint.attributes.front().value = "false";
+        assert(hintRuntime.applyCinematicCommand(hintThread, showHint));
+        hintRuntime.update(500, {});
+        hintState = hintRuntime.find(1113);
+        assert(hintState != nullptr && !hintState->visible);
+        assert(hintState->animationTimeMilliseconds == 100);
         assert(bootstrap.triggerSounds().size() == 2);
         assert(bootstrap.triggerSounds()[0].objectId == 40006);
         assert(bootstrap.triggerSounds()[0].eventName == "SFX_FIRE_TRAP");

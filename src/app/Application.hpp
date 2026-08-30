@@ -16,6 +16,7 @@
 #include "game/LevelBonusRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelHintRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
@@ -71,6 +72,7 @@ private:
     game::LevelBonusRuntime levelBonusRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::LevelEffectRuntime effectRuntime_;
+    game::LevelHintRuntime hintRuntime_;
     game::LevelMusicRuntime levelMusicRuntime_;
     game::LevelObjectRuntime objectRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;
