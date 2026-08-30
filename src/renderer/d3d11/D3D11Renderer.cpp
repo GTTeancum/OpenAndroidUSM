@@ -77,12 +77,10 @@ float4 main(PixelInput input) : SV_TARGET {
                      input.color;
     float3 reflection = ReflectionTexture.Sample(DiffuseSampler,
                                                    sphereCoordinate).rgb;
-    float lighting = 0.35 + 0.65 * abs(dot(normal,
-                                           normalize(float3(0.3, 0.5, -0.8))));
     // GL_COMBINE_RGB = GL_ADD in
     // CCommonGLMaterialRenderer_REFLECTION_2_LAYER::onSetMaterial
     // (original 0x00455be0).
-    return float4(saturate(diffuse.rgb * lighting + reflection), diffuse.a);
+    return float4(saturate(diffuse.rgb + reflection), diffuse.a);
 }
 )hlsl";
 
@@ -98,10 +96,10 @@ struct PixelInput {
 };
 
 float4 main(PixelInput input) : SV_TARGET {
-    float3 normal = normalize(input.normal);
-    float lighting = 0.35 + 0.65 * abs(dot(normal, normalize(float3(0.3, 0.5, -0.8))));
+    // Room irradiance and static occlusion are baked into COLOR0. The native
+    // SOLID material selects GL_MODULATE at image 0x00455a08.
     return DiffuseTexture.Sample(DiffuseSampler, input.textureCoordinate) *
-           input.color * float4(lighting, lighting, lighting, 1.0);
+           input.color;
 }
 )hlsl";
 
@@ -167,9 +165,7 @@ float4 main(PixelInput input) : SV_TARGET {
     // Original CCommonGLMaterialRenderer_ALPHA_TEST_NONTRANSPARENT uses
     // GL_GREATER with a 0.5 alpha reference (Ghidra image 0x00397864).
     clip(diffuse.a - 0.5);
-    float3 normal = normalize(input.normal);
-    float lighting = 0.35 + 0.65 * abs(dot(normal, normalize(float3(0.3, 0.5, -0.8))));
-    return diffuse * float4(lighting, lighting, lighting, 1.0);
+    return diffuse;
 }
 )hlsl";
 

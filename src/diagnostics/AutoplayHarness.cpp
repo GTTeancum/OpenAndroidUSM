@@ -94,13 +94,14 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
                  "player_z,facing_x,facing_y,facing_z,health,animation,"
                  "animation_ms,state_id,state_name,punch_transition_ready,"
                  "on_wall,"
-                 "camera_area,cinematic,qte,tutorial,restore,"
+                 "camera_area,cinematic,active_cinematics,qte,tutorial,restore,"
                  "restore_alpha,visible_rooms,input_right,input_forward,"
                  "camera_x,camera_y,camera_z,target_x,target_y,target_z\n";
     enemyLog_ << "frame,real_ms,object_id,type_id,x,y,z,health,visible,ai,"
-                 "detected,behavior,animation,animation_ms,animation_speed,"
+                 "physics_active,detected,behavior,animation,animation_ms,animation_speed,"
                  "animation_loop,animation_reverse,collision_radius,"
-                 "collision_height,vertical_velocity,grounded\n";
+                 "collision_height,vertical_velocity,grounded,cinematic_motion,"
+                 "cinematic_motion_ms,cinematic_motion_duration_ms\n";
     eventLog_ << "real_ms,frame,type,detail\n";
     cinematicAssetLog_
         << "cinematic_id,cinematic_name,script_file,thread_type,"
@@ -268,6 +269,20 @@ Result AutoplayHarness::parseScript(
                 return invalid(
                     "wait_enemies_grounded requires at least one enemy ID");
             }
+        } else if (command == "wait_enemies_active") {
+            step.kind = StepKind::WaitEnemiesActive;
+            if (!(tokens >> step.durationOrTimeoutMilliseconds)) {
+                return invalid(
+                    "wait_enemies_active requires timeout and enemy IDs");
+            }
+            std::int32_t objectId = -1;
+            while (tokens >> objectId) {
+                step.objectIds.push_back(objectId);
+            }
+            if (step.objectIds.empty()) {
+                return invalid(
+                    "wait_enemies_active requires at least one enemy ID");
+            }
         } else if (command == "attack") {
             step.kind = StepKind::Attack;
             if (!(tokens >> step.durationOrTimeoutMilliseconds >>
@@ -307,6 +322,16 @@ Result AutoplayHarness::parseScript(
                 step.radius <= 0.0F) {
                 return invalid("assert_near requires x y z radius");
             }
+        } else if (command == "assert_enemy_near") {
+            step.kind = StepKind::AssertEnemyNear;
+            std::int32_t objectId = -1;
+            if (!(tokens >> objectId >> step.position.x >> step.position.y >>
+                  step.position.z >> step.radius) ||
+                objectId < 0 || step.radius <= 0.0F) {
+                return invalid(
+                    "assert_enemy_near requires enemy_id x y z radius");
+            }
+            step.objectIds.push_back(objectId);
         } else if (command == "assert_health_above") {
             step.kind = StepKind::AssertHealthAbove;
             if (!(tokens >> step.value)) {
@@ -442,7 +467,10 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         break;
     case StepKind::MoveUntilCinematic:
         if (!step.objectIds.empty() &&
-            snapshot.activeCinematicId == step.objectIds.front()) {
+            std::find(snapshot.activeCinematicIds.begin(),
+                      snapshot.activeCinematicIds.end(),
+                      step.objectIds.front()) !=
+                snapshot.activeCinematicIds.end()) {
             completeStep(snapshot, step);
         } else if (timedOut()) {
             failStep(snapshot, step,
@@ -469,6 +497,28 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         } else if (timedOut()) {
             failStep(snapshot, step,
                      "enemies did not become visible and grounded");
+        }
+        break;
+    }
+    case StepKind::WaitEnemiesActive: {
+        const bool allActive = std::all_of(
+            step.objectIds.begin(), step.objectIds.end(),
+            [&snapshot](std::int32_t objectId) {
+                const auto match = std::find_if(
+                    snapshot.enemies.begin(), snapshot.enemies.end(),
+                    [objectId](const game::LevelEnemyState& enemy) {
+                        return enemy.asset != nullptr &&
+                               enemy.asset->objectId == objectId;
+                    });
+                return match != snapshot.enemies.end() && match->visible &&
+                       match->aiEnabled && match->physicsActive &&
+                       !match->cinematicMotion.active;
+            });
+        if (allActive) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step,
+                     "enemies did not complete cinematic activation");
         }
         break;
     }
@@ -559,6 +609,29 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
             completeStep(snapshot, step);
         }
         break;
+    case StepKind::AssertEnemyNear: {
+        const std::int32_t objectId = step.objectIds.front();
+        const auto match = std::find_if(
+            snapshot.enemies.begin(), snapshot.enemies.end(),
+            [objectId](const game::LevelEnemyState& enemy) {
+                return enemy.asset != nullptr &&
+                       enemy.asset->objectId == objectId;
+            });
+        if (match == snapshot.enemies.end()) {
+            failStep(snapshot, step, "enemy was not loaded");
+        } else {
+            const float dx = match->position.x - step.position.x;
+            const float dy = match->position.y - step.position.y;
+            const float dz = match->position.z - step.position.z;
+            if (std::sqrt(dx * dx + dy * dy + dz * dz) > step.radius) {
+                failStep(snapshot, step,
+                         "enemy is outside assert_enemy_near radius");
+            } else {
+                completeStep(snapshot, step);
+            }
+        }
+        break;
+    }
     case StepKind::AssertHealthAbove:
         if (snapshot.playerHealth <= step.value) {
             failStep(snapshot, step,
@@ -686,25 +759,32 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
         EnemyTraceState current{enemy.health,
                                 enemy.visible,
                                 enemy.aiEnabled,
+                                enemy.physicsActive,
                                 enemy.playerDetected,
                                 enemy.behavior,
                                 enemy.activeAnimation,
-                                enemy.grounded};
+                                enemy.grounded,
+                                enemy.cinematicMotion.active};
         auto [entry, inserted] = previousEnemies_.try_emplace(
             enemy.asset->objectId, current);
         if (!inserted &&
             (entry->second.health != current.health ||
              entry->second.visible != current.visible ||
              entry->second.aiEnabled != current.aiEnabled ||
+             entry->second.physicsActive != current.physicsActive ||
              entry->second.playerDetected != current.playerDetected ||
              entry->second.behavior != current.behavior ||
              entry->second.animation != current.animation ||
-             entry->second.grounded != current.grounded)) {
+             entry->second.grounded != current.grounded ||
+             entry->second.cinematicMotionActive !=
+                 current.cinematicMotionActive)) {
             transition("enemy_state",
                        "id=" + std::to_string(enemy.asset->objectId) +
                            ";health=" + std::to_string(current.health) +
                            ";visible=" + std::to_string(current.visible) +
                            ";ai=" + std::to_string(current.aiEnabled) +
+                           ";physics_active=" +
+                           std::to_string(current.physicsActive) +
                            ";detected=" +
                            std::to_string(current.playerDetected) +
                            ";behavior=" + behaviorName(current.behavior) +
@@ -713,7 +793,15 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                            std::to_string(current.grounded) +
                            ";z=" + std::to_string(enemy.position.z) +
                            ";vertical_velocity=" +
-                           std::to_string(enemy.verticalVelocity));
+                           std::to_string(enemy.verticalVelocity) +
+                           ";cinematic_motion=" +
+                           std::to_string(current.cinematicMotionActive) +
+                           ";cinematic_motion_ms=" +
+                           std::to_string(
+                               enemy.cinematicMotion.elapsedMilliseconds) +
+                           ";cinematic_motion_duration_ms=" +
+                           std::to_string(
+                               enemy.cinematicMotion.durationMilliseconds));
             entry->second = std::move(current);
         }
     }
@@ -723,6 +811,13 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
     }
     nextSampleMilliseconds_ = snapshot.realTimeMilliseconds +
                               sampleIntervalMilliseconds_;
+    std::string activeCinematics;
+    for (const std::int32_t cinematicId : snapshot.activeCinematicIds) {
+        if (!activeCinematics.empty()) {
+            activeCinematics += '|';
+        }
+        activeCinematics += std::to_string(cinematicId);
+    }
     frameLog_ << snapshot.frameIndex << ',' << snapshot.realTimeMilliseconds
               << ',' << snapshot.gameTimeMilliseconds << ','
               << (snapshot.gameplayActive ? "gameplay" : "intro") << ','
@@ -738,7 +833,8 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
               << snapshot.playerPunchTransitionReady << ','
               << snapshot.playerOnWall << ','
               << snapshot.cameraAreaId << ',' << snapshot.activeCinematicId
-              << ',' << snapshot.quickTimeEventActive << ','
+              << ',' << csv(activeCinematics) << ','
+              << snapshot.quickTimeEventActive << ','
               << snapshot.tutorialVisible << ','
               << snapshot.restoreActive << ',' << snapshot.restoreAlpha << ','
               << csv(visibleRooms) << ',' << lastMotionInput_.right << ','
@@ -757,13 +853,17 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << ',' << enemy.position.x << ',' << enemy.position.y << ','
                   << enemy.position.z << ',' << enemy.health << ','
                   << enemy.visible << ',' << enemy.aiEnabled << ','
+                  << enemy.physicsActive << ','
                   << enemy.playerDetected << ',' << behaviorName(enemy.behavior)
                   << ',' << csv(enemy.activeAnimation) << ','
                   << enemy.animationTimeMilliseconds << ','
                   << enemy.animationSpeed << ',' << enemy.animationLoops << ','
                   << enemy.animationReversed << ',' << enemy.collisionRadius
                   << ',' << enemy.collisionHeight << ','
-                  << enemy.verticalVelocity << ',' << enemy.grounded << '\n';
+                  << enemy.verticalVelocity << ',' << enemy.grounded << ','
+                  << enemy.cinematicMotion.active << ','
+                  << enemy.cinematicMotion.elapsedMilliseconds << ','
+                  << enemy.cinematicMotion.durationMilliseconds << '\n';
     }
     frameLog_.flush();
     enemyLog_.flush();
@@ -1075,6 +1175,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::MoveUntilState: return "move_until_state";
     case StepKind::MoveUntilCinematic: return "move_until_cinematic";
     case StepKind::WaitEnemiesGrounded: return "wait_enemies_grounded";
+    case StepKind::WaitEnemiesActive: return "wait_enemies_active";
     case StepKind::Attack: return "attack";
     case StepKind::Jump: return "jump";
     case StepKind::WebOn: return "web_on";
@@ -1082,6 +1183,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::Teleport: return "teleport";
     case StepKind::Capture: return "capture";
     case StepKind::AssertNear: return "assert_near";
+    case StepKind::AssertEnemyNear: return "assert_enemy_near";
     case StepKind::AssertHealthAbove: return "assert_health_above";
     case StepKind::Finish: return "finish";
     }

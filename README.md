@@ -59,10 +59,13 @@ text scenario without keyboard, mouse, controller, or window automation:
 The output directory contains `frames.csv`, `enemies.csv`, `events.csv`,
 `player-states.csv`, geometry-level `collision-surfaces.csv`, face-level
 `collision-triangles.csv`, a `summary.txt` pass/fail record, and timestamped
-BMP readbacks. Audio is traced
+BMP readbacks. Frame samples retain the complete concurrent cinematic set. The
+enemy trace distinguishes visibility, AI, physics activity, and timed cinematic
+motion, including each interpolation clock. Audio is traced
 without playback by default; pass `--autoplay-audio` when audible output is
-useful. The tracked scenarios cover the opening, encounters, non-aliasing
-enemy animation, and authored wall/jump-wall/ledge traversal. They
+useful. The tracked scenarios cover the opening, concurrent first-encounter
+presentation, encounters, non-aliasing enemy animation, and authored
+wall/jump-wall/ledge traversal. They
 are reconstruction probes, not a claim that the campaign is ready for manual
 playtesting. Frame telemetry includes the active player state ID/name and
 deterministic combo readiness; melee-impact events retain each state's authored

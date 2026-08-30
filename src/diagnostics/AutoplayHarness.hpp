@@ -32,6 +32,7 @@ struct AutoplaySnapshot {
     float restoreAlpha{};
     std::int32_t cameraAreaId{-1};
     std::int32_t activeCinematicId{-1};
+    std::vector<std::int32_t> activeCinematicIds;
     assets::Vector3 playerPosition;
     assets::Vector3 playerFacing{1.0F, 0.0F, 0.0F};
     float playerHealth{};
@@ -127,6 +128,7 @@ private:
         MoveUntilState,
         MoveUntilCinematic,
         WaitEnemiesGrounded,
+        WaitEnemiesActive,
         Attack,
         Jump,
         WebOn,
@@ -134,6 +136,7 @@ private:
         Teleport,
         Capture,
         AssertNear,
+        AssertEnemyNear,
         AssertHealthAbove,
         Finish,
     };
@@ -154,10 +157,12 @@ private:
         float health{};
         bool visible{};
         bool aiEnabled{};
+        bool physicsActive{};
         bool playerDetected{};
         game::EnemyBehaviorState behavior{game::EnemyBehaviorState::Disabled};
         std::string animation;
         bool grounded{};
+        bool cinematicMotionActive{};
     };
 
     [[nodiscard]] Result parseScript(const std::filesystem::path& scriptPath);

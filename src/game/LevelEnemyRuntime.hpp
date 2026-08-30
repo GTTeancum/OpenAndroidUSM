@@ -24,6 +24,16 @@ enum class EnemyBehaviorState {
     Dead,
 };
 
+struct EnemyCinematicMotionState {
+    assets::Vector3 startPosition;
+    assets::Vector3 endPosition;
+    assets::Quaternion startRotation;
+    assets::Quaternion endRotation;
+    std::uint32_t elapsedMilliseconds{};
+    std::uint32_t durationMilliseconds{};
+    bool active{};
+};
+
 struct LevelEnemyState {
     const LevelEnemyAsset* asset{};
     assets::Vector3 position;
@@ -41,8 +51,12 @@ struct LevelEnemyState {
     float health{};
     bool visible{};
     bool aiEnabled{};
+    // CCinematicThread::DisableAI/EnableAI directly deactivate/reactivate the
+    // native PhysicsEntity independently of scene-node visibility.
+    bool physicsActive{};
     bool playerDetected{};
     EnemyBehaviorState behavior{EnemyBehaviorState::Disabled};
+    EnemyCinematicMotionState cinematicMotion;
     std::uint32_t hurtVariantCursor{};
     std::uint32_t soundVariantCursor{};
     std::uint32_t rangeAttackVariantCursor{};

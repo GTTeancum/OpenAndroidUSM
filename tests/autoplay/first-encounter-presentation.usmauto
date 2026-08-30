@@ -1,0 +1,24 @@
+# Enter the first encounter through its authored oriented trigger. Cinematic
+# 1162 remains active as a concurrent death watcher while Cinematic 71 runs
+# all three enemies from their reset staging positions and then enables them.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 500
+max_time_ms 70000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+# Approach across Trigger_begin's narrow local X axis. The level's authored
+# spawn is outside this rotated volume but blocked from a straight-line route.
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+# Horizontal coordinates must reach the authored endpoints; their vertical
+# coordinates may then settle as active physics resolves against the street.
+assert_enemy_near 394 13399.388 -6484.074 9.501 25
+assert_enemy_near 395 13148.155 -6459.130 7.408 25
+assert_enemy_near 397 13045.599 -6745.314 24.252 25
+capture first-encounter-presented
+assert_health_above 0
+finish

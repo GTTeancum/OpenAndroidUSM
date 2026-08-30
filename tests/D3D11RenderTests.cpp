@@ -95,6 +95,20 @@ int main() {
     assert(center[0] > 80);
     assert(center[1] > 20);
     assert(center[3] == 255);
+
+    // Native GL_MODULATE combines the sampled texture with baked COLOR0 and
+    // does not add a second directional-light term.
+    for (ColladaVertex& vertex : triangle.vertices) {
+        vertex.color = 0xff806040U;
+    }
+    texture.pixels = {255, 255, 255, 255};
+    assert(renderer.uploadPreviewGeometry(triangle, {&texture, 1}));
+    renderer.renderFrame();
+    assert(renderer.readBackPixel(32, 32, center));
+    assert(center[0] >= 126 && center[0] <= 130);
+    assert(center[1] >= 94 && center[1] <= 98);
+    assert(center[2] >= 62 && center[2] <= 66);
+    assert(center[3] == 255);
     const usm::game::EnemyGunLineState gunLine{
         1, {0.5F, 0.0F, -0.1F}, {1.0F, 0.0F, 0.0F}, 30.0F, 100, true};
     assert(renderer.updateEnemyGunLines({&gunLine, 1}));

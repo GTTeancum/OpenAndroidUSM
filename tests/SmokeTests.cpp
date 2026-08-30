@@ -136,6 +136,7 @@ int main() {
     assert(teleportInput.teleport->position.x == 1.0F);
     autoplaySnapshot.realTimeMilliseconds = 250;
     autoplaySnapshot.activeCinematicId = 974;
+    autoplaySnapshot.activeCinematicIds = {974};
     (void)autoplayHarness.update(autoplaySnapshot);
     autoplaySnapshot.realTimeMilliseconds = 275;
     const auto captureInput = autoplayHarness.update(autoplaySnapshot);
@@ -853,6 +854,17 @@ int main() {
         assert(buildingMaterial->diffuseImageIndex == 1);
         assert(colladaMesh.images()[*buildingMaterial->diffuseImageIndex]
                    .sourcePath == "041_building.tga");
+        std::set<std::uint32_t> roomVertexColors;
+        for (const auto& geometry : colladaMesh.geometries()) {
+            for (const auto& vertex : geometry.vertices) {
+                roomVertexColors.insert(vertex.color);
+            }
+        }
+        // geometry01 carries authored irradiance and occlusion in COLOR0,
+        // including full shadow and unoccluded samples.
+        assert(roomVertexColors.size() == 1507);
+        assert(roomVertexColors.contains(0xff000000U));
+        assert(roomVertexColors.contains(0xffffffffU));
 
         std::size_t meshFileCount = 0;
         std::size_t geometryCount = 0;
@@ -2294,6 +2306,7 @@ int main() {
         const auto* scriptedKnifeEnemy = enemyRuntime.find(394);
         assert(scriptedKnifeEnemy != nullptr);
         assert(!scriptedKnifeEnemy->aiEnabled);
+        assert(!scriptedKnifeEnemy->physicsActive);
         assert(scriptedKnifeEnemy->activeAnimation == "idle_knife_at_idle");
         assert(std::abs(scriptedKnifeEnemy->position.x - 13266.816406F) <
                0.01F);
@@ -2308,12 +2321,44 @@ int main() {
             }));
         assert(encounterCommandResult);
         assert(enemyRuntime.find(394)->visible);
+        usm::game::LevelCollision encounterCollision;
+        assert(encounterCollision.build(bootstrap.rooms()));
+        const float stagedBatEnemyHeight = enemyRuntime.find(395)->position.z;
+        enemyRuntime.updateGameplay(500, {}, &encounterCollision);
+        assert(enemyRuntime.find(395)->position.z == stagedBatEnemyHeight);
+        assert(!enemyRuntime.find(395)->physicsActive);
         const auto beginEncounterCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {
                 return cinematic.objectId == 71;
             });
         assert(beginEncounterCinematic != bootstrap.cinematics().end());
+        usm::game::LevelEnemyRuntime beginMotionRuntime;
+        assert(beginMotionRuntime.initialize(bootstrap));
+        usm::game::CinematicPlayer beginMotionPlayer;
+        assert(beginMotionPlayer.start(beginEncounterCinematic->script));
+        usm::Result beginMotionResult = usm::Result::success();
+        assert(beginMotionPlayer.advanceTo(
+            0, [&bootstrap, &beginMotionRuntime, &beginMotionResult](
+                   const usm::game::CinematicThread& thread,
+                   const usm::game::CinematicCommand& command) {
+                if (beginMotionResult) {
+                    beginMotionResult =
+                        beginMotionRuntime.applyCinematicCommand(
+                            bootstrap, thread, command);
+                }
+            }));
+        assert(beginMotionResult);
+        const auto* movingKnife = beginMotionRuntime.find(394);
+        assert(movingKnife != nullptr && movingKnife->cinematicMotion.active);
+        assert(movingKnife->cinematicMotion.durationMilliseconds == 1450);
+        const float motionStartX = movingKnife->position.x;
+        const float motionEndX = movingKnife->cinematicMotion.endPosition.x;
+        beginMotionRuntime.updateGameplay(725, {}, nullptr);
+        assert(beginMotionRuntime.find(394)->position.x == motionStartX);
+        beginMotionRuntime.updateGameplay(1, {}, nullptr);
+        assert(std::abs(beginMotionRuntime.find(394)->position.x -
+                        (motionStartX + motionEndX) * 0.5F) < 0.01F);
         usm::game::CinematicPlayer beginEncounterPlayer;
         assert(beginEncounterPlayer.start(beginEncounterCinematic->script));
         assert(beginEncounterPlayer.advanceTo(
@@ -2327,8 +2372,11 @@ int main() {
             }));
         assert(encounterCommandResult);
         assert(enemyRuntime.find(394)->aiEnabled);
+        assert(enemyRuntime.find(394)->physicsActive);
         assert(enemyRuntime.find(395)->aiEnabled);
+        assert(enemyRuntime.find(395)->physicsActive);
         assert(enemyRuntime.find(397)->aiEnabled);
+        assert(enemyRuntime.find(397)->physicsActive);
         assert(bootstrap.enemyArchetypes().size() == 6);
         assert(bootstrap.enemies().size() == 34);
         const auto firstKnifeEnemy = std::find_if(
@@ -2602,6 +2650,7 @@ int main() {
         for (const std::int32_t objectId : {398, 399, 401}) {
             const auto* spawnedEnemy = spawnRuntime.find(objectId);
             assert(spawnedEnemy != nullptr && spawnedEnemy->visible);
+            assert(spawnedEnemy->physicsActive);
             assert(spawnedEnemy->grounded);
             assert(spawnedEnemy->position.z < 100.0F);
         }
@@ -2631,6 +2680,28 @@ int main() {
         enemySoundCues = damageRuntime.consumeSoundCues();
         assert(enemySoundCues.size() == 1);
         assert(enemySoundCues.front().voxSoundId == 185);
+        usm::game::LevelEnemyRuntime airborneHurtRuntime;
+        assert(airborneHurtRuntime.initialize(bootstrap));
+        usm::game::CinematicThread airborneHurtThread;
+        airborneHurtThread.objectId = 394;
+        usm::game::CinematicCommand raiseEnemy;
+        raiseEnemy.name = "MoveObject";
+        raiseEnemy.attributes.push_back(
+            {"vector3d", "abspos",
+             "13355.999023, -6311.277344, 505.131531"});
+        assert(airborneHurtRuntime.applyCinematicCommand(
+            bootstrap, airborneHurtThread, raiseEnemy));
+        assert(airborneHurtRuntime.applyPlayerMeleeHit(
+            {13255.999023F, -6311.277344F, 505.131531F},
+            {1.0F, 0.0F, 0.0F}, 200.0F, 35.0F));
+        const float airborneHurtStartZ =
+            airborneHurtRuntime.find(394)->position.z;
+        airborneHurtRuntime.updateGameplay(50, {}, &encounterCollision);
+        assert(airborneHurtRuntime.find(394)->behavior ==
+               usm::game::EnemyBehaviorState::Hurt);
+        assert(airborneHurtRuntime.find(394)->position.z <
+               airborneHurtStartZ);
+        assert(airborneHurtRuntime.find(394)->verticalVelocity < 0.0F);
         for (int hit = 0; hit < 4; ++hit) {
             assert(damageRuntime.applyPlayerMeleeHit(
                 attackPosition, {1.0F, 0.0F, 0.0F}, 200.0F, 100.0F));

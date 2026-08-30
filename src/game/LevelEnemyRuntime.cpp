@@ -56,6 +56,42 @@ assets::Quaternion parseQuaternion(std::string_view text) noexcept {
     return result;
 }
 
+assets::Quaternion slerp(assets::Quaternion start,
+                         assets::Quaternion end, float factor) noexcept {
+    float dot = start.x * end.x + start.y * end.y + start.z * end.z +
+                start.w * end.w;
+    if (dot < 0.0F) {
+        end.x = -end.x;
+        end.y = -end.y;
+        end.z = -end.z;
+        end.w = -end.w;
+        dot = -dot;
+    }
+    dot = std::clamp(dot, -1.0F, 1.0F);
+    float startWeight = 1.0F - factor;
+    float endWeight = factor;
+    if (dot < 0.9995F) {
+        const float angle = std::acos(dot);
+        const float inverseSine = 1.0F / std::sin(angle);
+        startWeight = std::sin((1.0F - factor) * angle) * inverseSine;
+        endWeight = std::sin(factor * angle) * inverseSine;
+    }
+    assets::Quaternion result{start.x * startWeight + end.x * endWeight,
+                              start.y * startWeight + end.y * endWeight,
+                              start.z * startWeight + end.z * endWeight,
+                              start.w * startWeight + end.w * endWeight};
+    const float length =
+        std::sqrt(result.x * result.x + result.y * result.y +
+                  result.z * result.z + result.w * result.w);
+    if (length > std::numeric_limits<float>::epsilon()) {
+        result.x /= length;
+        result.y /= length;
+        result.z /= length;
+        result.w /= length;
+    }
+    return result;
+}
+
 float parseFloat(std::string_view text, float fallback) noexcept {
     std::string storage(text);
     char* end = nullptr;
@@ -126,6 +162,56 @@ assets::Vector3 facingFromMatrix(
         return {1.0F, 0.0F, 0.0F};
     }
     return {-matrix[4] / length, -matrix[5] / length, 0.0F};
+}
+
+const CinematicCommand* nextMoveObjectCommand(
+    const CinematicThread& thread, const CinematicCommand& command) noexcept {
+    bool currentFound = false;
+    for (const CinematicCommand& candidate : thread.commands) {
+        if (&candidate == &command) {
+            currentFound = true;
+            continue;
+        }
+        if (currentFound && candidate.name == "MoveObject") {
+            return &candidate;
+        }
+    }
+    return nullptr;
+}
+
+void advanceCinematicMotion(LevelEnemyState& enemy,
+                            std::uint32_t elapsedMilliseconds) noexcept {
+    EnemyCinematicMotionState& motion = enemy.cinematicMotion;
+    if (!motion.active || motion.durationMilliseconds == 0 ||
+        enemy.asset == nullptr) {
+        return;
+    }
+    // CCinematicThread::DoExecChange (0x00371880) evaluates the current clock
+    // before adding this frame's delta.
+    const float factor = std::clamp(
+        static_cast<float>(motion.elapsedMilliseconds) /
+            static_cast<float>(motion.durationMilliseconds),
+        0.0F, 1.0F);
+    enemy.position = {
+        motion.startPosition.x +
+            (motion.endPosition.x - motion.startPosition.x) * factor,
+        motion.startPosition.y +
+            (motion.endPosition.y - motion.startPosition.y) * factor,
+        motion.startPosition.z +
+            (motion.endPosition.z - motion.startPosition.z) * factor};
+    enemy.worldTransform =
+        worldMatrix(enemy.position,
+                    slerp(motion.startRotation, motion.endRotation, factor),
+                    enemy.asset->scale);
+    enemy.facing = facingFromMatrix(enemy.worldTransform);
+    const std::uint64_t next =
+        static_cast<std::uint64_t>(motion.elapsedMilliseconds) +
+        elapsedMilliseconds;
+    motion.elapsedMilliseconds = static_cast<std::uint32_t>(
+        std::min<std::uint64_t>(next, motion.durationMilliseconds));
+    if (next >= motion.durationMilliseconds) {
+        motion.active = false;
+    }
 }
 
 std::string_view idleAnimation(const LevelEnemyAsset& enemy) noexcept {
@@ -270,29 +356,21 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
             states_.clear();
             return Result::failure("Enemy collision dimensions are invalid");
         }
-        states_.push_back({&enemy,
-                           enemy.position,
-                           facingFromMatrix(enemy.worldTransform),
-                           enemy.worldTransform,
-                           enemy.initialAnimation,
-                           0,
-                           1.0F,
-                           true,
-                           false,
-                           attributes->collisionRadius,
-                           attributes->collisionHeight,
-                           0.0F,
-                           false,
-                           enemy.health,
-                           enemy.visible && !enemy.waitSpawn,
-                           enemy.aiEnabled,
-                           false,
-                           enemy.aiEnabled ? EnemyBehaviorState::Idle
-                                           : EnemyBehaviorState::Disabled,
-                           0,
-                           0,
-                           0,
-                           0});
+        LevelEnemyState state;
+        state.asset = &enemy;
+        state.position = enemy.position;
+        state.facing = facingFromMatrix(enemy.worldTransform);
+        state.worldTransform = enemy.worldTransform;
+        state.activeAnimation = enemy.initialAnimation;
+        state.collisionRadius = attributes->collisionRadius;
+        state.collisionHeight = attributes->collisionHeight;
+        state.health = enemy.health;
+        state.visible = enemy.visible && !enemy.waitSpawn;
+        state.aiEnabled = enemy.aiEnabled;
+        state.physicsActive = enemy.aiEnabled;
+        state.behavior = enemy.aiEnabled ? EnemyBehaviorState::Idle
+                                         : EnemyBehaviorState::Disabled;
+        states_.push_back(std::move(state));
     }
     return Result::success();
 }
@@ -347,37 +425,17 @@ void LevelEnemyRuntime::updateGameplay(
         if (enemy.asset == nullptr) {
             continue;
         }
-        if (enemy.health <= 0.0F) {
-            enemy.behavior = EnemyBehaviorState::Dead;
-            continue;
-        }
-        if (enemy.behavior == EnemyBehaviorState::Hurt) {
-            const EnemyArchetypeAsset& archetype =
-                level_->enemyArchetypes()[enemy.asset->archetypeIndex];
-            const assets::ColladaAnimationClip* clip =
-                archetype.animationBank.findClip(enemy.activeAnimation);
-            if (clip != nullptr &&
-                enemy.animationTimeMilliseconds <
-                    clip->durationMilliseconds()) {
-                continue;
-            }
-            enemy.behavior = EnemyBehaviorState::Idle;
-            enemy.activeAnimation = std::string(idleAnimation(*enemy.asset));
-            enemy.animationTimeMilliseconds = 0;
-            enemy.animationSpeed = 1.0F;
-            enemy.animationLoops = true;
-            enemy.animationReversed = false;
-        }
+        advanceCinematicMotion(enemy, elapsedMilliseconds);
         if (!enemy.visible) {
             enemy.behavior = EnemyBehaviorState::Disabled;
             continue;
         }
 
-        // WaitSpawn enemies begin hidden in CEnemy::ProcessUserAttr
-        // (0x00332870). Once CEnemy::SetVisible (0x00330858) reveals them,
-        // Unit::UpdatePhysicsWithVisible (0x00323748) activates their capsule
-        // and Bullet gravity settles it onto level collision.
-        if (collision != nullptr) {
+        // CEnemy::Update (0x00333fd0) calls Unit::UpdatePhysicsWithVisible
+        // before behavior work. Cinematic DisableAI/EnableAI at
+        // 0x00371f94/0x0037206c independently toggle PhysicsEntity::setActive,
+        // so a visible staged actor can remain motion-scripted without gravity.
+        if (collision != nullptr && enemy.physicsActive) {
             const float seconds =
                 static_cast<float>(elapsedMilliseconds) / 1000.0F;
             float supportHeight = 0.0F;
@@ -413,10 +471,31 @@ void LevelEnemyRuntime::updateGameplay(
                 }
             }
             setFacing(enemy, enemy.facing);
-            if (!enemy.grounded) {
-                enemy.behavior = EnemyBehaviorState::Idle;
+        }
+        if (enemy.health <= 0.0F) {
+            enemy.behavior = EnemyBehaviorState::Dead;
+            continue;
+        }
+        if (enemy.behavior == EnemyBehaviorState::Hurt) {
+            const EnemyArchetypeAsset& archetype =
+                level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+            const assets::ColladaAnimationClip* clip =
+                archetype.animationBank.findClip(enemy.activeAnimation);
+            if (clip != nullptr &&
+                enemy.animationTimeMilliseconds <
+                    clip->durationMilliseconds()) {
                 continue;
             }
+            enemy.behavior = EnemyBehaviorState::Idle;
+            enemy.activeAnimation = std::string(idleAnimation(*enemy.asset));
+            enemy.animationTimeMilliseconds = 0;
+            enemy.animationSpeed = 1.0F;
+            enemy.animationLoops = true;
+            enemy.animationReversed = false;
+        }
+        if (collision != nullptr && enemy.physicsActive && !enemy.grounded) {
+            enemy.behavior = EnemyBehaviorState::Idle;
+            continue;
         }
         if (!enemy.aiEnabled) {
             enemy.behavior = EnemyBehaviorState::Disabled;
@@ -898,11 +977,13 @@ Result LevelEnemyRuntime::applyCinematicCommand(
     }
     if (command.name == "DisableAI") {
         enemy->aiEnabled = false;
+        enemy->physicsActive = false;
         enemy->behavior = EnemyBehaviorState::Disabled;
         return Result::success();
     }
     if (command.name == "EnableAI") {
         enemy->aiEnabled = true;
+        enemy->physicsActive = true;
         enemy->behavior = EnemyBehaviorState::Idle;
         return Result::success();
     }
@@ -910,10 +991,6 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         const CinematicAttribute* visible = command.findAttribute("Visible");
         enemy->visible =
             visible == nullptr ? true : parseBool(visible->value, true);
-        if (enemy->visible) {
-            enemy->verticalVelocity = 0.0F;
-            enemy->grounded = false;
-        }
         return Result::success();
     }
     if (command.name == "SetAnim") {
@@ -963,6 +1040,26 @@ Result LevelEnemyRuntime::applyCinematicCommand(
             enemy->asset == nullptr ? assets::Vector3{1.0F, 1.0F, 1.0F}
                                     : enemy->asset->scale);
         enemy->facing = facingFromMatrix(enemy->worldTransform);
+        enemy->cinematicMotion = {};
+        if (const CinematicCommand* next =
+                nextMoveObjectCommand(thread, command);
+            next != nullptr &&
+            next->timestampMilliseconds > command.timestampMilliseconds) {
+            const CinematicAttribute* nextAbsolute =
+                next->findAttribute("abspos");
+            const CinematicAttribute* nextRotation = next->findAttribute("rot");
+            if (nextAbsolute != nullptr && nextRotation != nullptr) {
+                enemy->cinematicMotion.startPosition = enemy->position;
+                enemy->cinematicMotion.endPosition =
+                    parseVector3(nextAbsolute->value, enemy->position);
+                enemy->cinematicMotion.startRotation = orientation;
+                enemy->cinematicMotion.endRotation =
+                    parseQuaternion(nextRotation->value);
+                enemy->cinematicMotion.durationMilliseconds =
+                    next->timestampMilliseconds - command.timestampMilliseconds;
+                enemy->cinematicMotion.active = true;
+            }
+        }
         return Result::success();
     }
     return Result::success();

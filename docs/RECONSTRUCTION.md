@@ -315,12 +315,28 @@ through the ceiling.
 `WaitSpawn` is an actual lifecycle flag, not a request to render an enemy at
 its scene coordinate. `CEnemy::ProcessUserAttr` (`0x00332870`) stores the flag
 and initially calls `SetVisible(false)`; `CEnemy::SetVisible` (`0x00330858`)
-clears it when a script reveals the actor. `Unit::UpdatePhysicsWithVisible`
-(`0x00323748`) activates physics only for visible units, and `CEnemy::EnableAI`
-(`0x00330914`) activates the enemy physics entity. `LevelEnemyRuntime` now
-starts those actors hidden, applies the recovered 1000 cm/s-squared downward
-acceleration once visible, and settles their authored cylinders onto the real
-level collision before allowing pursuit or attacks.
+clears it when a script reveals the actor. Visibility and physics activity are
+separate native states. `CEnemy::Update` (`0x00333fd0`) calls
+`Unit::UpdatePhysicsWithVisible` (`0x00323748`) to attach or detach the physics
+object according to visibility, while `CCinematicThread::DisableAI`
+(`0x00371f94`) and `EnableAI` (`0x0037206c`) explicitly deactivate and activate
+the `PhysicsEntity`. `CEnemy::EnableAI` (`0x00330914`) also activates it.
+`LevelEnemyRuntime` preserves that distinction: the visible first-encounter
+actors remain physically inert while their reset cinematic has AI disabled;
+the Room 2 `WaitSpawn` actors retain active physics and begin falling only
+after their reveal, settling their authored cylinders onto the real level
+collision before allowing pursuit or attacks.
+
+Enemy `MoveObject` is likewise a timed cinematic operation rather than a
+teleport followed by delayed AI. `CCinematicThread::MoveObject` (`0x00370494`)
+records an object's absolute position and quaternion plus the next
+`MoveObject` command in the same thread. `CCinematicThread::DoExecChange`
+(`0x00371880`) linearly interpolates position and slerps rotation, evaluates
+the current clock before adding the frame delta, and reaches the authored
+endpoint immediately before `EnableAI`. The portable runtime reproduces this
+ordering, so Cinematic 71 visibly runs actors 394, 395, and 397 from their
+staging coordinates into the first encounter before enabling their physics
+and behavior.
 
 The Room 2 regression follows the complete authored chain. Crossing oriented
 trigger 973 starts cinematic 974, which stages the rooftop spider-sense
@@ -386,6 +402,18 @@ The original
 image address `0x00397864` enables alpha testing with `GL_GREATER` and a 0.5
 reference. The D3D11 material path preserves that behavior with an HLSL
 `clip` shader variant for the recovered `alphatest` materials.
+
+Room lighting is authored rather than synthesized at runtime. The interleaved
+BDAE vertex declarations select `COLOR0`, and level-one `geometry01.bdae`
+alone contains 1,507 distinct opaque colors ranging from `0xff000000` shadow
+samples to `0xffffffff` unoccluded samples, with colored bounce light between
+them. `CCommonGLMaterialRenderer_SOLID::onSetMaterial` at image address
+`0x00455a08` selects `GL_MODULATE`; the alpha-test renderer at `0x00397864`
+uses the same base material state before enabling its cutoff. The D3D11 solid,
+alpha-test, and reflection paths therefore multiply the diffuse texture by the
+decoded vertex color directly. No additional directional-light approximation
+is applied over the baked irradiance. Core tests census the Room 1 bake and a
+WARP shader regression verifies an exact white-texture times `COLOR0` result.
 
 Geometry-library coordinates are object-local. The adjacent `SVisualScene`
 library begins at `SCollada` offsets `0x6c/0x70`; each visual scene owns
