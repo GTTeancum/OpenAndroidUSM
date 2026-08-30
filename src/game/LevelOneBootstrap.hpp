@@ -11,6 +11,7 @@
 #include "game/AttackConfig.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/EnemyBehaviorConfig.hpp"
+#include "game/EnemyRangeAttackConfig.hpp"
 #include "game/EnemySpecialActionConfig.hpp"
 #include "game/GameplayCamera.hpp"
 
@@ -272,6 +273,10 @@ public:
         const noexcept {
         return enemyBehaviorConfigs_;
     }
+    [[nodiscard]] const EnemyRangeAttackConfigDatabase&
+    enemyRangeAttackConfigs() const noexcept {
+        return enemyRangeAttackConfigs_;
+    }
     [[nodiscard]] const LevelHudAsset& hud() const noexcept { return hud_; }
 
 private:
@@ -296,6 +301,7 @@ private:
     AttackConfigDatabase attackConfigs_;
     EnemySpecialActionConfigDatabase enemySpecialActions_;
     EnemyBehaviorConfigDatabase enemyBehaviorConfigs_;
+    EnemyRangeAttackConfigDatabase enemyRangeAttackConfigs_;
     LevelHudAsset hud_;
 };
 

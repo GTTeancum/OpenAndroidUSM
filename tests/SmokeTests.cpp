@@ -20,6 +20,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/EnemyRangeAttackConfig.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
 #include "game/LevelTriggerRuntime.hpp"
@@ -805,10 +806,38 @@ int main() {
                sandmanAttack->maximumReach() == 400.0F);
         assert(bootstrap.enemySpecialActions().actions().size() == 230);
         const auto& behaviorConfigs = bootstrap.enemyBehaviorConfigs();
+        const auto& rangeAttackConfigs = bootstrap.enemyRangeAttackConfigs();
+        assert(rangeAttackConfigs.definitions().size() == 17);
+        const auto* rangeAttack01 = rangeAttackConfigs.findByMapId(7);
+        const auto* rangeAttack05 = rangeAttackConfigs.findByMapId(11);
+        const auto* rangeAttack15 = rangeAttackConfigs.findByMapId(22);
+        assert(rangeAttack01 != nullptr && rangeAttack01->id == 0 &&
+               rangeAttack01->name == "RANGE_ATTACK_01" &&
+               rangeAttack01->animationDurationMilliseconds == 1000.0F &&
+               rangeAttack01->projectileSpeedCentimetersPerSecond == -1.0F &&
+               rangeAttack01->damage == 50.0F);
+        assert(rangeAttack05 != nullptr && rangeAttack05->id == 4 &&
+               rangeAttack05->animationDurationMilliseconds == 1000.0F &&
+               rangeAttack05->projectileSpeedCentimetersPerSecond == 600.0F &&
+               rangeAttack05->damage == 50.0F);
+        assert(rangeAttack15 != nullptr && rangeAttack15->id == 15 &&
+               rangeAttack15->animationDurationMilliseconds == 0.0F &&
+               rangeAttack15->projectileSpeedCentimetersPerSecond == -1.0F &&
+               rangeAttack15->damage == 80.0F);
         assert(behaviorConfigs.animationMaps().size() == 239);
         assert(behaviorConfigs.animationLists().size() == 202);
         assert(behaviorConfigs.soundMaps().size() == 63);
         assert(behaviorConfigs.states().size() == 221);
+        const auto* fireLeftState = behaviorConfigs.findState(
+            "ENEMY_BEHAVIOR_RANGE_ATTACK_STATE_DO_ATTACK_FIRE_LEFT");
+        const auto* fireRightState = behaviorConfigs.findState(
+            "ENEMY_BEHAVIOR_RANGE_ATTACK_STATE_DO_ATTACK_FIRE_RIGHT");
+        assert(fireLeftState != nullptr && fireLeftState->id == 26);
+        assert(fireRightState != nullptr && fireRightState->id == 28);
+        assert(behaviorConfigs.resolveStateAnimationNames(fireLeftState->name, 3) ==
+               std::vector<std::string_view>{"idle_shoot_left_idle"});
+        assert(behaviorConfigs.resolveStateAnimationNames(fireRightState->name, 3) ==
+               std::vector<std::string_view>{"idle_shoot_right_idle"});
         const auto* commonHurtState = behaviorConfigs.findState(
             "ENEMY_BEHAVIOR_HURT_STATE_COMMON");
         assert(commonHurtState != nullptr);

@@ -203,6 +203,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Could not load enemy behavior configs: " +
                                result.message());
     }
+    result = enemyRangeAttackConfigs_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load enemy range-attack configs: " +
+                               result.message());
+    }
     filesystem::GbmpArchive levelArchive;
     result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {

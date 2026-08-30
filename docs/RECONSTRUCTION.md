@@ -130,6 +130,15 @@ reach); type 5 selects `idle_attack_hammer_idle` and attack 19 (50 damage,
 400 cm). Their key percentages, sectors, damage, and reach come from the same
 typed binary tables as the knife/bat attacks.
 
+`EnemyRangeAttackConfigDatabase` follows
+`EnemyAttributeFile::ReadEnemyRangeAttackInfo` at `0x0033b820` and decodes all
+17 `EnemysRangeAttackConfigs.bin` records. Each record preserves its exported
+ID and name plus the 16-byte runtime payload: attack-type map ID, animation
+duration in milliseconds, projectile speed in centimeters per second, and
+damage. `CBehaviorRangeAttack::StateEnter` at `0x003c143c` consumes the
+duration and `UpdateAttack` at `0x003c20e0` consumes the damage; representative
+map IDs and values are regression-tested from the shipped archive.
+
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation
 lists from `BehaviorAnimList.bin`, 63 sound maps from

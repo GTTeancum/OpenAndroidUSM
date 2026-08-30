@@ -100,6 +100,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
     src/game/EnemyBehaviorConfig.cpp
+    src/game/EnemyRangeAttackConfig.cpp
     src/game/EnemySpecialActionConfig.cpp
     src/game/GameplayCamera.cpp
     src/game/GameplayPlayer.cpp
