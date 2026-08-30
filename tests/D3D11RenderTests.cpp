@@ -5,7 +5,49 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <string_view>
+
+namespace {
+
+void captureIfRequested(const usm::assets::RgbaImage& image,
+                        std::string_view filename) {
+    const char* directory = std::getenv("OPENANDROIDUSM_CAPTURE_DIR");
+    if (directory == nullptr || *directory == '\0') {
+        return;
+    }
+    const std::filesystem::path outputDirectory(directory);
+    std::filesystem::create_directories(outputDirectory);
+    BITMAPFILEHEADER fileHeader{};
+    BITMAPINFOHEADER infoHeader{};
+    const std::uint32_t pixelBytes = image.width * image.height * 4;
+    fileHeader.bfType = 0x4d42;
+    fileHeader.bfOffBits = sizeof(fileHeader) + sizeof(infoHeader);
+    fileHeader.bfSize = fileHeader.bfOffBits + pixelBytes;
+    infoHeader.biSize = sizeof(infoHeader);
+    infoHeader.biWidth = static_cast<LONG>(image.width);
+    infoHeader.biHeight = -static_cast<LONG>(image.height);
+    infoHeader.biPlanes = 1;
+    infoHeader.biBitCount = 32;
+    infoHeader.biCompression = BI_RGB;
+    infoHeader.biSizeImage = pixelBytes;
+    std::vector<std::uint8_t> bgra(image.pixels.size());
+    for (std::size_t offset = 0; offset < image.pixels.size(); offset += 4) {
+        bgra[offset] = image.pixels[offset + 2];
+        bgra[offset + 1] = image.pixels[offset + 1];
+        bgra[offset + 2] = image.pixels[offset];
+        bgra[offset + 3] = image.pixels[offset + 3];
+    }
+    std::ofstream stream(outputDirectory / filename, std::ios::binary);
+    stream.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
+    stream.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
+    stream.write(reinterpret_cast<const char*>(bgra.data()),
+                 static_cast<std::streamsize>(bgra.size()));
+}
+
+} // namespace
 
 int main() {
     using namespace usm::assets;
@@ -44,13 +86,17 @@ int main() {
         assert(levelOne.load(dataRoot));
 
         usm::renderer::D3D11Renderer gameRenderer;
-        assert(gameRenderer.initializeOffscreen(256, 256));
+        const std::uint32_t captureSize =
+            std::getenv("OPENANDROIDUSM_CAPTURE_DIR") == nullptr ? 256U : 1024U;
+        assert(gameRenderer.initializeOffscreen(captureSize, captureSize));
         assert(gameRenderer.uploadLevelOneScene(levelOne));
+        assert(gameRenderer.updateLevelOneActors(levelOne, 0));
         assert(gameRenderer.setCamera(levelOne.introCamera().sample(0)));
         gameRenderer.renderFrame();
 
         RgbaImage rendered;
         assert(gameRenderer.readBackImage(rendered));
+        captureIfRequested(rendered, "intro-00000.bmp");
         std::size_t changedPixels = 0;
         for (std::size_t pixel = 0; pixel < rendered.pixels.size(); pixel += 4) {
             const bool isBackground = rendered.pixels[pixel] < 12 &&
@@ -61,9 +107,11 @@ int main() {
         assert(changedPixels > 100);
 
         assert(gameRenderer.setCamera(levelOne.introCamera().sample(10000)));
+        assert(gameRenderer.updateLevelOneActors(levelOne, 10000));
         gameRenderer.renderFrame();
         RgbaImage laterFrame;
         assert(gameRenderer.readBackImage(laterFrame));
+        captureIfRequested(laterFrame, "intro-10000.bmp");
         assert(laterFrame.pixels.size() == rendered.pixels.size());
         std::size_t changedBetweenFrames = 0;
         for (std::size_t component = 0; component < rendered.pixels.size();
@@ -76,6 +124,14 @@ int main() {
                     laterFrame.pixels[component + 2];
         }
         assert(changedBetweenFrames > 100);
+
+        assert(gameRenderer.setCamera(levelOne.introCamera().sample(20000)));
+        assert(gameRenderer.updateLevelOneActors(levelOne, 20000));
+        gameRenderer.renderFrame();
+        RgbaImage actorFrame;
+        assert(gameRenderer.readBackImage(actorFrame));
+        captureIfRequested(actorFrame, "intro-20000.bmp");
+        assert(actorFrame.pixels.size() == rendered.pixels.size());
     }
     return 0;
 }

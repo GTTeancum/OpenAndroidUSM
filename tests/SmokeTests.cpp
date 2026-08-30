@@ -2,6 +2,7 @@
 #include "assets/BtexTexture.hpp"
 #include "assets/ColladaAnimation.hpp"
 #include "assets/ColladaMesh.hpp"
+#include "assets/ColladaSkinning.hpp"
 #include "assets/IrrScene.hpp"
 #include "audio/OggAudio.hpp"
 #include "audio/CinematicSoundBank.hpp"
@@ -262,6 +263,67 @@ int main() {
         assert(bootstrap.introActors().front().animation.tracks().size() == 40);
         assert(bootstrap.introActors().front().mesh.geometries().size() == 1);
         assert(bootstrap.introActors().front().textures.size() == 2);
+        const auto& spiderMaterial =
+            bootstrap.introActors().front().mesh.materials().front();
+        if (spiderMaterial.diffuseImageIndex != 0 ||
+            spiderMaterial.secondaryImageIndex != 1) {
+            std::cerr << "Unexpected Spider-Man texture layers: ";
+            if (spiderMaterial.diffuseImageIndex) {
+                std::cerr << *spiderMaterial.diffuseImageIndex;
+            } else {
+                std::cerr << "none";
+            }
+            std::cerr << ", ";
+            if (spiderMaterial.secondaryImageIndex) {
+                std::cerr << *spiderMaterial.secondaryImageIndex;
+            } else {
+                std::cerr << "none";
+            }
+            std::cerr << '\n';
+            return 1;
+        }
+        assert(std::abs(bootstrap.introActors().front().worldTransform[12] -
+                        14701.2F) < 0.1F);
+        assert(std::abs(bootstrap.introActors()[1].worldTransform[12] -
+                        16247.8F) < 0.1F);
+        const auto& spiderSkins =
+            bootstrap.introActors().front().mesh.skins();
+        assert(spiderSkins.size() == 1);
+        assert(spiderSkins.front().jointNames.size() == 38);
+        assert(spiderSkins.front().inverseBindMatrices.size() == 38);
+        assert(spiderSkins.front().vertexInfluences.size() == 641);
+        assert(bootstrap.introActors().front().mesh.sceneNodes().size() >= 38);
+        for (const std::string& jointName : spiderSkins.front().jointNames) {
+            const auto* jointNode = bootstrap.introActors()
+                                        .front()
+                                        .mesh.findSceneNodeByScopeId(jointName);
+            assert(jointNode != nullptr);
+            assert(!jointNode->id.empty());
+        }
+        std::size_t spiderInfluenceCount = 0;
+        for (const auto& influences :
+             spiderSkins.front().vertexInfluences) {
+            float totalWeight = 0.0F;
+            for (const auto& influence : influences) {
+                totalWeight += influence.weight;
+            }
+            assert(std::abs(totalWeight - 1.0F) < 0.0001F);
+            spiderInfluenceCount += influences.size();
+        }
+        assert(spiderInfluenceCount == 974);
+        std::vector<usm::assets::ColladaGeometry> spiderStartPose;
+        std::vector<usm::assets::ColladaGeometry> spiderLaterPose;
+        assert(usm::assets::evaluateColladaPose(
+            bootstrap.introActors().front().mesh,
+            bootstrap.introActors().front().animation, 0, spiderStartPose));
+        assert(usm::assets::evaluateColladaPose(
+            bootstrap.introActors().front().mesh,
+            bootstrap.introActors().front().animation, 1000,
+            spiderLaterPose));
+        assert(spiderStartPose.size() == 1);
+        assert(spiderStartPose.front().vertices.size() == 641);
+        assert(spiderStartPose.front().vertices.front().position.x !=
+               spiderLaterPose.front().vertices.front().position.x);
         const auto carActor = std::find_if(
             bootstrap.introActors().begin(), bootstrap.introActors().end(),
             [](const usm::game::CinematicActorAsset& actor) {
@@ -270,6 +332,45 @@ int main() {
         assert(carActor != bootstrap.introActors().end());
         assert(carActor->animationStartMilliseconds == 35300);
         assert(carActor->mesh.geometries().size() == 6);
+        std::vector<usm::assets::ColladaGeometry> carStartPose;
+        std::vector<usm::assets::ColladaGeometry> carLaterPose;
+        assert(usm::assets::evaluateColladaPose(
+            carActor->mesh, carActor->animation, 0, carStartPose));
+        assert(usm::assets::evaluateColladaPose(
+            carActor->mesh, carActor->animation,
+            carActor->animation.durationMilliseconds(), carLaterPose));
+        assert(carStartPose.size() == carLaterPose.size());
+        bool carPoseChanged = false;
+        for (std::size_t geometryIndex = 0;
+             geometryIndex < carStartPose.size(); ++geometryIndex) {
+            assert(carStartPose[geometryIndex].vertices.size() ==
+                   carLaterPose[geometryIndex].vertices.size());
+            for (std::size_t vertexIndex = 0;
+                 vertexIndex < carStartPose[geometryIndex].vertices.size();
+                 ++vertexIndex) {
+                if (carStartPose[geometryIndex].vertices[vertexIndex].position.x !=
+                        carLaterPose[geometryIndex].vertices[vertexIndex].position.x ||
+                    carStartPose[geometryIndex].vertices[vertexIndex].position.y !=
+                        carLaterPose[geometryIndex].vertices[vertexIndex].position.y ||
+                    carStartPose[geometryIndex].vertices[vertexIndex].position.z !=
+                        carLaterPose[geometryIndex].vertices[vertexIndex].position.z) {
+                    carPoseChanged = true;
+                    break;
+                }
+            }
+        }
+        if (!carPoseChanged) {
+            std::cerr << "Police-car pose did not change. Tracks:";
+            for (const auto& track : carActor->animation.tracks()) {
+                std::cerr << ' ' << track.targetNode << '/' << track.id;
+            }
+            std::cerr << " Nodes:";
+            for (const auto& node : carActor->mesh.sceneNodes()) {
+                std::cerr << ' ' << node.id << '/' << node.scopeId;
+            }
+            std::cerr << '\n';
+            return 1;
+        }
         const auto cameraStart = cameraAnimation.tracks()[1].sample(0);
         const auto cameraMiddle = cameraAnimation.tracks()[1].sample(1000);
         assert(cameraStart.componentCount == 3);

@@ -31,6 +31,9 @@ public:
         std::span<const assets::BtexTexture> textures);
     [[nodiscard]] Result uploadLevelOneScene(
         const game::LevelOneBootstrap& levelOne);
+    [[nodiscard]] Result updateLevelOneActors(
+        const game::LevelOneBootstrap& levelOne,
+        std::uint32_t timestampMilliseconds);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -53,12 +56,9 @@ private:
         Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
         std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textures;
         std::vector<DrawBatch> drawBatches;
-    };
-
-    struct MeshTransform {
-        assets::Vector3 position;
-        assets::Quaternion rotation;
-        assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+        std::uint32_t vertexCount{};
+        bool dynamicVertices{};
+        bool visible{true};
     };
 
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
@@ -76,7 +76,8 @@ private:
         const assets::ColladaMeshFile* materialLibrary,
         std::span<const assets::BtexTexture> textures,
         std::span<const assets::RgbaImage> previewTexture,
-        const MeshTransform* transform = nullptr);
+        const std::array<float, 16>* transform = nullptr,
+        bool dynamicVertices = false);
     [[nodiscard]] Result createTextureView(
         std::span<const assets::RgbaImage> mipLevels,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);

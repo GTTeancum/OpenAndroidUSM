@@ -62,6 +62,32 @@ struct ColladaMaterial {
     std::string name;
     std::string effectId;
     std::optional<std::uint32_t> diffuseImageIndex;
+    std::optional<std::uint32_t> secondaryImageIndex;
+};
+
+struct ColladaVertexInfluence {
+    std::uint16_t jointIndex{};
+    float weight{};
+};
+
+struct ColladaSkin {
+    std::string controllerId;
+    std::string geometryId;
+    std::array<float, 16> bindShapeMatrix{};
+    std::vector<std::string> jointNames;
+    std::vector<std::array<float, 16>> inverseBindMatrices;
+    std::vector<std::vector<ColladaVertexInfluence>> vertexInfluences;
+};
+
+struct ColladaSceneNode {
+    std::string id;
+    std::string name;
+    std::string scopeId;
+    std::int32_t parentIndex{-1};
+    Vector3 position;
+    Quaternion rotation;
+    Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::vector<std::uint32_t> geometryIndices;
 };
 
 // Typed native view of the SGeometry/SMesh/SMeshBuffer graph consumed by
@@ -84,6 +110,17 @@ public:
     [[nodiscard]] const std::vector<ColladaMaterial>& materials() const noexcept {
         return materials_;
     }
+    [[nodiscard]] const std::vector<ColladaSkin>& skins() const noexcept {
+        return skins_;
+    }
+    [[nodiscard]] const std::vector<ColladaSceneNode>& sceneNodes() const
+        noexcept {
+        return sceneNodes_;
+    }
+    [[nodiscard]] const ColladaSceneNode* findSceneNodeByScopeId(
+        std::string_view scopeId) const noexcept;
+    [[nodiscard]] const ColladaSceneNode* findSceneNodeById(
+        std::string_view id) const noexcept;
     [[nodiscard]] const ColladaMaterial* findMaterial(
         std::string_view name) const noexcept;
 
@@ -93,6 +130,8 @@ private:
     std::vector<ColladaMaterial> materials_;
     std::vector<ColladaGeometry> geometries_;
     std::vector<ColladaGeometry> sceneGeometries_;
+    std::vector<ColladaSkin> skins_;
+    std::vector<ColladaSceneNode> sceneNodes_;
 };
 
 } // namespace usm::assets

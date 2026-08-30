@@ -214,6 +214,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             actor.position = sceneNode->position;
             actor.rotation = sceneNode->rotation;
             actor.scale = sceneNode->scale;
+            actor.worldTransform = sceneNode->absoluteTransform;
 
             result = entityArchive.read(
                 normalizeArchivePath(sceneNode->meshFile), resource);

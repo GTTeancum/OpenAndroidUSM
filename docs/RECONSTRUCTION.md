@@ -64,8 +64,9 @@ original class and member names rather than anonymous address labels.
 
 The adjacent Collada libraries are also typed: `SImage` records are 0x14
 bytes, `SEffect` records are 0x5c bytes, and `SMaterial` records are 0x40
-bytes. A material selects an effect, whose diffuse-image payload indexes the
-image library. The image's source path is the archive-facing texture name;
+bytes. A material selects an effect and can also carry primary/secondary image
+indices at offsets `0x24/0x28`; effect texture lists remain the fallback for
+general Collada materials. The image's source path is the archive-facing texture name;
 for example, Room 1 maps `alphatest` to `level01_alphatest.tga` and
 `Material__54` to `041_building.tga`.
 
@@ -125,8 +126,36 @@ hostage (1260), cop (1261), police car (1262), and web rope (1277).
 transform, command start time, and animation BDAE. Their recovered animations
 range from two car tracks to Spider-Man's 40 tracks. D3D11 stores the room and
 each actor as separate GPU mesh resources so their material libraries and
-textures cannot collide. These are currently rendered in their authored bind
-poses; controller/skin evaluation is the next reconstruction layer.
+textures cannot collide. Actor resources become visible at their authored
+`PlayDAEAnim` timestamps rather than all appearing at cinematic time zero.
+
+## Collada controllers and animated poses
+
+Controller type 0 is an `SSkin`. The 0x6c-byte payload contains a geometry URL,
+64-byte bind-shape matrix, joint-name array, one 64-byte inverse-bind matrix per
+joint, shared weight table, an influence count per vertex, and packed
+`uint16_t {jointIndex, weightIndex}` pairs. Spider-Man validates as 38 joints,
+641 controlled vertices, 12 shared weights, and 974 influence pairs. Joint
+names such as `Bone1` are Collada scope IDs; the visual-scene nodes bridge them
+to the animation channel node IDs.
+
+The recovered `CColladaSkinnedMesh::prepareSkinData`,
+`prepareSkeletonMtxCache`, and `skin` functions are preserved at original
+addresses `0x00428240`, `0x00428674`, and `0x00428718`. The native
+`assets::evaluateColladaPose` path follows their matrix order:
+`worldJoint * inverseBind * bindShape`, normalizes vertex weights, and updates
+positions and normals into D3D11 dynamic vertex buffers. Skinned character
+channels already produce authored level-space poses, while rigid actors use
+their serialized Irrlicht absolute transform. Rigid BDAE visual-scene nodes
+are also sampled, covering the police-car and web animations. WARP regressions
+exercise the intro at 0, 10, and 20 seconds; optional BMP captures verified a
+textured Spider-Man and the four 16.2-second character entrances without
+exploded geometry.
+
+Spider-Man's material directly selects `spiderman_red.tga` as its primary
+layer and `spiderman_rim.tga` as its secondary layer. The base layer is active
+in D3D11; the recovered secondary binding is retained for the later equivalent
+rim-light shader rather than discarded or guessed.
 
 ## Vox sound events
 

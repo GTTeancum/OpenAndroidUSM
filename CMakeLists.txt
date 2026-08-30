@@ -87,6 +87,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/assets/BtexTexture.cpp
     src/assets/ColladaAnimation.cpp
     src/assets/ColladaMesh.cpp
+    src/assets/ColladaSkinning.cpp
     src/assets/IrrScene.cpp
     src/filesystem/GbmpArchive.cpp
     src/game/CinematicScript.cpp

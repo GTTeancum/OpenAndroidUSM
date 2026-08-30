@@ -1,5 +1,7 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
 
+#include "assets/ColladaSkinning.hpp"
+
 #include <d3dcompiler.h>
 
 #include <algorithm>
@@ -451,16 +453,110 @@ Result D3D11Renderer::uploadLevelOneScene(
             return Result::failure(
                 "Actor texture count does not match its BDAE image library");
         }
-        const MeshTransform transform{actor.position, actor.rotation,
-                                      actor.scale};
-        result = uploadGeometrySet(actor.mesh.sceneGeometries(), &actor.mesh,
-                                   actor.textures, {}, &transform);
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        result = assets::evaluateColladaPose(
+            actor.mesh, actor.animation, 0, animatedGeometry);
+        if (!result) {
+            gpuMeshes_.clear();
+            return Result::failure("Could not evaluate actor " +
+                                   actor.sceneNodeName + ": " +
+                                   result.message());
+        }
+        const std::array<float, 16>* actorTransform =
+            actor.mesh.skins().empty() ? &actor.worldTransform : nullptr;
+        result = uploadGeometrySet(animatedGeometry, &actor.mesh,
+                                   actor.textures, {}, actorTransform, true);
         if (!result) {
             gpuMeshes_.clear();
             return Result::failure("Could not upload actor " +
                                    actor.sceneNodeName + ": " +
                                    result.message());
         }
+        gpuMeshes_.back().visible = actor.animationStartMilliseconds == 0;
+    }
+    return Result::success();
+}
+
+Result D3D11Renderer::updateLevelOneActors(
+    const game::LevelOneBootstrap& levelOne,
+    std::uint32_t timestampMilliseconds) {
+    if (gpuMeshes_.size() != levelOne.introActors().size() + 1) {
+        return Result::failure("Level-one actor GPU resources are incomplete");
+    }
+    for (std::size_t actorIndex = 0;
+         actorIndex < levelOne.introActors().size(); ++actorIndex) {
+        const game::CinematicActorAsset& actor =
+            levelOne.introActors()[actorIndex];
+        GpuMesh& gpuMesh = gpuMeshes_[actorIndex + 1];
+        if (!gpuMesh.dynamicVertices) {
+            return Result::failure("Actor vertex buffer is not dynamic");
+        }
+        gpuMesh.visible =
+            timestampMilliseconds >= actor.animationStartMilliseconds;
+        const std::uint32_t localTime =
+            timestampMilliseconds <= actor.animationStartMilliseconds
+                ? 0
+                : std::min(timestampMilliseconds -
+                               actor.animationStartMilliseconds,
+                           actor.animation.durationMilliseconds());
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        Result result = assets::evaluateColladaPose(
+            actor.mesh, actor.animation, localTime, animatedGeometry);
+        if (!result) {
+            return Result::failure("Could not animate actor " +
+                                   actor.sceneNodeName + ": " +
+                                   result.message());
+        }
+        std::size_t vertexCount = 0;
+        for (const assets::ColladaGeometry& geometry : animatedGeometry) {
+            vertexCount += geometry.vertices.size();
+        }
+        if (vertexCount != gpuMesh.vertexCount) {
+            return Result::failure("Animated actor vertex count changed");
+        }
+
+        DirectX::XMMATRIX meshTransform = DirectX::XMMatrixIdentity();
+        if (actor.mesh.skins().empty()) {
+            DirectX::XMFLOAT4X4 worldStorage;
+            std::copy(actor.worldTransform.begin(), actor.worldTransform.end(),
+                      &worldStorage.m[0][0]);
+            meshTransform = DirectX::XMLoadFloat4x4(&worldStorage);
+        }
+        DirectX::XMVECTOR determinant;
+        const DirectX::XMMATRIX normalTransform = DirectX::XMMatrixTranspose(
+            DirectX::XMMatrixInverse(&determinant, meshTransform));
+
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        const HRESULT mapResult = context_->Map(
+            gpuMesh.vertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        if (FAILED(mapResult)) {
+            return hresultFailure("ID3D11DeviceContext::Map(actor)", mapResult);
+        }
+        auto* destination = static_cast<GpuVertex*>(mapped.pData);
+        for (const assets::ColladaGeometry& geometry : animatedGeometry) {
+            for (const assets::ColladaVertex& source : geometry.vertices) {
+                DirectX::XMVECTOR position = DirectX::XMVectorSet(
+                    source.position.x, source.position.y, source.position.z,
+                    1.0F);
+                DirectX::XMVECTOR normal = DirectX::XMVectorSet(
+                    source.normal.x, source.normal.y, source.normal.z, 0.0F);
+                position = DirectX::XMVector3TransformCoord(position,
+                                                            meshTransform);
+                normal = DirectX::XMVector3Normalize(
+                    DirectX::XMVector3TransformNormal(normal, normalTransform));
+                *destination++ = {
+                    {DirectX::XMVectorGetX(position),
+                     DirectX::XMVectorGetY(position),
+                     DirectX::XMVectorGetZ(position)},
+                    {DirectX::XMVectorGetX(normal),
+                     DirectX::XMVectorGetY(normal),
+                     DirectX::XMVectorGetZ(normal)},
+                    {source.textureCoordinate[0], source.textureCoordinate[1]},
+                    rgbaVertexColor(source.color),
+                };
+            }
+        }
+        context_->Unmap(gpuMesh.vertexBuffer.Get(), 0);
     }
     return Result::success();
 }
@@ -506,7 +602,7 @@ Result D3D11Renderer::uploadGeometrySet(
     const assets::ColladaMeshFile* materialLibrary,
     std::span<const assets::BtexTexture> textures,
     std::span<const assets::RgbaImage> previewTexture,
-    const MeshTransform* transform) {
+    const std::array<float, 16>* transform, bool dynamicVertices) {
     if (!device_ || geometries.empty()) {
         return Result::failure("Geometry set is empty or D3D11 is uninitialized");
     }
@@ -514,17 +610,10 @@ Result D3D11Renderer::uploadGeometrySet(
     DirectX::XMMATRIX meshTransform = DirectX::XMMatrixIdentity();
     DirectX::XMMATRIX normalTransform = DirectX::XMMatrixIdentity();
     if (transform != nullptr) {
-        DirectX::XMVECTOR rotation = DirectX::XMVectorSet(
-            transform->rotation.x, transform->rotation.y,
-            transform->rotation.z, transform->rotation.w);
-        rotation = DirectX::XMQuaternionNormalize(rotation);
-        meshTransform =
-            DirectX::XMMatrixScaling(transform->scale.x, transform->scale.y,
-                                     transform->scale.z) *
-            DirectX::XMMatrixRotationQuaternion(rotation) *
-            DirectX::XMMatrixTranslation(
-                transform->position.x, transform->position.y,
-                transform->position.z);
+        DirectX::XMFLOAT4X4 worldStorage;
+        std::copy(transform->begin(), transform->end(),
+                  &worldStorage.m[0][0]);
+        meshTransform = DirectX::XMLoadFloat4x4(&worldStorage);
         DirectX::XMVECTOR determinant;
         normalTransform = DirectX::XMMatrixTranspose(
             DirectX::XMMatrixInverse(&determinant, meshTransform));
@@ -565,14 +654,19 @@ Result D3D11Renderer::uploadGeometrySet(
     D3D11_BUFFER_DESC vertexDescription{};
     vertexDescription.ByteWidth =
         static_cast<UINT>(vertices.size() * sizeof(GpuVertex));
-    vertexDescription.Usage = D3D11_USAGE_IMMUTABLE;
+    vertexDescription.Usage = dynamicVertices ? D3D11_USAGE_DYNAMIC
+                                               : D3D11_USAGE_IMMUTABLE;
     vertexDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    vertexDescription.CPUAccessFlags =
+        dynamicVertices ? D3D11_CPU_ACCESS_WRITE : 0;
     D3D11_SUBRESOURCE_DATA vertexData{vertices.data(), 0, 0};
     HRESULT result = device_->CreateBuffer(&vertexDescription, &vertexData,
                                             &gpuMesh.vertexBuffer);
     if (FAILED(result)) {
         return hresultFailure("ID3D11Device::CreateBuffer(vertices)", result);
     }
+    gpuMesh.vertexCount = static_cast<std::uint32_t>(vertices.size());
+    gpuMesh.dynamicVertices = dynamicVertices;
 
     std::vector<std::uint16_t> indices;
     std::uint32_t baseVertex = 0;
@@ -757,7 +851,8 @@ void D3D11Renderer::renderFrame() {
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
         context_->RSSetState(rasterizerState_.Get());
         for (const GpuMesh& gpuMesh : gpuMeshes_) {
-            if (!gpuMesh.vertexBuffer || !gpuMesh.indexBuffer ||
+            if (!gpuMesh.visible || !gpuMesh.vertexBuffer ||
+                !gpuMesh.indexBuffer ||
                 gpuMesh.textures.empty()) {
                 continue;
             }

@@ -8,8 +8,9 @@
 #include "game/CinematicScript.hpp"
 #include "game/CinematicCamera.hpp"
 
-#include <filesystem>
+#include <array>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,9 @@ struct CinematicActorAsset {
     assets::Vector3 position;
     assets::Quaternion rotation;
     assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    // Serialized Irrlicht absolute transform. Keeping the complete matrix is
+    // required for actors parented to the level root, not just its translation.
+    std::array<float, 16> worldTransform{};
     assets::ColladaMeshFile mesh;
     std::vector<assets::BtexTexture> textures;
     assets::ColladaAnimationFile animation;

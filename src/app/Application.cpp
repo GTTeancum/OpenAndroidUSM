@@ -99,6 +99,10 @@ int Application::run(HINSTANCE instance) {
         if (!soundResult) {
             return fail(soundResult.message());
         }
+        result = renderer_.updateLevelOneActors(levelOne_, timestamp);
+        if (!result) {
+            return fail(result.message());
+        }
         result = renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
         if (!result) {
             return fail(result.message());

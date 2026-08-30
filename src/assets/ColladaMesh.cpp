@@ -32,6 +32,10 @@ constexpr std::uint32_t kVisualSceneSize = 0x10;
 constexpr std::uint32_t kSceneNodeSize = 0x50;
 constexpr std::uint32_t kSceneInstanceSize = 0x08;
 constexpr std::uint32_t kGeometryInstanceType = 3;
+constexpr std::uint32_t kControllerCountOffset = 0x54;
+constexpr std::uint32_t kControllerArrayOffset = 0x58;
+constexpr std::uint32_t kControllerSize = 0x0c;
+constexpr std::uint32_t kSkinControllerType = 0;
 
 class BinaryView final {
 public:
@@ -483,8 +487,12 @@ Result parseImageLibrary(const BinaryView& view, std::uint32_t rootOffset,
 }
 
 Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
-                            std::uint32_t imageCount,
+                            const std::vector<ColladaImage>& images,
                             std::vector<ColladaMaterial>& output) {
+    const std::uint32_t imageCount =
+        static_cast<std::uint32_t>(images.size());
+    const auto imageArray =
+        view.integer<std::uint32_t>(rootOffset + kImageArrayOffset);
     const auto effectCount =
         view.integer<std::uint32_t>(rootOffset + kEffectCountOffset);
     const auto effectArray =
@@ -493,7 +501,8 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
         view.integer<std::uint32_t>(rootOffset + kMaterialCountOffset);
     const auto materialArray =
         view.integer<std::uint32_t>(rootOffset + kMaterialArrayOffset);
-    if (!effectCount || !effectArray || !materialCount || !materialArray) {
+    if (!imageArray || !effectCount || !effectArray || !materialCount ||
+        !materialArray) {
         return Result::failure("BDAE material-library fields are truncated");
     }
     if ((*effectCount != 0 &&
@@ -523,12 +532,94 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
             return Result::failure("BDAE material metadata is invalid");
         }
 
-        ColladaMaterial material{*id, *name, *effectId, std::nullopt};
+        ColladaMaterial material{*id, *name, *effectId, std::nullopt,
+                                 std::nullopt};
+        const auto imageIndexFromReference =
+            [imageCount, imageArray](std::uint32_t pointer)
+            -> std::optional<std::uint32_t> {
+            if (pointer < imageCount) {
+                return pointer;
+            }
+            if (pointer < *imageArray) {
+                return std::nullopt;
+            }
+            const std::uint32_t byteOffset = pointer - *imageArray;
+            if (byteOffset % kImageSize != 0) {
+                return std::nullopt;
+            }
+            const std::uint32_t imageIndex = byteOffset / kImageSize;
+            return imageIndex < imageCount
+                       ? std::optional(imageIndex)
+                       : std::nullopt;
+        };
+        const auto primaryImage = view.integer<std::uint32_t>(entry + 0x24);
+        const auto secondaryImage = view.integer<std::uint32_t>(entry + 0x28);
+        if (!primaryImage || !secondaryImage) {
+            return Result::failure("BDAE material texture fields are truncated");
+        }
+        material.diffuseImageIndex = imageIndexFromReference(*primaryImage);
+        material.secondaryImageIndex = imageIndexFromReference(*secondaryImage);
+        const std::uint32_t effect = *effectArray + *effectIndex * kEffectSize;
+        const auto diffuseUsesTextures =
+            view.integer<std::uint8_t>(effect + 0x10);
+        const auto diffusePayload =
+            view.integer<std::uint32_t>(effect + 0x14);
+        if (!material.diffuseImageIndex && diffuseUsesTextures &&
+            *diffuseUsesTextures == 1 && diffusePayload &&
+            *diffusePayload != 0) {
+            const auto textureCount =
+                view.integer<std::uint32_t>(*diffusePayload);
+            const auto textureArray =
+                view.integer<std::uint32_t>(*diffusePayload + 4);
+            if (textureCount && textureArray &&
+                view.contains(*textureArray,
+                              static_cast<std::uint64_t>(*textureCount) *
+                                  0x1c)) {
+                std::vector<std::uint32_t> layerImages;
+                for (std::uint32_t layer = 0; layer < *textureCount; ++layer) {
+                    const auto descriptorOwner = view.integer<std::uint32_t>(
+                        *textureArray + layer * 0x1c);
+                    const auto descriptor =
+                        descriptorOwner && *descriptorOwner != 0
+                            ? view.integer<std::uint32_t>(*descriptorOwner)
+                            : std::nullopt;
+                    const auto imageIdOffset =
+                        descriptor && *descriptor != 0
+                            ? view.integer<std::uint32_t>(*descriptor)
+                            : std::nullopt;
+                    const auto sourceType =
+                        descriptor && *descriptor != 0
+                            ? view.integer<std::uint32_t>(*descriptor + 0x0c)
+                            : std::nullopt;
+                    if (!imageIdOffset || !sourceType || *sourceType != 1) {
+                        continue;
+                    }
+                    const auto imageId = view.string(*imageIdOffset);
+                    if (!imageId) {
+                        continue;
+                    }
+                    const auto image = std::find_if(
+                        images.begin(), images.end(),
+                        [&imageId](const ColladaImage& candidate) {
+                            return candidate.id == *imageId;
+                        });
+                    if (image != images.end()) {
+                        layerImages.push_back(static_cast<std::uint32_t>(
+                            image - images.begin()));
+                    }
+                }
+                if (!layerImages.empty()) {
+                    material.diffuseImageIndex = layerImages[0];
+                }
+                if (layerImages.size() > 1) {
+                    material.secondaryImageIndex = layerImages[1];
+                }
+            }
+        }
         // SEffect's final pointer resolves to its diffuse SImage index for
         // textured effects. Color-only effects use a different payload.
-        const std::uint32_t effect = *effectArray + *effectIndex * kEffectSize;
         const auto imageIndexPointer = view.integer<std::uint32_t>(effect + 0x58);
-        if (imageIndexPointer) {
+        if (!material.diffuseImageIndex && imageIndexPointer) {
             const auto imageIndex = view.integer<std::uint32_t>(*imageIndexPointer);
             if (imageIndex && *imageIndex < imageCount) {
                 material.diffuseImageIndex = *imageIndex;
@@ -544,7 +635,9 @@ Result parseSceneNodes(
     const AffineTransform& parentTransform,
     const std::unordered_map<std::string, std::uint32_t>& geometryIndices,
     const std::vector<ColladaGeometry>& geometries,
-    std::vector<ColladaGeometry>& output, std::uint32_t depth) {
+    std::vector<ColladaGeometry>& output,
+    std::vector<ColladaSceneNode>& sceneNodes, std::int32_t parentIndex,
+    std::uint32_t depth) {
     if (depth > 64 ||
         !view.contains(nodeArray,
                        static_cast<std::uint64_t>(nodeCount) * kSceneNodeSize)) {
@@ -555,24 +648,46 @@ Result parseSceneNodes(
             nodeArray + nodeIndex * kSceneNodeSize;
         const auto idOffset = view.integer<std::uint32_t>(nodeOffset);
         const auto nameOffset = view.integer<std::uint32_t>(nodeOffset + 4);
+        const auto scopeIdOffset = view.integer<std::uint32_t>(nodeOffset + 8);
         const auto localTransform = readNodeTransform(view, nodeOffset);
         const auto childCount = view.integer<std::uint32_t>(nodeOffset + 0x38);
         const auto childArray = view.integer<std::uint32_t>(nodeOffset + 0x3c);
         const auto instanceCount = view.integer<std::uint32_t>(nodeOffset + 0x40);
         const auto instanceArray = view.integer<std::uint32_t>(nodeOffset + 0x44);
-        if (!idOffset || !nameOffset || !localTransform || !childCount ||
-            !childArray || !instanceCount || !instanceArray) {
+        if (!idOffset || !nameOffset || !scopeIdOffset || !localTransform ||
+            !childCount || !childArray || !instanceCount || !instanceArray) {
             return Result::failure("BDAE visual-scene node is truncated");
         }
         const auto id = view.string(*idOffset);
         const auto name = view.string(*nameOffset);
-        if (!id || !name ||
+        const auto scopeId = *scopeIdOffset == 0
+                                 ? std::optional(std::string{})
+                                 : view.string(*scopeIdOffset);
+        const auto position = readVector3(view, nodeOffset + 0x0c);
+        const auto scale = readVector3(view, nodeOffset + 0x28);
+        const auto rotationX = view.floating(nodeOffset + 0x18);
+        const auto rotationY = view.floating(nodeOffset + 0x1c);
+        const auto rotationZ = view.floating(nodeOffset + 0x20);
+        const auto rotationW = view.floating(nodeOffset + 0x24);
+        if (!id || !name || !scopeId || !position || !scale || !rotationX ||
+            !rotationY || !rotationZ || !rotationW ||
             (*instanceCount != 0 &&
              !view.contains(*instanceArray,
                             static_cast<std::uint64_t>(*instanceCount) *
                                 kSceneInstanceSize))) {
             return Result::failure("BDAE visual-scene node metadata is invalid");
         }
+
+        const std::int32_t currentNodeIndex =
+            static_cast<std::int32_t>(sceneNodes.size());
+        sceneNodes.push_back({*id,
+                              *name,
+                              *scopeId,
+                              parentIndex,
+                              *position,
+                              {*rotationX, *rotationY, *rotationZ, *rotationW},
+                              *scale,
+                              {}});
 
         const AffineTransform worldTransform =
             combine(parentTransform, *localTransform);
@@ -612,6 +727,8 @@ Result parseSceneNodes(
                 // contribute renderable geometry in this file.
                 continue;
             }
+            sceneNodes[static_cast<std::size_t>(currentNodeIndex)]
+                .geometryIndices.push_back(geometry->second);
             ColladaGeometry instance = geometries[geometry->second];
             instance.name = *name;
             transformGeometry(instance, worldTransform);
@@ -621,7 +738,8 @@ Result parseSceneNodes(
         if (*childCount != 0) {
             Result result = parseSceneNodes(
                 view, *childArray, *childCount, worldTransform,
-                geometryIndices, geometries, output, depth + 1);
+                geometryIndices, geometries, output, sceneNodes,
+                currentNodeIndex, depth + 1);
             if (!result) {
                 return result;
             }
@@ -632,7 +750,8 @@ Result parseSceneNodes(
 
 Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
                          const std::vector<ColladaGeometry>& geometries,
-                         std::vector<ColladaGeometry>& output) {
+                         std::vector<ColladaGeometry>& output,
+                         std::vector<ColladaSceneNode>& sceneNodes) {
     const auto sceneCount =
         view.integer<std::uint32_t>(rootOffset + kVisualSceneCountOffset);
     const auto sceneArray =
@@ -665,7 +784,7 @@ Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
         }
         Result result = parseSceneNodes(
             view, *nodeArray, *nodeCount, identity, geometryIndices,
-            geometries, output, 0);
+            geometries, output, sceneNodes, -1, 0);
         if (!result) {
             output.clear();
             return result;
@@ -677,6 +796,161 @@ Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
     return Result::success();
 }
 
+Result parseSkinControllers(const BinaryView& view, std::uint32_t rootOffset,
+                            std::vector<ColladaSkin>& output) {
+    const auto controllerCount =
+        view.integer<std::uint32_t>(rootOffset + kControllerCountOffset);
+    const auto controllerArray =
+        view.integer<std::uint32_t>(rootOffset + kControllerArrayOffset);
+    if (!controllerCount || !controllerArray ||
+        (*controllerCount != 0 &&
+         !view.contains(*controllerArray,
+                        static_cast<std::uint64_t>(*controllerCount) *
+                            kControllerSize))) {
+        return Result::failure("BDAE controller library is invalid");
+    }
+
+    for (std::uint32_t controllerIndex = 0;
+         controllerIndex < *controllerCount; ++controllerIndex) {
+        const std::uint32_t controllerOffset =
+            *controllerArray + controllerIndex * kControllerSize;
+        const auto type = view.integer<std::uint32_t>(controllerOffset);
+        const auto idOffset = view.integer<std::uint32_t>(controllerOffset + 4);
+        const auto skinOffset = view.integer<std::uint32_t>(controllerOffset + 8);
+        if (!type || !idOffset || !skinOffset) {
+            return Result::failure("BDAE controller record is truncated");
+        }
+        if (*type != kSkinControllerType) {
+            continue;
+        }
+        const auto controllerId = view.string(*idOffset);
+        const auto geometryUrlOffset = view.integer<std::uint32_t>(*skinOffset);
+        const auto jointCount = view.integer<std::uint32_t>(*skinOffset + 0x44);
+        const auto jointNamesOffset =
+            view.integer<std::uint32_t>(*skinOffset + 0x48);
+        const auto inverseBindOffset =
+            view.integer<std::uint32_t>(*skinOffset + 0x50);
+        const auto weightCount = view.integer<std::uint32_t>(*skinOffset + 0x54);
+        const auto weightsOffset = view.integer<std::uint32_t>(*skinOffset + 0x58);
+        const auto vertexCount = view.integer<std::uint32_t>(*skinOffset + 0x5c);
+        const auto vertexInfluenceCountsOffset =
+            view.integer<std::uint32_t>(*skinOffset + 0x60);
+        const auto influenceIndexCount =
+            view.integer<std::uint32_t>(*skinOffset + 0x64);
+        const auto influencesOffset =
+            view.integer<std::uint32_t>(*skinOffset + 0x68);
+        if (!controllerId || !geometryUrlOffset || !jointCount ||
+            !jointNamesOffset || !inverseBindOffset || !weightCount ||
+            !weightsOffset || !vertexCount || !vertexInfluenceCountsOffset ||
+            !influenceIndexCount || !influencesOffset || *jointCount == 0 ||
+            *weightCount == 0 || *vertexCount == 0 ||
+            (*influenceIndexCount & 1U) != 0 ||
+            !view.contains(*jointNamesOffset,
+                           static_cast<std::uint64_t>(*jointCount) * 4) ||
+            !view.contains(*inverseBindOffset,
+                           static_cast<std::uint64_t>(*jointCount) * 64) ||
+            !view.contains(*weightsOffset,
+                           static_cast<std::uint64_t>(*weightCount) * 4) ||
+            !view.contains(*vertexInfluenceCountsOffset, *vertexCount) ||
+            !view.contains(*influencesOffset,
+                           static_cast<std::uint64_t>(*influenceIndexCount) *
+                               sizeof(std::uint16_t)) ||
+            !view.contains(*skinOffset + 4, 64)) {
+            return Result::failure("BDAE skin payload is invalid");
+        }
+        const auto geometryUrl = view.string(*geometryUrlOffset);
+        if (!geometryUrl || geometryUrl->empty() ||
+            geometryUrl->front() != '#') {
+            return Result::failure("BDAE skin geometry URL is invalid");
+        }
+
+        ColladaSkin skin;
+        skin.controllerId = *controllerId;
+        skin.geometryId = geometryUrl->substr(1);
+        for (std::uint32_t component = 0; component < 16; ++component) {
+            const auto value = view.floating(*skinOffset + 4 + component * 4);
+            if (!value || !std::isfinite(*value)) {
+                return Result::failure("BDAE bind-shape matrix is invalid");
+            }
+            skin.bindShapeMatrix[component] = *value;
+        }
+        skin.jointNames.reserve(*jointCount);
+        skin.inverseBindMatrices.resize(*jointCount);
+        for (std::uint32_t joint = 0; joint < *jointCount; ++joint) {
+            const auto nameOffset =
+                view.integer<std::uint32_t>(*jointNamesOffset + joint * 4);
+            if (!nameOffset) {
+                return Result::failure("BDAE skin joint name is truncated");
+            }
+            const auto name = view.string(*nameOffset);
+            if (!name) {
+                return Result::failure("BDAE skin joint name is invalid");
+            }
+            skin.jointNames.push_back(*name);
+            for (std::uint32_t component = 0; component < 16; ++component) {
+                const auto value = view.floating(
+                    *inverseBindOffset + joint * 64 + component * 4);
+                if (!value || !std::isfinite(*value)) {
+                    return Result::failure(
+                        "BDAE inverse-bind matrix is invalid");
+                }
+                skin.inverseBindMatrices[joint][component] = *value;
+            }
+        }
+
+        std::vector<float> weights;
+        weights.reserve(*weightCount);
+        for (std::uint32_t weight = 0; weight < *weightCount; ++weight) {
+            const auto value = view.floating(*weightsOffset + weight * 4);
+            if (!value || !std::isfinite(*value) || *value < 0.0F) {
+                return Result::failure("BDAE skin weight is invalid");
+            }
+            weights.push_back(*value);
+        }
+        skin.vertexInfluences.reserve(*vertexCount);
+        const std::uint32_t influenceCount = *influenceIndexCount / 2;
+        std::uint32_t influenceCursor = 0;
+        for (std::uint32_t vertex = 0; vertex < *vertexCount; ++vertex) {
+            const auto count = view.integer<std::uint8_t>(
+                *vertexInfluenceCountsOffset + vertex);
+            if (!count || influenceCursor + *count > influenceCount) {
+                return Result::failure(
+                    "BDAE vertex influence range is invalid");
+            }
+            std::vector<ColladaVertexInfluence> influences;
+            influences.reserve(*count);
+            float totalWeight = 0.0F;
+            for (std::uint32_t influence = 0; influence < *count; ++influence) {
+                const std::uint32_t pairOffset =
+                    *influencesOffset + (influenceCursor + influence) * 4;
+                const auto jointIndex = view.integer<std::uint16_t>(pairOffset);
+                const auto weightIndex =
+                    view.integer<std::uint16_t>(pairOffset + 2);
+                if (!jointIndex || !weightIndex || *jointIndex >= *jointCount ||
+                    *weightIndex >= weights.size()) {
+                    return Result::failure("BDAE vertex influence is invalid");
+                }
+                totalWeight += weights[*weightIndex];
+                influences.push_back({*jointIndex, weights[*weightIndex]});
+            }
+            if (influences.empty() ||
+                totalWeight <= std::numeric_limits<float>::epsilon()) {
+                return Result::failure("BDAE vertex has no skin weight");
+            }
+            for (ColladaVertexInfluence& influence : influences) {
+                influence.weight /= totalWeight;
+            }
+            influenceCursor += *count;
+            skin.vertexInfluences.push_back(std::move(influences));
+        }
+        if (influenceCursor != influenceCount) {
+            return Result::failure("BDAE skin influence stream has trailing data");
+        }
+        output.push_back(std::move(skin));
+    }
+    return Result::success();
+}
+
 } // namespace
 
 Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
@@ -684,6 +958,8 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
     materials_.clear();
     geometries_.clear();
     sceneGeometries_.clear();
+    skins_.clear();
+    sceneNodes_.clear();
     Result result = resource_.load(bytes);
     if (!result) {
         return result;
@@ -699,8 +975,7 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
         return result;
     }
     result = parseMaterialLibrary(view, *rootOffset,
-                                  static_cast<std::uint32_t>(images_.size()),
-                                  materials_);
+                                  images_, materials_);
     if (!result) {
         images_.clear();
         return result;
@@ -726,9 +1001,15 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
         }
         geometries_.push_back(std::move(geometry));
     }
-    result = parseVisualScenes(view, *rootOffset, geometries_, sceneGeometries_);
+    result = parseVisualScenes(view, *rootOffset, geometries_,
+                               sceneGeometries_, sceneNodes_);
     if (!result) {
         sceneGeometries_.clear();
+        return result;
+    }
+    result = parseSkinControllers(view, *rootOffset, skins_);
+    if (!result) {
+        skins_.clear();
         return result;
     }
     return Result::success();
@@ -742,6 +1023,24 @@ const ColladaMaterial* ColladaMeshFile::findMaterial(
             return material.id == name || material.name == name;
         });
     return iterator == materials_.end() ? nullptr : &*iterator;
+}
+
+const ColladaSceneNode* ColladaMeshFile::findSceneNodeByScopeId(
+    std::string_view scopeId) const noexcept {
+    const auto match = std::find_if(
+        sceneNodes_.begin(), sceneNodes_.end(),
+        [scopeId](const ColladaSceneNode& node) {
+            return node.scopeId == scopeId;
+        });
+    return match == sceneNodes_.end() ? nullptr : &*match;
+}
+
+const ColladaSceneNode* ColladaMeshFile::findSceneNodeById(
+    std::string_view id) const noexcept {
+    const auto match = std::find_if(
+        sceneNodes_.begin(), sceneNodes_.end(),
+        [id](const ColladaSceneNode& node) { return node.id == id; });
+    return match == sceneNodes_.end() ? nullptr : &*match;
 }
 
 } // namespace usm::assets
