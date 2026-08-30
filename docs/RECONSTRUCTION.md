@@ -118,6 +118,16 @@ level's Collada Z-up convention, and feeds sampled world-space poses to the
 D3D11 view/projection path. WARP regression coverage renders Room 1 from the
 actual time-zero intro camera rather than the earlier normalized overview.
 
+The eight `PlayDAEAnim` commands are resolved through their CFF object IDs to
+named Irrlicht scene nodes: Spider-Man (288), three thugs (1257–1259), the
+hostage (1260), cop (1261), police car (1262), and web rope (1277).
+`CinematicActorAsset` loads each original entity BDAE, texture set, scene
+transform, command start time, and animation BDAE. Their recovered animations
+range from two car tracks to Spider-Man's 40 tracks. D3D11 stores the room and
+each actor as separate GPU mesh resources so their material libraries and
+textures cannot collide. These are currently rendered in their authored bind
+poses; controller/skin evaluation is the next reconstruction layer.
+
 ## Vox sound events
 
 The preserved `VoxSoundFile::LoadRecordFromFile` and `ReadBasicRecord`

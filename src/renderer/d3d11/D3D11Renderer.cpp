@@ -420,6 +420,7 @@ void D3D11Renderer::bindRenderTarget(std::uint32_t width,
 Result D3D11Renderer::uploadPreviewGeometry(
     const assets::ColladaGeometry& geometry,
     std::span<const assets::RgbaImage> mipLevels) {
+    gpuMeshes_.clear();
     return uploadGeometrySet({&geometry, 1}, nullptr, {}, mipLevels);
 }
 
@@ -430,7 +431,38 @@ Result D3D11Renderer::uploadSceneGeometry(
         return Result::failure(
             "Scene texture count does not match the BDAE image library");
     }
+    gpuMeshes_.clear();
     return uploadGeometrySet(mesh.sceneGeometries(), &mesh, textures, {});
+}
+
+Result D3D11Renderer::uploadLevelOneScene(
+    const game::LevelOneBootstrap& levelOne) {
+    gpuMeshes_.clear();
+    Result result = uploadGeometrySet(
+        levelOne.roomGeometry().sceneGeometries(), &levelOne.roomGeometry(),
+        levelOne.roomTextures(), {});
+    if (!result) {
+        gpuMeshes_.clear();
+        return result;
+    }
+    for (const game::CinematicActorAsset& actor : levelOne.introActors()) {
+        if (actor.mesh.images().size() != actor.textures.size()) {
+            gpuMeshes_.clear();
+            return Result::failure(
+                "Actor texture count does not match its BDAE image library");
+        }
+        const MeshTransform transform{actor.position, actor.rotation,
+                                      actor.scale};
+        result = uploadGeometrySet(actor.mesh.sceneGeometries(), &actor.mesh,
+                                   actor.textures, {}, &transform);
+        if (!result) {
+            gpuMeshes_.clear();
+            return Result::failure("Could not upload actor " +
+                                   actor.sceneNodeName + ": " +
+                                   result.message());
+        }
+    }
+    return Result::success();
 }
 
 Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
@@ -473,9 +505,29 @@ Result D3D11Renderer::uploadGeometrySet(
     std::span<const assets::ColladaGeometry> geometries,
     const assets::ColladaMeshFile* materialLibrary,
     std::span<const assets::BtexTexture> textures,
-    std::span<const assets::RgbaImage> previewTexture) {
+    std::span<const assets::RgbaImage> previewTexture,
+    const MeshTransform* transform) {
     if (!device_ || geometries.empty()) {
         return Result::failure("Geometry set is empty or D3D11 is uninitialized");
+    }
+    GpuMesh gpuMesh;
+    DirectX::XMMATRIX meshTransform = DirectX::XMMatrixIdentity();
+    DirectX::XMMATRIX normalTransform = DirectX::XMMatrixIdentity();
+    if (transform != nullptr) {
+        DirectX::XMVECTOR rotation = DirectX::XMVectorSet(
+            transform->rotation.x, transform->rotation.y,
+            transform->rotation.z, transform->rotation.w);
+        rotation = DirectX::XMQuaternionNormalize(rotation);
+        meshTransform =
+            DirectX::XMMatrixScaling(transform->scale.x, transform->scale.y,
+                                     transform->scale.z) *
+            DirectX::XMMatrixRotationQuaternion(rotation) *
+            DirectX::XMMatrixTranslation(
+                transform->position.x, transform->position.y,
+                transform->position.z);
+        DirectX::XMVECTOR determinant;
+        normalTransform = DirectX::XMMatrixTranspose(
+            DirectX::XMMatrixInverse(&determinant, meshTransform));
     }
 
     std::vector<GpuVertex> vertices;
@@ -486,9 +538,21 @@ Result D3D11Renderer::uploadGeometrySet(
     vertices.reserve(totalVertexCount);
     for (const assets::ColladaGeometry& geometry : geometries) {
         for (const assets::ColladaVertex& source : geometry.vertices) {
+            DirectX::XMVECTOR position = DirectX::XMVectorSet(
+                source.position.x, source.position.y, source.position.z, 1.0F);
+            DirectX::XMVECTOR normal = DirectX::XMVectorSet(
+                source.normal.x, source.normal.y, source.normal.z, 0.0F);
+            if (transform != nullptr) {
+                position = DirectX::XMVector3TransformCoord(position,
+                                                            meshTransform);
+                normal = DirectX::XMVector3Normalize(
+                    DirectX::XMVector3TransformNormal(normal, normalTransform));
+            }
             vertices.push_back({
-                {source.position.x, source.position.y, source.position.z},
-                {source.normal.x, source.normal.y, source.normal.z},
+                {DirectX::XMVectorGetX(position), DirectX::XMVectorGetY(position),
+                 DirectX::XMVectorGetZ(position)},
+                {DirectX::XMVectorGetX(normal), DirectX::XMVectorGetY(normal),
+                 DirectX::XMVectorGetZ(normal)},
                 {source.textureCoordinate[0], source.textureCoordinate[1]},
                 rgbaVertexColor(source.color),
             });
@@ -505,13 +569,12 @@ Result D3D11Renderer::uploadGeometrySet(
     vertexDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     D3D11_SUBRESOURCE_DATA vertexData{vertices.data(), 0, 0};
     HRESULT result = device_->CreateBuffer(&vertexDescription, &vertexData,
-                                            &vertexBuffer_);
+                                            &gpuMesh.vertexBuffer);
     if (FAILED(result)) {
         return hresultFailure("ID3D11Device::CreateBuffer(vertices)", result);
     }
 
     std::vector<std::uint16_t> indices;
-    drawBatches_.clear();
     std::uint32_t baseVertex = 0;
     for (const assets::ColladaGeometry& geometry : geometries) {
         for (const assets::ColladaMeshBuffer& source : geometry.meshBuffers) {
@@ -541,7 +604,7 @@ Result D3D11Renderer::uploadGeometrySet(
                                       material->name.starts_with("alphatest");
                 }
             }
-            drawBatches_.push_back(batch);
+            gpuMesh.drawBatches.push_back(batch);
         }
         baseVertex += static_cast<std::uint32_t>(geometry.vertices.size());
     }
@@ -556,28 +619,28 @@ Result D3D11Renderer::uploadGeometrySet(
     indexDescription.BindFlags = D3D11_BIND_INDEX_BUFFER;
     D3D11_SUBRESOURCE_DATA indexData{indices.data(), 0, 0};
     result =
-        device_->CreateBuffer(&indexDescription, &indexData, &indexBuffer_);
+        device_->CreateBuffer(&indexDescription, &indexData,
+                              &gpuMesh.indexBuffer);
     if (FAILED(result)) {
         return hresultFailure("ID3D11Device::CreateBuffer(indices)", result);
     }
 
-    textureViews_.clear();
     if (materialLibrary == nullptr) {
         ComPtr<ID3D11ShaderResourceView> view;
         Result textureResult = createTextureView(previewTexture, view);
         if (!textureResult) {
             return textureResult;
         }
-        textureViews_.push_back(std::move(view));
+        gpuMesh.textures.push_back(std::move(view));
     } else {
-        textureViews_.reserve(textures.size() + 1);
+        gpuMesh.textures.reserve(textures.size() + 1);
         for (const assets::BtexTexture& texture : textures) {
             ComPtr<ID3D11ShaderResourceView> view;
             Result textureResult = createTextureView(texture.mipLevels(), view);
             if (!textureResult) {
                 return textureResult;
             }
-            textureViews_.push_back(std::move(view));
+            gpuMesh.textures.push_back(std::move(view));
         }
         assets::RgbaImage white;
         white.width = 1;
@@ -588,7 +651,7 @@ Result D3D11Renderer::uploadGeometrySet(
         if (!textureResult) {
             return textureResult;
         }
-        textureViews_.push_back(std::move(view));
+        gpuMesh.textures.push_back(std::move(view));
     }
 
     assets::AxisAlignedBounds bounds = geometries.front().bounds;
@@ -627,6 +690,7 @@ Result D3D11Renderer::uploadGeometrySet(
         DirectX::XMMatrixTranspose(world * view * projection));
     context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
                                 &worldViewProjection_, 0, 0);
+    gpuMeshes_.push_back(std::move(gpuMesh));
     return Result::success();
 }
 
@@ -684,26 +748,34 @@ void D3D11Renderer::renderFrame() {
                                     D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
                                     1.0F, 0);
 
-    if (vertexBuffer_ && indexBuffer_ && !textureViews_.empty()) {
+    if (!gpuMeshes_.empty()) {
         constexpr UINT stride = sizeof(GpuVertex);
         constexpr UINT offset = 0;
         context_->IASetInputLayout(inputLayout_.Get());
-        context_->IASetVertexBuffers(0, 1, vertexBuffer_.GetAddressOf(), &stride,
-                                     &offset);
-        context_->IASetIndexBuffer(indexBuffer_.Get(), DXGI_FORMAT_R16_UINT, 0);
         context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
         context_->VSSetConstantBuffers(0, 1, transformBuffer_.GetAddressOf());
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
         context_->RSSetState(rasterizerState_.Get());
-        for (const DrawBatch& batch : drawBatches_) {
-            context_->PSSetShader(batch.alphaTest ? alphaTestPixelShader_.Get()
-                                                  : pixelShader_.Get(),
-                                  nullptr, 0);
-            context_->PSSetShaderResources(
-                0, 1, textureViews_[batch.textureIndex].GetAddressOf());
-            context_->IASetPrimitiveTopology(batch.topology);
-            context_->DrawIndexed(batch.indexCount, batch.startIndex,
-                                  batch.baseVertex);
+        for (const GpuMesh& gpuMesh : gpuMeshes_) {
+            if (!gpuMesh.vertexBuffer || !gpuMesh.indexBuffer ||
+                gpuMesh.textures.empty()) {
+                continue;
+            }
+            context_->IASetVertexBuffers(
+                0, 1, gpuMesh.vertexBuffer.GetAddressOf(), &stride, &offset);
+            context_->IASetIndexBuffer(gpuMesh.indexBuffer.Get(),
+                                       DXGI_FORMAT_R16_UINT, 0);
+            for (const DrawBatch& batch : gpuMesh.drawBatches) {
+                context_->PSSetShader(
+                    batch.alphaTest ? alphaTestPixelShader_.Get()
+                                    : pixelShader_.Get(),
+                    nullptr, 0);
+                context_->PSSetShaderResources(
+                    0, 1, gpuMesh.textures[batch.textureIndex].GetAddressOf());
+                context_->IASetPrimitiveTopology(batch.topology);
+                context_->DrawIndexed(batch.indexCount, batch.startIndex,
+                                      batch.baseVertex);
+            }
         }
     }
 

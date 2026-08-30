@@ -59,8 +59,7 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    result = renderer_.uploadSceneGeometry(levelOne_.roomGeometry(),
-                                           levelOne_.roomTextures());
+    result = renderer_.uploadLevelOneScene(levelOne_);
     if (!result) {
         return fail(result.message());
     }

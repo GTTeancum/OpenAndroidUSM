@@ -45,8 +45,7 @@ int main() {
 
         usm::renderer::D3D11Renderer gameRenderer;
         assert(gameRenderer.initializeOffscreen(256, 256));
-        assert(gameRenderer.uploadSceneGeometry(levelOne.roomGeometry(),
-                                                levelOne.roomTextures()));
+        assert(gameRenderer.uploadLevelOneScene(levelOne));
         assert(gameRenderer.setCamera(levelOne.introCamera().sample(0)));
         gameRenderer.renderFrame();
 

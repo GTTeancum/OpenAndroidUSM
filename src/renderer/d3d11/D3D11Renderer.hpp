@@ -3,6 +3,7 @@
 #include "assets/ColladaMesh.hpp"
 #include "assets/BtexTexture.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/LevelOneBootstrap.hpp"
 #include "renderer/IRenderer.hpp"
 
 #include <DirectXMath.h>
@@ -28,6 +29,8 @@ public:
     [[nodiscard]] Result uploadSceneGeometry(
         const assets::ColladaMeshFile& mesh,
         std::span<const assets::BtexTexture> textures);
+    [[nodiscard]] Result uploadLevelOneScene(
+        const game::LevelOneBootstrap& levelOne);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -45,6 +48,19 @@ private:
         bool alphaTest{};
     };
 
+    struct GpuMesh {
+        Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
+        std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textures;
+        std::vector<DrawBatch> drawBatches;
+    };
+
+    struct MeshTransform {
+        assets::Vector3 position;
+        assets::Quaternion rotation;
+        assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    };
+
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
     [[nodiscard]] Result createWindowRenderTarget(HWND window,
                                                    std::uint32_t width,
@@ -59,7 +75,8 @@ private:
         std::span<const assets::ColladaGeometry> geometries,
         const assets::ColladaMeshFile* materialLibrary,
         std::span<const assets::BtexTexture> textures,
-        std::span<const assets::RgbaImage> previewTexture);
+        std::span<const assets::RgbaImage> previewTexture,
+        const MeshTransform* transform = nullptr);
     [[nodiscard]] Result createTextureView(
         std::span<const assets::RgbaImage> mipLevels,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);
@@ -77,12 +94,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
-    Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
-    Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
-    std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textureViews_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
-    std::vector<DrawBatch> drawBatches_;
+    std::vector<GpuMesh> gpuMeshes_;
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     std::uint32_t width_{};
     std::uint32_t height_{};

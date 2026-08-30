@@ -184,6 +184,8 @@ int main() {
             return 1;
         }
         assert(bootstrap.mainScene().nodes().size() == 154);
+        assert(bootstrap.mainScene().findNode(288) != nullptr);
+        assert(bootstrap.mainScene().findNode(288)->gameType == "SpiderMan");
         assert(bootstrap.firstRoom().nodes().size() == 60);
         assert(!bootstrap.previewGeometry().vertices.empty());
         assert(!bootstrap.previewTexture().mipLevels().empty());
@@ -254,6 +256,20 @@ int main() {
                       << '\n';
             return 1;
         }
+        assert(bootstrap.introActors().size() == 8);
+        assert(bootstrap.introActors().front().objectId == 288);
+        assert(bootstrap.introActors().front().sceneNodeName == "SpiderMan");
+        assert(bootstrap.introActors().front().animation.tracks().size() == 40);
+        assert(bootstrap.introActors().front().mesh.geometries().size() == 1);
+        assert(bootstrap.introActors().front().textures.size() == 2);
+        const auto carActor = std::find_if(
+            bootstrap.introActors().begin(), bootstrap.introActors().end(),
+            [](const usm::game::CinematicActorAsset& actor) {
+                return actor.objectId == 1262;
+            });
+        assert(carActor != bootstrap.introActors().end());
+        assert(carActor->animationStartMilliseconds == 35300);
+        assert(carActor->mesh.geometries().size() == 6);
         const auto cameraStart = cameraAnimation.tracks()[1].sample(0);
         const auto cameraMiddle = cameraAnimation.tracks()[1].sample(1000);
         assert(cameraStart.componentCount == 3);

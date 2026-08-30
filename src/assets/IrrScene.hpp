@@ -46,6 +46,7 @@ public:
     [[nodiscard]] const std::vector<IrrSceneNode>& nodes() const noexcept {
         return nodes_;
     }
+    [[nodiscard]] const IrrSceneNode* findNode(std::int32_t id) const noexcept;
 
 private:
     std::vector<IrrSceneNode> nodes_;

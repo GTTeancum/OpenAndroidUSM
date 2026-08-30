@@ -9,9 +9,23 @@
 #include "game/CinematicCamera.hpp"
 
 #include <filesystem>
+#include <cstdint>
+#include <string>
 #include <vector>
 
 namespace usm::game {
+
+struct CinematicActorAsset {
+    std::int32_t objectId{-1};
+    std::string sceneNodeName;
+    std::uint32_t animationStartMilliseconds{};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    assets::ColladaMeshFile mesh;
+    std::vector<assets::BtexTexture> textures;
+    assets::ColladaAnimationFile animation;
+};
 
 class LevelOneBootstrap final {
 public:
@@ -52,6 +66,10 @@ public:
     [[nodiscard]] const CinematicCamera& introCamera() const noexcept {
         return introCamera_;
     }
+    [[nodiscard]] const std::vector<CinematicActorAsset>& introActors() const
+        noexcept {
+        return introActors_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -63,6 +81,7 @@ private:
     CinematicScript introEndScript_;
     assets::ColladaAnimationFile introCameraAnimation_;
     CinematicCamera introCamera_;
+    std::vector<CinematicActorAsset> introActors_;
 };
 
 } // namespace usm::game

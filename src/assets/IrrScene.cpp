@@ -117,4 +117,11 @@ Result IrrScene::load(std::span<const std::byte> bytes) {
     return Result::success();
 }
 
+const IrrSceneNode* IrrScene::findNode(std::int32_t id) const noexcept {
+    const auto match = std::find_if(
+        nodes_.begin(), nodes_.end(),
+        [id](const IrrSceneNode& node) { return node.id == id; });
+    return match == nodes_.end() ? nullptr : &*match;
+}
+
 } // namespace usm::assets
