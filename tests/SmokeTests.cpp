@@ -2070,6 +2070,35 @@ int main() {
         for (const std::int32_t enemyId : conditionEnemyIds) {
             assert(enemyRuntime.find(enemyId) != nullptr);
         }
+        usm::game::LevelEnemyRuntime reverseAnimationRuntime;
+        assert(reverseAnimationRuntime.initialize(bootstrap));
+        usm::game::CinematicThread reverseAnimationThread;
+        reverseAnimationThread.objectId = 394;
+        usm::game::CinematicCommand reverseAnimationCommand;
+        reverseAnimationCommand.name = "SetAnim";
+        reverseAnimationCommand.attributes = {
+            {"string", "$Anim", "idle_knife_at_idle"},
+            {"bool", "loop", "false"},
+            {"bool", "reverse", "true"},
+            {"float", "speed", "0.5"},
+        };
+        assert(reverseAnimationRuntime.applyCinematicCommand(
+            bootstrap, reverseAnimationThread, reverseAnimationCommand));
+        const auto* reversedEnemy = reverseAnimationRuntime.find(394);
+        assert(reversedEnemy != nullptr);
+        const auto& reversedArchetype =
+            bootstrap.enemyArchetypes()[reversedEnemy->asset->archetypeIndex];
+        const auto* reversedClip =
+            reversedArchetype.animationBank.findClip("idle_knife_at_idle");
+        assert(reversedClip != nullptr);
+        assert(!reversedEnemy->animationLoops);
+        assert(reversedEnemy->animationReversed);
+        assert(reversedEnemy->animationSpeed == 0.5F);
+        assert(reversedEnemy->animationTimeMilliseconds ==
+               reversedClip->durationMilliseconds());
+        reverseAnimationRuntime.advanceAnimations(200);
+        assert(reverseAnimationRuntime.find(394)->animationTimeMilliseconds ==
+               reversedClip->durationMilliseconds() - 100);
         usm::game::LevelEnemyRuntime killedEnemyRuntime;
         assert(killedEnemyRuntime.initialize(bootstrap));
         usm::game::CinematicThread killEnemyThread;
@@ -2149,6 +2178,52 @@ int main() {
         assert(bootstrap.enemyArchetypes()[firstKnifeEnemy->archetypeIndex]
                    .animationFile ==
                "../entities/meshes_bin/thug_bat_anim.bdae");
+        const auto& knifeArchetype =
+            bootstrap.enemyArchetypes()[firstKnifeEnemy->archetypeIndex];
+        assert(std::all_of(
+            knifeArchetype.animationBank.tracks().begin(),
+            knifeArchetype.animationBank.tracks().end(), [](const auto& track) {
+                return track.property !=
+                           usm::assets::ColladaAnimationProperty::Rotation ||
+                       track.componentCount == 4;
+            }));
+        const auto* knifeIdleClip =
+            knifeArchetype.animationBank.findClip("idle_knife_at_idle");
+        assert(knifeIdleClip != nullptr);
+        assert(knifeIdleClip->durationMilliseconds() > 200);
+        std::vector<usm::assets::ColladaGeometry> knifeIdleStartPose;
+        std::vector<usm::assets::ColladaGeometry> knifeIdleLaterPose;
+        assert(usm::assets::evaluateColladaPose(
+            knifeArchetype.mesh, knifeArchetype.animationBank,
+            knifeIdleClip->startMilliseconds, knifeIdleStartPose));
+        assert(usm::assets::evaluateColladaPose(
+            knifeArchetype.mesh, knifeArchetype.animationBank,
+            knifeIdleClip->startMilliseconds + 200, knifeIdleLaterPose));
+        assert(knifeIdleStartPose.size() == knifeIdleLaterPose.size());
+        bool knifeIdlePoseChanged = false;
+        for (std::size_t geometryIndex = 0;
+             geometryIndex < knifeIdleStartPose.size(); ++geometryIndex) {
+            assert(knifeIdleStartPose[geometryIndex].vertices.size() ==
+                   knifeIdleLaterPose[geometryIndex].vertices.size());
+            for (std::size_t vertexIndex = 0;
+                 vertexIndex <
+                 knifeIdleStartPose[geometryIndex].vertices.size();
+                 ++vertexIndex) {
+                const auto& start = knifeIdleStartPose[geometryIndex]
+                                        .vertices[vertexIndex]
+                                        .position;
+                const auto& later = knifeIdleLaterPose[geometryIndex]
+                                        .vertices[vertexIndex]
+                                        .position;
+                if (std::abs(start.x - later.x) > 0.001F ||
+                    std::abs(start.y - later.y) > 0.001F ||
+                    std::abs(start.z - later.z) > 0.001F) {
+                    knifeIdlePoseChanged = true;
+                    break;
+                }
+            }
+        }
+        assert(knifeIdlePoseChanged);
         const auto bigRangeEnemy = std::find_if(
             bootstrap.enemies().begin(), bootstrap.enemies().end(),
             [](const usm::game::LevelEnemyAsset& enemy) {

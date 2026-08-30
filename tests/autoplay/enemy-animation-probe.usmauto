@@ -1,0 +1,16 @@
+# Short, non-aliasing room-two animation probe. The 200 ms capture cadence is
+# intentionally not a divisor of the authored 2.5-second idle loops.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 200
+max_time_ms 55000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+teleport 7575 -6305 1042 0 1 0
+capture enemy-animation-start
+wait 1000
+capture enemy-animation-end
+assert_health_above 0
+finish

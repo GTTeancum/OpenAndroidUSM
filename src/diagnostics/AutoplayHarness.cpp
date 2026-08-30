@@ -85,7 +85,8 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
                  "restore_alpha,visible_rooms,input_right,input_forward,"
                  "camera_x,camera_y,camera_z,target_x,target_y,target_z\n";
     enemyLog_ << "frame,real_ms,object_id,type_id,x,y,z,health,visible,ai,"
-                 "detected,behavior,animation,animation_ms\n";
+                 "detected,behavior,animation,animation_ms,animation_speed,"
+                 "animation_loop,animation_reverse\n";
     eventLog_ << "real_ms,frame,type,detail\n";
     recordEvent(0, "harness_start",
                 "script=" + scriptPath.generic_string());
@@ -584,7 +585,9 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << enemy.visible << ',' << enemy.aiEnabled << ','
                   << enemy.playerDetected << ',' << behaviorName(enemy.behavior)
                   << ',' << csv(enemy.activeAnimation) << ','
-                  << enemy.animationTimeMilliseconds << '\n';
+                  << enemy.animationTimeMilliseconds << ','
+                  << enemy.animationSpeed << ',' << enemy.animationLoops << ','
+                  << enemy.animationReversed << '\n';
     }
     frameLog_.flush();
     enemyLog_.flush();

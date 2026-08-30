@@ -33,6 +33,7 @@ struct LevelEnemyState {
     std::uint32_t animationTimeMilliseconds{};
     float animationSpeed{1.0F};
     bool animationLoops{true};
+    bool animationReversed{};
     float health{};
     bool visible{};
     bool aiEnabled{};

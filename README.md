@@ -59,6 +59,7 @@ text scenario without keyboard, mouse, controller, or window automation:
 The output directory contains `frames.csv`, `enemies.csv`, `events.csv`, a
 `summary.txt` pass/fail record, and timestamped BMP readbacks. Audio is traced
 without playback by default; pass `--autoplay-audio` when audible output is
-useful. The tracked scenarios cover the opening, the first encounter, and an
-isolated later encounter. They are reconstruction probes, not a claim that
-the campaign is ready for manual playtesting.
+useful. The tracked scenarios cover the opening, the first encounter, an
+isolated later encounter, and a short non-aliasing enemy-animation probe. They
+are reconstruction probes, not a claim that the campaign is ready for manual
+playtesting.

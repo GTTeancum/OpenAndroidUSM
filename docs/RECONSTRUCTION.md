@@ -118,6 +118,17 @@ enemies. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
 player using their scene-authored awareness radius and chase at the authored
 line speed.
 
+Enemy animation commands preserve all authored playback fields.
+`CCinematicThread::SetAnim` at `0x00372468` routes the clip, speed, loop, and
+reverse values into `IAnimatedObject::SetAnimWithSpeed` at `0x0031104c`; the
+latter sets the animation scale and jumps reverse playback to the clip end.
+`LevelEnemyRuntime` mirrors that state explicitly, advances reverse clips
+toward zero (wrapping only when authored to loop), and clamps ordinary
+non-looping clips in the renderer. The deterministic enemy trace records the
+clip clock, speed, loop, and reverse state. A short 200 ms capture probe avoids
+phase-locking to the 2.5-second thug idle loop, while a core pose regression
+proves that the decoded knife-thug mesh changes from its first sampled frame.
+
 `LevelCinematicRuntime` handles the global encounter state without coupling
 gameplay to Win32 or D3D. `DisableTrigger` and `EnableTrigger` follow
 `CCinematicThread` at `0x0036fef0`/`0x0036ff38` and reset the native trigger

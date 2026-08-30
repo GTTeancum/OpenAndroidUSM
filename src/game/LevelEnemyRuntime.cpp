@@ -216,6 +216,7 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
                            0,
                            1.0F,
                            true,
+                           false,
                            enemy.health,
                            enemy.visible,
                            enemy.aiEnabled,
@@ -235,9 +236,36 @@ void LevelEnemyRuntime::advanceAnimations(
     for (LevelEnemyState& enemy : states_) {
         const double advanced =
             static_cast<double>(elapsedMilliseconds) * enemy.animationSpeed;
-        const std::uint64_t next = enemy.animationTimeMilliseconds +
-                                   static_cast<std::uint64_t>(
-                                       std::max(advanced, 0.0));
+        const std::uint64_t step = static_cast<std::uint64_t>(
+            std::max(advanced, 0.0));
+        if (enemy.animationReversed) {
+            if (enemy.animationLoops && level_ != nullptr &&
+                enemy.asset != nullptr &&
+                enemy.asset->archetypeIndex <
+                    level_->enemyArchetypes().size()) {
+                const EnemyArchetypeAsset& archetype =
+                    level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+                const assets::ColladaAnimationClip* clip =
+                    archetype.animationBank.findClip(enemy.activeAnimation);
+                const std::uint64_t duration =
+                    clip == nullptr ? 0 : clip->durationMilliseconds();
+                if (duration != 0) {
+                    const std::uint64_t current =
+                        enemy.animationTimeMilliseconds % duration;
+                    enemy.animationTimeMilliseconds =
+                        static_cast<std::uint32_t>(
+                            (current + duration - step % duration) % duration);
+                }
+            } else {
+                enemy.animationTimeMilliseconds =
+                    step >= enemy.animationTimeMilliseconds
+                        ? 0
+                        : static_cast<std::uint32_t>(
+                              enemy.animationTimeMilliseconds - step);
+            }
+            continue;
+        }
+        const std::uint64_t next = enemy.animationTimeMilliseconds + step;
         enemy.animationTimeMilliseconds = static_cast<std::uint32_t>(
             std::min<std::uint64_t>(next,
                                     std::numeric_limits<std::uint32_t>::max()));
@@ -270,7 +298,9 @@ void LevelEnemyRuntime::updateGameplay(
             enemy.behavior = EnemyBehaviorState::Idle;
             enemy.activeAnimation = std::string(idleAnimation(*enemy.asset));
             enemy.animationTimeMilliseconds = 0;
+            enemy.animationSpeed = 1.0F;
             enemy.animationLoops = true;
+            enemy.animationReversed = false;
         }
         if (!enemy.visible || !enemy.aiEnabled) {
             enemy.behavior = EnemyBehaviorState::Disabled;
@@ -316,7 +346,9 @@ void LevelEnemyRuntime::updateGameplay(
                         enemy.activeAnimation =
                             std::string(idleAnimation(*enemy.asset));
                         enemy.animationTimeMilliseconds = 0;
+                        enemy.animationSpeed = 1.0F;
                         enemy.animationLoops = true;
+                        enemy.animationReversed = false;
                         const auto* interval =
                             level_->enemyAttackIntervalConfigs()
                                 .findForWeaponType(13);
@@ -346,7 +378,9 @@ void LevelEnemyRuntime::updateGameplay(
                 previousBehavior != EnemyBehaviorState::AttackRange) {
                 enemy.activeAnimation = attack;
                 enemy.animationTimeMilliseconds = 0;
+                enemy.animationSpeed = 1.0F;
                 enemy.animationLoops = true;
+                enemy.animationReversed = false;
             }
             continue;
         }
@@ -379,7 +413,9 @@ void LevelEnemyRuntime::updateGameplay(
         if (enemy.activeAnimation != "run") {
             enemy.activeAnimation = "run";
             enemy.animationTimeMilliseconds = 0;
+            enemy.animationSpeed = 1.0F;
             enemy.animationLoops = true;
+            enemy.animationReversed = false;
         }
     }
     std::vector<std::uint32_t> previousAnimationTimes;
@@ -668,7 +704,9 @@ void LevelEnemyRuntime::startGunLineAttack(LevelEnemyState& enemy) {
     }
     enemy.activeAnimation = animation;
     enemy.animationTimeMilliseconds = 0;
+    enemy.animationSpeed = 1.0F;
     enemy.animationLoops = false;
+    enemy.animationReversed = false;
 }
 
 bool LevelEnemyRuntime::isGunLineEnemy(
@@ -722,7 +760,9 @@ void LevelEnemyRuntime::selectStateAnimation(
         (selected + 1) % animationNames.size());
     enemy.activeAnimation = animationNames[selected];
     enemy.animationTimeMilliseconds = 0;
+    enemy.animationSpeed = 1.0F;
     enemy.animationLoops = loop;
+    enemy.animationReversed = false;
 }
 
 void LevelEnemyRuntime::enterDeadState(LevelEnemyState& enemy) {
@@ -785,11 +825,23 @@ Result LevelEnemyRuntime::applyCinematicCommand(
             return Result::failure("Enemy SetAnim references a missing clip");
         }
         enemy->activeAnimation = animation->value;
-        enemy->animationTimeMilliseconds = 0;
-        enemy->animationLoops = true;
+        const CinematicAttribute* loop = command.findAttribute("loop");
+        const CinematicAttribute* reverse = command.findAttribute("reverse");
+        enemy->animationLoops =
+            loop == nullptr ? true : parseBool(loop->value, true);
+        enemy->animationReversed =
+            reverse == nullptr ? false : parseBool(reverse->value, false);
         const CinematicAttribute* speed = command.findAttribute("speed");
         enemy->animationSpeed =
-            speed == nullptr ? 1.0F : parseFloat(speed->value, 1.0F);
+            std::abs(speed == nullptr ? 1.0F
+                                      : parseFloat(speed->value, 1.0F));
+        const auto* clip =
+            level.enemyArchetypes()[enemy->asset->archetypeIndex]
+                .animationBank.findClip(animation->value);
+        enemy->animationTimeMilliseconds =
+            enemy->animationReversed && clip != nullptr
+                ? clip->durationMilliseconds()
+                : 0;
         return Result::success();
     }
     if (command.name == "MoveObject") {
