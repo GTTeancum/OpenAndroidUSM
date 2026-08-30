@@ -376,6 +376,27 @@ int main() {
             }));
         assert(encounterCommandResult);
         assert(enemyRuntime.find(394)->visible);
+        const auto beginEncounterCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 71;
+            });
+        assert(beginEncounterCinematic != bootstrap.cinematics().end());
+        usm::game::CinematicPlayer beginEncounterPlayer;
+        assert(beginEncounterPlayer.start(beginEncounterCinematic->script));
+        assert(beginEncounterPlayer.advanceTo(
+            1550, [&bootstrap, &enemyRuntime, &encounterCommandResult](
+                      const usm::game::CinematicThread& thread,
+                      const usm::game::CinematicCommand& command) {
+                if (encounterCommandResult) {
+                    encounterCommandResult = enemyRuntime.applyCinematicCommand(
+                        bootstrap, thread, command);
+                }
+            }));
+        assert(encounterCommandResult);
+        assert(enemyRuntime.find(394)->aiEnabled);
+        assert(enemyRuntime.find(395)->aiEnabled);
+        assert(enemyRuntime.find(397)->aiEnabled);
         assert(bootstrap.enemyArchetypes().size() == 2);
         assert(bootstrap.enemies().size() == 14);
         const auto firstKnifeEnemy = std::find_if(
@@ -386,11 +407,36 @@ int main() {
         assert(firstKnifeEnemy != bootstrap.enemies().end());
         assert(firstKnifeEnemy->health == 500.0F);
         assert(firstKnifeEnemy->aiEnabled);
+        assert(firstKnifeEnemy->lineSpeedCentimetersPerMillisecond == 0.3F);
         assert(firstKnifeEnemy->awarenessRadius == 1500.0F);
         assert(firstKnifeEnemy->initialAnimation == "idle_knife_at_idle");
         assert(bootstrap.enemyArchetypes()[firstKnifeEnemy->archetypeIndex]
                    .animationFile ==
                "../entities/meshes_bin/thug_bat_anim.bdae");
+        usm::game::LevelEnemyRuntime chaseRuntime;
+        assert(chaseRuntime.initialize(bootstrap));
+        const auto* chasingKnife = chaseRuntime.find(394);
+        assert(chasingKnife != nullptr);
+        const usm::assets::Vector3 chaseTarget{
+            chasingKnife->position.x + 1000.0F, chasingKnife->position.y,
+            chasingKnife->position.z};
+        const float chaseStartX = chasingKnife->position.x;
+        chaseRuntime.updateGameplay(100, chaseTarget);
+        chasingKnife = chaseRuntime.find(394);
+        assert(chasingKnife->playerDetected);
+        assert(chasingKnife->behavior ==
+               usm::game::EnemyBehaviorState::Chasing);
+        assert(chasingKnife->activeAnimation == "run");
+        assert(std::abs(chasingKnife->position.x - chaseStartX - 30.0F) <
+               0.01F);
+        const usm::assets::Vector3 meleeTarget{
+            chasingKnife->position.x + 100.0F, chasingKnife->position.y,
+            chasingKnife->position.z};
+        chaseRuntime.updateGameplay(16, meleeTarget);
+        chasingKnife = chaseRuntime.find(394);
+        assert(chasingKnife->behavior ==
+               usm::game::EnemyBehaviorState::AttackRange);
+        assert(chasingKnife->activeAnimation == "idle_knife_at_idle");
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(bootstrap.introRooms()));
         assert(levelCollision.triangleCount() > 100);

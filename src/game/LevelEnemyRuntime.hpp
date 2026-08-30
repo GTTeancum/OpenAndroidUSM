@@ -12,6 +12,16 @@
 
 namespace usm::game {
 
+class LevelCollision;
+
+enum class EnemyBehaviorState {
+    Disabled,
+    Idle,
+    Chasing,
+    AttackRange,
+    Dead,
+};
+
 struct LevelEnemyState {
     const LevelEnemyAsset* asset{};
     assets::Vector3 position;
@@ -22,6 +32,8 @@ struct LevelEnemyState {
     float health{};
     bool visible{};
     bool aiEnabled{};
+    bool playerDetected{};
+    EnemyBehaviorState behavior{EnemyBehaviorState::Disabled};
 };
 
 // Mutable native state for the authored enemy objects. Cinematic command names
@@ -29,7 +41,10 @@ struct LevelEnemyState {
 class LevelEnemyRuntime final {
 public:
     [[nodiscard]] Result initialize(const LevelOneBootstrap& level);
-    void update(std::uint32_t elapsedMilliseconds) noexcept;
+    void advanceAnimations(std::uint32_t elapsedMilliseconds) noexcept;
+    void updateGameplay(std::uint32_t elapsedMilliseconds,
+                        const assets::Vector3& playerPosition,
+                        const LevelCollision* collision = nullptr) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
         const LevelOneBootstrap& level, const CinematicThread& thread,
         const CinematicCommand& command);

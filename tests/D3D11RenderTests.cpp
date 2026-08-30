@@ -267,7 +267,7 @@ int main() {
                2500.0F);
         assert(planarDistanceSquared(*encounterBat, *encounterKnifeTwo) >
                2500.0F);
-        enemies.update(750);
+        enemies.advanceAnimations(750);
         assert(gameRenderer.updateLevelOneEnemies(levelOne, enemies));
         const float encounterCenterX =
             (encounterKnife->position.x + encounterBat->position.x +
@@ -313,6 +313,48 @@ int main() {
                     gameplayMiddleFrame.pixels[component + 2];
         }
         assert(encounterChangedPixels > 100);
+
+        usm::game::CinematicThread chasingEnemyThread;
+        chasingEnemyThread.objectId = 394;
+        usm::game::CinematicCommand enableEnemyAi;
+        enableEnemyAi.name = "EnableAI";
+        assert(enemies.applyCinematicCommand(
+            levelOne, chasingEnemyThread, enableEnemyAi));
+        const auto* chasingEnemy = enemies.find(394);
+        assert(chasingEnemy != nullptr);
+        const usm::assets::Vector3 chaseTarget{
+            chasingEnemy->position.x + 1000.0F, chasingEnemy->position.y,
+            chasingEnemy->position.z};
+        enemies.updateGameplay(500, chaseTarget);
+        chasingEnemy = enemies.find(394);
+        assert(chasingEnemy->behavior ==
+               usm::game::EnemyBehaviorState::Chasing);
+        assert(gameRenderer.updateLevelOneEnemies(levelOne, enemies));
+        const usm::game::CameraPose chaseCamera{
+            {chasingEnemy->position.x, chasingEnemy->position.y - 1100.0F,
+             350.0F},
+            {chasingEnemy->position.x, chasingEnemy->position.y, 120.0F},
+            {0.0F, 0.0F, 1.0F},
+            50.0F,
+            10.0F,
+            3000.0F};
+        assert(gameRenderer.setCamera(chaseCamera));
+        gameRenderer.renderFrame();
+        RgbaImage chaseFrame;
+        assert(gameRenderer.readBackImage(chaseFrame));
+        captureIfRequested(chaseFrame, "gameplay-enemy-chase.bmp");
+        std::size_t chaseChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < chaseFrame.pixels.size(); component += 4) {
+            chaseChangedPixels +=
+                chaseFrame.pixels[component] !=
+                    encounterFrame.pixels[component] ||
+                chaseFrame.pixels[component + 1] !=
+                    encounterFrame.pixels[component + 1] ||
+                chaseFrame.pixels[component + 2] !=
+                    encounterFrame.pixels[component + 2];
+        }
+        assert(chaseChangedPixels > 100);
     }
     return 0;
 }

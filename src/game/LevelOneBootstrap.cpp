@@ -479,6 +479,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             enemy.visible = node.visible;
             enemy.aiEnabled = booleanAttribute(node, "AI_Enable", true);
             enemy.waitSpawn = booleanAttribute(node, "WaitSpawn", false);
+            enemy.lineSpeedCentimetersPerMillisecond =
+                floatAttribute(node, "Line_Speed", 0.3F);
             enemy.awarenessRadius = floatAttribute(node, "Aware_Radius");
             enemy.awarenessAngleDegrees =
                 floatAttribute(node, "Aware_Angle");

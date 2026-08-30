@@ -193,7 +193,9 @@ int Application::run(HINSTANCE instance) {
                     activeGameplayCinematic_ = nullptr;
                 }
             }
-            enemyRuntime_.update(deltaMilliseconds);
+            enemyRuntime_.updateGameplay(deltaMilliseconds,
+                                         gameplayPlayer_.position(),
+                                         &levelCollision_);
             const assets::ColladaAnimationClip* activeClip =
                 levelOne_.player().animationBank.findClip(
                     gameplayPlayer_.activeAnimation());

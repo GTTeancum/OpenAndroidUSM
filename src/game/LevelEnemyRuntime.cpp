@@ -1,5 +1,7 @@
 #include "game/LevelEnemyRuntime.hpp"
 
+#include "game/LevelCollision.hpp"
+
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -9,6 +11,11 @@
 
 namespace usm::game {
 namespace {
+
+// The behavior boundary is recovered from CBehaviorMeleeAttack, but its exact
+// radius is data-driven through EnemysAttackConfigs.bin. Keep this inferred
+// level-one fallback explicit until that config reader is reconstructed.
+constexpr float kMeleeAttackRangeCentimeters = 180.0F;
 
 assets::Vector3 parseVector3(std::string_view text,
                              assets::Vector3 fallback = {}) noexcept {
@@ -109,20 +116,25 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
             states_.clear();
             return Result::failure("Enemy archetype index is invalid");
         }
-        states_.push_back({&enemy,
-                           enemy.position,
-                           enemy.worldTransform,
-                           enemy.initialAnimation,
-                           0,
-                           1.0F,
-                           enemy.health,
-                           enemy.visible,
-                           enemy.aiEnabled});
+        states_.push_back(
+            {&enemy,
+             enemy.position,
+             enemy.worldTransform,
+             enemy.initialAnimation,
+             0,
+             1.0F,
+             enemy.health,
+             enemy.visible,
+             enemy.aiEnabled,
+             false,
+             enemy.aiEnabled ? EnemyBehaviorState::Idle
+                             : EnemyBehaviorState::Disabled});
     }
     return Result::success();
 }
 
-void LevelEnemyRuntime::update(std::uint32_t elapsedMilliseconds) noexcept {
+void LevelEnemyRuntime::advanceAnimations(
+    std::uint32_t elapsedMilliseconds) noexcept {
     for (LevelEnemyState& enemy : states_) {
         const double advanced =
             static_cast<double>(elapsedMilliseconds) * enemy.animationSpeed;
@@ -135,6 +147,101 @@ void LevelEnemyRuntime::update(std::uint32_t elapsedMilliseconds) noexcept {
     }
 }
 
+void LevelEnemyRuntime::updateGameplay(
+    std::uint32_t elapsedMilliseconds,
+    const assets::Vector3& playerPosition,
+    const LevelCollision* collision) noexcept {
+    for (LevelEnemyState& enemy : states_) {
+        if (enemy.asset == nullptr) {
+            continue;
+        }
+        if (enemy.health <= 0.0F) {
+            enemy.behavior = EnemyBehaviorState::Dead;
+            continue;
+        }
+        if (!enemy.visible || !enemy.aiEnabled) {
+            enemy.behavior = EnemyBehaviorState::Disabled;
+            continue;
+        }
+
+        const float toPlayerX = playerPosition.x - enemy.position.x;
+        const float toPlayerY = playerPosition.y - enemy.position.y;
+        const float distanceSquared =
+            toPlayerX * toPlayerX + toPlayerY * toPlayerY;
+        const float awarenessRadius = enemy.asset->awarenessRadius;
+        if (!enemy.playerDetected && awarenessRadius > 0.0F &&
+            distanceSquared <= awarenessRadius * awarenessRadius) {
+            enemy.playerDetected = true;
+        }
+        if (!enemy.playerDetected) {
+            enemy.behavior = EnemyBehaviorState::Idle;
+            continue;
+        }
+
+        if (distanceSquared <=
+            kMeleeAttackRangeCentimeters * kMeleeAttackRangeCentimeters) {
+            enemy.behavior = EnemyBehaviorState::AttackRange;
+            const std::string_view idleAnimation =
+                enemy.asset->gameType == "MeleeThugEnemy_knife"
+                    ? "idle_knife_at_idle"
+                    : "idle_at1_idle";
+            if (enemy.activeAnimation != idleAnimation) {
+                enemy.activeAnimation = idleAnimation;
+                enemy.animationTimeMilliseconds = 0;
+            }
+            continue;
+        }
+
+        const float distance = std::sqrt(distanceSquared);
+        if (distance <= std::numeric_limits<float>::epsilon()) {
+            continue;
+        }
+        const float inverseDistance = 1.0F / distance;
+        const assets::Vector3 facing{toPlayerX * inverseDistance,
+                                     toPlayerY * inverseDistance, 0.0F};
+        const float maximumTravel =
+            enemy.asset->lineSpeedCentimetersPerMillisecond *
+            static_cast<float>(elapsedMilliseconds);
+        const float travel = std::min(
+            maximumTravel, distance - kMeleeAttackRangeCentimeters);
+        assets::Vector3 desired = enemy.position;
+        desired.x += facing.x * travel;
+        desired.y += facing.y * travel;
+        if (collision != nullptr) {
+            assets::Vector3 resolved;
+            (void)collision->resolveGroundMotion(enemy.position, desired,
+                                                 resolved);
+            enemy.position = resolved;
+        } else {
+            enemy.position = desired;
+        }
+        const assets::Vector3 scale = enemy.asset->scale;
+        enemy.worldTransform = {
+            -facing.y * scale.x,
+            facing.x * scale.x,
+            0.0F,
+            0.0F,
+            -facing.x * scale.y,
+            -facing.y * scale.y,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            scale.z,
+            0.0F,
+            enemy.position.x,
+            enemy.position.y,
+            enemy.position.z,
+            1.0F};
+        enemy.behavior = EnemyBehaviorState::Chasing;
+        if (enemy.activeAnimation != "run") {
+            enemy.activeAnimation = "run";
+            enemy.animationTimeMilliseconds = 0;
+        }
+    }
+    advanceAnimations(elapsedMilliseconds);
+}
+
 Result LevelEnemyRuntime::applyCinematicCommand(
     const LevelOneBootstrap& level, const CinematicThread& thread,
     const CinematicCommand& command) {
@@ -144,10 +251,12 @@ Result LevelEnemyRuntime::applyCinematicCommand(
     }
     if (command.name == "DisableAI") {
         enemy->aiEnabled = false;
+        enemy->behavior = EnemyBehaviorState::Disabled;
         return Result::success();
     }
     if (command.name == "EnableAI") {
         enemy->aiEnabled = true;
+        enemy->behavior = EnemyBehaviorState::Idle;
         return Result::success();
     }
     if (command.name == "SetVisible") {

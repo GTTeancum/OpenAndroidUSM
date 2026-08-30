@@ -112,6 +112,7 @@ struct LevelEnemyAsset {
     bool visible{true};
     bool aiEnabled{};
     bool waitSpawn{};
+    float lineSpeedCentimetersPerMillisecond{};
     float awarenessRadius{};
     float awarenessAngleDegrees{};
 };
