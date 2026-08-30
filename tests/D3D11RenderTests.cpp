@@ -92,6 +92,17 @@ int main() {
                 levelOne.introSky().textures[textureIndex].mipLevels().front(),
                 "sky-texture-" + std::to_string(textureIndex) + ".bmp");
         }
+        for (std::size_t textureIndex = 0;
+             textureIndex < levelOne.introActors().front().textures.size();
+             ++textureIndex) {
+            captureIfRequested(
+                levelOne.introActors()
+                    .front()
+                    .textures[textureIndex]
+                    .mipLevels()
+                    .front(),
+                "spider-texture-" + std::to_string(textureIndex) + ".bmp");
+        }
 
         usm::renderer::D3D11Renderer gameRenderer;
         const std::uint32_t captureSize =

@@ -532,8 +532,13 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
             return Result::failure("BDAE material metadata is invalid");
         }
 
+        const auto secondaryTextureMode =
+            view.integer<std::uint32_t>(entry + 0x30);
+        if (!secondaryTextureMode) {
+            return Result::failure("BDAE material mode is truncated");
+        }
         ColladaMaterial material{*id, *name, *effectId, std::nullopt,
-                                 std::nullopt};
+                                 std::nullopt, *secondaryTextureMode};
         const auto imageIndexFromReference =
             [imageCount, imageArray](std::uint32_t pointer)
             -> std::optional<std::uint32_t> {

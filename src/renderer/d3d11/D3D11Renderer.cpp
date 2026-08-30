@@ -28,6 +28,9 @@ constexpr std::string_view kVertexShader = R"hlsl(
 cbuffer TransformBuffer : register(b0) {
     float4x4 WorldViewProjection;
 };
+cbuffer ViewRotationBuffer : register(b1) {
+    float4x4 ViewRotation;
+};
 
 struct VertexInput {
     float3 position : POSITION;
@@ -46,10 +49,39 @@ struct PixelInput {
 PixelInput main(VertexInput input) {
     PixelInput output;
     output.position = mul(float4(input.position, 1.0), WorldViewProjection);
-    output.normal = input.normal;
+    output.normal = mul(float4(input.normal, 0.0), ViewRotation).xyz;
     output.textureCoordinate = input.textureCoordinate;
     output.color = input.color;
     return output;
+}
+)hlsl";
+
+constexpr std::string_view kReflectionPixelShader = R"hlsl(
+Texture2D DiffuseTexture : register(t0);
+Texture2D ReflectionTexture : register(t1);
+SamplerState DiffuseSampler : register(s0);
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    float3 normal = normalize(input.normal);
+    float2 sphereCoordinate = normal.xy * float2(0.5, -0.5) + 0.5;
+    float4 diffuse = DiffuseTexture.Sample(DiffuseSampler,
+                                            input.textureCoordinate) *
+                     input.color;
+    float3 reflection = ReflectionTexture.Sample(DiffuseSampler,
+                                                   sphereCoordinate).rgb;
+    float lighting = 0.35 + 0.65 * abs(dot(normal,
+                                           normalize(float3(0.3, 0.5, -0.8))));
+    // GL_COMBINE_RGB = GL_ADD in
+    // CCommonGLMaterialRenderer_REFLECTION_2_LAYER::onSetMaterial
+    // (original 0x00455be0).
+    return float4(saturate(diffuse.rgb * lighting + reflection), diffuse.a);
 }
 )hlsl";
 
@@ -368,6 +400,20 @@ Result D3D11Renderer::createPipeline() {
         return hresultFailure(
             "ID3D11Device::CreatePixelShader(alpha test)", callResult);
     }
+    ComPtr<ID3DBlob> reflectionPixelBytecode;
+    result = compileShader(kReflectionPixelShader, "ps_5_0",
+                           reflectionPixelBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreatePixelShader(
+        reflectionPixelBytecode->GetBufferPointer(),
+        reflectionPixelBytecode->GetBufferSize(), nullptr,
+        &reflectionPixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure(
+            "ID3D11Device::CreatePixelShader(reflection)", callResult);
+    }
 
     constexpr std::array inputElements{
         D3D11_INPUT_ELEMENT_DESC{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
@@ -399,6 +445,16 @@ Result D3D11Renderer::createPipeline() {
                                        &transformBuffer_);
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreateBuffer(transform)", callResult);
+    }
+    D3D11_BUFFER_DESC viewRotationDescription{};
+    viewRotationDescription.ByteWidth = sizeof(viewRotation_);
+    viewRotationDescription.Usage = D3D11_USAGE_DEFAULT;
+    viewRotationDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    callResult = device_->CreateBuffer(&viewRotationDescription, nullptr,
+                                       &viewRotationBuffer_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateBuffer(view rotation)",
+                              callResult);
     }
 
     D3D11_SAMPLER_DESC samplerDescription{};
@@ -629,7 +685,8 @@ Result D3D11Renderer::updateLevelOneActors(
 }
 
 Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
-    if (!context_ || !transformBuffer_ || width_ == 0 || height_ == 0 ||
+    if (!context_ || !transformBuffer_ || !viewRotationBuffer_ || width_ == 0 ||
+        height_ == 0 ||
         !std::isfinite(camera.verticalFieldOfViewDegrees) ||
         camera.verticalFieldOfViewDegrees <= 0.0F ||
         camera.verticalFieldOfViewDegrees >= 180.0F ||
@@ -664,8 +721,12 @@ Result D3D11Renderer::setCamera(const game::CameraPose& camera) {
     DirectX::XMStoreFloat4x4(
         &skyViewProjection_,
         DirectX::XMMatrixTranspose(skyView * projection));
+    DirectX::XMStoreFloat4x4(&viewRotation_,
+                             DirectX::XMMatrixTranspose(skyView));
     context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
                                 &worldViewProjection_, 0, 0);
+    context_->UpdateSubresource(viewRotationBuffer_.Get(), 0, nullptr,
+                                &viewRotation_, 0, 0);
     return Result::success();
 }
 
@@ -755,6 +816,8 @@ Result D3D11Renderer::uploadGeometrySet(
             batch.indexCount = static_cast<std::uint32_t>(source.indices.size());
             batch.startIndex = static_cast<std::uint32_t>(indices.size());
             batch.baseVertex = static_cast<std::int32_t>(baseVertex);
+            batch.secondaryTextureIndex =
+                static_cast<std::uint32_t>(textures.size());
             indices.insert(indices.end(), source.indices.begin(),
                            source.indices.end());
             if (source.primitive == assets::ColladaPrimitive::LineLoop &&
@@ -779,6 +842,13 @@ Result D3D11Renderer::uploadGeometrySet(
                         *material->diffuseImageIndex <
                             transparentTextures.size() &&
                         transparentTextures[*material->diffuseImageIndex];
+                    if (material->secondaryImageIndex &&
+                        *material->secondaryImageIndex < textures.size() &&
+                        material->secondaryTextureMode == 0) {
+                        batch.secondaryTextureIndex =
+                            *material->secondaryImageIndex;
+                        batch.reflectionTwoLayer = true;
+                    }
                 }
             }
             gpuMesh.drawBatches.push_back(batch);
@@ -865,8 +935,12 @@ Result D3D11Renderer::uploadGeometrySet(
     DirectX::XMStoreFloat4x4(
         &worldViewProjection_,
         DirectX::XMMatrixTranspose(world * view * projection));
+    DirectX::XMStoreFloat4x4(&viewRotation_,
+                             DirectX::XMMatrixIdentity());
     context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
                                 &worldViewProjection_, 0, 0);
+    context_->UpdateSubresource(viewRotationBuffer_.Get(), 0, nullptr,
+                                &viewRotation_, 0, 0);
     gpuMeshes_.push_back(std::move(gpuMesh));
     return Result::success();
 }
@@ -930,7 +1004,10 @@ void D3D11Renderer::renderFrame() {
         constexpr UINT offset = 0;
         context_->IASetInputLayout(inputLayout_.Get());
         context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
-        context_->VSSetConstantBuffers(0, 1, transformBuffer_.GetAddressOf());
+        const std::array<ID3D11Buffer*, 2> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
         context_->RSSetState(rasterizerState_.Get());
         for (const GpuMesh& gpuMesh : gpuMeshes_) {
@@ -957,11 +1034,19 @@ void D3D11Renderer::renderFrame() {
                                      : depthWriteState_.Get(),
                     0);
                 context_->PSSetShader(
-                    batch.alphaTest ? alphaTestPixelShader_.Get()
-                                    : pixelShader_.Get(),
+                    batch.reflectionTwoLayer
+                        ? reflectionPixelShader_.Get()
+                        : batch.alphaTest ? alphaTestPixelShader_.Get()
+                                          : pixelShader_.Get(),
                     nullptr, 0);
+                const std::array<ID3D11ShaderResourceView*, 2> textureViews{
+                    gpuMesh.textures[batch.textureIndex].Get(),
+                    batch.reflectionTwoLayer
+                        ? gpuMesh.textures[batch.secondaryTextureIndex].Get()
+                        : nullptr};
                 context_->PSSetShaderResources(
-                    0, 1, gpuMesh.textures[batch.textureIndex].GetAddressOf());
+                    0, static_cast<UINT>(textureViews.size()),
+                    textureViews.data());
                 context_->IASetPrimitiveTopology(batch.topology);
                 context_->DrawIndexed(batch.indexCount, batch.startIndex,
                                       batch.baseVertex);

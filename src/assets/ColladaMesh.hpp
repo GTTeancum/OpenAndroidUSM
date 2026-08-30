@@ -63,6 +63,7 @@ struct ColladaMaterial {
     std::string effectId;
     std::optional<std::uint32_t> diffuseImageIndex;
     std::optional<std::uint32_t> secondaryImageIndex;
+    std::uint32_t secondaryTextureMode{};
 };
 
 struct ColladaVertexInfluence {

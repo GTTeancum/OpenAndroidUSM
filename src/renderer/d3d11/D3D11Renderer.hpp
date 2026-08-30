@@ -48,8 +48,10 @@ private:
         std::uint32_t startIndex{};
         std::int32_t baseVertex{};
         std::uint32_t textureIndex{};
+        std::uint32_t secondaryTextureIndex{};
         bool alphaTest{};
         bool alphaBlend{};
+        bool reflectionTwoLayer{};
     };
 
     struct GpuMesh {
@@ -95,8 +97,10 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> viewRotationBuffer_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
     Microsoft::WRL::ComPtr<ID3D11BlendState> alphaBlendState_;
@@ -106,6 +110,7 @@ private:
     std::size_t environmentMeshCount_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
+    DirectX::XMFLOAT4X4 viewRotation_{};
     std::uint32_t width_{};
     std::uint32_t height_{};
 };

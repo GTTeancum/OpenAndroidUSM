@@ -172,9 +172,14 @@ textured Spider-Man and the four 16.2-second character entrances without
 exploded geometry.
 
 Spider-Man's material directly selects `spiderman_red.tga` as its primary
-layer and `spiderman_rim.tga` as its secondary layer. The base layer is active
-in D3D11; the recovered secondary binding is retained for the later equivalent
-rim-light shader rather than discarded or guessed.
+layer and the 32x32 `spiderman_rim.tga` sphere map as its secondary layer. Its
+serialized secondary mode is 0, which `CMaterial::prepareMaterial` maps to
+renderer index `0x0c`, `CCommonGLMaterialRenderer_REFLECTION_2_LAYER`.
+That renderer's preserved `onSetMaterial` at `0x00455be0` sets
+`GL_COMBINE_RGB` to `GL_ADD`. The D3D11 reflection variant therefore samples
+the secondary layer with view-space normal sphere coordinates and adds it to
+the lit diffuse result, reproducing the colored edge/rim highlights rather
+than treating the 32x32 map as ordinary mesh UV data.
 
 ## Vox sound events
 

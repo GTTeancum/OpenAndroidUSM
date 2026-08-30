@@ -283,7 +283,8 @@ int main() {
         const auto& spiderMaterial =
             bootstrap.introActors().front().mesh.materials().front();
         if (spiderMaterial.diffuseImageIndex != 0 ||
-            spiderMaterial.secondaryImageIndex != 1) {
+            spiderMaterial.secondaryImageIndex != 1 ||
+            spiderMaterial.secondaryTextureMode != 0) {
             std::cerr << "Unexpected Spider-Man texture layers: ";
             if (spiderMaterial.diffuseImageIndex) {
                 std::cerr << *spiderMaterial.diffuseImageIndex;
@@ -296,7 +297,8 @@ int main() {
             } else {
                 std::cerr << "none";
             }
-            std::cerr << '\n';
+            std::cerr << ", mode " << spiderMaterial.secondaryTextureMode
+                      << '\n';
             return 1;
         }
         assert(std::abs(bootstrap.introActors().front().worldTransform[12] -
