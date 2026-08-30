@@ -115,6 +115,22 @@ bool LevelTriggerRuntime::isEnabled(std::int32_t triggerId) const noexcept {
     return match != states_.end() && match->enabled;
 }
 
+bool LevelTriggerRuntime::setEnabled(std::int32_t triggerId,
+                                     bool enabled) noexcept {
+    const auto match = std::find_if(
+        states_.begin(), states_.end(), [triggerId](const State& state) {
+            return state.asset != nullptr && state.asset->objectId == triggerId;
+        });
+    if (match == states_.end()) {
+        return false;
+    }
+    match->enabled = enabled;
+    match->initialized = false;
+    match->inside = false;
+    match->whileEventDispatched = false;
+    return true;
+}
+
 bool LevelTriggerRuntime::containsPlayer(
     const LevelTriggerAsset& trigger,
     const assets::Vector3& playerPosition) noexcept {

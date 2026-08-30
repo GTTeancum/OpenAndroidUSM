@@ -6,6 +6,8 @@
 #include <atomic>
 #include <list>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <wrl/client.h>
 #include <xaudio2.h>
 
@@ -20,6 +22,9 @@ public:
 
     [[nodiscard]] Result initialize() override;
     [[nodiscard]] Result play(const PcmAudio& audio, bool loop = false);
+    [[nodiscard]] Result playNamed(std::string_view eventName,
+                                   const PcmAudio& audio, bool loop = false);
+    [[nodiscard]] Result stopNamed(std::string_view eventName) noexcept;
     void update();
 
 private:
@@ -42,6 +47,7 @@ private:
         IXAudio2SourceVoice* voice{};
         std::unique_ptr<VoiceCallback> callback;
         std::vector<std::int16_t> samples;
+        std::string eventName;
     };
 
     void destroyActiveVoices() noexcept;

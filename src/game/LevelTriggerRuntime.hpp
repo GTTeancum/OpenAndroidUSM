@@ -29,6 +29,8 @@ public:
     void bind(std::span<const LevelTriggerAsset> triggers);
     [[nodiscard]] std::vector<TriggerEvent> update(
         const assets::Vector3& playerPosition);
+    [[nodiscard]] bool setEnabled(std::int32_t triggerId,
+                                  bool enabled) noexcept;
     [[nodiscard]] bool isEnabled(std::int32_t triggerId) const noexcept;
 
 private:

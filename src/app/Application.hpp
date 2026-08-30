@@ -10,6 +10,7 @@
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
+#include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
@@ -40,6 +41,7 @@ private:
     audio::PlayerStateSoundBank playerSounds_;
     audio::EnemyBehaviorSoundBank enemySounds_;
     audio::CinematicSoundBank introSounds_;
+    audio::CinematicSoundBank gameplaySounds_;
     game::CinematicPlayer introPlayer_;
     game::GameplayCamera gameplayCamera_;
     game::LevelCollision levelCollision_;
@@ -47,6 +49,7 @@ private:
     game::PlayerHudHealthState playerHudHealth_;
     game::PlayerStateConfigDatabase playerStateConfigs_;
     game::LevelTriggerRuntime triggerRuntime_;
+    game::LevelCinematicRuntime levelCinematicRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;
     const game::LevelCinematicAsset* activeGameplayCinematic_{};

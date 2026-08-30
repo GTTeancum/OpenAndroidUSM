@@ -84,6 +84,21 @@ thugs. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
 player using their scene-authored awareness radius and chase at the authored
 line speed.
 
+`LevelCinematicRuntime` handles the global encounter state without coupling
+gameplay to Win32 or D3D. `DisableTrigger` and `EnableTrigger` follow
+`CCinematicThread` at `0x0036fef0`/`0x0036ff38` and reset the native trigger
+volume state through `CTrigger::SetEnabled`. `EnableCameraArea` and
+`SetCameraArea` follow `0x00371990`/`0x00371a28`; they update the runtime copy
+of the 44-area graph and preserve the original's successful no-op when an
+area lookup fails. That behavior matters for Room 9 cinematic 30003, whose
+shipped script contains a stale reference to nonexistent area 224.
+`StartCinematic`, `GameEnd`, and `LevelEnd` preserve their named state and
+attributes. All seven level-one `StartCinematic` commands occur at their
+parent script's final timestamp, so the application queues each authored
+handoff deterministically. The zero-time intro-start script now also disables
+trigger 1263 before explicit cinematic 1265 playback, preventing the opening
+sequence from retriggering during gameplay.
+
 Enemy melee timing is not guessed. The typed
 `EnemySpecialActionConfigDatabase` follows
 `EnemyAttributeFile::ReadAnimSpeciaActionInfo` at `0x0033b9d8` and decodes all
@@ -326,7 +341,11 @@ each unique resolvable event once, keeping Vorbis work off its scheduled frame.
 The application advances `CinematicPlayer` from the same monotonic clock as
 the camera and dispatches 2D/loop flags to XAudio2. All 19 unique level-one
 intro event names now resolve through the recovered table and preload before
-playback.
+playback. The same deduplicated path scans all 42 runnable encounter scripts,
+preloads their 60 unique sound events with no unresolved aliases, and tags
+XAudio2 voices by Vox event name. Authored `Stop`/`Stop2D` commands can
+therefore stop every matching active voice instead of leaking looping sounds
+across cinematic boundaries.
 
 ## Native interface sprites and player HUD
 

@@ -11,6 +11,7 @@
 #include <string>
 #include <filesystem>
 #include <limits>
+#include <vector>
 
 namespace usm {
 namespace {
@@ -85,6 +86,18 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    std::vector<const game::CinematicScript*> gameplaySoundScripts;
+    gameplaySoundScripts.reserve(levelOne_.cinematics().size());
+    for (const game::LevelCinematicAsset& cinematic :
+         levelOne_.cinematics()) {
+        if (cinematic.scriptAvailable) {
+            gameplaySoundScripts.push_back(&cinematic.script);
+        }
+    }
+    result = gameplaySounds_.preload(gameplaySoundScripts, soundCatalog_);
+    if (!result) {
+        return fail(result.message());
+    }
     result = introPlayer_.start(levelOne_.introScript());
     if (!result) {
         return fail(result.message());
@@ -118,6 +131,46 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_);
+    game::CinematicPlayer introStartCommands;
+    result = introStartCommands.start(levelOne_.introStartScript());
+    if (!result) {
+        return fail(result.message());
+    }
+    Result introStartCommandResult = Result::success();
+    result = introStartCommands.advanceTo(
+        introStartCommands.durationMilliseconds(),
+        [this, &introStartCommandResult](
+            const game::CinematicThread&,
+            const game::CinematicCommand& command) {
+            if (introStartCommandResult) {
+                introStartCommandResult =
+                    levelCinematicRuntime_.applyCommand(command);
+            }
+        });
+    if (!result || !introStartCommandResult) {
+        return fail(!result ? result.message()
+                            : introStartCommandResult.message());
+    }
+    // Cinematic 1265 is already the explicitly selected intro playback.
+    (void)levelCinematicRuntime_.consumeCinematicStartRequests();
+
+    const auto startGameplayCinematic =
+        [this](std::int32_t cinematicId) -> Result {
+        const auto cinematic = std::find_if(
+            levelOne_.cinematics().begin(), levelOne_.cinematics().end(),
+            [cinematicId](const game::LevelCinematicAsset& candidate) {
+                return candidate.objectId == cinematicId &&
+                       candidate.scriptAvailable;
+            });
+        if (cinematic == levelOne_.cinematics().end()) {
+            return Result::failure(
+                "Cinematic command references an unavailable script");
+        }
+        activeGameplayCinematic_ = &*cinematic;
+        gameplayCinematicTimeMilliseconds_ = 0;
+        return gameplayCinematicPlayer_.start(cinematic->script);
+    };
 
     const auto introStart = std::chrono::steady_clock::now();
     auto previousFrame = introStart;
@@ -151,8 +204,13 @@ int Application::run(HINSTANCE instance) {
                     return;
                 }
                 soundResult = introSounds_.dispatch(
-                    command, [this](const audio::PcmAudio& clip, bool loop) {
-                        return audio_.play(clip, loop);
+                    command,
+                    [this](std::string_view eventName,
+                           const audio::PcmAudio& clip, bool loop) {
+                        return audio_.playNamed(eventName, clip, loop);
+                    },
+                    [this](std::string_view eventName) {
+                        return audio_.stopNamed(eventName);
                     });
             });
         if (!result) {
@@ -216,20 +274,10 @@ int Application::run(HINSTANCE instance) {
                 triggerRuntime_.update(gameplayPlayer_.position());
             if (activeGameplayCinematic_ == nullptr) {
                 for (const game::TriggerEvent& event : triggerEvents) {
-                    const auto cinematic = std::find_if(
-                        levelOne_.cinematics().begin(),
-                        levelOne_.cinematics().end(),
-                        [&event](const game::LevelCinematicAsset& candidate) {
-                            return candidate.objectId == event.cinematicId &&
-                                   candidate.scriptAvailable;
-                        });
-                    if (cinematic == levelOne_.cinematics().end()) {
-                        continue;
+                    result = startGameplayCinematic(event.cinematicId);
+                    if (result) {
+                        break;
                     }
-                    activeGameplayCinematic_ = &*cinematic;
-                    gameplayCinematicTimeMilliseconds_ = 0;
-                    result = gameplayCinematicPlayer_.start(cinematic->script);
-                    break;
                 }
             }
             if (result && activeGameplayCinematic_ != nullptr) {
@@ -248,12 +296,39 @@ int Application::run(HINSTANCE instance) {
                             commandResult = enemyRuntime_.applyCinematicCommand(
                                 levelOne_, thread, command);
                         }
+                        if (commandResult) {
+                            commandResult =
+                                levelCinematicRuntime_.applyCommand(command);
+                        }
+                        if (commandResult) {
+                            commandResult = gameplaySounds_.dispatch(
+                                command,
+                                [this](std::string_view eventName,
+                                       const audio::PcmAudio& clip,
+                                       bool loop) {
+                                    return audio_.playNamed(eventName, clip,
+                                                            loop);
+                                },
+                                [this](std::string_view eventName) {
+                                    return audio_.stopNamed(eventName);
+                                });
+                        }
                     });
                 if (result && !commandResult) {
                     result = commandResult;
                 }
                 if (result && gameplayCinematicPlayer_.finished()) {
                     activeGameplayCinematic_ = nullptr;
+                    auto chainedCinematics = levelCinematicRuntime_
+                                                 .consumeCinematicStartRequests();
+                    if (chainedCinematics.size() > 1) {
+                        result = Result::failure(
+                            "Concurrent gameplay cinematics are not yet "
+                            "reconstructed");
+                    } else if (!chainedCinematics.empty()) {
+                        result = startGameplayCinematic(
+                            chainedCinematics.front());
+                    }
                 }
             }
             enemyRuntime_.updateGameplay(deltaMilliseconds,

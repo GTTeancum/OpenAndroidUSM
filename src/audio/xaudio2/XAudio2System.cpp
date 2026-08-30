@@ -22,6 +22,11 @@ Result XAudio2System::initialize() {
 }
 
 Result XAudio2System::play(const PcmAudio& audio, bool loop) {
+    return playNamed({}, audio, loop);
+}
+
+Result XAudio2System::playNamed(std::string_view eventName,
+                               const PcmAudio& audio, bool loop) {
     if (engine_ == nullptr || masteringVoice_ == nullptr) {
         return Result::failure("XAudio2 has not been initialized");
     }
@@ -35,6 +40,7 @@ Result XAudio2System::play(const PcmAudio& audio, bool loop) {
     ActiveVoice& active = activeVoices_.back();
     active.callback = std::make_unique<VoiceCallback>();
     active.samples = audio.interleavedSamples;
+    active.eventName = eventName;
 
     WAVEFORMATEX format{};
     format.wFormatTag = WAVE_FORMAT_PCM;
@@ -67,6 +73,22 @@ Result XAudio2System::play(const PcmAudio& audio, bool loop) {
         active.voice->DestroyVoice();
         activeVoices_.pop_back();
         return Result::failure("Could not submit or start XAudio2 source voice");
+    }
+    return Result::success();
+}
+
+Result XAudio2System::stopNamed(std::string_view eventName) noexcept {
+    for (auto iterator = activeVoices_.begin();
+         iterator != activeVoices_.end();) {
+        if (iterator->eventName != eventName) {
+            ++iterator;
+            continue;
+        }
+        if (iterator->voice != nullptr) {
+            iterator->voice->Stop();
+            iterator->voice->DestroyVoice();
+        }
+        iterator = activeVoices_.erase(iterator);
     }
     return Result::success();
 }

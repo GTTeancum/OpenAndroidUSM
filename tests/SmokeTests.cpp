@@ -17,6 +17,7 @@
 #include "game/LevelOneBootstrap.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
+#include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
@@ -528,6 +529,11 @@ int main() {
         assert(firstEncounterTrigger->whileOutsideCinematicId == 1162);
         assert(!firstEncounterTrigger->autoDisabled);
         assert(firstEncounterTrigger->sizes.y == 1664.575195F);
+        assert(std::any_of(
+            bootstrap.triggers().begin(), bootstrap.triggers().end(),
+            [](const usm::game::LevelTriggerAsset& trigger) {
+                return trigger.objectId == 1263;
+            }));
         usm::game::LevelTriggerRuntime initialTriggerRuntime;
         initialTriggerRuntime.bind(
             std::span<const usm::game::LevelTriggerAsset>(
@@ -797,6 +803,53 @@ int main() {
         }
         const auto gameplayCameraPose =
             gameplayCamera.sample(bootstrap.player().position);
+        usm::game::LevelCinematicRuntime levelCommandRuntime;
+        levelCommandRuntime.bind(triggerRuntime, gameplayCamera);
+        const auto controlCommand = [](std::string name,
+                                       std::string attributeName,
+                                       std::string value) {
+            usm::game::CinematicCommand command;
+            command.name = std::move(name);
+            command.attributes.push_back(
+                {"string", std::move(attributeName), std::move(value)});
+            return command;
+        };
+        assert(triggerRuntime.isEnabled(534));
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("DisableTrigger", "^ID^Trigger", "534")));
+        assert(!triggerRuntime.isEnabled(534));
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("EnableTrigger", "^ID^Trigger", "534")));
+        assert(triggerRuntime.isEnabled(534));
+        assert(!levelCommandRuntime.applyCommand(controlCommand(
+            "EnableCameraArea", "^ID^CameraArea", "10275")));
+        usm::game::CinematicCommand disableCameraArea = controlCommand(
+            "EnableCameraArea", "^ID^CameraArea", "10275");
+        disableCameraArea.attributes.push_back(
+            {"bool", "enable", "false"});
+        assert(levelCommandRuntime.applyCommand(disableCameraArea));
+        assert(!gameplayCamera.isAreaEnabled(10275));
+        usm::game::CinematicCommand enableCameraArea = controlCommand(
+            "EnableCameraArea", "^ID^CameraArea", "10275");
+        enableCameraArea.attributes.push_back({"bool", "enable", "true"});
+        assert(levelCommandRuntime.applyCommand(enableCameraArea));
+        assert(gameplayCamera.isAreaEnabled(10275));
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("SetCameraArea", "^ID^CameraArea", "10100")));
+        assert(gameplayCamera.currentAreaId() == 10100);
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("StartCinematic", "CinematicID", "1238")));
+        const auto cinematicStarts =
+            levelCommandRuntime.consumeCinematicStartRequests();
+        assert(cinematicStarts.size() == 1 && cinematicStarts.front() == 1238);
+        assert(levelCommandRuntime.consumeCinematicStartRequests().empty());
+        assert(levelCommandRuntime.applyCommand(
+            controlCommand("LevelEnd", "GoToNext", "true")));
+        assert(levelCommandRuntime.levelEnded());
+        assert(levelCommandRuntime.goToNextLevel());
+        assert(levelCommandRuntime.applyCommand(
+            usm::game::CinematicCommand{0, -1, "GameEnd", {}}));
+        assert(levelCommandRuntime.gameEnded());
         if (std::abs(gameplayCameraPose.target.x - 14688.7148F) >= 0.1F ||
             std::abs(gameplayCameraPose.target.y - -9614.6006F) >= 0.1F ||
             std::abs(gameplayCameraPose.target.z - 126.8340F) >= 0.1F ||
@@ -946,6 +999,62 @@ int main() {
         assert(startCommands.front().findAttribute("CinematicID") != nullptr);
         assert(startCommands.front().findAttribute("CinematicID")->value ==
                "1265");
+        usm::game::LevelTriggerRuntime introTriggerRuntime;
+        introTriggerRuntime.bind(bootstrap.triggers());
+        usm::game::GameplayCamera introGameplayCamera;
+        assert(introGameplayCamera.bind(
+            bootstrap.cameraAreas(), bootstrap.player().initialCameraAreaId));
+        usm::game::LevelCinematicRuntime introCommandRuntime;
+        introCommandRuntime.bind(introTriggerRuntime, introGameplayCamera);
+        usm::game::CinematicPlayer introStartPlayer;
+        assert(introStartPlayer.start(bootstrap.introStartScript()));
+        usm::Result introStartResult = usm::Result::success();
+        assert(introStartPlayer.advanceTo(
+            introStartPlayer.durationMilliseconds(),
+            [&introCommandRuntime, &introStartResult](
+                const usm::game::CinematicThread&,
+                const usm::game::CinematicCommand& command) {
+                if (introStartResult) {
+                    introStartResult = introCommandRuntime.applyCommand(command);
+                }
+            }));
+        assert(introStartResult);
+        assert(!introTriggerRuntime.isEnabled(1263));
+        const auto introStartRequests =
+            introCommandRuntime.consumeCinematicStartRequests();
+        assert(introStartRequests.size() == 1);
+        assert(introStartRequests.front() == 1265);
+        std::size_t chainedCinematicCommandCount = 0;
+        for (const auto& cinematic : bootstrap.cinematics()) {
+            if (!cinematic.scriptAvailable) {
+                continue;
+            }
+            std::uint32_t scriptDuration = 0;
+            for (const auto& thread : cinematic.script.threads()) {
+                for (const auto& command : thread.commands) {
+                    scriptDuration =
+                        std::max(scriptDuration, command.timestampMilliseconds);
+                }
+            }
+            for (const auto& thread : cinematic.script.threads()) {
+                for (const auto& command : thread.commands) {
+                    if (command.name == "StartCinematic") {
+                        ++chainedCinematicCommandCount;
+                        assert(command.timestampMilliseconds == scriptDuration);
+                    }
+                    const auto commandResult =
+                        introCommandRuntime.applyCommand(command);
+                    if (!commandResult) {
+                        std::cerr << "Level command " << command.name
+                                  << " in cinematic " << cinematic.objectId
+                                  << " failed: " << commandResult.message()
+                                  << '\n';
+                        return 1;
+                    }
+                }
+            }
+        }
+        assert(chainedCinematicCommandCount == 7);
         assert(bootstrap.introScript().threads().size() == 11);
         assert(bootstrap.introScript().commandCount() == 38);
         const auto& playerCommands =
@@ -1153,11 +1262,56 @@ int main() {
         std::size_t playedSoundCount = 0;
         assert(introSounds.dispatch(
             bootstrap.introScript().threads().front().commands.back(),
-            [&playedSoundCount](const usm::audio::PcmAudio&, bool) {
+            [&playedSoundCount](std::string_view,
+                                const usm::audio::PcmAudio&, bool) {
                 ++playedSoundCount;
                 return usm::Result::success();
             }));
         assert(playedSoundCount == 1);
+
+        std::vector<const usm::game::CinematicScript*> gameplaySoundScripts;
+        const usm::game::CinematicCommand* gameplayStopCommand = nullptr;
+        for (const auto& cinematic : bootstrap.cinematics()) {
+            if (!cinematic.scriptAvailable) {
+                continue;
+            }
+            gameplaySoundScripts.push_back(&cinematic.script);
+            for (const auto& thread : cinematic.script.threads()) {
+                for (const auto& command : thread.commands) {
+                    const auto* stop2D = command.findAttribute("Stop2D");
+                    const auto* stop = command.findAttribute("Stop");
+                    if (command.name == "SoundControl" &&
+                        ((stop2D != nullptr && stop2D->value == "true") ||
+                         (stop != nullptr && stop->value == "true"))) {
+                        gameplayStopCommand = &command;
+                    }
+                }
+            }
+        }
+        usm::audio::CinematicSoundBank gameplaySounds;
+        assert(gameplaySounds.preload(gameplaySoundScripts, soundCatalog));
+        assert(gameplaySounds.loadedEventCount() == 60);
+        if (!gameplaySounds.unresolvedEvents().empty()) {
+            std::cerr << "Unresolved gameplay cinematic sound:";
+            for (const auto& event : gameplaySounds.unresolvedEvents()) {
+                std::cerr << ' ' << event;
+            }
+            std::cerr << '\n';
+            return 1;
+        }
+        assert(gameplayStopCommand != nullptr);
+        std::size_t stoppedSoundCount = 0;
+        assert(gameplaySounds.dispatch(
+            *gameplayStopCommand,
+            [](std::string_view, const usm::audio::PcmAudio&, bool) {
+                return usm::Result::success();
+            },
+            [&stoppedSoundCount](std::string_view eventName) {
+                assert(!eventName.empty());
+                ++stoppedSoundCount;
+                return usm::Result::success();
+            }));
+        assert(stoppedSoundCount == 1);
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

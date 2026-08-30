@@ -7,13 +7,18 @@
 
 #include <functional>
 #include <map>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace usm::audio {
 
 using PlayCinematicSound =
-    std::function<Result(const PcmAudio& audio, bool loop)>;
+    std::function<Result(std::string_view eventName, const PcmAudio& audio,
+                         bool loop)>;
+using StopCinematicSound =
+    std::function<Result(std::string_view eventName)>;
 
 // Predecoded sound events referenced by a CFF command stream. This keeps Ogg
 // decoding off the frame that dispatches the timestamped SoundControl command.
@@ -21,9 +26,13 @@ class CinematicSoundBank final {
 public:
     [[nodiscard]] Result preload(const game::CinematicScript& script,
                                  const SoundEventCatalog& catalog);
+    [[nodiscard]] Result preload(
+        std::span<const game::CinematicScript* const> scripts,
+        const SoundEventCatalog& catalog);
     [[nodiscard]] Result dispatch(
         const game::CinematicCommand& command,
-        const PlayCinematicSound& play) const;
+        const PlayCinematicSound& play,
+        const StopCinematicSound& stop = {}) const;
 
     [[nodiscard]] std::size_t loadedEventCount() const noexcept {
         return decodedByEvent_.size();

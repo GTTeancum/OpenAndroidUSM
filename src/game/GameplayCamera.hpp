@@ -48,6 +48,10 @@ public:
     [[nodiscard]] bool updateArea(
         const assets::Vector3& playerPosition,
         std::uint32_t elapsedMilliseconds = 0) noexcept;
+    [[nodiscard]] bool setAreaEnabled(std::int32_t areaId,
+                                      bool enabled) noexcept;
+    [[nodiscard]] bool isAreaEnabled(std::int32_t areaId) const noexcept;
+    [[nodiscard]] bool setCurrentArea(std::int32_t areaId) noexcept;
     [[nodiscard]] std::int32_t currentAreaId() const noexcept {
         return currentArea_ == nullptr ? -1 : currentArea_->objectId;
     }
@@ -58,8 +62,8 @@ public:
 private:
     void advanceTransition(std::uint32_t elapsedMilliseconds) noexcept;
 
-    std::span<const CameraArea> areas_;
-    const CameraArea* currentArea_{};
+    std::vector<CameraArea> areas_;
+    CameraArea* currentArea_{};
     CameraPose transitionStartPose_;
     std::uint32_t transitionDurationMilliseconds_{};
     std::uint32_t transitionElapsedMilliseconds_{};

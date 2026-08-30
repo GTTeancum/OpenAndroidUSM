@@ -167,15 +167,15 @@ bool containsPlayer(const CameraArea& area, const Vector3& player) noexcept {
 
 Result GameplayCamera::bind(std::span<const CameraArea> areas,
                             std::int32_t initialAreaId) {
-    areas_ = areas;
+    areas_.assign(areas.begin(), areas.end());
     transitionDurationMilliseconds_ = 0;
     transitionElapsedMilliseconds_ = 0;
     transitionProgress_ = 1.0F;
     const auto match = std::find_if(
-        areas.begin(), areas.end(), [initialAreaId](const CameraArea& area) {
+        areas_.begin(), areas_.end(), [initialAreaId](const CameraArea& area) {
             return area.objectId == initialAreaId;
         });
-    if (match == areas.end()) {
+    if (match == areas_.end()) {
         currentArea_ = nullptr;
         return Result::failure("Initial gameplay camera area was not found");
     }
@@ -190,6 +190,42 @@ Result GameplayCamera::bind(std::span<const CameraArea> areas,
     }
     currentArea_ = &*match;
     return Result::success();
+}
+
+bool GameplayCamera::setAreaEnabled(std::int32_t areaId,
+                                    bool enabled) noexcept {
+    const auto match = std::find_if(
+        areas_.begin(), areas_.end(), [areaId](const CameraArea& area) {
+            return area.objectId == areaId;
+        });
+    if (match == areas_.end()) {
+        return false;
+    }
+    match->disabled = !enabled;
+    return true;
+}
+
+bool GameplayCamera::isAreaEnabled(std::int32_t areaId) const noexcept {
+    const auto match = std::find_if(
+        areas_.begin(), areas_.end(), [areaId](const CameraArea& area) {
+            return area.objectId == areaId;
+        });
+    return match != areas_.end() && !match->disabled;
+}
+
+bool GameplayCamera::setCurrentArea(std::int32_t areaId) noexcept {
+    const auto match = std::find_if(
+        areas_.begin(), areas_.end(), [areaId](const CameraArea& area) {
+            return area.objectId == areaId;
+        });
+    if (match == areas_.end()) {
+        return false;
+    }
+    currentArea_ = &*match;
+    transitionDurationMilliseconds_ = 0;
+    transitionElapsedMilliseconds_ = 0;
+    transitionProgress_ = 1.0F;
+    return true;
 }
 
 bool GameplayCamera::updateArea(
