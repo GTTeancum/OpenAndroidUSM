@@ -82,6 +82,7 @@ endif()
 add_library(OpenAndroidUSM.Core STATIC
     src/audio/CinematicSoundBank.cpp
     src/audio/EnemyBehaviorSoundBank.cpp
+    src/audio/LevelMusicBank.cpp
     src/audio/OggAudio.cpp
     src/audio/PlayerStateSoundBank.cpp
     src/audio/SoundEventCatalog.cpp
@@ -115,6 +116,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelCinematicRuntime.cpp
     src/game/LevelEnemyRuntime.cpp
     src/game/LevelEffectRuntime.cpp
+    src/game/LevelMusicRuntime.cpp
     src/game/LevelObjectRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
     src/game/LevelTriggerSoundRuntime.cpp

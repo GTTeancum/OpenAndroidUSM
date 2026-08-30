@@ -8,6 +8,7 @@
 #include "assets/SpriteAtlas.hpp"
 #include "audio/OggAudio.hpp"
 #include "audio/EnemyBehaviorSoundBank.hpp"
+#include "audio/LevelMusicBank.hpp"
 #include "audio/PlayerStateSoundBank.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
@@ -22,6 +23,7 @@
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/PlayerHudHealthState.hpp"
@@ -258,6 +260,20 @@ int main() {
             return 1;
         }
         assert(voxSounds.records().size() == 493);
+        const auto* downtownCalm = voxSounds.find("M_DOWNTOWN_CALM");
+        const auto* downtownMixed = voxSounds.find("M_DOWNTOWN_MIXED");
+        const auto* sandmanMusic = voxSounds.find("M_BOSS_SANDMAN");
+        const auto* loseMusic = voxSounds.find("M_LOSE");
+        assert(downtownCalm != nullptr && downtownCalm->id == 4);
+        assert(downtownMixed != nullptr && downtownMixed->id == 5);
+        assert(sandmanMusic != nullptr && sandmanMusic->id == 22);
+        assert(loseMusic != nullptr && loseMusic->id == 1);
+        assert(downtownCalm->groupId == 1 &&
+               downtownMixed->groupId == 1 && sandmanMusic->groupId == 1);
+        assert(downtownCalm->parameter2c == 3 &&
+               downtownMixed->parameter2c == 3 &&
+               sandmanMusic->parameter2c == 3);
+        assert(loseMusic->parameter2c == 4);
         const auto* knifeHurt = voxSounds.find("SFX_THUG_KNIFE_HURT_1");
         assert(knifeHurt != nullptr);
         assert(knifeHurt->resourcePath ==
@@ -400,6 +416,60 @@ int main() {
         assert(soundCatalog.eventCount() == 510);
         assert(soundCatalog.ambiguousEventCount() == 5);
         assert(soundCatalog.configuredEventCount() == 483);
+        usm::audio::LevelMusicBank levelMusicBank;
+        assert(levelMusicBank.preload(soundCatalog));
+        const auto& calmTrack = levelMusicBank.track(
+            usm::game::LevelMusicTrack::DowntownCalm);
+        const auto& mixedTrack = levelMusicBank.track(
+            usm::game::LevelMusicTrack::DowntownMixed);
+        assert(calmTrack.frameCount() > 0);
+        assert(calmTrack.sampleRate == mixedTrack.sampleRate);
+        assert(calmTrack.channelCount == mixedTrack.channelCount);
+        assert(calmTrack.frameCount() == mixedTrack.frameCount());
+        assert(levelMusicBank
+                   .track(usm::game::LevelMusicTrack::BossSandman)
+                   .frameCount() > 0);
+        assert(levelMusicBank.track(usm::game::LevelMusicTrack::Lose)
+                   .frameCount() > 0);
+
+        usm::game::LevelMusicRuntime levelMusicRuntime;
+        levelMusicRuntime.reset();
+        auto musicTransition = levelMusicRuntime.update({}, false);
+        assert(musicTransition.from ==
+               usm::game::LevelMusicTrack::DowntownCalm);
+        assert(musicTransition.to ==
+               usm::game::LevelMusicTrack::DowntownCalm);
+        usm::game::LevelEnemyAsset musicEnemyAsset;
+        musicEnemyAsset.enemyTypeId = 0;
+        usm::game::LevelEnemyState musicEnemy;
+        musicEnemy.asset = &musicEnemyAsset;
+        musicEnemy.health = 100.0F;
+        musicEnemy.visible = true;
+        musicEnemy.aiEnabled = true;
+        musicEnemy.playerDetected = true;
+        musicEnemy.behavior = usm::game::EnemyBehaviorState::Chasing;
+        musicTransition = levelMusicRuntime.update({&musicEnemy, 1}, false);
+        assert(musicTransition.to ==
+               usm::game::LevelMusicTrack::DowntownMixed);
+        assert(musicTransition.fadeMilliseconds == 500);
+        musicEnemy.playerDetected = false;
+        musicEnemy.behavior = usm::game::EnemyBehaviorState::Idle;
+        musicTransition = levelMusicRuntime.update({&musicEnemy, 1}, false);
+        assert(musicTransition.to ==
+               usm::game::LevelMusicTrack::DowntownCalm);
+        musicEnemy.playerDetected = true;
+        musicEnemy.behavior = usm::game::EnemyBehaviorState::Chasing;
+        musicEnemyAsset.enemyTypeId = 16;
+        musicTransition = levelMusicRuntime.update({&musicEnemy, 1}, false);
+        assert(musicTransition.to ==
+               usm::game::LevelMusicTrack::BossSandman);
+        musicTransition = levelMusicRuntime.update({&musicEnemy, 1}, true);
+        assert(musicTransition.to == usm::game::LevelMusicTrack::Lose);
+        assert(!usm::game::LevelMusicRuntime::loops(
+            usm::game::LevelMusicTrack::Lose));
+        assert(usm::game::LevelMusicRuntime::eventName(
+                   usm::game::LevelMusicTrack::BossSandman) ==
+               "M_BOSS_SANDMAN");
         assert(soundCatalog.resolve("SFX_WEB_SWING_START") != nullptr);
         assert(soundCatalog.resolve("VFX_PROLOGUE_SPIDY_01") != nullptr);
         assert(soundCatalog.resolve("SFX_CUTSCENE_LV3_SPIDY_ARRIVES") !=

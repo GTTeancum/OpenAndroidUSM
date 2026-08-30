@@ -207,6 +207,33 @@ Result XAudio2System::stopNamed(
     return Result::success();
 }
 
+Result XAudio2System::setNamedVolume(
+    std::string_view eventName, float volume,
+    std::uint32_t fadeMilliseconds) noexcept {
+    if (!std::isfinite(volume) || volume < 0.0F) {
+        return Result::failure("XAudio2 voice volume is invalid");
+    }
+    for (ActiveVoice& active : activeVoices_) {
+        if (active.eventName != eventName || active.voice == nullptr) {
+            continue;
+        }
+        active.stopAfterFade = false;
+        active.fadeStartVolume = active.volume;
+        active.fadeTargetVolume = volume;
+        active.fadeElapsedMilliseconds = 0;
+        active.fadeDurationMilliseconds = fadeMilliseconds;
+        if (fadeMilliseconds == 0) {
+            active.volume = volume;
+            if (active.spatialized) {
+                applySpatialization(active);
+            } else {
+                (void)active.voice->SetVolume(active.volume);
+            }
+        }
+    }
+    return Result::success();
+}
+
 void XAudio2System::update() {
     const auto now = std::chrono::steady_clock::now();
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

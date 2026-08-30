@@ -35,6 +35,9 @@ public:
     [[nodiscard]] Result stopNamed(
         std::string_view eventName,
         std::uint32_t fadeMilliseconds = 0) noexcept;
+    [[nodiscard]] Result setNamedVolume(
+        std::string_view eventName, float volume,
+        std::uint32_t fadeMilliseconds = 0) noexcept;
     void setListener(const assets::Vector3& position,
                      const assets::Vector3& target,
                      const assets::Vector3& up) noexcept;

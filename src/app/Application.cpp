@@ -78,6 +78,10 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = levelMusicBank_.preload(soundCatalog_);
+    if (!result) {
+        return fail(result.message());
+    }
     // Application::SetSlowMotion/ResetSlowMotion use VoxSound IDs 0x186 and
     // 0x187 respectively. Their recovered event names make the native lookup
     // independent of record ordering.
@@ -228,6 +232,71 @@ int Application::run(HINSTANCE instance) {
     }
     // Cinematic 1265 is already the explicitly selected intro playback.
     (void)levelCinematicRuntime_.consumeCinematicStartRequests();
+
+    levelMusicRuntime_.reset();
+    constexpr game::LevelMusicTrack calmMusic =
+        game::LevelMusicTrack::DowntownCalm;
+    constexpr game::LevelMusicTrack mixedMusic =
+        game::LevelMusicTrack::DowntownMixed;
+    result = audio_.playNamed(
+        game::LevelMusicRuntime::eventName(calmMusic),
+        levelMusicBank_.track(calmMusic), true);
+    if (result) {
+        // The two downtown files are sample-aligned. Keeping the mixed voice
+        // running silently matches the native cursor-preserving transition
+        // without restarting the score when combat begins.
+        result = audio_.playNamed(
+            game::LevelMusicRuntime::eventName(mixedMusic),
+            levelMusicBank_.track(mixedMusic), true, 0.0F);
+    }
+    if (!result) {
+        return fail(result.message());
+    }
+
+    const auto applyMusicTransition =
+        [this](const game::LevelMusicTransition& transition) -> Result {
+        if (transition.from == transition.to) {
+            return Result::success();
+        }
+        const auto setVolume =
+            [this, &transition](game::LevelMusicTrack track, float volume) {
+                return audio_.setNamedVolume(
+                    game::LevelMusicRuntime::eventName(track), volume,
+                    transition.fadeMilliseconds);
+            };
+        Result transitionResult = setVolume(
+            game::LevelMusicTrack::DowntownCalm,
+            transition.to == game::LevelMusicTrack::DowntownCalm ? 1.0F
+                                                                  : 0.0F);
+        if (transitionResult) {
+            transitionResult = setVolume(
+                game::LevelMusicTrack::DowntownMixed,
+                transition.to == game::LevelMusicTrack::DowntownMixed ? 1.0F
+                                                                       : 0.0F);
+        }
+        if (!transitionResult) {
+            return transitionResult;
+        }
+        if (transition.from == game::LevelMusicTrack::BossSandman) {
+            transitionResult = audio_.stopNamed(
+                game::LevelMusicRuntime::eventName(transition.from),
+                transition.fadeMilliseconds);
+        } else if (transition.from == game::LevelMusicTrack::Lose) {
+            transitionResult = audio_.stopNamed(
+                game::LevelMusicRuntime::eventName(transition.from),
+                transition.fadeMilliseconds);
+        }
+        if (!transitionResult ||
+            transition.to == game::LevelMusicTrack::DowntownCalm ||
+            transition.to == game::LevelMusicTrack::DowntownMixed) {
+            return transitionResult;
+        }
+        return audio_.playNamed(
+            game::LevelMusicRuntime::eventName(transition.to),
+            levelMusicBank_.track(transition.to),
+            game::LevelMusicRuntime::loops(transition.to), 1.0F,
+            transition.fadeMilliseconds);
+    };
 
     const auto startGameplayCinematic =
         [this](std::int32_t cinematicId) -> Result {
@@ -665,6 +734,11 @@ int Application::run(HINSTANCE instance) {
                         return fail(result.message());
                     }
                 }
+            }
+            result = applyMusicTransition(levelMusicRuntime_.update(
+                enemyRuntime_.states(), gameplayPlayer_.dead()));
+            if (!result) {
+                return fail(result.message());
             }
             playerHudHealth_.update(gameplayPlayer_.health(),
                                     gameDeltaMilliseconds);

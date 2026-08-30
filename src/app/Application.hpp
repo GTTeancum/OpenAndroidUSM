@@ -3,6 +3,7 @@
 #include "audio/xaudio2/XAudio2System.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/EnemyBehaviorSoundBank.hpp"
+#include "audio/LevelMusicBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
 #include "audio/VoxSoundTable.hpp"
 #include "audio/PlayerStateSoundBank.hpp"
@@ -14,6 +15,7 @@
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
+#include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
@@ -48,6 +50,7 @@ private:
     audio::SoundEventCatalog soundCatalog_;
     audio::PlayerStateSoundBank playerSounds_;
     audio::EnemyBehaviorSoundBank enemySounds_;
+    audio::LevelMusicBank levelMusicBank_;
     audio::CinematicSoundBank introSounds_;
     audio::CinematicSoundBank gameplaySounds_;
     audio::PcmAudio slowMotionEnterSound_;
@@ -65,6 +68,7 @@ private:
     game::LevelCinematicRuntime levelCinematicRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::LevelEffectRuntime effectRuntime_;
+    game::LevelMusicRuntime levelMusicRuntime_;
     game::LevelObjectRuntime objectRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;
     game::QuickTimeEventRuntime quickTimeEvent_;

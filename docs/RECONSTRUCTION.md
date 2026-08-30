@@ -675,6 +675,26 @@ success and failure branches therefore reproduce their scripted knockback,
 landing, recovery, and final positions instead of leaving the gameplay player
 idle underneath the recovered camera.
 
+## Adaptive level music
+
+Level-one music follows `CAIEntityManager::Update` at `0x00376444` rather than
+starting an arbitrary soundtrack at application launch. The recovered first
+entries of `LevelSound::levelSoundCalms` and `levelSoundActions` select Vox
+records 4 and 5, `M_DOWNTOWN_CALM` and `M_DOWNTOWN_MIXED`; an active boss with
+enemy type 16 selects record 22, `M_BOSS_SANDMAN`. Player death selects record
+1, `M_LOSE`, as in `CLevel::UpdateBlackScreen` at `0x003805f0`. The Vox mode
+field at `+0x2c` distinguishes the looping level/boss records (`3`) from the
+one-shot loss cue (`4`), and all native transitions use a 500 ms fade.
+
+`LevelMusicRuntime` keeps those decisions independent of the Windows backend.
+The XAudio2 path decodes the four configured events up front and verifies that
+the downtown calm and mixed tracks have identical sample format and frame
+count. Both downtown voices then start together, with one silent, so combat
+crossfades preserve the original music cursor instead of restarting the song.
+Boss and loss tracks fade in as named voices while the two synchronized base
+tracks fade out. Deterministic tests cover the exploration, ordinary combat,
+Sandman, return-to-calm, and death transitions.
+
 ## Slow motion and authored camera shake
 
 The global presentation timing path follows `Application::SetSlowMotion`,
