@@ -157,6 +157,41 @@ int main() {
         }
         assert(playerStateConfigs.states().size() == 131);
         assert(playerStateConfigs.soundConfigs().size() == 38);
+        const auto& jumpReadyState = playerStateConfigs.states()[12];
+        const auto& jumpStartState = playerStateConfigs.states()[13];
+        const auto& jumpFallState = playerStateConfigs.states()[14];
+        const auto& jumpLandState = playerStateConfigs.states()[16];
+        assert(jumpReadyState.name == "k_state_jump_ready");
+        assert(jumpReadyState.stateClass == 1);
+        assert(jumpReadyState.motionType == 17);
+        assert(jumpReadyState.primaryAnimationId == 71);
+        assert(jumpReadyState.nextStateId == 13);
+        assert(jumpStartState.name == "k_state_jump_start");
+        assert(jumpStartState.motionType == 18);
+        assert(jumpStartState.primaryAnimationId == 95);
+        assert(jumpStartState.nextStateId == 14);
+        assert(jumpFallState.name == "k_state_jump_fall");
+        assert(jumpFallState.motionType == 20);
+        assert(jumpFallState.primaryAnimationId == 96);
+        assert(jumpFallState.nextStateId == 16);
+        assert(jumpLandState.name == "k_state_jump_land");
+        assert(jumpLandState.motionType == 23);
+        assert(jumpLandState.primaryAnimationId == 40);
+        assert(jumpLandState.nextStateId == 0);
+        assert(jumpStartState.enterSoundConfigIds ==
+               std::vector<std::int16_t>{8});
+        assert(jumpLandState.enterSoundConfigIds ==
+               std::vector<std::int16_t>{11});
+        const auto* jumpSwoosh = playerStateConfigs.findSoundConfig(8);
+        const auto* jumpLand = playerStateConfigs.findSoundConfig(11);
+        assert(jumpSwoosh != nullptr);
+        assert(jumpSwoosh->name == "k_mc_sfx_swoosh_jump");
+        assert(jumpSwoosh->voxSoundIds ==
+               (std::vector<std::int16_t>{44, 45, 46, 47, 48, 49}));
+        assert(jumpLand != nullptr);
+        assert(jumpLand->name == "k_mc_sfx_land");
+        assert(jumpLand->voxSoundIds ==
+               std::vector<std::int16_t>{38});
         const auto* punchState = playerStateConfigs.findState(
             "k_state_idle_to_punch_right");
         assert(punchState != nullptr);
@@ -199,11 +234,12 @@ int main() {
         assert(catalogAudio.frameCount() > 0);
 
         usm::audio::PlayerStateSoundBank playerSounds;
-        constexpr std::array<std::string_view, 2> gameplaySoundStates{
-            "k_state_idle_to_punch_right", "k_state_hurt_light"};
+        constexpr std::array<std::string_view, 4> gameplaySoundStates{
+            "k_state_idle_to_punch_right", "k_state_hurt_light",
+            "k_state_jump_start", "k_state_jump_land"};
         assert(playerSounds.preload(playerStateConfigs, voxSounds,
                                     soundCatalog, gameplaySoundStates));
-        assert(playerSounds.decodedVariantCount() == 7);
+        assert(playerSounds.decodedVariantCount() == 14);
         std::size_t playerSoundPlayCount = 0;
         const auto countPlayerSound =
             [&playerSoundPlayCount](const usm::audio::PcmAudio& clip,
@@ -219,7 +255,11 @@ int main() {
             "k_state_idle_to_punch_right", countPlayerSound));
         assert(playerSounds.dispatchStateEnter("k_state_hurt_light",
                                                countPlayerSound));
-        assert(playerSoundPlayCount == 3);
+        assert(playerSounds.dispatchStateEnter("k_state_jump_start",
+                                               countPlayerSound));
+        assert(playerSounds.dispatchStateEnter("k_state_jump_land",
+                                               countPlayerSound));
+        assert(playerSoundPlayCount == 5);
 
         usm::filesystem::GbmpArchive archive;
         assert(archive.open(configArchive));
@@ -904,6 +944,46 @@ int main() {
         gameplayPlayer.update({}, gameplayCameraPose, 466);
         assert(gameplayPlayer.activeAnimation() == "idle_stand");
         assert(gameplayPlayer.requestPunch());
+
+        usm::game::GameplayPlayer jumpingPlayer;
+        assert(jumpingPlayer.initialize(bootstrap.player(), nullptr,
+                                        &playerStateConfigs));
+        const float jumpGroundHeight = jumpingPlayer.position().z;
+        assert(jumpingPlayer.requestJump());
+        assert(jumpingPlayer.activeStateId() == 13);
+        assert(jumpingPlayer.activeAnimation() == "jump_ready_to_jump");
+        assert(jumpingPlayer.airborne());
+        assert(jumpingPlayer.consumeEnteredState() ==
+               "k_state_jump_start");
+        assert(jumpingPlayer.consumeEnteredState().empty());
+        assert(!jumpingPlayer.requestJump());
+        assert(!jumpingPlayer.requestPunch());
+        jumpingPlayer.update({}, gameplayCameraPose, 150);
+        assert(jumpingPlayer.animatedFootHeight() >
+               jumpGroundHeight + 100.0F);
+        assert(std::abs(jumpingPlayer.position().z - jumpGroundHeight) <
+               0.001F);
+        assert(std::abs(jumpingPlayer.worldTransform()[14] -
+                        jumpGroundHeight) < 0.001F);
+        jumpingPlayer.update({}, gameplayCameraPose, 150);
+        assert(jumpingPlayer.activeStateId() == 14);
+        assert(jumpingPlayer.activeAnimation() == "jump_to_fall");
+        assert(jumpingPlayer.animatedFootHeight() >
+               jumpGroundHeight + 300.0F);
+        jumpingPlayer.update({}, gameplayCameraPose, 150);
+        assert(jumpingPlayer.animatedFootHeight() >
+               jumpGroundHeight + 100.0F);
+        jumpingPlayer.update({}, gameplayCameraPose, 150);
+        assert(!jumpingPlayer.airborne());
+        assert(jumpingPlayer.activeStateId() == 16);
+        assert(jumpingPlayer.activeAnimation() == "fall_to_idle");
+        assert(jumpingPlayer.consumeEnteredState() == "k_state_jump_land");
+        assert(std::abs(jumpingPlayer.position().z - jumpGroundHeight) <
+               0.001F);
+        jumpingPlayer.update({}, gameplayCameraPose, 400);
+        assert(jumpingPlayer.activeStateId() == 0);
+        assert(jumpingPlayer.activeAnimation() == "idle_stand");
+        assert(jumpingPlayer.requestJump());
 
         auto makeCameraArea = [](std::int32_t id, float minimumX,
                                  float maximumX) {

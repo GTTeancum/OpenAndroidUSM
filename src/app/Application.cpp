@@ -68,8 +68,9 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::string_view, 2> gameplaySoundStates{
-        "k_state_idle_to_punch_right", "k_state_hurt_light"};
+    constexpr std::array<std::string_view, 4> gameplaySoundStates{
+        "k_state_idle_to_punch_right", "k_state_hurt_light",
+        "k_state_jump_start", "k_state_jump_land"};
     result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
                                    soundCatalog_, gameplaySoundStates);
     if (!result) {
@@ -236,6 +237,9 @@ int Application::run(HINSTANCE instance) {
                 motion.forward = static_cast<float>(input.moveUp.held) -
                                  static_cast<float>(input.moveDown.held);
             }
+            if (keyRouter_.state().jump.pressed) {
+                (void)gameplayPlayer_.requestJump();
+            }
             if (keyRouter_.state().punch.pressed &&
                 gameplayPlayer_.requestPunch()) {
                 result = playerSounds_.dispatchStateEnter(
@@ -250,6 +254,16 @@ int Application::run(HINSTANCE instance) {
                 std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    deltaMilliseconds);
+            for (std::string_view enteredState =
+                     gameplayPlayer_.consumeEnteredState();
+                 !enteredState.empty();
+                 enteredState = gameplayPlayer_.consumeEnteredState()) {
+                result = playerSounds_.dispatchStateEnter(enteredState,
+                                                          playGameplaySound);
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
             if (gameplayPlayer_.consumePunchSoundFrame()) {
                 result = playerSounds_.dispatchStateFrame(
                     "k_state_idle_to_punch_right", playGameplaySound);

@@ -49,6 +49,22 @@ public:
         return true;
     }
 
+    bool i32(std::int32_t& output) noexcept {
+        if (remaining() < 4) {
+            return false;
+        }
+        std::uint32_t encoded{};
+        for (std::size_t index = 0; index < 4; ++index) {
+            encoded |= static_cast<std::uint32_t>(
+                           std::to_integer<std::uint8_t>(
+                               bytes_[offset_ + index]))
+                       << (index * 8);
+        }
+        offset_ += 4;
+        output = static_cast<std::int32_t>(encoded);
+        return true;
+    }
+
     bool string(std::string& output) {
         std::int16_t length{};
         if (!s16(length) || length < 0 ||
@@ -87,9 +103,10 @@ private:
     std::size_t offset_{};
 };
 
-bool readIgnoredS16(Reader& reader, std::size_t count) noexcept {
-    std::int16_t value{};
-    for (std::size_t index = 0; index < count; ++index) {
+template <std::size_t Size>
+bool readS16Array(Reader& reader,
+                  std::array<std::int16_t, Size>& output) noexcept {
+    for (auto& value : output) {
         if (!reader.s16(value)) {
             return false;
         }
@@ -97,9 +114,10 @@ bool readIgnoredS16(Reader& reader, std::size_t count) noexcept {
     return true;
 }
 
-bool readIgnoredF32(Reader& reader, std::size_t count) noexcept {
-    float value{};
-    for (std::size_t index = 0; index < count; ++index) {
+template <std::size_t Size>
+bool readF32Array(Reader& reader,
+                  std::array<float, Size>& output) noexcept {
+    for (auto& value : output) {
         if (!reader.f32(value)) {
             return false;
         }
@@ -145,28 +163,44 @@ Result PlayerStateConfigDatabase::loadStates(
         PlayerStateDefinition state;
         std::int16_t serializedId{};
         std::int16_t boolValue{};
-        std::vector<std::int16_t> ignored;
         if (!reader.s16(serializedId) || serializedId < 0 ||
-            !reader.string(state.name) || !readIgnoredS16(reader, 2) ||
-            !readIgnoredF32(reader, 4) ||
+            !reader.string(state.name) || !reader.s16(state.stateClass) ||
+            !reader.s16(state.motionType) ||
+            !readF32Array(reader, state.motionParameters) ||
             !reader.s16(state.soundTriggerFrame) ||
-            !readIgnoredS16(reader, 4) || !readIgnoredF32(reader, 1) ||
-            !reader.int16Vector(ignored) || !reader.int16Vector(ignored) ||
-            !reader.int16Vector(ignored) ||
+            !readS16Array(reader, state.auxiliaryParameters) ||
+            !reader.i32(state.primaryAnimationId) ||
+            !reader.int16Vector(state.animationIds) ||
+            !reader.int16Vector(state.auxiliaryIdLists[0]) ||
+            !reader.int16Vector(state.auxiliaryIdLists[1]) ||
             !reader.int16Vector(state.enterSoundConfigIds) ||
             !reader.int16Vector(state.frameSoundConfigIds) ||
-            !readIgnoredF32(reader, 2) || !reader.s16(boolValue) ||
-            !readIgnoredS16(reader, 1)) {
+            !readF32Array(reader, state.timingParameters) ||
+            !reader.s16(boolValue) || !reader.s16(state.nextStateId)) {
             states_.clear();
             return Result::failure("MC_STATE record is truncated");
         }
         std::int16_t transitionCount{};
         if ((boolValue != 0 && boolValue != 1) ||
-            !reader.s16(transitionCount) || transitionCount < 0 ||
-            !readIgnoredS16(reader,
-                            static_cast<std::size_t>(transitionCount) * 3)) {
+            !reader.s16(transitionCount) || transitionCount < 0) {
             states_.clear();
             return Result::failure("MC_STATE record contains invalid fields");
+        }
+        state.animationListFlag = boolValue != 0;
+        for (auto& field : state.transitionFields) {
+            field.reserve(static_cast<std::size_t>(transitionCount));
+        }
+        for (std::int16_t transition = 0; transition < transitionCount;
+             ++transition) {
+            for (auto& field : state.transitionFields) {
+                std::int16_t value{};
+                if (!reader.s16(value)) {
+                    states_.clear();
+                    return Result::failure(
+                        "MC_STATE transition record is truncated");
+                }
+                field.push_back(value);
+            }
         }
         state.id = static_cast<std::uint16_t>(serializedId);
         if (state.id != index || state.name.empty()) {

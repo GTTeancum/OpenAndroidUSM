@@ -376,6 +376,38 @@ with a uniformly scaled and centered 3:2 safe canvas on widescreen displays.
 WARP regressions compare frames before and after HUD submission and produce a
 1280x720 capture for visual review.
 
+## Player states and authored jump traversal
+
+`PlayerStateConfigDatabase` now preserves the portable fields recovered from
+`StateFile::ReadBasicState` at `0x0033d294`, including `stateClass`,
+`motionType`, the four motion parameters, primary and alternate animation
+IDs, `nextStateId`, and transition records. `Player::SetNextStateId` at
+`0x003491d0` selects the animation ID, while `Player::UpdateMove` at
+`0x0035081c` consumes `nextStateId` after a clip finishes. The level-one data
+therefore supplies the native jump graph rather than requiring inferred
+animation names: state 13 (`k_state_jump_start`, motion 18) selects
+`jump_ready_to_jump`, state 14 (`k_state_jump_fall`, motion 20) selects
+`jump_to_fall`, and state 16 (`k_state_jump_land`, motion 23) selects
+`fall_to_idle`.
+
+The 600 ms jump arc is authored on the `Dummy_center-node` translation track:
+the first clip rises roughly 353 cm and the second returns to ground. The
+portable player samples that root height for landing tests while retaining
+the scene/physics anchor used by `CGameCamera::Update` at `0x002f327c`; D3D11
+applies the track once during skinning, avoiding double displacement. If the
+falling arc finds no authored floor, state 15 continues with the recovered
+`-1200 cm/s` value at image address `0x004c6a78`. Airborne horizontal motion
+uses the existing recovered 700 cm/s controller-relative movement and the
+level collision wall resolver.
+
+XInput A follows the original Cross route into `requestJump`. SoundConfig 8
+(`k_mc_sfx_swoosh_jump`, six variants) plays on state 13 entry and
+SoundConfig 11 (`k_mc_sfx_land`) plays on state 16 entry through the existing
+predecoded XAudio2 state-sound path. Deterministic core regressions cover the
+state IDs, authored clips, root-height arc, midair rejection, landing, and
+sound cues; a WARP regression renders the midpoint pose in the first gameplay
+camera area.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

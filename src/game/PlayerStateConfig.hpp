@@ -2,6 +2,7 @@
 
 #include "core/Result.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -26,12 +27,26 @@ struct PlayerSoundConfig {
 struct PlayerStateDefinition {
     std::uint16_t id{};
     std::string name;
+    // StateBasic fields recovered from StateFile::ReadBasicState
+    // (0x0033d294). Player::SetNextStateId (0x003491d0) dispatches on
+    // motionType and selects primaryAnimationId/animationIds.
+    std::int16_t stateClass{};
+    std::int16_t motionType{};
+    std::array<float, 4> motionParameters{};
     std::int16_t soundTriggerFrame{-1};
+    std::array<std::int16_t, 4> auxiliaryParameters{};
+    std::int32_t primaryAnimationId{-1};
+    std::vector<std::int16_t> animationIds;
+    bool animationListFlag{};
+    std::array<std::vector<std::int16_t>, 2> auxiliaryIdLists;
     std::vector<std::int16_t> enterSoundConfigIds;
     std::vector<std::int16_t> frameSoundConfigIds;
+    std::array<float, 2> timingParameters{};
+    std::int16_t nextStateId{-1};
+    std::array<std::vector<std::int16_t>, 3> transitionFields;
 };
 
-// Audio-relevant portion of the original StateFile data. The readers follow
+// Portable view of the original StateFile data. The readers follow
 // StateFile::ReadBasicState (0x0033d294) and ReadSoundConfig (0x0033d5f8).
 class PlayerStateConfigDatabase final {
 public:

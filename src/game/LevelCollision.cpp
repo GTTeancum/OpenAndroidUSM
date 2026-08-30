@@ -305,6 +305,16 @@ bool LevelCollision::resolveGroundMotion(const Vector3& start,
     return false;
 }
 
+void LevelCollision::resolveAirMotion(const Vector3& start,
+                                      const Vector3& desired,
+                                      Vector3& resolved) const noexcept {
+    resolved = desired;
+    if (std::abs(desired.x - start.x) > 1e-4F ||
+        std::abs(desired.y - start.y) > 1e-4F) {
+        resolveWalls(start, resolved);
+    }
+}
+
 void LevelCollision::resolveWalls(const Vector3& start,
                                   Vector3& desired) const noexcept {
     std::vector<std::uint32_t> candidates = broadTriangles_;

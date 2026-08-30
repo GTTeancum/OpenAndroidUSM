@@ -90,6 +90,8 @@ int main() {
     if (std::filesystem::exists(dataRoot / "levelnew_01.pack")) {
         usm::game::LevelOneBootstrap levelOne;
         assert(levelOne.load(dataRoot));
+        usm::game::PlayerStateConfigDatabase playerStates;
+        assert(playerStates.load(dataRoot));
         captureIfRequested(levelOne.hud().interfaceTexture.image(),
                            "interface-atlas.bmp");
         for (std::size_t textureIndex = 0;
@@ -249,6 +251,41 @@ int main() {
                     gameplayMiddleFrame.pixels[component + 2];
         }
         assert(gameplayChangedPixels > 100);
+
+        usm::game::GameplayPlayer jumpingPlayer;
+        assert(jumpingPlayer.initialize(levelOne.player(), &levelCollision,
+                                        &playerStates));
+        assert(jumpingPlayer.requestJump());
+        jumpingPlayer.update({},
+                             gameplayCamera.sample(jumpingPlayer.position()),
+                             150);
+        const auto* jumpClip = levelOne.player().animationBank.findClip(
+            jumpingPlayer.activeAnimation());
+        assert(jumpClip != nullptr);
+        assert(jumpingPlayer.animatedFootHeight() >
+               jumpingPlayer.worldTransform()[14] + 100.0F);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *jumpClip,
+            jumpingPlayer.animationTimeMilliseconds(),
+            jumpingPlayer.worldTransform()));
+        assert(gameRenderer.setCamera(
+            gameplayCamera.sample(jumpingPlayer.position())));
+        gameRenderer.renderFrame();
+        RgbaImage playerJumpFrame;
+        assert(gameRenderer.readBackImage(playerJumpFrame));
+        captureIfRequested(playerJumpFrame, "gameplay-player-jump.bmp");
+        std::size_t jumpChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < playerJumpFrame.pixels.size(); component += 4) {
+            jumpChangedPixels +=
+                playerJumpFrame.pixels[component] !=
+                    gameplayRunningFrame.pixels[component] ||
+                playerJumpFrame.pixels[component + 1] !=
+                    gameplayRunningFrame.pixels[component + 1] ||
+                playerJumpFrame.pixels[component + 2] !=
+                    gameplayRunningFrame.pixels[component + 2];
+        }
+        assert(jumpChangedPixels > 100);
 
         assert(gameplayPlayer.requestPunch());
         gameplayPlayer.update({},
