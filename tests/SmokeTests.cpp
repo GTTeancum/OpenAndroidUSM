@@ -7,6 +7,7 @@
 #include "assets/IrrScene.hpp"
 #include "assets/SpriteAtlas.hpp"
 #include "audio/OggAudio.hpp"
+#include "audio/PlayerStateSoundBank.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
 #include "audio/VoxSoundTable.hpp"
@@ -17,6 +18,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/PlayerHudHealthState.hpp"
+#include "game/PlayerStateConfig.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
@@ -144,6 +146,41 @@ int main() {
                "sfx/NPC/Thugs/sfx_thug_hurt_1.wav");
         assert(voxSounds.find("SFX_VERTICAL_IMPACT") != nullptr);
 
+        usm::game::PlayerStateConfigDatabase playerStateConfigs;
+        const usm::Result playerStateConfigResult =
+            playerStateConfigs.load(dataRoot);
+        if (!playerStateConfigResult) {
+            std::cerr << playerStateConfigResult.message() << '\n';
+            return 1;
+        }
+        assert(playerStateConfigs.states().size() == 131);
+        assert(playerStateConfigs.soundConfigs().size() == 38);
+        const auto* punchState = playerStateConfigs.findState(
+            "k_state_idle_to_punch_right");
+        assert(punchState != nullptr);
+        assert(punchState->soundTriggerFrame == 9);
+        assert(punchState->enterSoundConfigIds ==
+               std::vector<std::int16_t>{1});
+        assert(punchState->frameSoundConfigIds ==
+               std::vector<std::int16_t>{34});
+        const auto* punchSwoosh = playerStateConfigs.findSoundConfig(1);
+        const auto* punchImpact = playerStateConfigs.findSoundConfig(34);
+        assert(punchSwoosh != nullptr);
+        assert(punchSwoosh->name == "k_mc_sfx_swoosh_punch_lag");
+        assert(punchSwoosh->voxSoundIds ==
+               (std::vector<std::int16_t>{60, 61}));
+        assert(punchImpact != nullptr);
+        assert(punchImpact->name == "k_mc_sfx_punch_impact");
+        assert(punchImpact->voxSoundIds ==
+               (std::vector<std::int16_t>{58, 59}));
+        const auto* hurtState =
+            playerStateConfigs.findState("k_state_hurt_light");
+        assert(hurtState != nullptr);
+        assert(hurtState->soundTriggerFrame == -1);
+        assert(hurtState->enterSoundConfigIds ==
+               std::vector<std::int16_t>{15});
+        assert(hurtState->frameSoundConfigIds.empty());
+
         usm::audio::SoundEventCatalog soundCatalog;
         assert(soundCatalog.index(dataRoot / "sound", &voxSounds));
         assert(soundCatalog.eventCount() == 510);
@@ -158,6 +195,29 @@ int main() {
         usm::audio::PcmAudio catalogAudio;
         assert(soundCatalog.decode("SFX_WEB_SWING_START", catalogAudio));
         assert(catalogAudio.frameCount() > 0);
+
+        usm::audio::PlayerStateSoundBank playerSounds;
+        constexpr std::array<std::string_view, 2> gameplaySoundStates{
+            "k_state_idle_to_punch_right", "k_state_hurt_light"};
+        assert(playerSounds.preload(playerStateConfigs, voxSounds,
+                                    soundCatalog, gameplaySoundStates));
+        assert(playerSounds.decodedVariantCount() == 7);
+        std::size_t playerSoundPlayCount = 0;
+        const auto countPlayerSound =
+            [&playerSoundPlayCount](const usm::audio::PcmAudio& clip,
+                                    bool loop) {
+                assert(clip.frameCount() > 0);
+                assert(!loop);
+                ++playerSoundPlayCount;
+                return usm::Result::success();
+            };
+        assert(playerSounds.dispatchStateEnter(
+            "k_state_idle_to_punch_right", countPlayerSound));
+        assert(playerSounds.dispatchStateFrame(
+            "k_state_idle_to_punch_right", countPlayerSound));
+        assert(playerSounds.dispatchStateEnter("k_state_hurt_light",
+                                               countPlayerSound));
+        assert(playerSoundPlayCount == 3);
 
         usm::filesystem::GbmpArchive archive;
         assert(archive.open(configArchive));
@@ -667,7 +727,8 @@ int main() {
             return 1;
         }
         usm::game::GameplayPlayer gameplayPlayer;
-        assert(gameplayPlayer.initialize(bootstrap.player()));
+        assert(gameplayPlayer.initialize(bootstrap.player(), nullptr,
+                                         &playerStateConfigs));
         const auto initialPlayerPosition = gameplayPlayer.position();
         gameplayPlayer.update({0.0F, 1.0F}, gameplayCameraPose, 1000);
         const auto movedPlayerPosition = gameplayPlayer.position();
@@ -687,12 +748,19 @@ int main() {
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.activeAnimation() == "idle_to_punch_right");
         assert(!gameplayPlayer.requestPunch());
+        assert(!gameplayPlayer.consumePunchSoundFrame());
         gameplayPlayer.update({}, gameplayCameraPose, 179);
         assert(!gameplayPlayer.consumePunchImpact());
         gameplayPlayer.update({}, gameplayCameraPose, 1);
         assert(gameplayPlayer.consumePunchImpact());
         assert(!gameplayPlayer.consumePunchImpact());
-        gameplayPlayer.update({}, gameplayCameraPose, 153);
+        assert(!gameplayPlayer.consumePunchSoundFrame());
+        gameplayPlayer.update({}, gameplayCameraPose, 119);
+        assert(!gameplayPlayer.consumePunchSoundFrame());
+        gameplayPlayer.update({}, gameplayCameraPose, 1);
+        assert(gameplayPlayer.consumePunchSoundFrame());
+        assert(!gameplayPlayer.consumePunchSoundFrame());
+        gameplayPlayer.update({}, gameplayCameraPose, 33);
         assert(gameplayPlayer.activeAnimation() == "punch_right_to_idle");
         gameplayPlayer.update({}, gameplayCameraPose, 466);
         assert(gameplayPlayer.activeAnimation() == "idle_stand");

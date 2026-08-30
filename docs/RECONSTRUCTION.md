@@ -91,6 +91,18 @@ each crossed looping key frame, queues a named `EnemyMeleeHit`, and applies it
 to player health. Core regressions exercise both knife impact frames and
 verify their recovered 25-point damage.
 
+Player combat audio is likewise state-driven. `PlayerStateConfigDatabase`
+follows `StateFile::ReadBasicState` (`0x0033d294`) and
+`StateFile::ReadSoundConfig` (`0x0033d5f8`) to decode all 131 `MC_STATE.bin`
+states and 38 `MC_SOUND.bin` configurations. The recovered
+`k_state_idle_to_punch_right` record fires
+`k_mc_sfx_swoosh_punch_lag` on entry and
+`k_mc_sfx_punch_impact` at authored frame 9; those configurations select Vox
+IDs 60/61 and 58/59 respectively. `k_state_hurt_light` selects the three
+authored player-hurt variants on entry. `PlayerStateSoundBank` predecodes the
+seven required clips, rotates variants deterministically, and dispatches them
+to XAudio2 from the native gameplay state rather than filename heuristics.
+
 ## Collada mesh layout
 
 The BRES root points to `SCollada`; its geometry library contains named
@@ -258,7 +270,7 @@ The preserved `VoxSoundFile::LoadRecordFromFile` and `ReadBasicRecord`
 functions (Ghidra `0x003da650` and `0x003da570`) load `/VoxSound.bin` or
 `/VoxSounds.bin` into 0x30-byte event records. The supplied `configs.pack`
 contains all 493 serialized records. `audio::VoxSoundTable` now decodes their
-IDs, event names, resource paths, instance limits, volume/loop flags, distance
+IDs, event names, resource paths, instance limits, volume/record flags, distance
 ranges, and remaining preserved parameters. Its exact path mappings resolve
 483 shipped Ogg resources; ten table targets are absent from the supplied
 sound directory and remain explicit. `audio::SoundEventCatalog` retains the

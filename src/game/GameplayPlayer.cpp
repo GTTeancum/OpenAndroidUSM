@@ -17,7 +17,8 @@ float length2D(float x, float y) noexcept { return std::sqrt(x * x + y * y); }
 } // namespace
 
 Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
-                                  const LevelCollision* collision) {
+                                  const LevelCollision* collision,
+                                  const PlayerStateConfigDatabase* states) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
         asset.animationBank.findClip("run") == nullptr ||
         asset.animationBank.findClip("idle_to_punch_right") == nullptr ||
@@ -45,6 +46,21 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     attackState_ = AttackState::None;
     punchImpactPending_ = false;
     punchImpactEmitted_ = false;
+    punchSoundFramePending_ = false;
+    punchSoundFrameEmitted_ = false;
+    punchSoundFrameMilliseconds_ = 300;
+    if (states != nullptr) {
+        const PlayerStateDefinition* punchState =
+            states->findState("k_state_idle_to_punch_right");
+        if (punchState == nullptr || punchState->soundTriggerFrame < 0) {
+            return Result::failure(
+                "Player punch state has no sound trigger frame");
+        }
+        // CheckFrame consumes the authored 30 Hz state frame number.
+        punchSoundFrameMilliseconds_ =
+            static_cast<std::uint32_t>(punchState->soundTriggerFrame) * 1000U /
+            30U;
+    }
     maximumHealth_ = std::max(asset.health, 1.0F);
     health_ = maximumHealth_;
     if (collision_ != nullptr) {
@@ -66,6 +82,8 @@ bool GameplayPlayer::requestPunch() noexcept {
     attackState_ = AttackState::PunchRight;
     punchImpactPending_ = false;
     punchImpactEmitted_ = false;
+    punchSoundFramePending_ = false;
+    punchSoundFrameEmitted_ = false;
     setAnimation("idle_to_punch_right");
     return true;
 }
@@ -87,6 +105,11 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     if (attackState_ != AttackState::None) {
         animationTimeMilliseconds_ += elapsedMilliseconds;
         if (attackState_ == AttackState::PunchRight) {
+            if (!punchSoundFrameEmitted_ &&
+                animationTimeMilliseconds_ >= punchSoundFrameMilliseconds_) {
+                punchSoundFramePending_ = true;
+                punchSoundFrameEmitted_ = true;
+            }
             if (!punchImpactEmitted_ &&
                 animationTimeMilliseconds_ >= kPunchImpactMilliseconds) {
                 punchImpactPending_ = true;
@@ -166,6 +189,12 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
 bool GameplayPlayer::consumePunchImpact() noexcept {
     const bool pending = punchImpactPending_;
     punchImpactPending_ = false;
+    return pending;
+}
+
+bool GameplayPlayer::consumePunchSoundFrame() noexcept {
+    const bool pending = punchSoundFramePending_;
+    punchSoundFramePending_ = false;
     return pending;
 }
 

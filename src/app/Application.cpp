@@ -5,6 +5,7 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <string>
@@ -62,6 +63,17 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = playerStateConfigs_.load(gameDataRoot);
+    if (!result) {
+        return fail(result.message());
+    }
+    constexpr std::array<std::string_view, 2> gameplaySoundStates{
+        "k_state_idle_to_punch_right", "k_state_hurt_light"};
+    result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
+                                   soundCatalog_, gameplaySoundStates);
+    if (!result) {
+        return fail(result.message());
+    }
     result = introSounds_.preload(levelOne_.introScript(), soundCatalog_);
     if (!result) {
         return fail(result.message());
@@ -87,7 +99,8 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    result = gameplayPlayer_.initialize(levelOne_.player(), &levelCollision_);
+    result = gameplayPlayer_.initialize(levelOne_.player(), &levelCollision_,
+                                        &playerStateConfigs_);
     if (!result) {
         return fail(result.message());
     }
@@ -101,6 +114,10 @@ int Application::run(HINSTANCE instance) {
 
     const auto introStart = std::chrono::steady_clock::now();
     auto previousFrame = introStart;
+    const auto playGameplaySound =
+        [this](const audio::PcmAudio& clip, bool loop) {
+            return audio_.play(clip, loop);
+        };
     while (window_.pumpMessages()) {
         const auto frameTime = std::chrono::steady_clock::now();
         const auto frameElapsed =
@@ -154,8 +171,13 @@ int Application::run(HINSTANCE instance) {
                 motion.forward = static_cast<float>(input.moveUp.held) -
                                  static_cast<float>(input.moveDown.held);
             }
-            if (keyRouter_.state().punch.pressed) {
-                (void)gameplayPlayer_.requestPunch();
+            if (keyRouter_.state().punch.pressed &&
+                gameplayPlayer_.requestPunch()) {
+                result = playerSounds_.dispatchStateEnter(
+                    "k_state_idle_to_punch_right", playGameplaySound);
+                if (!result) {
+                    return fail(result.message());
+                }
             }
             const auto cameraBeforeMovement =
                 gameplayCamera_.sample(gameplayPlayer_.position());
@@ -163,6 +185,13 @@ int Application::run(HINSTANCE instance) {
                 std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    deltaMilliseconds);
+            if (gameplayPlayer_.consumePunchSoundFrame()) {
+                result = playerSounds_.dispatchStateFrame(
+                    "k_state_idle_to_punch_right", playGameplaySound);
+                if (!result) {
+                    return fail(result.message());
+                }
+            }
             if (gameplayPlayer_.consumePunchImpact()) {
                 const float sectorHalfAngle = std::max(
                     std::abs(normalPunchAttack->minimumAngleDegrees),
@@ -224,7 +253,13 @@ int Application::run(HINSTANCE instance) {
                                          &levelCollision_);
             for (const game::EnemyMeleeHit& hit :
                  enemyRuntime_.consumePlayerHits()) {
-                (void)gameplayPlayer_.applyDamage(hit.damage);
+                if (gameplayPlayer_.applyDamage(hit.damage)) {
+                    result = playerSounds_.dispatchStateEnter(
+                        "k_state_hurt_light", playGameplaySound);
+                    if (!result) {
+                        return fail(result.message());
+                    }
+                }
             }
             playerHudHealth_.update(gameplayPlayer_.health(),
                                     deltaMilliseconds);

@@ -19,7 +19,7 @@ struct VoxSoundRecord {
     std::int16_t groupId{};
     std::int16_t maximumInstances{};
     float volume{};
-    bool looping{};
+    bool flag18{};
     float minimumDistance{};
     float maximumDistance{};
     bool distanceCullingDisabled{};

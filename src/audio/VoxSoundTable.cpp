@@ -104,13 +104,13 @@ Result VoxSoundTable::load(std::span<const std::byte> bytes) {
     records_.reserve(recordCount);
     for (std::uint16_t index = 0; index < recordCount; ++index) {
         VoxSoundRecord record;
-        std::int16_t looping{};
+        std::int16_t flag18{};
         std::int16_t distanceCullingDisabled{};
         if (!reader.u16(record.id) || !reader.string(record.eventName) ||
             !reader.string(record.resourcePath) ||
             !reader.s16(record.groupId) ||
             !reader.s16(record.maximumInstances) || !reader.f32(record.volume) ||
-            !reader.s16(looping) || !reader.f32(record.minimumDistance) ||
+            !reader.s16(flag18) || !reader.f32(record.minimumDistance) ||
             !reader.f32(record.maximumDistance) ||
             !reader.s16(distanceCullingDisabled) ||
             !reader.s16(record.parameter28) ||
@@ -119,12 +119,12 @@ Result VoxSoundTable::load(std::span<const std::byte> bytes) {
             return Result::failure("VoxSounds record is truncated");
         }
         if (record.id != index || record.eventName.empty() ||
-            record.resourcePath.empty() || (looping != 0 && looping != 1) ||
+            record.resourcePath.empty() || (flag18 != 0 && flag18 != 1) ||
             (distanceCullingDisabled != 0 && distanceCullingDisabled != 1)) {
             records_.clear();
             return Result::failure("VoxSounds record contains invalid fields");
         }
-        record.looping = looping == 1;
+        record.flag18 = flag18 == 1;
         record.distanceCullingDisabled = distanceCullingDisabled == 1;
         records_.push_back(std::move(record));
     }

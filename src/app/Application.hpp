@@ -4,6 +4,7 @@
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
 #include "audio/VoxSoundTable.hpp"
+#include "audio/PlayerStateSoundBank.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayPlayer.hpp"
@@ -12,6 +13,7 @@
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/PlayerHudHealthState.hpp"
+#include "game/PlayerStateConfig.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -34,12 +36,14 @@ private:
     audio::XAudio2System audio_;
     audio::VoxSoundTable voxSounds_;
     audio::SoundEventCatalog soundCatalog_;
+    audio::PlayerStateSoundBank playerSounds_;
     audio::CinematicSoundBank introSounds_;
     game::CinematicPlayer introPlayer_;
     game::GameplayCamera gameplayCamera_;
     game::LevelCollision levelCollision_;
     game::GameplayPlayer gameplayPlayer_;
     game::PlayerHudHealthState playerHudHealth_;
+    game::PlayerStateConfigDatabase playerStateConfigs_;
     game::LevelTriggerRuntime triggerRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;

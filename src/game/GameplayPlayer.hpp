@@ -4,6 +4,7 @@
 #include "core/Result.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/PlayerStateConfig.hpp"
 
 #include <array>
 #include <cstdint>
@@ -24,12 +25,15 @@ struct PlayerMotionInput {
 class GameplayPlayer final {
 public:
     [[nodiscard]] Result initialize(const LevelPlayerAsset& asset,
-                                    const LevelCollision* collision = nullptr);
+                                    const LevelCollision* collision = nullptr,
+                                    const PlayerStateConfigDatabase* states =
+                                        nullptr);
     [[nodiscard]] bool requestPunch() noexcept;
     [[nodiscard]] bool applyDamage(float damage) noexcept;
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
     [[nodiscard]] bool consumePunchImpact() noexcept;
+    [[nodiscard]] bool consumePunchSoundFrame() noexcept;
 
     [[nodiscard]] const assets::Vector3& position() const noexcept {
         return position_;
@@ -68,6 +72,9 @@ private:
     AttackState attackState_{AttackState::None};
     bool punchImpactPending_{};
     bool punchImpactEmitted_{};
+    bool punchSoundFramePending_{};
+    bool punchSoundFrameEmitted_{};
+    std::uint32_t punchSoundFrameMilliseconds_{300};
     float health_{1000.0F};
     float maximumHealth_{1000.0F};
 };
