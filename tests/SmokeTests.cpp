@@ -926,6 +926,28 @@ int main() {
         assert(firstEncounterCinematic->scriptFile ==
                "cinematics/levelnew_01_1162_cinematic.cff");
         assert(firstEncounterCinematic->script.commandCount() > 0);
+        const auto enemyGateCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 20026;
+            });
+        assert(enemyGateCinematic != bootstrap.cinematics().end());
+        assert(enemyGateCinematic->script.commandCount() == 8);
+        usm::game::CinematicPlayer enemyGatePlayer;
+        assert(enemyGatePlayer.start(enemyGateCinematic->script));
+        bool enemyGateSatisfied = false;
+        const auto evaluateEnemyGate =
+            [&enemyGateSatisfied](const usm::game::CinematicThread&,
+                                  const usm::game::CinematicCommand& command) {
+                return command.name != "IfEnemyDead" || enemyGateSatisfied;
+            };
+        assert(enemyGatePlayer.advanceToConditional(0, evaluateEnemyGate));
+        assert(enemyGatePlayer.dispatchedCommandCount() == 2);
+        assert(!enemyGatePlayer.finished());
+        enemyGateSatisfied = true;
+        assert(enemyGatePlayer.advanceToConditional(0, evaluateEnemyGate));
+        assert(enemyGatePlayer.dispatchedCommandCount() == 8);
+        assert(enemyGatePlayer.finished());
         usm::game::LevelEnemyRuntime enemyRuntime;
         assert(enemyRuntime.initialize(bootstrap));
         usm::game::CinematicPlayer encounterPlayer;

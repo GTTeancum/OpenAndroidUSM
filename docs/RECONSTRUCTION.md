@@ -99,6 +99,14 @@ handoff deterministically. The zero-time intro-start script now also disables
 trigger 1263 before explicit cinematic 1265 playback, preventing the opening
 sequence from retriggering during gameplay.
 
+Encounter conditions retain the per-thread blocking behavior recovered from
+`CCinematicThread::executeCommand` at `0x00372aa4`. A false `IfEnemyDead`
+leaves that command pending and suppresses only later commands in the same
+cinematic thread; unrelated threads continue. The condition is retried on
+subsequent updates and releases the authored trigger/cinematic chain only
+after the referenced native enemy state is dead. This is materially different
+from flattening every time-zero command into an unconditional batch.
+
 Enemy melee timing is not guessed. The typed
 `EnemySpecialActionConfigDatabase` follows
 `EnemyAttributeFile::ReadAnimSpeciaActionInfo` at `0x0033b9d8` and decodes all

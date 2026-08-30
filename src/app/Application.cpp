@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <string>
@@ -21,6 +22,18 @@ int fail(std::string_view message) {
     MessageBoxW(nullptr, wideMessage.c_str(), L"OpenAndroidUSM error",
                 MB_OK | MB_ICONERROR);
     return EXIT_FAILURE;
+}
+
+bool commandInteger(const game::CinematicCommand& command,
+                    std::string_view name, std::int32_t& value) noexcept {
+    const game::CinematicAttribute* attribute = command.findAttribute(name);
+    if (attribute == nullptr) {
+        return false;
+    }
+    const char* begin = attribute->value.data();
+    const char* end = begin + attribute->value.size();
+    const auto parsed = std::from_chars(begin, end, value);
+    return parsed.ec == std::errc{} && parsed.ptr == end;
 }
 
 } // namespace
@@ -312,11 +325,18 @@ int Application::run(HINSTANCE instance) {
                             deltaMilliseconds,
                         gameplayCinematicPlayer_.durationMilliseconds());
                 Result commandResult = Result::success();
-                result = gameplayCinematicPlayer_.advanceTo(
+                result = gameplayCinematicPlayer_.advanceToConditional(
                     gameplayCinematicTimeMilliseconds_,
                     [this, &commandResult](
                         const game::CinematicThread& thread,
                         const game::CinematicCommand& command) {
+                        if (command.name == "IfEnemyDead") {
+                            std::int32_t enemyId = thread.objectId;
+                            (void)commandInteger(command, "IDEnemy", enemyId);
+                            const game::LevelEnemyState* enemy =
+                                enemyRuntime_.find(enemyId);
+                            return enemy != nullptr && enemy->health <= 0.0F;
+                        }
                         if (commandResult) {
                             commandResult = enemyRuntime_.applyCinematicCommand(
                                 levelOne_, thread, command);
@@ -338,6 +358,7 @@ int Application::run(HINSTANCE instance) {
                                     return audio_.stopNamed(eventName);
                                 });
                         }
+                        return true;
                     });
                 if (result && !commandResult) {
                     result = commandResult;

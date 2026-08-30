@@ -28,6 +28,18 @@ Result CinematicPlayer::start(const CinematicScript& script) {
 Result CinematicPlayer::advanceTo(
     std::uint32_t elapsedMilliseconds,
     const CinematicCommandHandler& handler) {
+    return advanceToConditional(
+        elapsedMilliseconds,
+        [&handler](const CinematicThread& thread,
+                   const CinematicCommand& command) {
+            handler(thread, command);
+            return true;
+        });
+}
+
+Result CinematicPlayer::advanceToConditional(
+    std::uint32_t elapsedMilliseconds,
+    const ConditionalCinematicCommandHandler& handler) {
     if (!started_) {
         return Result::failure("Cinematic playback has not been started");
     }
@@ -35,19 +47,31 @@ Result CinematicPlayer::advanceTo(
         return Result::failure("Cinematic playback time cannot move backwards");
     }
     elapsedMilliseconds_ = elapsedMilliseconds;
-    while (nextCommand_ < schedule_.size() &&
-           schedule_[nextCommand_].command->timestampMilliseconds <=
-               elapsedMilliseconds) {
-        const ScheduledCommand& scheduled = schedule_[nextCommand_];
-        handler(*scheduled.thread, *scheduled.command);
-        ++nextCommand_;
+    std::vector<const CinematicThread*> blockedThreads;
+    for (ScheduledCommand& scheduled : schedule_) {
+        if (scheduled.dispatched) {
+            continue;
+        }
+        if (scheduled.command->timestampMilliseconds > elapsedMilliseconds) {
+            break;
+        }
+        if (std::find(blockedThreads.begin(), blockedThreads.end(),
+                      scheduled.thread) != blockedThreads.end()) {
+            continue;
+        }
+        if (handler(*scheduled.thread, *scheduled.command)) {
+            scheduled.dispatched = true;
+            ++dispatchedCommandCount_;
+        } else {
+            blockedThreads.push_back(scheduled.thread);
+        }
     }
     return Result::success();
 }
 
 void CinematicPlayer::reset() noexcept {
     schedule_.clear();
-    nextCommand_ = 0;
+    dispatchedCommandCount_ = 0;
     elapsedMilliseconds_ = 0;
     durationMilliseconds_ = 0;
     started_ = false;
