@@ -193,6 +193,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Could not load attack configs: " +
                                result.message());
     }
+    result = buttonConfigs_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load button configs: " +
+                               result.message());
+    }
     result = enemySpecialActions_.load(gameDataRoot);
     if (!result) {
         return Result::failure("Could not load enemy special actions: " +

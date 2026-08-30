@@ -549,6 +549,25 @@ uses the authored camera pose until the cinematic ends, then returns to the
 active gameplay `CameraArea`. Tests cover all eight shipped tracks, signed
 distance reconstruction, linear interpolation, and authored hard cuts.
 
+## Controller-native quick-time events
+
+`ButtonConfigDatabase` follows `ButtonConfigFile::LoadConfig` and
+`ReadBasic` at `0x002fb9b4` and `0x002fb8d4`. It preserves all twenty shipped
+`BCONFIG.bin` records, including interaction type/value, screen position,
+duration, sprite animation IDs, required action count, and compound sequence.
+The level-one QTE uses record 6 (`k_igm_button_qte_1_2`) with its authored
+3900 ms response window.
+
+`QuickTimeEventRuntime` reconstructs `CCinematicThread::StartQTE` at
+`0x0037153c`, `Player::BeginQTE` at `0x0034c9b4`, and the success/failure
+cinematic dispatch from `CQTEManager` at `0x0038a5e4` and `0x0038a630`.
+Because the mobile interaction is a positional touch gesture, the native
+controller route deliberately maps the abstract QTE action to XInput A. A
+press selects authored success cinematic 20006; expiry selects authored fail
+cinematic 20010. `InterfaceControl` now also preserves the original
+`ControlEnable` and `BlackEnable` state, so gameplay input and encounter
+triggers cannot interfere while the QTE owns control.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

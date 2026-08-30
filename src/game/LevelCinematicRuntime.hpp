@@ -24,6 +24,12 @@ public:
     [[nodiscard]] bool levelEnded() const noexcept { return levelEnded_; }
     [[nodiscard]] bool goToNextLevel() const noexcept { return goToNextLevel_; }
     [[nodiscard]] bool gameEnded() const noexcept { return gameEnded_; }
+    [[nodiscard]] bool controlsEnabled() const noexcept {
+        return controlsEnabled_;
+    }
+    [[nodiscard]] bool blackOverlayEnabled() const noexcept {
+        return blackOverlayEnabled_;
+    }
 
 private:
     LevelTriggerRuntime* triggers_{};
@@ -33,6 +39,8 @@ private:
     bool levelEnded_{};
     bool goToNextLevel_{};
     bool gameEnded_{};
+    bool controlsEnabled_{true};
+    bool blackOverlayEnabled_{};
 };
 
 } // namespace usm::game

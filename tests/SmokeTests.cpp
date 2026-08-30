@@ -23,6 +23,7 @@
 #include "game/EnemyRangeAttackConfig.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
+#include "game/QuickTimeEventRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/WebGrabPointRuntime.hpp"
 #include "game/WebSwingRuntime.hpp"
@@ -1011,6 +1012,43 @@ int main() {
         assert(firstEncounterCinematic->scriptFile ==
                "cinematics/levelnew_01_1162_cinematic.cff");
         assert(firstEncounterCinematic->script.commandCount() > 0);
+        assert(bootstrap.buttonConfigs().definitions().size() == 20);
+        const auto* levelOneQteConfig = bootstrap.buttonConfigs().find(6);
+        assert(levelOneQteConfig != nullptr);
+        assert(levelOneQteConfig->name == "k_igm_button_qte_1_2");
+        assert(levelOneQteConfig->interactionType == 1);
+        assert(levelOneQteConfig->interactionValue == 14);
+        assert(levelOneQteConfig->screenX == 360.0F);
+        assert(levelOneQteConfig->screenY == 101.0F);
+        assert(levelOneQteConfig->durationMilliseconds == 3900.0F);
+        assert(levelOneQteConfig->normalAnimationId == 6);
+        assert(levelOneQteConfig->activeAnimationId == 7);
+        assert(levelOneQteConfig->requiredActionCount == -1);
+        assert(levelOneQteConfig->sequence.empty());
+        usm::game::CinematicCommand startLevelOneQte;
+        startLevelOneQte.name = "StartQTE";
+        startLevelOneQte.attributes = {
+            {"int", "QTEID", "6"},
+            {"int", "^ID^Cinematic^Success", "20006"},
+            {"int", "^ID^Cinematic^Fail", "20010"},
+        };
+        usm::game::QuickTimeEventRuntime successfulQte;
+        successfulQte.bind(bootstrap.buttonConfigs());
+        assert(successfulQte.applyCommand(startLevelOneQte));
+        assert(successfulQte.active());
+        assert(successfulQte.durationMilliseconds() == 3900);
+        successfulQte.update(2000, true);
+        assert(!successfulQte.active());
+        assert(successfulQte.consumeCinematicRequest() == 20006);
+        assert(!successfulQte.consumeCinematicRequest().has_value());
+        usm::game::QuickTimeEventRuntime failedQte;
+        failedQte.bind(bootstrap.buttonConfigs());
+        assert(failedQte.applyCommand(startLevelOneQte));
+        failedQte.update(3899, false);
+        assert(failedQte.active());
+        failedQte.update(1, false);
+        assert(!failedQte.active());
+        assert(failedQte.consumeCinematicRequest() == 20010);
         const auto roomNineCameraCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {
@@ -1451,6 +1489,18 @@ int main() {
         assert(levelCommandRuntime.applyCommand(
             controlCommand("SetCameraArea", "^ID^CameraArea", "10100")));
         assert(gameplayCamera.currentAreaId() == 10100);
+        usm::game::CinematicCommand disableControls = controlCommand(
+            "InterfaceControl", "ControlEnable", "false");
+        disableControls.attributes.push_back(
+            {"bool", "BlackEnable", "true"});
+        assert(levelCommandRuntime.applyCommand(disableControls));
+        assert(!levelCommandRuntime.controlsEnabled());
+        assert(levelCommandRuntime.blackOverlayEnabled());
+        disableControls.attributes.front().value = "true";
+        disableControls.attributes.back().value = "false";
+        assert(levelCommandRuntime.applyCommand(disableControls));
+        assert(levelCommandRuntime.controlsEnabled());
+        assert(!levelCommandRuntime.blackOverlayEnabled());
         assert(levelCommandRuntime.applyCommand(
             controlCommand("StartCinematic", "CinematicID", "1238")));
         const auto cinematicStarts =

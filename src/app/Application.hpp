@@ -12,6 +12,7 @@
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/QuickTimeEventRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/PlayerHudHealthState.hpp"
@@ -52,6 +53,7 @@ private:
     game::LevelCinematicRuntime levelCinematicRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;
+    game::QuickTimeEventRuntime quickTimeEvent_;
     const game::LevelCinematicAsset* activeGameplayCinematic_{};
     std::uint32_t gameplayCinematicTimeMilliseconds_{};
 };

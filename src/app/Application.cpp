@@ -153,6 +153,7 @@ int Application::run(HINSTANCE instance) {
     }
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints());
+    quickTimeEvent_.bind(levelOne_.buttonConfigs());
     game::CinematicPlayer introStartCommands;
     result = introStartCommands.start(levelOne_.introStartScript());
     if (!result) {
@@ -257,16 +258,22 @@ int Application::run(HINSTANCE instance) {
                 motion.forward = static_cast<float>(input.moveUp.held) -
                                  static_cast<float>(input.moveDown.held);
             }
-            if (keyRouter_.state().jump.pressed) {
+            const bool controlsEnabled =
+                levelCinematicRuntime_.controlsEnabled() &&
+                !quickTimeEvent_.active();
+            if (!controlsEnabled) {
+                motion = {};
+            }
+            if (controlsEnabled && keyRouter_.state().jump.pressed) {
                 (void)gameplayPlayer_.requestJump();
             }
-            if (keyRouter_.state().web.pressed) {
+            if (controlsEnabled && keyRouter_.state().web.pressed) {
                 (void)gameplayPlayer_.requestWeb();
             }
-            if (keyRouter_.state().web.released) {
+            if (controlsEnabled && keyRouter_.state().web.released) {
                 (void)gameplayPlayer_.releaseWeb();
             }
-            if (keyRouter_.state().punch.pressed &&
+            if (controlsEnabled && keyRouter_.state().punch.pressed &&
                 gameplayPlayer_.requestPunch()) {
                 result = playerSounds_.dispatchStateEnter(
                     "k_state_idle_to_punch_right", playGameplaySound);
@@ -312,7 +319,8 @@ int Application::run(HINSTANCE instance) {
                                              deltaMilliseconds);
             const auto triggerEvents =
                 triggerRuntime_.update(gameplayPlayer_.position());
-            if (activeGameplayCinematic_ == nullptr) {
+            if (activeGameplayCinematic_ == nullptr &&
+                !quickTimeEvent_.active()) {
                 for (const game::TriggerEvent& event : triggerEvents) {
                     result = startGameplayCinematic(event.cinematicId);
                     if (result) {
@@ -352,6 +360,10 @@ int Application::run(HINSTANCE instance) {
                         }
                         if (commandResult) {
                             commandResult =
+                                quickTimeEvent_.applyCommand(command);
+                        }
+                        if (commandResult) {
+                            commandResult =
                                 levelCinematicRuntime_.applyCommand(command);
                         }
                         if (commandResult) {
@@ -385,6 +397,13 @@ int Application::run(HINSTANCE instance) {
                             chainedCinematics.front());
                     }
                 }
+            }
+            quickTimeEvent_.update(
+                deltaMilliseconds,
+                keyRouter_.state().quickTimeEvent.pressed);
+            if (const auto qteCinematic =
+                    quickTimeEvent_.consumeCinematicRequest()) {
+                result = startGameplayCinematic(*qteCinematic);
             }
             enemyRuntime_.updateGameplay(deltaMilliseconds,
                                          gameplayPlayer_.position(),

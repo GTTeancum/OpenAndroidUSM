@@ -54,6 +54,8 @@ void LevelCinematicRuntime::bind(LevelTriggerRuntime& triggers,
     levelEnded_ = false;
     goToNextLevel_ = false;
     gameEnded_ = false;
+    controlsEnabled_ = true;
+    blackOverlayEnabled_ = false;
 }
 
 Result LevelCinematicRuntime::applyCommand(const CinematicCommand& command) {
@@ -68,6 +70,18 @@ Result LevelCinematicRuntime::applyCommand(const CinematicCommand& command) {
             return Result::failure(command.name +
                                    " references an unknown trigger");
         }
+        return Result::success();
+    }
+    if (command.name == "InterfaceControl") {
+        bool controlsEnabled = false;
+        bool blackOverlayEnabled = false;
+        if (!parseBoolean(command, "ControlEnable", controlsEnabled) ||
+            !parseBoolean(command, "BlackEnable", blackOverlayEnabled)) {
+            return Result::failure(
+                "InterfaceControl has invalid control or black flags");
+        }
+        controlsEnabled_ = controlsEnabled;
+        blackOverlayEnabled_ = blackOverlayEnabled;
         return Result::success();
     }
     if (command.name == "EnableCameraArea") {

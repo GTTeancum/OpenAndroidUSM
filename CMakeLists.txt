@@ -97,6 +97,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/filesystem/GbmpArchive.cpp
     src/game/CinematicScript.cpp
     src/game/AttackConfig.cpp
+    src/game/ButtonConfig.cpp
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
     src/game/CinematicCameraTrack.cpp
@@ -115,6 +116,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelSlideRuntime.cpp
     src/game/PlayerHudHealthState.cpp
     src/game/PlayerStateConfig.cpp
+    src/game/QuickTimeEventRuntime.cpp
     src/game/WebGrabPointRuntime.cpp
     src/game/WebSwingRuntime.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp

@@ -9,6 +9,7 @@
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/AttackConfig.hpp"
+#include "game/ButtonConfig.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/CinematicCameraTrack.hpp"
 #include "game/EnemyBehaviorConfig.hpp"
@@ -269,6 +270,9 @@ public:
     [[nodiscard]] const AttackConfigDatabase& attackConfigs() const noexcept {
         return attackConfigs_;
     }
+    [[nodiscard]] const ButtonConfigDatabase& buttonConfigs() const noexcept {
+        return buttonConfigs_;
+    }
     [[nodiscard]] const EnemySpecialActionConfigDatabase&
     enemySpecialActions() const noexcept {
         return enemySpecialActions_;
@@ -311,6 +315,7 @@ private:
     std::vector<EnemyArchetypeAsset> enemyArchetypes_;
     std::vector<LevelEnemyAsset> enemies_;
     AttackConfigDatabase attackConfigs_;
+    ButtonConfigDatabase buttonConfigs_;
     EnemySpecialActionConfigDatabase enemySpecialActions_;
     EnemyBehaviorConfigDatabase enemyBehaviorConfigs_;
     EnemyAttributeConfigDatabase enemyAttributeConfigs_;
