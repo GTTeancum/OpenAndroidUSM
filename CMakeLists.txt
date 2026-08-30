@@ -94,6 +94,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/AttackConfig.cpp
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
+    src/game/EnemySpecialActionConfig.cpp
     src/game/GameplayCamera.cpp
     src/game/GameplayPlayer.cpp
     src/game/LevelCollision.cpp

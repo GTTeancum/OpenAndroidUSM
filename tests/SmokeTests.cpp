@@ -307,6 +307,24 @@ int main() {
         assert(normalAttack->maximumReach() == 200.0F);
         assert(normalAttack->minimumAngleDegrees == -90.0F);
         assert(normalAttack->maximumAngleDegrees == 90.0F);
+        assert(bootstrap.enemySpecialActions().actions().size() == 230);
+        const auto knifeAttackEvents =
+            bootstrap.enemySpecialActions().findAttackEvents(
+                0, "idle_knife_at_idle");
+        assert(knifeAttackEvents.size() == 2);
+        assert(knifeAttackEvents[0]->name == "THUG_KNIFE_01");
+        assert(knifeAttackEvents[0]->keyFramePercent == 45);
+        assert(knifeAttackEvents[0]->attackId == 6);
+        assert(knifeAttackEvents[0]->nextActionIds.size() == 1);
+        assert(knifeAttackEvents[0]->nextActionIds.front() == 16);
+        assert(knifeAttackEvents[1]->keyFramePercent == 75);
+        const auto batAttackEvents =
+            bootstrap.enemySpecialActions().findAttackEvents(
+                1, "idle_at1_idle");
+        assert(batAttackEvents.size() == 1);
+        assert(batAttackEvents.front()->name == "THUG_BAT_01");
+        assert(batAttackEvents.front()->keyFramePercent == 47);
+        assert(batAttackEvents.front()->attackId == 7);
         assert(bootstrap.triggers().size() == 15);
         const auto firstEncounterTrigger = std::find_if(
             bootstrap.triggers().begin(), bootstrap.triggers().end(),
@@ -445,6 +463,45 @@ int main() {
         assert(chasingKnife->behavior ==
                usm::game::EnemyBehaviorState::AttackRange);
         assert(chasingKnife->activeAnimation == "idle_knife_at_idle");
+        usm::game::LevelEnemyRuntime enemyAttackRuntime;
+        assert(enemyAttackRuntime.initialize(bootstrap));
+        const auto* attackingKnife = enemyAttackRuntime.find(394);
+        assert(attackingKnife != nullptr);
+        const auto* knifeAttackClip =
+            bootstrap.enemyArchetypes()[attackingKnife->asset->archetypeIndex]
+                .animationBank.findClip("idle_knife_at_idle");
+        assert(knifeAttackClip != nullptr);
+        const std::uint32_t firstKnifeImpact =
+            knifeAttackClip->durationMilliseconds() * 45U / 100U;
+        const std::uint32_t secondKnifeImpact =
+            knifeAttackClip->durationMilliseconds() * 75U / 100U;
+        assert(firstKnifeImpact > 0);
+        assert(secondKnifeImpact > firstKnifeImpact);
+        const usm::assets::Vector3 knifeVictim{
+            attackingKnife->position.x + 100.0F,
+            attackingKnife->position.y,
+            attackingKnife->position.z};
+        enemyAttackRuntime.updateGameplay(firstKnifeImpact, knifeVictim);
+        auto enemyHits = enemyAttackRuntime.consumePlayerHits();
+        const auto firstKnifeHit = std::find_if(
+            enemyHits.begin(), enemyHits.end(),
+            [](const usm::game::EnemyMeleeHit& hit) {
+                return hit.sourceObjectId == 394;
+            });
+        assert(firstKnifeHit != enemyHits.end());
+        assert(firstKnifeHit->attackId == 6);
+        assert(firstKnifeHit->damage == 25.0F);
+        enemyAttackRuntime.updateGameplay(secondKnifeImpact - firstKnifeImpact,
+                                          knifeVictim);
+        enemyHits = enemyAttackRuntime.consumePlayerHits();
+        const auto secondKnifeHit = std::find_if(
+            enemyHits.begin(), enemyHits.end(),
+            [](const usm::game::EnemyMeleeHit& hit) {
+                return hit.sourceObjectId == 394;
+            });
+        assert(secondKnifeHit != enemyHits.end());
+        assert(secondKnifeHit->attackId == 6);
+        assert(secondKnifeHit->damage == 25.0F);
         usm::game::LevelEnemyRuntime damageRuntime;
         assert(damageRuntime.initialize(bootstrap));
         const auto* damageTarget = damageRuntime.find(394);
@@ -475,6 +532,13 @@ int main() {
                                            initialGroundHeight));
         usm::game::GameplayPlayer groundedPlayer;
         assert(groundedPlayer.initialize(bootstrap.player(), &levelCollision));
+        assert(groundedPlayer.maximumHealth() == bootstrap.player().health);
+        assert(groundedPlayer.applyDamage(25.0F));
+        assert(groundedPlayer.health() ==
+               groundedPlayer.maximumHealth() - 25.0F);
+        assert(groundedPlayer.applyDamage(groundedPlayer.maximumHealth()));
+        assert(groundedPlayer.dead());
+        assert(!groundedPlayer.requestPunch());
         assert(std::abs(groundedPlayer.position().z - initialGroundHeight) <
                0.001F);
         std::vector<usm::assets::ColladaGeometry> idlePose;

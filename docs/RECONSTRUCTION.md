@@ -70,6 +70,27 @@ camera at `target - direction * distance` and adding the preserved 120-unit
 vertical target offset. The initial area 283 pose is regression-tested from
 Spider-Man's serialized level-one start position.
 
+## Native gameplay and combat
+
+`GameplayPlayer` implements renderer-independent ground movement, collision,
+camera-relative controller input, named punch clips, authored impact timing,
+and health. `LevelEnemyRuntime` owns the mutable state of all 14 level-one
+thugs. Cinematic `DisableAI`, `EnableAI`, `SetVisible`, `SetAnim`, and
+`MoveObject` commands feed that state directly; enabled enemies acquire the
+player using their scene-authored awareness radius and chase at the authored
+line speed.
+
+Enemy melee timing is not guessed. The typed
+`EnemySpecialActionConfigDatabase` follows
+`EnemyAttributeFile::ReadAnimSpeciaActionInfo` at `0x0033b9d8` and decodes all
+230 records in `EnemysSpecialAnimConfigs.bin`. Knife thugs attach attack ID 6
+to 45% and 75% of `idle_knife_at_idle`; bat thugs attach attack ID 7 to 47% of
+`idle_at1_idle`. Those IDs resolve through `EnemysAttackConfigs.bin` to the
+authored damage, hit-box reach, and angular sector. The native runtime checks
+each crossed looping key frame, queues a named `EnemyMeleeHit`, and applies it
+to player health. Core regressions exercise both knife impact frames and
+verify their recovered 25-point damage.
+
 ## Collada mesh layout
 
 The BRES root points to `SCollada`; its geometry library contains named

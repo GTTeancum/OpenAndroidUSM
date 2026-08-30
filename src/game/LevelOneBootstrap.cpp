@@ -171,6 +171,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return Result::failure("Could not load attack configs: " +
                                result.message());
     }
+    result = enemySpecialActions_.load(gameDataRoot);
+    if (!result) {
+        return Result::failure("Could not load enemy special actions: " +
+                               result.message());
+    }
     filesystem::GbmpArchive levelArchive;
     result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {
@@ -209,6 +214,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     player_.linkedCinematicId = playerNode->linkedCinematicId;
     player_.endGameCinematicId = playerNode->endGameCinematicId;
     player_.hasCollision = playerNode->hasCollision;
+    player_.health = floatAttribute(*playerNode, "Health", 1000.0F);
     player_.position = playerNode->position;
     player_.rotation = playerNode->rotation;
     player_.scale = playerNode->scale;
@@ -468,6 +474,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
             enemy.objectId = node.id;
             enemy.name = node.name;
             enemy.gameType = node.gameType;
+            enemy.enemyTypeId =
+                node.gameType == "MeleeThugEnemy_knife" ? 0 : 1;
             enemy.initialAnimation = node.initialAnimation;
             if (enemy.initialAnimation.empty()) {
                 enemy.initialAnimation =

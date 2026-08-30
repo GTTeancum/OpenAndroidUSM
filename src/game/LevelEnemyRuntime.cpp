@@ -12,10 +12,7 @@
 namespace usm::game {
 namespace {
 
-// The behavior boundary is recovered from CBehaviorMeleeAttack, but its exact
-// radius is data-driven through EnemysAttackConfigs.bin. Keep this inferred
-// level-one fallback explicit until that config reader is reconstructed.
-constexpr float kMeleeAttackRangeCentimeters = 180.0F;
+constexpr float kRadiansToDegrees = 57.29577951308232F;
 
 assets::Vector3 parseVector3(std::string_view text,
                              assets::Vector3 fallback = {}) noexcept {
@@ -106,29 +103,80 @@ std::array<float, 16> worldMatrix(const assets::Vector3& position,
             1.0F};
 }
 
+assets::Vector3 facingFromMatrix(
+    const std::array<float, 16>& matrix) noexcept {
+    const float length = std::hypot(matrix[4], matrix[5]);
+    if (length <= std::numeric_limits<float>::epsilon()) {
+        return {1.0F, 0.0F, 0.0F};
+    }
+    return {-matrix[4] / length, -matrix[5] / length, 0.0F};
+}
+
+void setFacing(LevelEnemyState& enemy, const assets::Vector3& facing) noexcept {
+    if (enemy.asset == nullptr) {
+        return;
+    }
+    enemy.facing = facing;
+    const assets::Vector3& scale = enemy.asset->scale;
+    enemy.worldTransform = {
+        -facing.y * scale.x,
+        facing.x * scale.x,
+        0.0F,
+        0.0F,
+        -facing.x * scale.y,
+        -facing.y * scale.y,
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        scale.z,
+        0.0F,
+        enemy.position.x,
+        enemy.position.y,
+        enemy.position.z,
+        1.0F};
+}
+
+bool crossedLoopEvent(std::uint32_t previousTime,
+                      std::uint32_t currentTime, std::uint32_t duration,
+                      std::uint32_t eventTime) noexcept {
+    if (duration == 0 || currentTime <= previousTime || eventTime >= duration) {
+        return false;
+    }
+    std::uint64_t nextOccurrence =
+        (static_cast<std::uint64_t>(previousTime) / duration) * duration +
+        eventTime;
+    if (nextOccurrence <= previousTime) {
+        nextOccurrence += duration;
+    }
+    return nextOccurrence <= currentTime;
+}
+
 } // namespace
 
 Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
     states_.clear();
+    pendingPlayerHits_.clear();
+    level_ = &level;
     states_.reserve(level.enemies().size());
     for (const LevelEnemyAsset& enemy : level.enemies()) {
         if (enemy.archetypeIndex >= level.enemyArchetypes().size()) {
             states_.clear();
             return Result::failure("Enemy archetype index is invalid");
         }
-        states_.push_back(
-            {&enemy,
-             enemy.position,
-             enemy.worldTransform,
-             enemy.initialAnimation,
-             0,
-             1.0F,
-             enemy.health,
-             enemy.visible,
-             enemy.aiEnabled,
-             false,
-             enemy.aiEnabled ? EnemyBehaviorState::Idle
-                             : EnemyBehaviorState::Disabled});
+        states_.push_back({&enemy,
+                           enemy.position,
+                           facingFromMatrix(enemy.worldTransform),
+                           enemy.worldTransform,
+                           enemy.initialAnimation,
+                           0,
+                           1.0F,
+                           enemy.health,
+                           enemy.visible,
+                           enemy.aiEnabled,
+                           false,
+                           enemy.aiEnabled ? EnemyBehaviorState::Idle
+                                           : EnemyBehaviorState::Disabled});
     }
     return Result::success();
 }
@@ -178,14 +226,22 @@ void LevelEnemyRuntime::updateGameplay(
             continue;
         }
 
-        if (distanceSquared <=
-            kMeleeAttackRangeCentimeters * kMeleeAttackRangeCentimeters) {
+        const float attackRange = maximumAttackReach(enemy);
+        if (attackRange > 0.0F &&
+            distanceSquared <= attackRange * attackRange) {
+            const EnemyBehaviorState previousBehavior = enemy.behavior;
             enemy.behavior = EnemyBehaviorState::AttackRange;
             const std::string_view idleAnimation =
                 enemy.asset->gameType == "MeleeThugEnemy_knife"
                     ? "idle_knife_at_idle"
                     : "idle_at1_idle";
-            if (enemy.activeAnimation != idleAnimation) {
+            const float distance = std::sqrt(distanceSquared);
+            if (distance > std::numeric_limits<float>::epsilon()) {
+                setFacing(enemy, {toPlayerX / distance, toPlayerY / distance,
+                                  0.0F});
+            }
+            if (enemy.activeAnimation != idleAnimation ||
+                previousBehavior != EnemyBehaviorState::AttackRange) {
                 enemy.activeAnimation = idleAnimation;
                 enemy.animationTimeMilliseconds = 0;
             }
@@ -203,7 +259,7 @@ void LevelEnemyRuntime::updateGameplay(
             enemy.asset->lineSpeedCentimetersPerMillisecond *
             static_cast<float>(elapsedMilliseconds);
         const float travel = std::min(
-            maximumTravel, distance - kMeleeAttackRangeCentimeters);
+            maximumTravel, distance - attackRange);
         assets::Vector3 desired = enemy.position;
         desired.x += facing.x * travel;
         desired.y += facing.y * travel;
@@ -215,31 +271,26 @@ void LevelEnemyRuntime::updateGameplay(
         } else {
             enemy.position = desired;
         }
-        const assets::Vector3 scale = enemy.asset->scale;
-        enemy.worldTransform = {
-            -facing.y * scale.x,
-            facing.x * scale.x,
-            0.0F,
-            0.0F,
-            -facing.x * scale.y,
-            -facing.y * scale.y,
-            0.0F,
-            0.0F,
-            0.0F,
-            0.0F,
-            scale.z,
-            0.0F,
-            enemy.position.x,
-            enemy.position.y,
-            enemy.position.z,
-            1.0F};
+        setFacing(enemy, facing);
         enemy.behavior = EnemyBehaviorState::Chasing;
         if (enemy.activeAnimation != "run") {
             enemy.activeAnimation = "run";
             enemy.animationTimeMilliseconds = 0;
         }
     }
+    std::vector<std::uint32_t> previousAnimationTimes;
+    previousAnimationTimes.reserve(states_.size());
+    for (const LevelEnemyState& enemy : states_) {
+        previousAnimationTimes.push_back(enemy.animationTimeMilliseconds);
+    }
     advanceAnimations(elapsedMilliseconds);
+    for (std::size_t index = 0; index < states_.size(); ++index) {
+        if (states_[index].behavior == EnemyBehaviorState::AttackRange) {
+            queueAuthoredAttackEvents(states_[index],
+                                      previousAnimationTimes[index],
+                                      playerPosition);
+        }
+    }
 }
 
 std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
@@ -291,6 +342,98 @@ std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
         nearest->animationTimeMilliseconds = 0;
     }
     return nearest->asset->objectId;
+}
+
+std::vector<EnemyMeleeHit> LevelEnemyRuntime::consumePlayerHits() noexcept {
+    std::vector<EnemyMeleeHit> hits = std::move(pendingPlayerHits_);
+    pendingPlayerHits_.clear();
+    return hits;
+}
+
+float LevelEnemyRuntime::maximumAttackReach(
+    const LevelEnemyState& enemy) const noexcept {
+    if (level_ == nullptr || enemy.asset == nullptr) {
+        return 0.0F;
+    }
+    float maximumReach = 0.0F;
+    const auto events = level_->enemySpecialActions().findAttackEvents(
+        enemy.asset->enemyTypeId,
+        enemy.asset->gameType == "MeleeThugEnemy_knife"
+            ? "idle_knife_at_idle"
+            : "idle_at1_idle");
+    for (const EnemyAnimationSpecialAction* event : events) {
+        if (event == nullptr || event->attackId < 0 ||
+            event->attackId > std::numeric_limits<std::int16_t>::max()) {
+            continue;
+        }
+        const AttackDefinition* attack = level_->attackConfigs().find(
+            static_cast<std::int16_t>(event->attackId));
+        if (attack != nullptr) {
+            maximumReach = std::max(maximumReach, attack->maximumReach());
+        }
+    }
+    return maximumReach;
+}
+
+void LevelEnemyRuntime::queueAuthoredAttackEvents(
+    LevelEnemyState& enemy, std::uint32_t previousTimeMilliseconds,
+    const assets::Vector3& playerPosition) {
+    if (level_ == nullptr || enemy.asset == nullptr ||
+        enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
+        return;
+    }
+    const EnemyArchetypeAsset& archetype =
+        level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+    const assets::ColladaAnimationClip* clip =
+        archetype.animationBank.findClip(enemy.activeAnimation);
+    if (clip == nullptr || clip->durationMilliseconds() == 0) {
+        return;
+    }
+    const auto events = level_->enemySpecialActions().findAttackEvents(
+        enemy.asset->enemyTypeId, enemy.activeAnimation);
+    for (const EnemyAnimationSpecialAction* event : events) {
+        if (event == nullptr || event->keyFramePercent < 0 ||
+            event->keyFramePercent >= 100 || event->attackId < 0 ||
+            event->attackId > std::numeric_limits<std::int16_t>::max()) {
+            continue;
+        }
+        const std::uint32_t eventTime = static_cast<std::uint32_t>(
+            (static_cast<std::uint64_t>(clip->durationMilliseconds()) *
+             static_cast<std::uint32_t>(event->keyFramePercent)) /
+            100U);
+        if (!crossedLoopEvent(previousTimeMilliseconds,
+                              enemy.animationTimeMilliseconds,
+                              clip->durationMilliseconds(), eventTime)) {
+            continue;
+        }
+        const auto attackId = static_cast<std::int16_t>(event->attackId);
+        const AttackDefinition* attack = level_->attackConfigs().find(attackId);
+        if (attack == nullptr) {
+            continue;
+        }
+        const float toPlayerX = playerPosition.x - enemy.position.x;
+        const float toPlayerY = playerPosition.y - enemy.position.y;
+        const float distance = std::hypot(toPlayerX, toPlayerY);
+        if (distance > attack->maximumReach()) {
+            continue;
+        }
+        if (distance > std::numeric_limits<float>::epsilon()) {
+            const float inverseDistance = 1.0F / distance;
+            const float forwardDot =
+                enemy.facing.x * toPlayerX * inverseDistance +
+                enemy.facing.y * toPlayerY * inverseDistance;
+            const float side = enemy.facing.x * toPlayerY * inverseDistance -
+                               enemy.facing.y * toPlayerX * inverseDistance;
+            const float angleDegrees =
+                std::atan2(side, forwardDot) * kRadiansToDegrees;
+            if (angleDegrees < attack->minimumAngleDegrees ||
+                angleDegrees > attack->maximumAngleDegrees) {
+                continue;
+            }
+        }
+        pendingPlayerHits_.push_back(
+            {enemy.asset->objectId, attackId, attack->damage});
+    }
 }
 
 Result LevelEnemyRuntime::applyCinematicCommand(
@@ -347,6 +490,7 @@ Result LevelEnemyRuntime::applyCinematicCommand(
             enemy->position, orientation,
             enemy->asset == nullptr ? assets::Vector3{1.0F, 1.0F, 1.0F}
                                     : enemy->asset->scale);
+        enemy->facing = facingFromMatrix(enemy->worldTransform);
         return Result::success();
     }
     return Result::success();

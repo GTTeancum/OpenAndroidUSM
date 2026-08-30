@@ -216,6 +216,10 @@ int Application::run(HINSTANCE instance) {
             enemyRuntime_.updateGameplay(deltaMilliseconds,
                                          gameplayPlayer_.position(),
                                          &levelCollision_);
+            for (const game::EnemyMeleeHit& hit :
+                 enemyRuntime_.consumePlayerHits()) {
+                (void)gameplayPlayer_.applyDamage(hit.damage);
+            }
             const assets::ColladaAnimationClip* activeClip =
                 levelOne_.player().animationBank.findClip(
                     gameplayPlayer_.activeAnimation());

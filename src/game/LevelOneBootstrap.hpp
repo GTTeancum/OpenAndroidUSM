@@ -8,6 +8,7 @@
 #include "game/CinematicScript.hpp"
 #include "game/AttackConfig.hpp"
 #include "game/CinematicCamera.hpp"
+#include "game/EnemySpecialActionConfig.hpp"
 #include "game/GameplayCamera.hpp"
 
 #include <array>
@@ -57,6 +58,7 @@ struct LevelPlayerAsset {
     std::int32_t linkedCinematicId{-1};
     std::int32_t endGameCinematicId{-1};
     bool hasCollision{};
+    float health{1000.0F};
     assets::Vector3 position;
     assets::Quaternion rotation;
     assets::Vector3 scale{1.0F, 1.0F, 1.0F};
@@ -104,6 +106,7 @@ struct LevelEnemyAsset {
     std::string name;
     std::string gameType;
     std::string initialAnimation;
+    std::int16_t enemyTypeId{-1};
     std::size_t archetypeIndex{};
     assets::Vector3 position;
     assets::Quaternion rotation;
@@ -191,6 +194,10 @@ public:
     [[nodiscard]] const AttackConfigDatabase& attackConfigs() const noexcept {
         return attackConfigs_;
     }
+    [[nodiscard]] const EnemySpecialActionConfigDatabase&
+    enemySpecialActions() const noexcept {
+        return enemySpecialActions_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -209,6 +216,7 @@ private:
     std::vector<EnemyArchetypeAsset> enemyArchetypes_;
     std::vector<LevelEnemyAsset> enemies_;
     AttackConfigDatabase attackConfigs_;
+    EnemySpecialActionConfigDatabase enemySpecialActions_;
 };
 
 } // namespace usm::game

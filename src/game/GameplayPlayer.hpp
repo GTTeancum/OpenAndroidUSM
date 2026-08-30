@@ -26,6 +26,7 @@ public:
     [[nodiscard]] Result initialize(const LevelPlayerAsset& asset,
                                     const LevelCollision* collision = nullptr);
     [[nodiscard]] bool requestPunch() noexcept;
+    [[nodiscard]] bool applyDamage(float damage) noexcept;
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
     [[nodiscard]] bool consumePunchImpact() noexcept;
@@ -43,6 +44,9 @@ public:
         return activeAnimation_;
     }
     [[nodiscard]] std::uint32_t animationTimeMilliseconds() const noexcept;
+    [[nodiscard]] float health() const noexcept { return health_; }
+    [[nodiscard]] float maximumHealth() const noexcept { return maximumHealth_; }
+    [[nodiscard]] bool dead() const noexcept { return health_ <= 0.0F; }
 
 private:
     enum class AttackState {
@@ -64,6 +68,8 @@ private:
     AttackState attackState_{AttackState::None};
     bool punchImpactPending_{};
     bool punchImpactEmitted_{};
+    float health_{1000.0F};
+    float maximumHealth_{1000.0F};
 };
 
 } // namespace usm::game

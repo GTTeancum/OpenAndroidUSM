@@ -45,6 +45,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     attackState_ = AttackState::None;
     punchImpactPending_ = false;
     punchImpactEmitted_ = false;
+    maximumHealth_ = std::max(asset.health, 1.0F);
+    health_ = maximumHealth_;
     if (collision_ != nullptr) {
         assets::Vector3 grounded;
         (void)collision_->resolveGroundMotion(position_, position_, grounded,
@@ -58,7 +60,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
 }
 
 bool GameplayPlayer::requestPunch() noexcept {
-    if (attackState_ != AttackState::None) {
+    if (attackState_ != AttackState::None || dead()) {
         return false;
     }
     attackState_ = AttackState::PunchRight;
@@ -68,9 +70,20 @@ bool GameplayPlayer::requestPunch() noexcept {
     return true;
 }
 
+bool GameplayPlayer::applyDamage(float damage) noexcept {
+    if (damage <= 0.0F || dead()) {
+        return false;
+    }
+    health_ = std::max(0.0F, health_ - damage);
+    return true;
+}
+
 void GameplayPlayer::update(const PlayerMotionInput& input,
                             const CameraPose& camera,
                             std::uint32_t elapsedMilliseconds) noexcept {
+    if (dead()) {
+        return;
+    }
     if (attackState_ != AttackState::None) {
         animationTimeMilliseconds_ += elapsedMilliseconds;
         if (attackState_ == AttackState::PunchRight) {
