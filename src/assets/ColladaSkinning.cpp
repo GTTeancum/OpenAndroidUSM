@@ -6,13 +6,15 @@
 #include <limits>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 namespace usm::assets {
 namespace {
 
 struct Matrix4 {
     // Column-major, matching Irrlicht's CMatrix4 indexing in the preserved
-    // CColladaSkinnedMesh::skin implementation.
+    // CColladaSkinnedMesh::skin implementation. Scene-node quaternions use
+    // quaternion::getMatrix_transposed before hierarchy multiplication.
     std::array<float, 16> value{1.0F, 0.0F, 0.0F, 0.0F,
                                 0.0F, 1.0F, 0.0F, 0.0F,
                                 0.0F, 0.0F, 1.0F, 0.0F,
@@ -59,15 +61,15 @@ Matrix4 localMatrix(const Vector3& position, Quaternion rotation,
     Matrix4 result;
     result.value = {
         (1.0F - 2.0F * (yy + zz)) * scale.x,
-        (2.0F * (xy + wz)) * scale.x,
-        (2.0F * (xz - wy)) * scale.x,
+        (2.0F * (xy - wz)) * scale.x,
+        (2.0F * (xz + wy)) * scale.x,
         0.0F,
-        (2.0F * (xy - wz)) * scale.y,
+        (2.0F * (xy + wz)) * scale.y,
         (1.0F - 2.0F * (xx + zz)) * scale.y,
-        (2.0F * (yz + wx)) * scale.y,
+        (2.0F * (yz - wx)) * scale.y,
         0.0F,
-        (2.0F * (xz + wy)) * scale.z,
-        (2.0F * (yz - wx)) * scale.z,
+        (2.0F * (xz - wy)) * scale.z,
+        (2.0F * (yz + wx)) * scale.z,
         (1.0F - 2.0F * (xx + yy)) * scale.z,
         0.0F,
         position.x,
@@ -166,6 +168,17 @@ Result buildWorldMatrices(const ColladaMeshFile& mesh,
             const ColladaAnimationSample sample =
                 translation->sample(timestampMilliseconds);
             position = {sample.value[0], sample.value[1], sample.value[2]};
+        }
+        for (const auto [property, component] :
+             {std::pair{ColladaAnimationProperty::TranslationX, 0U},
+              std::pair{ColladaAnimationProperty::TranslationY, 1U},
+              std::pair{ColladaAnimationProperty::TranslationZ, 2U}}) {
+            if (const ColladaAnimationTrack* translation =
+                    findTrack(animation, node.id, property)) {
+                const ColladaAnimationSample sample =
+                    translation->sample(timestampMilliseconds);
+                (&position.x)[component] = sample.value[0];
+            }
         }
         if (const ColladaAnimationTrack* rotationTrack = findTrack(
                 animation, node.id, ColladaAnimationProperty::Rotation)) {

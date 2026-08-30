@@ -249,6 +249,26 @@ int main() {
         assert(bootstrap.player().textures.size() == 2);
         assert(bootstrap.player().animationBank.tracks().size() == 46);
         assert(bootstrap.player().animationBank.clips().size() == 242);
+        assert(bootstrap.player().animationBank.tracks()[1].property ==
+               usm::assets::ColladaAnimationProperty::TranslationZ);
+        assert(bootstrap.player().animationBank.tracks()[40].property ==
+               usm::assets::ColladaAnimationProperty::Translation);
+        assert(bootstrap.player().animationBank.tracks()[44].property ==
+               usm::assets::ColladaAnimationProperty::TranslationX);
+        std::vector<usm::assets::ColladaGeometry> idlePose;
+        const auto* recoveredIdle =
+            bootstrap.player().animationBank.findClip("idle_stand");
+        assert(recoveredIdle != nullptr);
+        assert(usm::assets::evaluateColladaPose(
+            bootstrap.player().mesh, bootstrap.player().animationBank,
+            recoveredIdle->startMilliseconds, idlePose));
+        assert(idlePose.size() == 1);
+        assert(std::abs(idlePose.front().bounds.minimum.x - -51.1281F) < 0.05F);
+        assert(std::abs(idlePose.front().bounds.minimum.y - -68.0298F) < 0.05F);
+        assert(std::abs(idlePose.front().bounds.minimum.z - -1.47334F) < 0.05F);
+        assert(std::abs(idlePose.front().bounds.maximum.x - 46.8421F) < 0.05F);
+        assert(std::abs(idlePose.front().bounds.maximum.y - 49.5647F) < 0.05F);
+        assert(std::abs(idlePose.front().bounds.maximum.z - 134.96F) < 0.05F);
         if (bootstrap.cameraAreas().empty()) {
             std::cerr << "No gameplay camera areas were reconstructed\n";
             return 1;

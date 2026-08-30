@@ -8,6 +8,7 @@
 #include <chrono>
 #include <string>
 #include <filesystem>
+#include <limits>
 
 namespace usm {
 namespace {
@@ -67,6 +68,16 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    result = gameplayCamera_.bind(levelOne_.cameraAreas(),
+                                  levelOne_.player().initialCameraAreaId);
+    if (!result) {
+        return fail(result.message());
+    }
+    const assets::ColladaAnimationClip* idleClip =
+        levelOne_.player().animationBank.findClip("idle_stand");
+    if (idleClip == nullptr) {
+        return fail("The player animation bank has no idle_stand clip");
+    }
 
     const auto introStart = std::chrono::steady_clock::now();
     while (window_.pumpMessages()) {
@@ -77,9 +88,10 @@ int Application::run(HINSTANCE instance) {
         });
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - introStart);
-        const auto timestamp = static_cast<std::uint32_t>(std::min<std::int64_t>(
-            elapsed.count(),
-            levelOne_.introCameraAnimation().durationMilliseconds()));
+        const auto introDuration =
+            levelOne_.introCameraAnimation().durationMilliseconds();
+        const auto timestamp = static_cast<std::uint32_t>(
+            std::min<std::int64_t>(elapsed.count(), introDuration));
         Result soundResult = Result::success();
         result = introPlayer_.advanceTo(
             timestamp,
@@ -103,7 +115,21 @@ int Application::run(HINSTANCE instance) {
         if (!result) {
             return fail(result.message());
         }
-        result = renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
+        if (elapsed.count() < introDuration) {
+            result =
+                renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
+        } else {
+            const auto gameplayTime = static_cast<std::uint32_t>(
+                std::min<std::int64_t>(elapsed.count() - introDuration,
+                                       std::numeric_limits<std::uint32_t>::max()));
+            result = renderer_.updateLevelOnePlayer(
+                levelOne_, *idleClip, gameplayTime,
+                levelOne_.player().worldTransform);
+            if (result) {
+                result = renderer_.setCamera(
+                    gameplayCamera_.sample(levelOne_.player().position));
+            }
+        }
         if (!result) {
             return fail(result.message());
         }

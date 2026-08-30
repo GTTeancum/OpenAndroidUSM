@@ -17,6 +17,9 @@ namespace usm::assets {
 enum class ColladaAnimationProperty {
     Unknown,
     Translation,
+    TranslationX,
+    TranslationY,
+    TranslationZ,
     Rotation,
 };
 

@@ -149,6 +149,18 @@ select authored animation ranges rather than using guessed frame intervals.
 Five FX attachment channels contain a duplicated pre-roll transform under a
 serialized `0xe5555700` timestamp before their time-zero key; the native view
 discards that sentinel and retains the monotonic authored bank timeline.
+The `SChannel` target enum also distinguishes full float3 translation (1)
+from scalar X/Y/Z channels (2/3/4) and quaternion rotation (5). This matters
+for the gameplay bank: `Bip01-node-translation` is a scalar Z channel, while
+`Dummy_center-node-translation` is a full vector. Preserving those component
+semantics prevents scalar root height from incorrectly replacing all three
+coordinates during skin evaluation.
+Quaternion keys use the original shortest-path spherical interpolation rather
+than component-wise interpolation. Joint-local matrices also follow
+`ISceneNode::getRelativeTransformation` at image `0x004083c4`, which calls
+`quaternion::getMatrix_transposed`; using the non-transposed helper produced a
+coherent but inverted skeleton. The recovered `idle_stand` pose now remains
+grounded with a 136-unit vertical extent, covered by a core pose regression.
 
 The intro's `MustBeVisible` command names Rooms 1 through 5. The native level
 bootstrap loads those five authored room scenes, their `geometry01` through
@@ -210,6 +222,14 @@ That renderer's preserved `onSetMaterial` at `0x00455be0` sets
 the secondary layer with view-space normal sphere coordinates and adds it to
 the lit diffuse result, reproducing the colored edge/rim highlights rather
 than treating the 32x32 map as ordinary mesh UV data.
+
+At the end of the 53,033 ms camera animation, the application now follows the
+authored cinematic successor 1266 by releasing the intro camera and switching
+object 288 from `spiderman_lv1_start.bdae` to the persistent player's
+`spiderman_anim.bdae` bank. The same dynamic D3D11 actor buffer is reused,
+starts on the named looping `idle_stand` clip, receives the serialized player
+world transform, and is viewed through initial CameraArea 283. A WARP capture
+regression covers this native cinematic-to-gameplay render transition.
 
 ## Vox sound events
 

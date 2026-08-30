@@ -156,6 +156,32 @@ int main() {
         assert(gameRenderer.readBackImage(actorFrame));
         captureIfRequested(actorFrame, "intro-20000.bmp");
         assert(actorFrame.pixels.size() == rendered.pixels.size());
+
+        const auto* idleClip =
+            levelOne.player().animationBank.findClip("idle_stand");
+        assert(idleClip != nullptr);
+        usm::game::GameplayCamera gameplayCamera;
+        assert(gameplayCamera.bind(levelOne.cameraAreas(),
+                                   levelOne.player().initialCameraAreaId));
+        assert(gameRenderer.updateLevelOneActors(
+            levelOne,
+            levelOne.introCameraAnimation().durationMilliseconds()));
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *idleClip, 0, levelOne.player().worldTransform));
+        assert(gameRenderer.setCamera(
+            gameplayCamera.sample(levelOne.player().position)));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayFrame;
+        assert(gameRenderer.readBackImage(gameplayFrame));
+        captureIfRequested(gameplayFrame, "gameplay-start.bmp");
+        assert(gameplayFrame.pixels.size() == rendered.pixels.size());
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *idleClip, idleClip->durationMilliseconds() / 2,
+            levelOne.player().worldTransform));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayMiddleFrame;
+        assert(gameRenderer.readBackImage(gameplayMiddleFrame));
+        captureIfRequested(gameplayMiddleFrame, "gameplay-idle-middle.bmp");
     }
     return 0;
 }

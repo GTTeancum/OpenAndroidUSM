@@ -34,6 +34,11 @@ public:
     [[nodiscard]] Result updateLevelOneActors(
         const game::LevelOneBootstrap& levelOne,
         std::uint32_t timestampMilliseconds);
+    [[nodiscard]] Result updateLevelOnePlayer(
+        const game::LevelOneBootstrap& levelOne,
+        const assets::ColladaAnimationClip& clip,
+        std::uint32_t clipTimeMilliseconds,
+        const std::array<float, 16>& worldTransform);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -85,6 +90,10 @@ private:
     [[nodiscard]] Result createTextureView(
         std::span<const assets::RgbaImage> mipLevels,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);
+    [[nodiscard]] Result updateDynamicMesh(
+        GpuMesh& gpuMesh,
+        std::span<const assets::ColladaGeometry> animatedGeometry,
+        const std::array<float, 16>* worldTransform);
     void bindRenderTarget(std::uint32_t width, std::uint32_t height);
 
     Microsoft::WRL::ComPtr<ID3D11Device> device_;

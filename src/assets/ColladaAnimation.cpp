@@ -68,7 +68,24 @@ private:
     std::span<const std::byte> bytes_;
 };
 
-ColladaAnimationProperty propertyFromId(std::string_view id) noexcept {
+ColladaAnimationProperty propertyFromChannel(
+    std::uint32_t channelType, std::string_view id) noexcept {
+    // SCollada channel target enum used by CColladaDatabase::constructAnimation.
+    // Values 2-4 are scalar X/Y/Z position channels; value 1 is a float3.
+    switch (channelType) {
+    case 1:
+        return ColladaAnimationProperty::Translation;
+    case 2:
+        return ColladaAnimationProperty::TranslationX;
+    case 3:
+        return ColladaAnimationProperty::TranslationY;
+    case 4:
+        return ColladaAnimationProperty::TranslationZ;
+    case 5:
+        return ColladaAnimationProperty::Rotation;
+    default:
+        break;
+    }
     if (id.ends_with("-translation")) {
         return ColladaAnimationProperty::Translation;
     }
@@ -93,7 +110,8 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     }
     const auto id = view.string(*idOffset);
     const auto targetOffset = view.integer<std::uint32_t>(*channelsOffset + 4);
-    if (!id || !targetOffset) {
+    const auto channelType = view.integer<std::uint32_t>(*channelsOffset + 8);
+    if (!id || !targetOffset || !channelType) {
         return Result::failure("BDAE animation names are invalid");
     }
     const auto target = view.string(*targetOffset);
@@ -144,7 +162,7 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
 
     output.id = *id;
     output.targetNode = *target;
-    output.property = propertyFromId(output.id);
+    output.property = propertyFromChannel(*channelType, output.id);
     output.componentCount = componentCount;
     output.timestampsMilliseconds.reserve(*timeCount - firstKey);
     for (std::uint32_t index = firstKey; index < *timeCount; ++index) {
@@ -273,21 +291,39 @@ ColladaAnimationSample ColladaAnimationTrack::sample(
                            static_cast<float>(interval);
     }
     float rotationSign = 1.0F;
+    float rotationDot = 0.0F;
     if (property == ColladaAnimationProperty::Rotation &&
         componentCount == 4 && left != right) {
-        float dot = 0.0F;
         for (std::uint32_t component = 0; component < componentCount;
              ++component) {
-            dot += values[left * componentCount + component] *
-                   values[right * componentCount + component];
+            rotationDot += values[left * componentCount + component] *
+                           values[right * componentCount + component];
         }
-        rotationSign = dot < 0.0F ? -1.0F : 1.0F;
+        rotationSign = rotationDot < 0.0F ? -1.0F : 1.0F;
+        rotationDot = std::abs(rotationDot);
     }
-    for (std::uint32_t component = 0; component < componentCount; ++component) {
-        const float first = values[left * componentCount + component];
-        const float second =
-            values[right * componentCount + component] * rotationSign;
-        result.value[component] = first + (second - first) * factor;
+    if (property == ColladaAnimationProperty::Rotation &&
+        componentCount == 4 && left != right && rotationDot < 0.9995F) {
+        const float angle = std::acos(std::clamp(rotationDot, 0.0F, 1.0F));
+        const float denominator = std::sin(angle);
+        const float leftWeight = std::sin((1.0F - factor) * angle) /
+                                 denominator;
+        const float rightWeight = std::sin(factor * angle) / denominator;
+        for (std::uint32_t component = 0; component < componentCount;
+             ++component) {
+            result.value[component] =
+                values[left * componentCount + component] * leftWeight +
+                values[right * componentCount + component] * rotationSign *
+                    rightWeight;
+        }
+    } else {
+        for (std::uint32_t component = 0; component < componentCount;
+             ++component) {
+            const float first = values[left * componentCount + component];
+            const float second =
+                values[right * componentCount + component] * rotationSign;
+            result.value[component] = first + (second - first) * factor;
+        }
     }
     if (property == ColladaAnimationProperty::Rotation && componentCount == 4) {
         const float length = std::sqrt(
