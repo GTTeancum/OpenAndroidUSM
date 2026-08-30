@@ -1085,6 +1085,54 @@ int main() {
                    [](const usm::game::LevelCinematicAsset& cinematic) {
                        return cinematic.cameraTrack.valid();
                    }) == 8);
+        assert(std::count_if(
+                   bootstrap.cinematics().begin(),
+                   bootstrap.cinematics().end(),
+                   [](const usm::game::LevelCinematicAsset& cinematic) {
+                       return cinematic.hasColladaPlayback();
+                   }) == 3);
+        const auto beforeBossCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 1254;
+            });
+        assert(beforeBossCinematic != bootstrap.cinematics().end());
+        assert(beforeBossCinematic->cameraAnimationFile ==
+               "meshes_bin/camera_lv1_beforeboss.bdae");
+        assert(beforeBossCinematic->animatedCamera.valid());
+        assert(beforeBossCinematic->actors.size() == 2);
+        assert(beforeBossCinematic->actors.front().objectId == 288);
+        assert(beforeBossCinematic->actors.back().objectId == 1272);
+        assert(beforeBossCinematic->actors.back()
+                   .animationStartMilliseconds == 15700);
+        assert(beforeBossCinematic->colladaDurationMilliseconds > 34000);
+        assert(beforeBossCinematic->nextCinematicId == 1256);
+        assert(!beforeBossCinematic->levelEndAfterPlayback);
+        assert(!beforeBossCinematic->gameEndAfterPlayback);
+        const auto levelEndCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 1238;
+            });
+        assert(levelEndCinematic != bootstrap.cinematics().end());
+        assert(levelEndCinematic->actors.size() == 4);
+        assert(levelEndCinematic->actors.back().objectId == 1275);
+        assert(levelEndCinematic->actors.back()
+                   .animationStartMilliseconds == 28650);
+        assert(levelEndCinematic->nextCinematicId == -1);
+        assert(levelEndCinematic->levelEndAfterPlayback);
+        assert(!levelEndCinematic->gameEndAfterPlayback);
+        const auto gameOverCinematic = std::find_if(
+            bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 1267;
+            });
+        assert(gameOverCinematic != bootstrap.cinematics().end());
+        assert(gameOverCinematic->actors.size() == 4);
+        assert(gameOverCinematic->animatedCamera.sample(0).farPlane ==
+               20000.0F);
+        assert(!gameOverCinematic->levelEndAfterPlayback);
+        assert(gameOverCinematic->gameEndAfterPlayback);
         const auto enemyGateCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {

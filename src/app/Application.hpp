@@ -56,6 +56,7 @@ private:
     game::QuickTimeEventRuntime quickTimeEvent_;
     const game::LevelCinematicAsset* activeGameplayCinematic_{};
     std::uint32_t gameplayCinematicTimeMilliseconds_{};
+    std::uint32_t gameplayCinematicDurationMilliseconds_{};
 };
 
 } // namespace usm

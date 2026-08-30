@@ -151,6 +151,18 @@ struct LevelCinematicAsset {
     bool scriptAvailable{};
     CinematicScript script;
     CinematicCameraTrack cameraTrack;
+    std::string cameraAnimationFile;
+    assets::ColladaAnimationFile cameraAnimation;
+    CinematicCamera animatedCamera;
+    std::vector<CinematicActorAsset> actors;
+    std::uint32_t colladaDurationMilliseconds{};
+    std::int32_t nextCinematicId{-1};
+    bool levelEndAfterPlayback{};
+    bool gameEndAfterPlayback{};
+
+    [[nodiscard]] bool hasColladaPlayback() const noexcept {
+        return animatedCamera.valid();
+    }
 };
 
 struct EnemyArchetypeAsset {

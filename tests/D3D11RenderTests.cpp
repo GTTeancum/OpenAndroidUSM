@@ -197,6 +197,47 @@ int main() {
         assert(gameRenderer.readBackImage(gameplayFrame));
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
+        const auto beforeBossCinematic = std::find_if(
+            levelOne.cinematics().begin(), levelOne.cinematics().end(),
+            [](const usm::game::LevelCinematicAsset& cinematic) {
+                return cinematic.objectId == 1254;
+            });
+        assert(beforeBossCinematic != levelOne.cinematics().end());
+        assert(gameRenderer.updateGameplayCinematicActors(
+            levelOne, &*beforeBossCinematic, 0));
+        assert(gameRenderer.setCamera(
+            beforeBossCinematic->animatedCamera.sample(0)));
+        gameRenderer.renderFrame();
+        RgbaImage beforeBossStartFrame;
+        assert(gameRenderer.readBackImage(beforeBossStartFrame));
+        captureIfRequested(beforeBossStartFrame, "before-boss-00000.bmp");
+        assert(gameRenderer.updateGameplayCinematicActors(
+            levelOne, &*beforeBossCinematic, 16000));
+        assert(gameRenderer.setCamera(
+            beforeBossCinematic->animatedCamera.sample(16000)));
+        gameRenderer.renderFrame();
+        RgbaImage beforeBossSandmanFrame;
+        assert(gameRenderer.readBackImage(beforeBossSandmanFrame));
+        captureIfRequested(beforeBossSandmanFrame,
+                           "before-boss-16000.bmp");
+        std::size_t beforeBossChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < beforeBossStartFrame.pixels.size(); component += 4) {
+            beforeBossChangedPixels +=
+                beforeBossStartFrame.pixels[component] !=
+                    beforeBossSandmanFrame.pixels[component] ||
+                beforeBossStartFrame.pixels[component + 1] !=
+                    beforeBossSandmanFrame.pixels[component + 1] ||
+                beforeBossStartFrame.pixels[component + 2] !=
+                    beforeBossSandmanFrame.pixels[component + 2];
+        }
+        assert(beforeBossChangedPixels > 100);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *idleClip, 0, levelOne.player().worldTransform));
+        assert(gameRenderer.updateGameplayCinematicActors(levelOne, nullptr,
+                                                          0));
+        assert(gameRenderer.setCamera(
+            gameplayCamera.sample(levelOne.player().position)));
         assert(gameRenderer.updatePlayerHud(levelOne.hud(), 0.65F, 0.85F,
                                             1.0F));
         gameRenderer.renderFrame();

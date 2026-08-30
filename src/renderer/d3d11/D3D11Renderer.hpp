@@ -35,6 +35,10 @@ public:
     [[nodiscard]] Result updateLevelOneActors(
         const game::LevelOneBootstrap& levelOne,
         std::uint32_t timestampMilliseconds);
+    [[nodiscard]] Result updateGameplayCinematicActors(
+        const game::LevelOneBootstrap& levelOne,
+        const game::LevelCinematicAsset* cinematic,
+        std::uint32_t timestampMilliseconds);
     [[nodiscard]] Result updateLevelOnePlayer(
         const game::LevelOneBootstrap& levelOne,
         const assets::ColladaAnimationClip& clip,
@@ -139,6 +143,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
+    std::size_t gameplayCinematicMeshStart_{};
     std::size_t enemyMeshStart_{};
     std::uint32_t hudVertexCount_{};
     std::uint32_t hudVertexCapacity_{};

@@ -568,6 +568,25 @@ cinematic 20010. `InterfaceControl` now also preserves the original
 `ControlEnable` and `BlackEnable` state, so gameplay input and encounter
 triggers cannot interfere while the QTE owns control.
 
+## In-level Collada cinematics
+
+The intro's source-level Collada camera/actor path now covers the three other
+level-one `PlayDAECamera` streams: before-boss cinematic 1254, ending 1238,
+and game-over 1267. Bootstrap resolves the authored camera and every
+`PlayDAEAnim` target back to its named scene node, loads ten cutscene actor
+animations, preserves delayed starts (Sandman at 15,700 ms and Rhino at
+28,650 ms), and extends playback until both the CFF commands and all Collada
+tracks finish. The far-plane override and the `level end`, `game end`, and
+successor fields remain typed on each `LevelCinematicAsset`; 1254 therefore
+continues into authored cinematic 1256 after playback.
+
+D3D11 uploads these actors as hidden dynamic meshes. During playback it
+updates only the active cinematic set, replaces matching persistent player or
+enemy meshes, samples the authored animated camera, and restores gameplay
+actors afterward. Gameplay controls and enemy simulation are suspended while
+a full Collada cinematic owns the scene. A WARP regression renders cinematic
+1254 before and after the delayed Sandman entrance.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

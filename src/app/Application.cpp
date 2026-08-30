@@ -191,7 +191,15 @@ int Application::run(HINSTANCE instance) {
         }
         activeGameplayCinematic_ = &*cinematic;
         gameplayCinematicTimeMilliseconds_ = 0;
-        return gameplayCinematicPlayer_.start(cinematic->script);
+        Result startResult = gameplayCinematicPlayer_.start(cinematic->script);
+        if (!startResult) {
+            activeGameplayCinematic_ = nullptr;
+            return startResult;
+        }
+        gameplayCinematicDurationMilliseconds_ = std::max(
+            gameplayCinematicPlayer_.durationMilliseconds(),
+            cinematic->colladaDurationMilliseconds);
+        return Result::success();
     };
 
     const auto introStart = std::chrono::steady_clock::now();
@@ -260,7 +268,9 @@ int Application::run(HINSTANCE instance) {
             }
             const bool controlsEnabled =
                 levelCinematicRuntime_.controlsEnabled() &&
-                !quickTimeEvent_.active();
+                !quickTimeEvent_.active() &&
+                !(activeGameplayCinematic_ != nullptr &&
+                  activeGameplayCinematic_->hasColladaPlayback());
             if (!controlsEnabled) {
                 motion = {};
             }
@@ -333,7 +343,7 @@ int Application::run(HINSTANCE instance) {
                     std::min<std::uint32_t>(
                         gameplayCinematicTimeMilliseconds_ +
                             deltaMilliseconds,
-                        gameplayCinematicPlayer_.durationMilliseconds());
+                        gameplayCinematicDurationMilliseconds_);
                 Result commandResult = Result::success();
                 result = gameplayCinematicPlayer_.advanceToConditional(
                     gameplayCinematicTimeMilliseconds_,
@@ -384,10 +394,19 @@ int Application::run(HINSTANCE instance) {
                 if (result && !commandResult) {
                     result = commandResult;
                 }
-                if (result && gameplayCinematicPlayer_.finished()) {
+                if (result && gameplayCinematicPlayer_.finished() &&
+                    gameplayCinematicTimeMilliseconds_ >=
+                        gameplayCinematicDurationMilliseconds_) {
+                    const game::LevelCinematicAsset* completedCinematic =
+                        activeGameplayCinematic_;
                     activeGameplayCinematic_ = nullptr;
                     auto chainedCinematics = levelCinematicRuntime_
                                                  .consumeCinematicStartRequests();
+                    if (chainedCinematics.empty() &&
+                        completedCinematic->nextCinematicId >= 0) {
+                        chainedCinematics.push_back(
+                            completedCinematic->nextCinematicId);
+                    }
                     if (chainedCinematics.size() > 1) {
                         result = Result::failure(
                             "Concurrent gameplay cinematics are not yet "
@@ -405,9 +424,12 @@ int Application::run(HINSTANCE instance) {
                     quickTimeEvent_.consumeCinematicRequest()) {
                 result = startGameplayCinematic(*qteCinematic);
             }
-            enemyRuntime_.updateGameplay(deltaMilliseconds,
-                                         gameplayPlayer_.position(),
-                                         &levelCollision_);
+            if (activeGameplayCinematic_ == nullptr ||
+                !activeGameplayCinematic_->hasColladaPlayback()) {
+                enemyRuntime_.updateGameplay(deltaMilliseconds,
+                                             gameplayPlayer_.position(),
+                                             &levelCollision_);
+            }
             for (const game::EnemySoundCue& cue :
                  enemyRuntime_.consumeSoundCues()) {
                 result = enemySounds_.dispatch(cue.voxSoundId,
@@ -454,12 +476,22 @@ int Application::run(HINSTANCE instance) {
                                                          enemyRuntime_);
             }
             if (result) {
+                result = renderer_.updateGameplayCinematicActors(
+                    levelOne_, activeGameplayCinematic_,
+                    gameplayCinematicTimeMilliseconds_);
+            }
+            if (result) {
                 result = renderer_.updateEnemyGunLines(
                     enemyRuntime_.gunLines());
             }
             if (result) {
                 if (activeGameplayCinematic_ != nullptr &&
-                    activeGameplayCinematic_->cameraTrack.valid()) {
+                    activeGameplayCinematic_->hasColladaPlayback()) {
+                    result = renderer_.setCamera(
+                        activeGameplayCinematic_->animatedCamera.sample(
+                            gameplayCinematicTimeMilliseconds_));
+                } else if (activeGameplayCinematic_ != nullptr &&
+                           activeGameplayCinematic_->cameraTrack.valid()) {
                     result = renderer_.setCamera(
                         activeGameplayCinematic_->cameraTrack.sample(
                             gameplayCinematicTimeMilliseconds_));

@@ -172,6 +172,78 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
     return Result::success();
 }
 
+bool parseFloatText(std::string_view text, float& value) noexcept {
+    if (text.empty()) {
+        return false;
+    }
+    const std::string storage(text);
+    char* end = nullptr;
+    value = std::strtof(storage.c_str(), &end);
+    return end != storage.c_str() && *end == '\0';
+}
+
+bool parseIntegerText(std::string_view text, std::int32_t& value) noexcept {
+    const auto parsed =
+        std::from_chars(text.data(), text.data() + text.size(), value);
+    return parsed.ec == std::errc{} &&
+           parsed.ptr == text.data() + text.size();
+}
+
+Result loadCinematicActor(filesystem::GbmpArchive& levelArchive,
+                          filesystem::GbmpArchive& entityArchive,
+                          const assets::IrrSceneNode& sceneNode,
+                          const CinematicCommand& command,
+                          std::int32_t objectId,
+                          CinematicActorAsset& actor) {
+    const CinematicAttribute* animationFile =
+        command.findAttribute("AnimFile");
+    if (animationFile == nullptr || sceneNode.meshFile.empty()) {
+        return Result::failure(
+            "Cinematic actor command has no mesh or animation file");
+    }
+
+    actor = {};
+    actor.objectId = objectId;
+    actor.sceneNodeName = sceneNode.name;
+    actor.animationStartMilliseconds = command.timestampMilliseconds;
+    actor.position = sceneNode.position;
+    actor.rotation = sceneNode.rotation;
+    actor.scale = sceneNode.scale;
+    actor.worldTransform = sceneNode.absoluteTransform;
+
+    const std::string meshPath = normalizeArchivePath(sceneNode.meshFile);
+    filesystem::GbmpArchive* meshArchive =
+        entityArchive.find(meshPath) != nullptr ? &entityArchive
+                                                : &levelArchive;
+    if (meshArchive->find(meshPath) == nullptr) {
+        return Result::failure("Could not locate cinematic actor mesh " +
+                               sceneNode.meshFile);
+    }
+    std::vector<std::byte> resource;
+    Result result = meshArchive->read(meshPath, resource);
+    if (!result || !(result = actor.mesh.load(resource))) {
+        return Result::failure("Could not load cinematic actor " +
+                               actor.sceneNodeName + ": " +
+                               result.message());
+    }
+    filesystem::GbmpArchive* textureFallback =
+        meshArchive == &entityArchive ? &levelArchive : &entityArchive;
+    result = loadTextures(*meshArchive, textureFallback, actor.mesh,
+                          actor.textures, actor.sceneNodeName);
+    if (!result) {
+        return result;
+    }
+    const std::string animationPath =
+        normalizeArchivePath(animationFile->value);
+    result = levelArchive.read(animationPath, resource);
+    if (!result || !(result = actor.animation.load(resource))) {
+        return Result::failure("Could not load animation for " +
+                               actor.sceneNodeName + ": " +
+                               result.message());
+    }
+    return Result::success();
+}
+
 } // namespace
 
 Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
@@ -778,6 +850,100 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                                        enemy.initialAnimation + " is missing");
             }
             enemies_.push_back(std::move(enemy));
+        }
+    }
+
+    // Cinematic 1265 is retained by the dedicated boot sequence below. The
+    // other PlayDAECamera streams are loaded here for native in-level
+    // playback using the same scene-node actor bindings.
+    for (LevelCinematicAsset& cinematic : cinematics_) {
+        if (!cinematic.scriptAvailable || cinematic.objectId == 1265) {
+            continue;
+        }
+        const CinematicCommand* cameraCommand = nullptr;
+        for (const CinematicThread& thread : cinematic.script.threads()) {
+            for (const CinematicCommand& command : thread.commands) {
+                if (command.name == "PlayDAECamera") {
+                    if (cameraCommand != nullptr) {
+                        return Result::failure(
+                            "Cinematic has multiple PlayDAECamera commands");
+                    }
+                    cameraCommand = &command;
+                }
+            }
+        }
+        if (cameraCommand == nullptr) {
+            continue;
+        }
+        const CinematicAttribute* cameraFile =
+            cameraCommand->findAttribute("CameraAnimFile");
+        const CinematicAttribute* farPlane =
+            cameraCommand->findAttribute("farPlane");
+        const CinematicAttribute* nextCinematic =
+            cameraCommand->findAttribute("^ID^Cinematic^Next");
+        float farPlaneOverride = 0.0F;
+        if (cameraFile == nullptr || farPlane == nullptr ||
+            nextCinematic == nullptr ||
+            !parseFloatText(farPlane->value, farPlaneOverride) ||
+            !parseIntegerText(nextCinematic->value,
+                              cinematic.nextCinematicId)) {
+            return Result::failure(
+                "PlayDAECamera has invalid camera attributes");
+        }
+        if (const CinematicAttribute* levelEnd =
+                cameraCommand->findAttribute("level end")) {
+            cinematic.levelEndAfterPlayback = levelEnd->value == "true" ||
+                                              levelEnd->value == "1";
+        }
+        if (const CinematicAttribute* gameEnd =
+                cameraCommand->findAttribute("game end")) {
+            cinematic.gameEndAfterPlayback = gameEnd->value == "true" ||
+                                             gameEnd->value == "1";
+        }
+        cinematic.cameraAnimationFile =
+            normalizeArchivePath(cameraFile->value);
+        result = levelArchive.read(cinematic.cameraAnimationFile, resource);
+        if (!result ||
+            !(result = cinematic.cameraAnimation.load(resource)) ||
+            !(result = cinematic.animatedCamera.bind(
+                  cinematic.cameraAnimation, farPlaneOverride))) {
+            return Result::failure("Could not load animated camera for " +
+                                   cinematic.name + ": " +
+                                   result.message());
+        }
+        cinematic.colladaDurationMilliseconds =
+            cinematic.cameraAnimation.durationMilliseconds();
+
+        for (const CinematicThread& thread : cinematic.script.threads()) {
+            for (const CinematicCommand& command : thread.commands) {
+                if (command.name != "PlayDAEAnim") {
+                    continue;
+                }
+                const assets::IrrSceneNode* sceneNode =
+                    findLevelNode(mainScene_, rooms_, thread.objectId);
+                if (sceneNode == nullptr) {
+                    return Result::failure(
+                        "Cinematic actor command has no matching scene node");
+                }
+                CinematicActorAsset actor;
+                result = loadCinematicActor(levelArchive, entityArchive,
+                                            *sceneNode, command,
+                                            thread.objectId, actor);
+                if (!result) {
+                    return Result::failure("Could not load actors for " +
+                                           cinematic.name + ": " +
+                                           result.message());
+                }
+                cinematic.colladaDurationMilliseconds =
+                    std::max(cinematic.colladaDurationMilliseconds,
+                             actor.animationStartMilliseconds +
+                                 actor.animation.durationMilliseconds());
+                cinematic.actors.push_back(std::move(actor));
+            }
+        }
+        if (cinematic.actors.empty()) {
+            return Result::failure(
+                "Animated cinematic has no actor animations");
         }
     }
 

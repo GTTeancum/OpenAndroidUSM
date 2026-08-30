@@ -737,6 +737,39 @@ Result D3D11Renderer::uploadLevelOneScene(
         }
         gpuMeshes_.back().visible = actor.animationStartMilliseconds == 0;
     }
+    gameplayCinematicMeshStart_ = gpuMeshes_.size();
+    for (const game::LevelCinematicAsset& cinematic :
+         levelOne.cinematics()) {
+        for (const game::CinematicActorAsset& actor : cinematic.actors) {
+            if (actor.mesh.images().size() != actor.textures.size()) {
+                gpuMeshes_.clear();
+                return Result::failure(
+                    "Cinematic actor texture count does not match its BDAE "
+                    "image library");
+            }
+            std::vector<assets::ColladaGeometry> animatedGeometry;
+            result = assets::evaluateColladaPose(
+                actor.mesh, actor.animation, 0, animatedGeometry);
+            if (!result) {
+                gpuMeshes_.clear();
+                return Result::failure("Could not evaluate cinematic actor " +
+                                       actor.sceneNodeName + ": " +
+                                       result.message());
+            }
+            const std::array<float, 16>* actorTransform =
+                actor.mesh.skins().empty() ? &actor.worldTransform : nullptr;
+            result = uploadGeometrySet(animatedGeometry, &actor.mesh,
+                                       actor.textures, {}, actorTransform,
+                                       true);
+            if (!result) {
+                gpuMeshes_.clear();
+                return Result::failure("Could not upload cinematic actor " +
+                                       actor.sceneNodeName + ": " +
+                                       result.message());
+            }
+            gpuMeshes_.back().visible = false;
+        }
+    }
     enemyMeshStart_ = gpuMeshes_.size();
     for (const game::LevelEnemyAsset& enemy : levelOne.enemies()) {
         if (enemy.archetypeIndex >= levelOne.enemyArchetypes().size()) {
@@ -776,9 +809,15 @@ Result D3D11Renderer::uploadLevelOneScene(
 Result D3D11Renderer::updateLevelOneActors(
     const game::LevelOneBootstrap& levelOne,
     std::uint32_t timestampMilliseconds) {
-    if (gpuMeshes_.size() !=
-        levelOne.introActors().size() + levelOne.enemies().size() +
-            environmentMeshCount_) {
+    std::size_t gameplayCinematicActorCount = 0;
+    for (const game::LevelCinematicAsset& cinematic :
+         levelOne.cinematics()) {
+        gameplayCinematicActorCount += cinematic.actors.size();
+    }
+    if (gpuMeshes_.size() != levelOne.introActors().size() +
+                                 gameplayCinematicActorCount +
+                                 levelOne.enemies().size() +
+                                 environmentMeshCount_) {
         return Result::failure("Level-one actor GPU resources are incomplete");
     }
     for (std::size_t actorIndex = 0;
@@ -810,6 +849,98 @@ Result D3D11Renderer::updateLevelOneActors(
         result = updateDynamicMesh(gpuMesh, animatedGeometry, actorTransform);
         if (!result) {
             return Result::failure("Could not update actor " +
+                                   actor.sceneNodeName + ": " +
+                                   result.message());
+        }
+    }
+    return Result::success();
+}
+
+Result D3D11Renderer::updateGameplayCinematicActors(
+    const game::LevelOneBootstrap& levelOne,
+    const game::LevelCinematicAsset* cinematic,
+    std::uint32_t timestampMilliseconds) {
+    std::size_t totalActorCount = 0;
+    std::size_t activeActorOffset = 0;
+    bool foundActive = cinematic == nullptr;
+    for (const game::LevelCinematicAsset& candidate : levelOne.cinematics()) {
+        if (&candidate == cinematic) {
+            activeActorOffset = totalActorCount;
+            foundActive = true;
+        }
+        totalActorCount += candidate.actors.size();
+    }
+    if (!foundActive || gameplayCinematicMeshStart_ + totalActorCount !=
+                            enemyMeshStart_) {
+        return Result::failure(
+            "Gameplay cinematic actor GPU resources are incomplete");
+    }
+    for (std::size_t index = 0; index < totalActorCount; ++index) {
+        gpuMeshes_[gameplayCinematicMeshStart_ + index].visible = false;
+    }
+    if (cinematic == nullptr || cinematic->actors.empty()) {
+        return Result::success();
+    }
+
+    const bool replacesPlayer = std::any_of(
+        cinematic->actors.begin(), cinematic->actors.end(),
+        [&levelOne](const game::CinematicActorAsset& actor) {
+            return actor.objectId == levelOne.player().objectId;
+        });
+    if (replacesPlayer) {
+        const auto playerActor = std::find_if(
+            levelOne.introActors().begin(), levelOne.introActors().end(),
+            [&levelOne](const game::CinematicActorAsset& actor) {
+                return actor.objectId == levelOne.player().objectId;
+            });
+        if (playerActor == levelOne.introActors().end()) {
+            return Result::failure(
+                "Persistent player actor is missing during cinematic");
+        }
+        const std::size_t playerIndex = static_cast<std::size_t>(
+            playerActor - levelOne.introActors().begin());
+        gpuMeshes_[environmentMeshCount_ + playerIndex].visible = false;
+    }
+
+    for (std::size_t enemyIndex = 0;
+         enemyIndex < levelOne.enemies().size(); ++enemyIndex) {
+        const std::int32_t enemyId = levelOne.enemies()[enemyIndex].objectId;
+        if (std::any_of(cinematic->actors.begin(), cinematic->actors.end(),
+                        [enemyId](const game::CinematicActorAsset& actor) {
+                            return actor.objectId == enemyId;
+                        })) {
+            gpuMeshes_[enemyMeshStart_ + enemyIndex].visible = false;
+        }
+    }
+
+    for (std::size_t actorIndex = 0;
+         actorIndex < cinematic->actors.size(); ++actorIndex) {
+        const game::CinematicActorAsset& actor =
+            cinematic->actors[actorIndex];
+        GpuMesh& gpuMesh =
+            gpuMeshes_[gameplayCinematicMeshStart_ + activeActorOffset +
+                       actorIndex];
+        gpuMesh.visible =
+            timestampMilliseconds >= actor.animationStartMilliseconds;
+        const std::uint32_t localTime =
+            timestampMilliseconds <= actor.animationStartMilliseconds
+                ? 0
+                : std::min(timestampMilliseconds -
+                               actor.animationStartMilliseconds,
+                           actor.animation.durationMilliseconds());
+        std::vector<assets::ColladaGeometry> animatedGeometry;
+        Result result = assets::evaluateColladaPose(
+            actor.mesh, actor.animation, localTime, animatedGeometry);
+        if (!result) {
+            return Result::failure("Could not animate cinematic actor " +
+                                   actor.sceneNodeName + ": " +
+                                   result.message());
+        }
+        const std::array<float, 16>* actorTransform =
+            actor.mesh.skins().empty() ? &actor.worldTransform : nullptr;
+        result = updateDynamicMesh(gpuMesh, animatedGeometry, actorTransform);
+        if (!result) {
+            return Result::failure("Could not update cinematic actor " +
                                    actor.sceneNodeName + ": " +
                                    result.message());
         }
