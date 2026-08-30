@@ -92,6 +92,7 @@ public:
         return cinematicDriven_;
     }
     [[nodiscard]] bool airborne() const noexcept;
+    [[nodiscard]] bool onWall() const noexcept;
     [[nodiscard]] std::uint16_t activeStateId() const noexcept;
     [[nodiscard]] std::string_view activeStateName() const noexcept;
     [[nodiscard]] bool punchTransitionReadyAfterImpact() const noexcept;
@@ -112,6 +113,11 @@ private:
         SwingRelease,
         SliderLand,
         SliderMove,
+        WallAttach,
+        WallIdle,
+        WallMove,
+        WallExit,
+        WallJump,
     };
 
     void setAnimation(std::string_view animation) noexcept;
@@ -138,6 +144,17 @@ private:
     void enterSwingRelease() noexcept;
     [[nodiscard]] bool tryCatchSlide() noexcept;
     void updateSlideTraversal(std::uint32_t elapsedMilliseconds) noexcept;
+    [[nodiscard]] bool tryAttachWall(
+        const assets::Vector3& movement) noexcept;
+    void updateWallTraversal(const PlayerMotionInput& input,
+                             std::uint32_t elapsedMilliseconds) noexcept;
+    [[nodiscard]] assets::Vector3 wallRootTranslation(
+        const PlayerStateDefinition* state,
+        std::uint32_t localMilliseconds) const noexcept;
+    [[nodiscard]] assets::Vector3 wallRootWorldDelta(
+        const assets::Vector3& localDelta) const noexcept;
+    [[nodiscard]] bool reacquireWallAt(
+        const assets::Vector3& candidate) noexcept;
     [[nodiscard]] float currentRootHeight() const noexcept;
     [[nodiscard]] bool findLandingHeight(float referenceHeight,
                                          float& height) const noexcept;
@@ -164,6 +181,14 @@ private:
     const PlayerStateDefinition* swingIdleState_{};
     const PlayerStateDefinition* sliderLandState_{};
     const PlayerStateDefinition* sliderMoveState_{};
+    const PlayerStateDefinition* wallIdleState_{};
+    const PlayerStateDefinition* wallMoveState_{};
+    const PlayerStateDefinition* wallAttachState_{};
+    const PlayerStateDefinition* wallExitState_{};
+    const PlayerStateDefinition* wallJumpUpState_{};
+    const PlayerStateDefinition* wallJumpDownState_{};
+    const PlayerStateDefinition* wallJumpLeftState_{};
+    const PlayerStateDefinition* wallJumpRightState_{};
     const PlayerStateDefinition* hurtLightState_{};
     const PlayerStateDefinition* hurtHeavyState_{};
     const PlayerStateDefinition* activeLocomotionState_{};
@@ -172,6 +197,9 @@ private:
     assets::Vector3 swingReleaseVelocity_;
     bool swingReleaseHasTarget_{};
     assets::Vector3 swingReleaseTarget_;
+    assets::Vector3 wallNormal_;
+    assets::Vector3 wallStateStartPosition_;
+    PlayerMotionInput lastWallInput_;
     WebGrabPointRuntime webGrabPointRuntime_;
     WebSwingRuntime webSwingRuntime_;
     LevelSlideRuntime slideRuntime_;

@@ -75,7 +75,9 @@ int main() {
     };
     ColladaMeshBuffer buffer;
     buffer.primitive = ColladaPrimitive::Triangles;
-    buffer.indices = {0, 1, 2};
+    // Match the counter-clockwise front-face winding used by the shipped
+    // level geometry and the reconstructed D3D11 rasterizer state.
+    buffer.indices = {0, 2, 1};
     triangle.meshBuffers.push_back(buffer);
 
     RgbaImage texture;
@@ -98,6 +100,14 @@ int main() {
     assert(renderer.updateEnemyGunLines({&gunLine, 1}));
     renderer.renderFrame();
     assert(renderer.updateEnemyGunLines({}));
+
+    triangle.meshBuffers.front().indices = {0, 1, 2};
+    assert(renderer.uploadPreviewGeometry(triangle, {&texture, 1}));
+    renderer.renderFrame();
+    assert(renderer.readBackPixel(32, 32, center));
+    assert(center[0] < 20);
+    assert(center[1] < 20);
+    assert(center[2] < 35);
 
     const std::filesystem::path dataRoot = USM_TEST_GAME_DATA_ROOT;
     if (std::filesystem::exists(dataRoot / "levelnew_01.pack")) {
@@ -830,7 +840,10 @@ int main() {
         usm::game::GameplayPlayer gameplayPlayer;
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(levelOne.rooms()));
-        assert(gameplayPlayer.initialize(levelOne.player(), &levelCollision,
+        // This renderer fixture exercises run and punch skinning. Keep it
+        // collision-independent now that forward motion can legitimately
+        // enter the authored wall-climb state in the real level geometry.
+        assert(gameplayPlayer.initialize(levelOne.player(), nullptr,
                                          &playerStates));
         gameplayPlayer.update({0.0F, 1.0F},
                               gameplayCamera.sample(gameplayPlayer.position()),

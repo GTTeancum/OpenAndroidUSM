@@ -6,6 +6,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -53,15 +54,11 @@ public class ExportSelectedDisassembly extends GhidraScript {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(output))) {
                 writer.write("; Binary address: 0x" + function.getEntryPoint() + "\n");
                 writer.write("; Preserved symbol: " + qualifiedName + "\n\n");
-                Address cursor = function.getBody().getMinAddress();
-                while (cursor != null && function.getBody().contains(cursor)) {
-                    Instruction instruction = currentProgram.getListing().getInstructionAt(cursor);
-                    if (instruction == null) {
-                        cursor = cursor.next();
-                        continue;
-                    }
+                InstructionIterator instructions =
+                    currentProgram.getListing().getInstructions(function.getBody(), true);
+                while (instructions.hasNext()) {
+                    Instruction instruction = instructions.next();
                     writer.write(instruction.getAddress() + "  " + instruction + "\n");
-                    cursor = instruction.getMaxAddress().next();
                 }
                 writer.write("\n; 32 bytes following the function (literal pool):\n");
                 Address trailing = function.getBody().getMaxAddress().next();

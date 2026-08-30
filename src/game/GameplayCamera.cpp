@@ -358,10 +358,17 @@ CameraPose GameplayCamera::sample(
     }
     const Vector3 projected =
         projectOnControlPlane(*currentArea_, playerPosition);
-    const auto weights = controlPointWeights(*currentArea_, projected);
+    // CCameraArea::Update (0x002f539c) evaluates the authored camera data at
+    // the plane projection plus the off-plane displacement scaled by the
+    // area's zFollowRate. This matters for horizontal and sloped areas; a
+    // vertical wall area naturally preserves the player's height.
+    const Vector3 followed = add(
+        projected,
+        scale(subtract(playerPosition, projected), currentArea_->zFollowRate));
+    const auto weights = controlPointWeights(*currentArea_, followed);
 
     Vector3 direction{};
-    Vector3 target = projected;
+    Vector3 target = followed;
     float cameraDistance = 0.0F;
     float targetHeightOffset = 0.0F;
     for (std::size_t index = 0; index < weights.size(); ++index) {

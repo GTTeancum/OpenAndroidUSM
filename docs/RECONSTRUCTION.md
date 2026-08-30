@@ -17,9 +17,14 @@ and captured state wherever practical.
 loop with a fixed synthetic clock and the real level loader, cinematic
 players, gameplay runtimes, D3D11 renderer, and readback path. It does not
 inject OS input. Scenario steps express reconstruction goals (`wait_gameplay`,
-`move_to`, `move_until_cinematic`, `wait_enemies_grounded`, `attack`, `jump`,
-`web_on`, `web_off`, `teleport`, `capture`, and assertions) while directives
-select the fixed tick, trace/capture cadence, render size, and maximum run time.
+`move_to`, `move_input`, `move_until_wall`, `move_until_cinematic`,
+`wait_enemies_grounded`, `attack`, `jump`, `web_on`, `web_off`, `teleport`,
+`capture`, and assertions)
+while directives select the fixed tick, trace/capture cadence, render size, and
+maximum run time. `move_input` holds explicit right/forward controller axes for
+a deterministic duration, allowing traversal mechanics such as wall climbing
+to be isolated without OS-level input automation. `move_until_wall` steers
+toward a world-space target until the player reports native wall attachment.
 `move_until_cinematic` proves that movement crossed the intended authored
 trigger instead of merely reaching a coordinate. `start_time_ms` fast-forwards
 persistent intro world commands for focused probes while suppressing transient
@@ -28,16 +33,21 @@ destination. The harness acknowledges an active tutorial just as it already
 acknowledges an active QTE, preventing an infinite tutorial timer from masking
 the gameplay state under test; normal user input remains unchanged.
 
-Every sampled frame records player pose, health, animation clock, accepted
-input axes, gameplay camera area and pose, cinematic ownership, restore/QTE
-state, and visible rooms. A companion enemy table records every mutable enemy
-state. The event stream records script steps, trigger and cinematic starts,
+Every sampled frame records player pose, health, animation clock, state,
+on-wall status, accepted input axes, gameplay camera area and pose, cinematic
+ownership, restore/QTE state, and visible rooms. A companion enemy table
+records every mutable enemy state. The event stream records script steps,
+wall attachment/detachment, trigger and cinematic starts,
 every dispatched cinematic command with attributes, player impacts, state
 transitions, audio requests, teleports, and captures. `enemies.csv` also records
 each native collision cylinder, vertical velocity, and grounded state, while
 `cinematics.csv` provides a complete static census of every loaded thread,
-command, timestamp, and typed attribute. Trigger/enemy asset events include
-their complete authored transforms and spawn flags. Scenario completion and
+command, timestamp, and typed attribute. `collision-surfaces.csv` records each
+room collision instance, native surface class, and world bounds. Trigger/enemy
+asset events include their complete authored transforms and spawn flags.
+Camera-area asset events include each neighbor and switch time plus the
+area's follow rate and all four control-point positions, directions,
+distances, target offsets, and height offsets. Scenario completion and
 failures are machine-readable in `summary.txt`. Explicit capture steps and
 periodic D3D11 readbacks make visual regressions timestamp-addressable; review
 still examines those frames in chronological order.
@@ -52,7 +62,10 @@ separate experiments.
 `tools/ghidra/ExportSelectedDisassembly.java` complements the selected
 decompilation exporter with address-stamped ARM instruction listings and the
 adjacent literal pool. It is used when the decompiler elides constants or ABI
-arguments that are material to a reviewed reconstruction.
+arguments that are material to a reviewed reconstruction. Its instruction
+walk follows the complete function body rather than stopping at the first
+non-contiguous address range, which is required for compiler-generated switch
+islands in the player motion functions.
 
 ## Naming order
 
@@ -110,8 +123,10 @@ route from initial area 283 through final boss area 10100.
 
 `game::GameplayCamera` reconstructs `CCameraArea::ComputeAverageValues`
 (original `0x002e4ec4`, image `0x002f4ec4`): it projects the player onto the
-control plane, blends the polygon edges by reciprocal distance, distributes
-those weights to their endpoints, and normalizes the blended direction. It
+control plane, applies the area's `zFollowRate` to the off-plane displacement
+as recovered from `CCameraArea::Update` at `0x002f539c`, blends the polygon
+edges by reciprocal distance, distributes those weights to their endpoints,
+and normalizes the blended direction. It
 then follows `CGameCamera::Update` (original `0x002e327c`) by placing the
 camera at `target - direction * distance` and adding the preserved 120-unit
 vertical target offset. The initial area 283 pose is regression-tested from
@@ -338,6 +353,11 @@ texture views by archetype, avoiding the original per-instance memory
 explosion. Editor-only, unreferenced image slots remain index-stable and
 untextured helper/shadow batches are omitted. A WARP capture verifies the
 textured street furniture and props without white fallback geometry.
+Ordinary scene and actor meshes use the shipped counter-clockwise front-face
+winding with back-face culling. Procedural lines, particles, hints, HUD, and
+cinematic UI retain a separate two-sided state. This distinction is required
+by the Room 8 wall camera: its authored below-street viewpoint must see through
+the one-sided pavement back faces while retaining all screen-space overlays.
 
 ## Collada mesh layout
 
@@ -664,6 +684,42 @@ predecoded XAudio2 state-sound path. Deterministic core regressions cover the
 state IDs, authored clips, root-height arc, midair rejection, landing, and
 sound cues; a WARP regression renders the midpoint pose in the first gameplay
 camera area.
+
+## Authored wall traversal
+
+Wall traversal follows the native player-state records rather than treating a
+vertical collision as ordinary ground motion. State 6
+(`k_state_move_climb_wall`, motion 14) enters with `run_to_wall_climb`; state 1
+(`k_state_idle_onwall`) holds `wall_climb_idle`; state 5
+(`k_state_move_onwall`, motion 13) selects the six directional climb clips;
+and state 7 (`k_state_move_exit_wall`, motion 15) uses
+`wall_climb_to_roof_idle`. Cross transitions from the wall to states 8--11 and
+the authored `wall_jump_up/down/left/right` clips.
+
+`Player::CheckClimbableWall` at `0x0034863c` supplies the forward wall query
+and 0.94 surface-suitability threshold, while `Player::CheckWallCanClimb` and
+`Player::GetOnWallMoveDir` retain contact and orient controller motion in the
+wall plane. `Player::UpdateMCSpeed` at `0x00346f50` scales each wall axis by
+0.35 centimeters per millisecond (350 cm/s). `Player::SetNextStateId` at
+`0x003491d0` supplies the attach, exit, and directional-jump state setup.
+
+`PhysicsTriangleMeshShape::addSceneNodeInternal` at `0x003d9e94` assigns the
+surface flags from the original node prefixes: ordinary `wall*` faces use
+`0x20`, `jump_wall*` uses `0x10`, and `edge_wall*` uses `0x40`; unrelated
+collision faces remain flag 2. `PhysicsTriangleMesh::constructMesh` at
+`0x003d95d8` further separates regular wall and ground faces at its recovered
+0.70710677 normal threshold. `LevelCollision::climbableWallContact` therefore
+returns only the nearest native `0x20` vertical contact, plus a consistently
+player-facing normal. This prevents invisible boundary collision from being
+misclassified as a climbable wall. `GameplayPlayer` keeps the
+native 50 cm cylinder offset, applies the recovered center-node root
+translations continuously through attach/exit/jump clips in the wall basis,
+and reacquires the wall after each move. Failed attachment reacquisition falls
+back to the airborne state instead of leaving a detached wall idle. A
+synthetic floor-and-wall regression covers attach, idle,
+upward climb, jump selection, exact root displacement, and rejection of
+ground attacks while attached. The autoplay trace exposes `on_wall` and
+`move_input` so real-level probes can diagnose traversal state frame by frame.
 
 ## Authored web-grab and waypoint traversal
 

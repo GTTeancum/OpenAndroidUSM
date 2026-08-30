@@ -77,12 +77,16 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
     enemyLog_.open(outputPath_ / "enemies.csv", std::ios::trunc);
     eventLog_.open(outputPath_ / "events.csv", std::ios::trunc);
     cinematicAssetLog_.open(outputPath_ / "cinematics.csv", std::ios::trunc);
-    if (!frameLog_ || !enemyLog_ || !eventLog_ || !cinematicAssetLog_) {
+    collisionAssetLog_.open(outputPath_ / "collision-surfaces.csv",
+                            std::ios::trunc);
+    if (!frameLog_ || !enemyLog_ || !eventLog_ || !cinematicAssetLog_ ||
+        !collisionAssetLog_) {
         return Result::failure("Could not create autoplay trace files");
     }
     frameLog_ << "frame,real_ms,game_ms,phase,controls,player_x,player_y,"
                  "player_z,facing_x,facing_y,facing_z,health,animation,"
                  "animation_ms,state_id,state_name,punch_transition_ready,"
+                 "on_wall,"
                  "camera_area,cinematic,qte,tutorial,restore,"
                  "restore_alpha,visible_rooms,input_right,input_forward,"
                  "camera_x,camera_y,camera_z,target_x,target_y,target_z\n";
@@ -95,6 +99,8 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
         << "cinematic_id,cinematic_name,script_file,thread_type,"
            "thread_object_id,thread_name,command_ms,command_id,command_name,"
            "attributes\n";
+    collisionAssetLog_
+        << "room,geometry,surface_class,min_x,min_y,min_z,max_x,max_y,max_z\n";
     recordEvent(0, "harness_start",
                 "script=" + scriptPath.generic_string());
     return Result::success();
@@ -186,6 +192,25 @@ Result AutoplayHarness::parseScript(
                   step.durationOrTimeoutMilliseconds) ||
                 step.radius <= 0.0F) {
                 return invalid("move_to requires x y z radius timeout");
+            }
+        } else if (command == "move_input") {
+            step.kind = StepKind::MoveInput;
+            if (!(tokens >> step.durationOrTimeoutMilliseconds >>
+                  step.position.x >> step.position.y) ||
+                step.durationOrTimeoutMilliseconds == 0 ||
+                !std::isfinite(step.position.x) ||
+                !std::isfinite(step.position.y) ||
+                std::abs(step.position.x) > 1.0F ||
+                std::abs(step.position.y) > 1.0F) {
+                return invalid(
+                    "move_input requires duration right forward in [-1, 1]");
+            }
+        } else if (command == "move_until_wall") {
+            step.kind = StepKind::MoveUntilWall;
+            if (!(tokens >> step.position.x >> step.position.y >>
+                  step.position.z >> step.durationOrTimeoutMilliseconds) ||
+                step.durationOrTimeoutMilliseconds == 0) {
+                return invalid("move_until_wall requires x y z timeout");
             }
         } else if (command == "move_until_cinematic") {
             step.kind = StepKind::MoveUntilCinematic;
@@ -354,6 +379,22 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         } else if (timedOut()) {
             failStep(snapshot, step, "move_to did not reach its target");
         } else if (snapshot.controlsEnabled) {
+            input.motion = steerToward(snapshot, step.position);
+        }
+        break;
+    case StepKind::MoveInput:
+        if (elapsed >= step.durationOrTimeoutMilliseconds) {
+            completeStep(snapshot, step);
+        } else if (snapshot.gameplayActive && snapshot.controlsEnabled) {
+            input.motion = {step.position.x, step.position.y};
+        }
+        break;
+    case StepKind::MoveUntilWall:
+        if (snapshot.playerOnWall) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step, "player did not attach to a wall");
+        } else if (snapshot.gameplayActive && snapshot.controlsEnabled) {
             input.motion = steerToward(snapshot, step.position);
         }
         break;
@@ -567,6 +608,11 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                        std::string(snapshot.playerAnimation));
         previousPlayerAnimation_ = snapshot.playerAnimation;
     }
+    if (snapshot.playerOnWall != previousPlayerOnWall_) {
+        transition("player_on_wall",
+                   previousPlayerOnWall_ ? "true->false" : "false->true");
+        previousPlayerOnWall_ = snapshot.playerOnWall;
+    }
     if (snapshot.playerHealth != previousPlayerHealth_) {
         transition("player_health",
                    std::to_string(previousPlayerHealth_) + "->" +
@@ -648,6 +694,7 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
               << snapshot.playerStateId << ','
               << csv(snapshot.playerStateName) << ','
               << snapshot.playerPunchTransitionReady << ','
+              << snapshot.playerOnWall << ','
               << snapshot.cameraAreaId << ',' << snapshot.activeCinematicId
               << ',' << snapshot.quickTimeEventActive << ','
               << snapshot.tutorialVisible << ','
@@ -702,6 +749,35 @@ void AutoplayHarness::recordCommand(
         detail += ";" + attribute.name + "=" + attribute.value;
     }
     recordEvent(timeMilliseconds, "cinematic_command", detail);
+}
+
+void AutoplayHarness::recordCollisionAssets(
+    std::span<const game::LevelRoomAsset> rooms) {
+    if (!collisionAssetLog_) {
+        return;
+    }
+    for (std::size_t roomIndex = 0; roomIndex < rooms.size(); ++roomIndex) {
+        for (const assets::ColladaGeometry& geometry :
+             rooms[roomIndex].collision.sceneGeometries()) {
+            std::string_view surfaceClass = "collision";
+            if (geometry.name.starts_with("wall")) {
+                surfaceClass = "climbable_wall";
+            } else if (geometry.name.starts_with("jump_wall")) {
+                surfaceClass = "jump_wall";
+            } else if (geometry.name.starts_with("edge_wall")) {
+                surfaceClass = "edge_wall";
+            }
+            collisionAssetLog_
+                << (roomIndex + 1) << ',' << csv(geometry.name) << ','
+                << surfaceClass << ',' << geometry.bounds.minimum.x << ','
+                << geometry.bounds.minimum.y << ','
+                << geometry.bounds.minimum.z << ','
+                << geometry.bounds.maximum.x << ','
+                << geometry.bounds.maximum.y << ','
+                << geometry.bounds.maximum.z << '\n';
+        }
+    }
+    collisionAssetLog_.flush();
 }
 
 void AutoplayHarness::recordCinematicAssets(
@@ -836,6 +912,8 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::WaitGameplay: return "wait_gameplay";
     case StepKind::Wait: return "wait";
     case StepKind::MoveTo: return "move_to";
+    case StepKind::MoveInput: return "move_input";
+    case StepKind::MoveUntilWall: return "move_until_wall";
     case StepKind::MoveUntilCinematic: return "move_until_cinematic";
     case StepKind::WaitEnemiesGrounded: return "wait_enemies_grounded";
     case StepKind::Attack: return "attack";

@@ -154,6 +154,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     }
     if (autoplay) {
         autoplay->recordCinematicAssets(levelOne_.cinematics());
+        autoplay->recordCollisionAssets(levelOne_.rooms());
         for (const game::LevelTriggerAsset& trigger : levelOne_.triggers()) {
             autoplay->recordEvent(
                 0, "trigger_asset",
@@ -217,20 +218,40 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             std::string detail =
                 "object=" + std::to_string(area.objectId) +
                 ";disabled=" + std::to_string(area.disabled) +
-                ";height=" + std::to_string(area.height);
+                ";height=" + std::to_string(area.height) +
+                ";z_follow_rate=" + std::to_string(area.zFollowRate) +
+                ";inverse_normal=" +
+                std::to_string(area.inverseNormal) +
+                ";far_plane_offset=" +
+                std::to_string(area.farPlaneOffset);
             for (std::size_t index = 0; index < area.nextAreaIds.size();
                  ++index) {
                 detail += ";next" + std::to_string(index) + "=" +
-                          std::to_string(area.nextAreaIds[index]);
+                          std::to_string(area.nextAreaIds[index]) +
+                          ";switch" + std::to_string(index) + "=" +
+                          std::to_string(area.switchTimeUnits[index]);
             }
             for (std::size_t index = 0; index < area.controlPoints.size();
                  ++index) {
-                const assets::Vector3& point =
-                    area.controlPoints[index].position;
+                const game::CameraControlPoint& control =
+                    area.controlPoints[index];
+                const assets::Vector3& point = control.position;
                 detail += ";p" + std::to_string(index) + "=" +
                           std::to_string(point.x) + "|" +
                           std::to_string(point.y) + "|" +
-                          std::to_string(point.z);
+                          std::to_string(point.z) +
+                          ";d" + std::to_string(index) + "=" +
+                          std::to_string(control.direction.x) + "|" +
+                          std::to_string(control.direction.y) + "|" +
+                          std::to_string(control.direction.z) +
+                          ";distance" + std::to_string(index) + "=" +
+                          std::to_string(control.distance) +
+                          ";offset" + std::to_string(index) + "=" +
+                          std::to_string(control.targetOffset.x) + "|" +
+                          std::to_string(control.targetOffset.y) + "|" +
+                          std::to_string(control.targetOffset.z) +
+                          ";height_offset" + std::to_string(index) + "=" +
+                          std::to_string(control.targetHeightOffset);
             }
             autoplay->recordEvent(0, "camera_area_asset", detail);
         }
@@ -273,11 +294,15 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::string_view, 14> gameplaySoundStates{
+    constexpr std::array<std::string_view, 22> gameplaySoundStates{
         "k_state_idle_to_punch_right", "k_state_hurt_light",
         "k_state_hurt_heavy", "k_state_jump_start", "k_state_jump_land",
         "k_state_swing_web_throw", "k_state_swing_hang",
         "k_state_swing_idle", "k_state_trigger_slider_move",
+        "k_state_idle_onwall", "k_state_move_onwall",
+        "k_state_move_climb_wall", "k_state_move_exit_wall",
+        "k_state_move_jump_wall_up", "k_state_move_jump_wall_down",
+        "k_state_move_jump_wall_left", "k_state_move_jump_wall_right",
         "k_state_punch_right_to_punch_left",
         "k_state_punch_left_to_kick_right",
         "k_state_kick_right_to_fast_kick",
@@ -692,6 +717,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.activeStateId(),
                  gameplayPlayer_.activeStateName(),
                  gameplayPlayer_.punchTransitionReadyAfterImpact(),
+                 gameplayPlayer_.onWall(),
                  harnessCamera,
                  renderer_.roomVisibility(),
                  enemyRuntime_.states()});
@@ -1432,6 +1458,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.activeStateId(),
                  gameplayPlayer_.activeStateName(),
                  gameplayPlayer_.punchTransitionReadyAfterImpact(),
+                 gameplayPlayer_.onWall(),
                  presentedCameraPose,
                  renderer_.roomVisibility(),
                  enemyRuntime_.states()});

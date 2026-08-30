@@ -95,6 +95,8 @@ int main() {
                   "start_time_ms 100\n"
                   "render_size 320 180\n"
                   "wait_gameplay 50\n"
+                  "move_input 25 0.25 0.75\n"
+                  "move_until_wall 4 5 6 50\n"
                   "teleport 1 2 3 0 1 0\n"
                   "move_until_cinematic 4 5 6 974 50\n"
                   "capture smoke-frame\n"
@@ -115,17 +117,31 @@ int main() {
     autoplaySnapshot.realTimeMilliseconds = 100;
     assert(autoplayHarness.update(autoplaySnapshot).quickTimeEventPressed);
     autoplaySnapshot.realTimeMilliseconds = 125;
+    const auto motionInput = autoplayHarness.update(autoplaySnapshot);
+    assert(motionInput.motion.right == 0.25F);
+    assert(motionInput.motion.forward == 0.75F);
+    autoplaySnapshot.realTimeMilliseconds = 150;
+    (void)autoplayHarness.update(autoplaySnapshot);
+    autoplaySnapshot.realTimeMilliseconds = 175;
+    const auto wallSeekInput = autoplayHarness.update(autoplaySnapshot);
+    assert(wallSeekInput.motion.right != 0.0F ||
+           wallSeekInput.motion.forward != 0.0F);
+    autoplaySnapshot.realTimeMilliseconds = 200;
+    autoplaySnapshot.playerOnWall = true;
+    (void)autoplayHarness.update(autoplaySnapshot);
+    autoplaySnapshot.playerOnWall = false;
+    autoplaySnapshot.realTimeMilliseconds = 225;
     const auto teleportInput = autoplayHarness.update(autoplaySnapshot);
     assert(teleportInput.teleport.has_value());
     assert(teleportInput.teleport->position.x == 1.0F);
-    autoplaySnapshot.realTimeMilliseconds = 150;
+    autoplaySnapshot.realTimeMilliseconds = 250;
     autoplaySnapshot.activeCinematicId = 974;
     (void)autoplayHarness.update(autoplaySnapshot);
-    autoplaySnapshot.realTimeMilliseconds = 175;
+    autoplaySnapshot.realTimeMilliseconds = 275;
     const auto captureInput = autoplayHarness.update(autoplaySnapshot);
     assert(captureInput.captureLabels.size() == 1);
     assert(captureInput.captureLabels.front() == "smoke-frame");
-    autoplaySnapshot.realTimeMilliseconds = 200;
+    autoplaySnapshot.realTimeMilliseconds = 300;
     (void)autoplayHarness.update(autoplaySnapshot);
     assert(autoplayHarness.complete());
     autoplayHarness.finish(true, "smoke complete");
@@ -204,6 +220,7 @@ int main() {
     assert(!router.state().jump.held);
 
     usm::assets::ColladaGeometry collisionFixture;
+    collisionFixture.name = "wall_fixture";
     collisionFixture.vertices = {
         {{0.0F, 0.0F, 0.0F}},
         {{1000.0F, 0.0F, 0.0F}},
@@ -211,8 +228,8 @@ int main() {
         {{0.0F, 1000.0F, 0.0F}},
         {{500.0F, 0.0F, 0.0F}},
         {{500.0F, 1000.0F, 0.0F}},
-        {{500.0F, 0.0F, 200.0F}},
-        {{500.0F, 1000.0F, 200.0F}},
+        {{500.0F, 0.0F, 1000.0F}},
+        {{500.0F, 1000.0F, 1000.0F}},
     };
     usm::assets::ColladaMeshBuffer collisionFixtureBuffer;
     collisionFixtureBuffer.indices = {
@@ -237,6 +254,16 @@ int main() {
                                                 {600.0F, 500.0F, 100.0F}));
     assert(!collisionFixtureWorld.segmentBlocked({100.0F, 500.0F, 25.0F},
                                                  {300.0F, 500.0F, 100.0F}));
+    usm::game::LevelWallContact wallContact;
+    assert(collisionFixtureWorld.climbableWallContact(
+        {400.0F, 500.0F, 70.0F}, {520.0F, 500.0F, 70.0F},
+        wallContact));
+    assert(std::abs(wallContact.position.x - 500.0F) < 0.001F);
+    assert(wallContact.normal.x < -0.99F);
+    assert(wallContact.physicsFlags == 0x20U);
+    assert(!collisionFixtureWorld.climbableWallContact(
+        {100.0F, 500.0F, 70.0F}, {300.0F, 500.0F, 70.0F},
+        wallContact));
 
     std::array<usm::game::LevelWebGrabPointAsset, 3> selectionPoints{};
     selectionPoints[0].objectId = 1;
@@ -2863,12 +2890,12 @@ int main() {
         assert(levelCommandRuntime.applyCommand(
             usm::game::CinematicCommand{0, -1, "GameEnd", {}}));
         assert(levelCommandRuntime.gameEnded());
-        if (std::abs(gameplayCameraPose.target.x - 14688.7148F) >= 0.1F ||
-            std::abs(gameplayCameraPose.target.y - -9614.6006F) >= 0.1F ||
-            std::abs(gameplayCameraPose.target.z - 126.8340F) >= 0.1F ||
-            std::abs(gameplayCameraPose.position.x - 15133.0039F) >= 0.1F ||
-            std::abs(gameplayCameraPose.position.y - -10275.4551F) >= 0.1F ||
-            std::abs(gameplayCameraPose.position.z - 203.5090F) >= 0.1F) {
+        if (std::abs(gameplayCameraPose.target.x - 14688.7354F) >= 0.1F ||
+            std::abs(gameplayCameraPose.target.y - -9614.5928F) >= 0.1F ||
+            std::abs(gameplayCameraPose.target.z - 128.0306F) >= 0.1F ||
+            std::abs(gameplayCameraPose.position.x - 15133.0244F) >= 0.1F ||
+            std::abs(gameplayCameraPose.position.y - -10275.4473F) >= 0.1F ||
+            std::abs(gameplayCameraPose.position.z - 204.7056F) >= 0.1F) {
             std::cerr << "Unexpected initial gameplay camera pose: target "
                       << gameplayCameraPose.target.x << ' '
                       << gameplayCameraPose.target.y << ' '
@@ -3027,6 +3054,45 @@ int main() {
         assert(jumpingPlayer.activeAnimation() == "idle_stand");
         assert(jumpingPlayer.requestJump());
 
+        usm::game::GameplayPlayer wallPlayer;
+        assert(wallPlayer.initialize(bootstrap.player(),
+                                     &collisionFixtureWorld,
+                                     &playerStateConfigs));
+        wallPlayer.restoreAt({400.0F, 500.0F, 0.0F},
+                             {1.0F, 0.0F, 0.0F});
+        usm::game::CameraPose wallCamera;
+        wallCamera.position = {0.0F, 500.0F, 70.0F};
+        wallCamera.target = {1000.0F, 500.0F, 70.0F};
+        wallPlayer.update({0.0F, 1.0F}, wallCamera, 1);
+        assert(wallPlayer.onWall());
+        assert(wallPlayer.activeStateId() == 6);
+        assert(wallPlayer.activeAnimation() == "run_to_wall_climb");
+        assert(!wallPlayer.requestPunch());
+        wallPlayer.update({0.0F, 1.0F}, wallCamera, 266);
+        assert(wallPlayer.onWall());
+        assert(wallPlayer.activeStateId() == 1);
+        assert(wallPlayer.activeAnimation() == "wall_climb_idle");
+        assert(std::abs(wallPlayer.position().x - 450.0F) < 0.1F);
+        assert(std::abs(wallPlayer.position().z - 158.594F) < 0.1F);
+        const float wallIdleHeight = wallPlayer.position().z;
+        wallPlayer.update({0.0F, 1.0F}, wallCamera, 500);
+        assert(wallPlayer.onWall());
+        assert(wallPlayer.activeStateId() == 5);
+        assert(wallPlayer.activeAnimation() == "wall_climb_up");
+        assert(wallPlayer.position().z > wallIdleHeight + 174.0F);
+        assert(wallPlayer.requestJump());
+        assert(wallPlayer.activeStateId() == 8);
+        assert(wallPlayer.activeAnimation() == "wall_jump_up");
+        assert(wallPlayer.consumeEnteredState() ==
+               "k_state_move_climb_wall");
+        assert(wallPlayer.consumeEnteredState() ==
+               "k_state_idle_onwall");
+        assert(wallPlayer.consumeEnteredState() ==
+               "k_state_move_jump_wall_up");
+        wallPlayer.update({}, wallCamera, 500);
+        assert(wallPlayer.onWall());
+        assert(wallPlayer.activeStateId() == 8);
+
         std::array<usm::game::LevelWayPointAsset, 2>
             playerSlideWaypoints;
         playerSlideWaypoints[0].objectId = 9101;
@@ -3163,6 +3229,14 @@ int main() {
         const auto cameraAfterSwitch =
             switchingCamera.sample({15.0F, 5.0F, 0.0F});
         assert(std::abs(cameraAfterSwitch.position.x - -185.0F) < 0.01F);
+
+        usm::game::CameraArea followArea =
+            makeCameraArea(3, 0.0F, 10.0F);
+        followArea.zFollowRate = 0.25F;
+        usm::game::GameplayCamera followCamera;
+        assert(followCamera.bind(std::span{&followArea, 1}, 3));
+        const auto followedPose = followCamera.sample({5.0F, 5.0F, 40.0F});
+        assert(std::abs(followedPose.target.z - 130.0F) < 0.001F);
         assert(bootstrap.rooms().size() == 13);
         assert(bootstrap.mainScene().linkedSceneFiles().size() == 13);
         assert(bootstrap.mainScene().linkedSceneFiles().front() ==

@@ -12,6 +12,11 @@ namespace usm::game {
 namespace {
 
 constexpr float kMaximumRunSpeedCentimetersPerSecond = 700.0F;
+// Player::UpdateMCSpeed (0x00346f50), motion 13, scales each wall-axis
+// joystick component by 0.35 centimeters per millisecond.
+constexpr float kWallClimbSpeedCentimetersPerSecond = 350.0F;
+constexpr float kPlayerCollisionRadiusCentimeters = 50.0F;
+constexpr float kPlayerCollisionHalfHeightCentimeters = 70.0F;
 // `consts` image address 0x004c6a78, read by Player::SetNextStateId
 // (0x003491d0) when entering k_state_jump_fall_idle.
 constexpr float kSustainedFallSpeedCentimetersPerSecond = -1200.0F;
@@ -233,6 +238,14 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     swingIdleState_ = nullptr;
     sliderLandState_ = nullptr;
     sliderMoveState_ = nullptr;
+    wallIdleState_ = nullptr;
+    wallMoveState_ = nullptr;
+    wallAttachState_ = nullptr;
+    wallExitState_ = nullptr;
+    wallJumpUpState_ = nullptr;
+    wallJumpDownState_ = nullptr;
+    wallJumpLeftState_ = nullptr;
+    wallJumpRightState_ = nullptr;
     hurtLightState_ = nullptr;
     hurtHeavyState_ = nullptr;
     activeLocomotionState_ = nullptr;
@@ -241,6 +254,9 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     swingReleaseVelocity_ = {};
     swingReleaseHasTarget_ = false;
     swingReleaseTarget_ = {};
+    wallNormal_ = {};
+    wallStateStartPosition_ = {};
+    lastWallInput_ = {};
     webGrabPointRuntime_.bind(webGrabPoints, collision);
     webSwingRuntime_ = {};
     slideRuntime_.bind(slides, waypoints);
@@ -266,6 +282,15 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
             states->findState("k_state_trigger_slider_move");
         sliderLandState_ =
             states->findState("k_state_trigger_slider_land");
+        wallIdleState_ = states->findState("k_state_idle_onwall");
+        wallMoveState_ = states->findState("k_state_move_onwall");
+        wallAttachState_ = states->findState("k_state_move_climb_wall");
+        wallExitState_ = states->findState("k_state_move_exit_wall");
+        wallJumpUpState_ = states->findState("k_state_move_jump_wall_up");
+        wallJumpDownState_ = states->findState("k_state_move_jump_wall_down");
+        wallJumpLeftState_ = states->findState("k_state_move_jump_wall_left");
+        wallJumpRightState_ =
+            states->findState("k_state_move_jump_wall_right");
         hurtLightState_ = states->findState("k_state_hurt_light");
         hurtHeavyState_ = states->findState("k_state_hurt_heavy");
         if (stateClip(animationBank_, jumpStartState_) == nullptr ||
@@ -292,6 +317,20 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
              stateClip(animationBank_, sliderMoveState_) == nullptr)) {
             return Result::failure(
                 "Player slider states have invalid animation IDs");
+        }
+        if (wallIdleState_ == nullptr || wallMoveState_ == nullptr ||
+            wallAttachState_ == nullptr || wallExitState_ == nullptr ||
+            wallJumpUpState_ == nullptr || wallJumpDownState_ == nullptr ||
+            wallJumpLeftState_ == nullptr || wallJumpRightState_ == nullptr ||
+            stateClip(animationBank_, wallIdleState_) == nullptr ||
+            clipById(animationBank_, 128) == nullptr ||
+            clipById(animationBank_, 198) == nullptr ||
+            stateClip(animationBank_, wallJumpUpState_) == nullptr ||
+            stateClip(animationBank_, wallJumpDownState_) == nullptr ||
+            stateClip(animationBank_, wallJumpLeftState_) == nullptr ||
+            stateClip(animationBank_, wallJumpRightState_) == nullptr) {
+            return Result::failure(
+                "Player wall states have invalid animation IDs");
         }
         if (stateClip(animationBank_, hurtLightState_) == nullptr ||
             stateClip(animationBank_, hurtHeavyState_) == nullptr) {
@@ -349,10 +388,33 @@ bool GameplayPlayer::requestPunch() noexcept {
 }
 
 bool GameplayPlayer::requestJump() noexcept {
-    if (activeAttackState_ != nullptr ||
-        locomotionState_ != LocomotionState::Grounded || dead() ||
-        jumpStartState_ == nullptr ||
+    if (activeAttackState_ != nullptr || dead() ||
         hurtReactionRemainingMilliseconds_ != 0) {
+        return false;
+    }
+    if (onWall()) {
+        const PlayerStateDefinition* jumpState = wallJumpUpState_;
+        if (std::abs(lastWallInput_.right) >
+            std::abs(lastWallInput_.forward)) {
+            jumpState = lastWallInput_.right < 0.0F
+                            ? wallJumpLeftState_
+                            : wallJumpRightState_;
+        } else if (lastWallInput_.forward < -0.25F) {
+            jumpState = wallJumpDownState_;
+        }
+        if (jumpState == nullptr || stateClip(animationBank_, jumpState) == nullptr) {
+            return false;
+        }
+        wallStateStartPosition_ = position_;
+        activeLocomotionState_ = jumpState;
+        locomotionState_ = LocomotionState::WallJump;
+        setAnimation(stateClip(animationBank_, jumpState)->name);
+        queueEnteredState(jumpState->name);
+        updateWorldTransform(facing_);
+        return true;
+    }
+    if (locomotionState_ != LocomotionState::Grounded ||
+        jumpStartState_ == nullptr) {
         return false;
     }
     jumpAnchorHeight_ = position_.z;
@@ -464,6 +526,8 @@ void GameplayPlayer::restoreAt(const assets::Vector3& position,
     swingReleaseVelocity_ = {};
     swingReleaseHasTarget_ = false;
     selectedWebGrabPoint_ = nullptr;
+    wallNormal_ = {};
+    lastWallInput_ = {};
     webSwingRuntime_ = {};
     webReleaseRequested_ = false;
     cancelAttack();
@@ -601,6 +665,10 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
         updateSlideTraversal(elapsedMilliseconds);
         return;
     }
+    if (onWall()) {
+        updateWallTraversal(input, elapsedMilliseconds);
+        return;
+    }
     if (locomotionState_ == LocomotionState::WebThrow ||
         locomotionState_ == LocomotionState::SwingHang ||
         locomotionState_ == LocomotionState::SwingRelease) {
@@ -628,6 +696,10 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     assets::Vector3 desired = position_;
     desired.x += movement.x * distance;
     desired.y += movement.y * distance;
+    if (tryAttachWall(movement)) {
+        updateWallTraversal(input, elapsedMilliseconds);
+        return;
+    }
     if (collision_ != nullptr) {
         assets::Vector3 resolved;
         if (collision_->resolveGroundMotion(position_, desired, resolved)) {
@@ -688,6 +760,20 @@ void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
         activeLocomotionState_ = sliderMoveState_;
         selectedWebGrabPoint_ = nullptr;
         break;
+    case LocomotionState::WallAttach:
+        activeLocomotionState_ = wallAttachState_;
+        break;
+    case LocomotionState::WallIdle:
+        activeLocomotionState_ = wallIdleState_;
+        break;
+    case LocomotionState::WallMove:
+        activeLocomotionState_ = wallMoveState_;
+        break;
+    case LocomotionState::WallExit:
+        activeLocomotionState_ = wallExitState_;
+        break;
+    case LocomotionState::WallJump:
+        break;
     }
     if (activeLocomotionState_ != nullptr) {
         const assets::ColladaAnimationClip* clip =
@@ -697,7 +783,10 @@ void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
         }
         if (state == LocomotionState::JumpStart ||
             state == LocomotionState::JumpLand ||
-            state == LocomotionState::SliderMove) {
+            state == LocomotionState::SliderMove ||
+            state == LocomotionState::WallAttach ||
+            state == LocomotionState::WallIdle ||
+            state == LocomotionState::WallExit) {
             queueEnteredState(activeLocomotionState_->name);
         }
     }
@@ -1039,6 +1128,281 @@ void GameplayPlayer::updateSlideTraversal(
         verticalVelocityCentimetersPerSecond_ =
             exit.velocityCentimetersPerSecond.z;
     }
+}
+
+bool GameplayPlayer::tryAttachWall(
+    const assets::Vector3& movement) noexcept {
+    if (collision_ == nullptr || wallAttachState_ == nullptr) {
+        return false;
+    }
+    const assets::Vector3 start{
+        position_.x, position_.y,
+        position_.z + kPlayerCollisionHalfHeightCentimeters};
+    const assets::Vector3 end{
+        start.x + movement.x * 120.0F,
+        start.y + movement.y * 120.0F, start.z};
+    LevelWallContact contact;
+    if (!collision_->climbableWallContact(start, end, contact) ||
+        movement.x * contact.normal.x + movement.y * contact.normal.y >
+            -0.2F) {
+        return false;
+    }
+    wallNormal_ = contact.normal;
+    wallNormal_.z = 0.0F;
+    const float normalLength = length2D(wallNormal_.x, wallNormal_.y);
+    if (normalLength <= std::numeric_limits<float>::epsilon()) {
+        return false;
+    }
+    wallNormal_.x /= normalLength;
+    wallNormal_.y /= normalLength;
+    // run_to_wall_climb carries 37 cm toward the wall. Begin one root-motion
+    // span outside the native 50 cm player cylinder so the final idle anchor
+    // sits exactly at that radius.
+    position_.x = contact.position.x +
+                  wallNormal_.x *
+                      (kPlayerCollisionRadiusCentimeters + 37.0F);
+    position_.y = contact.position.y +
+                  wallNormal_.y *
+                      (kPlayerCollisionRadiusCentimeters + 37.0F);
+    wallStateStartPosition_ = position_;
+    facing_ = {-wallNormal_.x, -wallNormal_.y, 0.0F};
+    renderPosition_ = position_;
+    enterLocomotionState(LocomotionState::WallAttach);
+    const assets::ColladaAnimationClip* attachClip =
+        clipById(animationBank_, 128);
+    if (attachClip == nullptr) {
+        enterLocomotionState(LocomotionState::Grounded);
+        return false;
+    }
+    setAnimation(attachClip->name);
+    return true;
+}
+
+assets::Vector3 GameplayPlayer::wallRootTranslation(
+    const PlayerStateDefinition* state,
+    std::uint32_t localMilliseconds) const noexcept {
+    const assets::ColladaAnimationClip* clip = stateClip(animationBank_, state);
+    if (clip == nullptr && animationBank_ != nullptr) {
+        clip = animationBank_->findClip(activeAnimation_);
+    }
+    if (clip == nullptr || animationBank_ == nullptr) {
+        return {};
+    }
+    const std::uint32_t timestamp =
+        clip->startMilliseconds +
+        std::min(localMilliseconds, clip->durationMilliseconds());
+    assets::Vector3 translation;
+    for (const assets::ColladaAnimationTrack& track :
+         animationBank_->tracks()) {
+        if (track.targetNode != "Dummy_center-node") {
+            continue;
+        }
+        const assets::ColladaAnimationSample sample = track.sample(timestamp);
+        switch (track.property) {
+        case assets::ColladaAnimationProperty::Translation:
+            translation = {sample.value[0], sample.value[1], sample.value[2]};
+            break;
+        case assets::ColladaAnimationProperty::TranslationX:
+            translation.x = sample.value[0];
+            break;
+        case assets::ColladaAnimationProperty::TranslationY:
+            translation.y = sample.value[0];
+            break;
+        case assets::ColladaAnimationProperty::TranslationZ:
+            translation.z = sample.value[0];
+            break;
+        default: break;
+        }
+    }
+    return translation;
+}
+
+assets::Vector3 GameplayPlayer::wallRootWorldDelta(
+    const assets::Vector3& localDelta) const noexcept {
+    // UpdateRotation exposes local X as (-facing.y, facing.x), while local Y
+    // points away from the wall. Preserve that same basis for authored root
+    // translation in attach, exit, and directional wall-jump clips.
+    const assets::Vector3 localX{-facing_.y, facing_.x, 0.0F};
+    return {localX.x * localDelta.x + wallNormal_.x * localDelta.y,
+            localX.y * localDelta.x + wallNormal_.y * localDelta.y,
+            localDelta.z};
+}
+
+bool GameplayPlayer::reacquireWallAt(
+    const assets::Vector3& candidate) noexcept {
+    if (collision_ == nullptr) {
+        return false;
+    }
+    const assets::Vector3 start{
+        candidate.x, candidate.y,
+        candidate.z + kPlayerCollisionHalfHeightCentimeters};
+    const assets::Vector3 end{
+        start.x - wallNormal_.x * 125.0F,
+        start.y - wallNormal_.y * 125.0F, start.z};
+    LevelWallContact contact;
+    if (!collision_->climbableWallContact(start, end, contact)) {
+        return false;
+    }
+    wallNormal_ = contact.normal;
+    wallNormal_.z = 0.0F;
+    const float normalLength = length2D(wallNormal_.x, wallNormal_.y);
+    if (normalLength <= std::numeric_limits<float>::epsilon()) {
+        return false;
+    }
+    wallNormal_.x /= normalLength;
+    wallNormal_.y /= normalLength;
+    position_ = {contact.position.x +
+                     wallNormal_.x * kPlayerCollisionRadiusCentimeters,
+                 contact.position.y +
+                     wallNormal_.y * kPlayerCollisionRadiusCentimeters,
+                 candidate.z};
+    renderPosition_ = position_;
+    facing_ = {-wallNormal_.x, -wallNormal_.y, 0.0F};
+    return true;
+}
+
+void GameplayPlayer::updateWallTraversal(
+    const PlayerMotionInput& input,
+    std::uint32_t elapsedMilliseconds) noexcept {
+    lastWallInput_ = input;
+    const auto finishRootMotionState = [this, elapsedMilliseconds]() {
+        const assets::ColladaAnimationClip* clip =
+            stateClip(animationBank_, activeLocomotionState_);
+        if (clip == nullptr && animationBank_ != nullptr) {
+            clip = animationBank_->findClip(activeAnimation_);
+        }
+        if (clip == nullptr) {
+            return true;
+        }
+        animationTimeMilliseconds_ = std::min<std::uint64_t>(
+            animationTimeMilliseconds_ + elapsedMilliseconds,
+            clip->durationMilliseconds());
+        const assets::Vector3 first =
+            wallRootTranslation(activeLocomotionState_, 0);
+        const assets::Vector3 last = wallRootTranslation(
+            activeLocomotionState_, animationTimeMilliseconds());
+        const assets::Vector3 worldDelta = wallRootWorldDelta(
+            {last.x - first.x, last.y - first.y, last.z - first.z});
+        position_ = {wallStateStartPosition_.x + worldDelta.x,
+                     wallStateStartPosition_.y + worldDelta.y,
+                     wallStateStartPosition_.z + worldDelta.z};
+        renderPosition_ = position_;
+        updateWorldTransform(facing_);
+        return animationTimeMilliseconds_ >= clip->durationMilliseconds();
+    };
+
+    if (locomotionState_ == LocomotionState::WallAttach) {
+        if (!finishRootMotionState()) {
+            return;
+        }
+        if (reacquireWallAt(position_)) {
+            enterLocomotionState(LocomotionState::WallIdle);
+        } else {
+            jumpAnchorHeight_ = position_.z;
+            enterLocomotionState(LocomotionState::SustainedFall);
+        }
+        return;
+    }
+    if (locomotionState_ == LocomotionState::WallJump) {
+        const PlayerStateDefinition* completedState = activeLocomotionState_;
+        if (!finishRootMotionState()) {
+            return;
+        }
+        if (reacquireWallAt(position_)) {
+            enterLocomotionState(LocomotionState::WallIdle);
+        } else if (completedState == wallJumpUpState_) {
+            wallStateStartPosition_ = position_;
+            enterLocomotionState(LocomotionState::WallExit);
+            if (const auto* clip = clipById(animationBank_, 198)) {
+                setAnimation(clip->name);
+            }
+        } else {
+            jumpAnchorHeight_ = position_.z;
+            enterLocomotionState(LocomotionState::SustainedFall);
+        }
+        return;
+    }
+    if (locomotionState_ == LocomotionState::WallExit) {
+        if (!finishRootMotionState()) {
+            return;
+        }
+        assets::Vector3 grounded = position_;
+        if (collision_ != nullptr &&
+            collision_->resolveGroundMotion(position_, position_, grounded,
+                                             300.0F, 500.0F)) {
+            position_ = grounded;
+            renderPosition_ = grounded;
+            jumpAnchorHeight_ = grounded.z;
+            enterLocomotionState(LocomotionState::Grounded);
+        } else {
+            jumpAnchorHeight_ = position_.z;
+            enterLocomotionState(LocomotionState::SustainedFall);
+        }
+        return;
+    }
+
+    const float magnitude =
+        std::min(length2D(input.right, input.forward), 1.0F);
+    if (magnitude <= 1e-4F || elapsedMilliseconds == 0) {
+        if (locomotionState_ != LocomotionState::WallIdle) {
+            enterLocomotionState(LocomotionState::WallIdle);
+        } else {
+            const assets::ColladaAnimationClip* clip =
+                stateClip(animationBank_, wallIdleState_);
+            animationTimeMilliseconds_ += elapsedMilliseconds;
+            if (clip != nullptr && clip->durationMilliseconds() > 0) {
+                animationTimeMilliseconds_ %= clip->durationMilliseconds();
+            }
+        }
+        updateWorldTransform(facing_);
+        return;
+    }
+
+    const float inverseMagnitude =
+        1.0F / length2D(input.right, input.forward);
+    const float right = input.right * inverseMagnitude * magnitude;
+    const float upward = input.forward * inverseMagnitude * magnitude;
+    const assets::Vector3 localX{-facing_.y, facing_.x, 0.0F};
+    const float travel = kWallClimbSpeedCentimetersPerSecond *
+                         (static_cast<float>(elapsedMilliseconds) / 1000.0F);
+    assets::Vector3 candidate{
+        position_.x + localX.x * right * travel,
+        position_.y + localX.y * right * travel,
+        position_.z + upward * travel};
+    if (!reacquireWallAt(candidate)) {
+        if (upward > 0.1F) {
+            wallStateStartPosition_ = position_;
+            enterLocomotionState(LocomotionState::WallExit);
+            if (const auto* clip = clipById(animationBank_, 198)) {
+                setAnimation(clip->name);
+            }
+        } else if (upward < -0.1F) {
+            jumpAnchorHeight_ = position_.z;
+            enterLocomotionState(LocomotionState::SustainedFall);
+        } else {
+            enterLocomotionState(LocomotionState::WallIdle);
+        }
+        return;
+    }
+
+    activeLocomotionState_ = wallMoveState_;
+    locomotionState_ = LocomotionState::WallMove;
+    std::int32_t animationId = upward < 0.0F ? 191 : 199;
+    if (right < -0.1F) {
+        animationId = upward < 0.0F ? 194 : 195;
+    } else if (right > 0.1F) {
+        animationId = upward < 0.0F ? 196 : 197;
+    }
+    if (const auto* clip = clipById(animationBank_, animationId)) {
+        if (activeAnimation_ != clip->name) {
+            setAnimation(clip->name);
+        } else if (clip->durationMilliseconds() > 0) {
+            animationTimeMilliseconds_ =
+                (animationTimeMilliseconds_ + elapsedMilliseconds) %
+                clip->durationMilliseconds();
+        }
+    }
+    updateWorldTransform(facing_);
 }
 
 float GameplayPlayer::currentRootHeight() const noexcept {
@@ -1383,6 +1747,14 @@ bool GameplayPlayer::airborne() const noexcept {
            locomotionState_ == LocomotionState::WebThrow ||
            locomotionState_ == LocomotionState::SwingHang ||
            locomotionState_ == LocomotionState::SwingRelease;
+}
+
+bool GameplayPlayer::onWall() const noexcept {
+    return locomotionState_ == LocomotionState::WallAttach ||
+           locomotionState_ == LocomotionState::WallIdle ||
+           locomotionState_ == LocomotionState::WallMove ||
+           locomotionState_ == LocomotionState::WallExit ||
+           locomotionState_ == LocomotionState::WallJump;
 }
 
 std::uint16_t GameplayPlayer::activeStateId() const noexcept {

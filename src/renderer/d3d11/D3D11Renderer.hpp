@@ -172,6 +172,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> viewRotationBuffer_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> noCullRasterizerState_;
     Microsoft::WRL::ComPtr<ID3D11BlendState> alphaBlendState_;
     Microsoft::WRL::ComPtr<ID3D11BlendState> additiveBlendState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthWriteState_;

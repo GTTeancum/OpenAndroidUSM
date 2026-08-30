@@ -39,6 +39,7 @@ struct AutoplaySnapshot {
     std::uint16_t playerStateId{};
     std::string_view playerStateName;
     bool playerPunchTransitionReady{};
+    bool playerOnWall{};
     game::CameraPose camera;
     std::span<const bool> visibleRooms;
     std::span<const game::LevelEnemyState> enemies;
@@ -77,6 +78,8 @@ public:
                        const game::CinematicCommand& command);
     void recordCinematicAssets(
         std::span<const game::LevelCinematicAsset> cinematics);
+    void recordCollisionAssets(
+        std::span<const game::LevelRoomAsset> rooms);
     void recordAudio(std::uint64_t timeMilliseconds, std::string_view action,
                      std::string_view eventName, bool loop = false,
                      bool spatial = false);
@@ -116,6 +119,8 @@ private:
         WaitGameplay,
         Wait,
         MoveTo,
+        MoveInput,
+        MoveUntilWall,
         MoveUntilCinematic,
         WaitEnemiesGrounded,
         Attack,
@@ -171,6 +176,7 @@ private:
     std::ofstream enemyLog_;
     std::ofstream eventLog_;
     std::ofstream cinematicAssetLog_;
+    std::ofstream collisionAssetLog_;
     std::vector<Step> steps_;
     std::size_t activeStepIndex_{};
     std::optional<std::uint64_t> activeStepStartMilliseconds_;
@@ -190,6 +196,7 @@ private:
     bool finishedLog_{};
     std::string failureMessage_;
     bool previousGameplayActive_{};
+    bool previousPlayerOnWall_{};
     float previousPlayerHealth_{};
     std::string previousPlayerAnimation_;
     std::int32_t previousCameraAreaId_{-1};

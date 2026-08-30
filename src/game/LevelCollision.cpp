@@ -20,6 +20,7 @@ constexpr float kMinimumWalkableNormalZ = 0.5F;
 // at image address 0x0056ec90.
 constexpr float kGroundSupportRadius = 50.0F;
 constexpr float kPlayerCollisionHeight = 140.0F;
+constexpr std::uint32_t kClimbableWallPhysicsFlag = 0x20U;
 
 Vector3 subtract(const Vector3& left, const Vector3& right) noexcept {
     return {left.x - right.x, left.y - right.y, left.z - right.z};
@@ -93,6 +94,7 @@ Result LevelCollision::build(
 
 void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
     auto appendTriangle = [this](const ColladaGeometry& geometry,
+                                 const ColladaMeshBuffer& buffer,
                                  std::uint16_t firstIndex,
                                  std::uint16_t secondIndex,
                                  std::uint16_t thirdIndex) {
@@ -134,6 +136,27 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
             {triangle.first.z, triangle.second.z, triangle.third.z});
         triangle.maximumZ = std::max(
             {triangle.first.z, triangle.second.z, triangle.third.z});
+        triangle.geometryName = geometry.name;
+        triangle.materialName = buffer.materialName;
+        // PhysicsTriangleMeshShape::addSceneNodeInternal (0x003d9e94)
+        // derives the native triangle flags from collision-node prefixes.
+        // constructMesh (0x003d95d8) applies the regular wall flag only to
+        // faces below its 0.70710677 ground-normal threshold.
+        if (geometry.name.starts_with("wall")) {
+            triangle.physicsFlags =
+                std::abs(triangle.normal.z) < kMinimumWalkableNormalZ
+                    ? kClimbableWallPhysicsFlag
+                    : 1U;
+        } else if (geometry.name.starts_with("jump_wall")) {
+            triangle.physicsFlags = 0x10U;
+        } else if (geometry.name.starts_with("edge_wall")) {
+            triangle.physicsFlags = 0x40U;
+        } else {
+            triangle.physicsFlags =
+                std::abs(triangle.normal.z) < kMinimumWalkableNormalZ
+                    ? 2U
+                    : 1U;
+        }
         triangles_.push_back(triangle);
     };
 
@@ -142,7 +165,7 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
             if (buffer.primitive == ColladaPrimitive::Triangles) {
                 for (std::size_t index = 0; index + 2 < buffer.indices.size();
                      index += 3) {
-                    appendTriangle(geometry, buffer.indices[index],
+                    appendTriangle(geometry, buffer, buffer.indices[index],
                                    buffer.indices[index + 1],
                                    buffer.indices[index + 2]);
                 }
@@ -150,7 +173,7 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
                 for (std::size_t index = 2; index < buffer.indices.size();
                      ++index) {
                     const bool odd = (index & 1U) != 0;
-                    appendTriangle(geometry,
+                    appendTriangle(geometry, buffer,
                                    buffer.indices[index - (odd ? 0 : 2)],
                                    buffer.indices[index - 1],
                                    buffer.indices[index - (odd ? 2 : 0)]);
@@ -363,6 +386,74 @@ bool LevelCollision::segmentBlocked(const Vector3& start,
         }
     }
     return false;
+}
+
+bool LevelCollision::climbableWallContact(
+    const Vector3& start, const Vector3& end,
+    LevelWallContact& contact) const noexcept {
+    // Player::CheckClimbableWall (0x0034863c) obtains both the contact point
+    // and manifold normal from a forward segment/contact query. The portable
+    // collision mesh has no Bullet manifold, so retain the nearest vertical
+    // triangle intersection explicitly.
+    const Vector3 direction = subtract(end, start);
+    constexpr float kIntersectionEpsilon = 1e-5F;
+    bool found = false;
+    float nearestFraction = 1.0F + kIntersectionEpsilon;
+    for (const Triangle& triangle : triangles_) {
+        if (triangle.physicsFlags != kClimbableWallPhysicsFlag ||
+            std::abs(triangle.normal.z) >= kMinimumWalkableNormalZ ||
+            std::max(start.x, end.x) < triangle.minimumX ||
+            std::min(start.x, end.x) > triangle.maximumX ||
+            std::max(start.y, end.y) < triangle.minimumY ||
+            std::min(start.y, end.y) > triangle.maximumY ||
+            std::max(start.z, end.z) < triangle.minimumZ ||
+            std::min(start.z, end.z) > triangle.maximumZ) {
+            continue;
+        }
+        const Vector3 firstEdge = subtract(triangle.second, triangle.first);
+        const Vector3 secondEdge = subtract(triangle.third, triangle.first);
+        const Vector3 determinantCross = cross(direction, secondEdge);
+        const float determinant = dot(firstEdge, determinantCross);
+        if (std::abs(determinant) <= kIntersectionEpsilon) {
+            continue;
+        }
+        const float inverseDeterminant = 1.0F / determinant;
+        const Vector3 fromFirst = subtract(start, triangle.first);
+        const float firstWeight =
+            dot(fromFirst, determinantCross) * inverseDeterminant;
+        if (firstWeight < 0.0F || firstWeight > 1.0F) {
+            continue;
+        }
+        const Vector3 secondCross = cross(fromFirst, firstEdge);
+        const float secondWeight =
+            dot(direction, secondCross) * inverseDeterminant;
+        if (secondWeight < 0.0F || firstWeight + secondWeight > 1.0F) {
+            continue;
+        }
+        const float fraction =
+            dot(secondEdge, secondCross) * inverseDeterminant;
+        if (fraction < -kIntersectionEpsilon ||
+            fraction > 1.0F + kIntersectionEpsilon ||
+            fraction >= nearestFraction) {
+            continue;
+        }
+        nearestFraction = std::clamp(fraction, 0.0F, 1.0F);
+        contact.position = {start.x + direction.x * nearestFraction,
+                            start.y + direction.y * nearestFraction,
+                            start.z + direction.z * nearestFraction};
+        contact.normal = triangle.normal;
+        if (dot(contact.normal, direction) > 0.0F) {
+            contact.normal.x = -contact.normal.x;
+            contact.normal.y = -contact.normal.y;
+            contact.normal.z = -contact.normal.z;
+        }
+        contact.segmentFraction = nearestFraction;
+        contact.physicsFlags = triangle.physicsFlags;
+        contact.geometryName = triangle.geometryName;
+        contact.materialName = triangle.materialName;
+        found = true;
+    }
+    return found;
 }
 
 void LevelCollision::resolveWalls(const Vector3& start,

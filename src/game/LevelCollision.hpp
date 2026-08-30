@@ -8,10 +8,21 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 namespace usm::game {
+
+struct LevelWallContact {
+    assets::Vector3 position;
+    assets::Vector3 normal;
+    float segmentFraction{};
+    std::uint32_t physicsFlags{};
+    std::string_view geometryName;
+    std::string_view materialName;
+};
 
 // Portable triangle collision extracted from each room's authored Collisions
 // mesh. It is deliberately independent of Direct3D and platform input.
@@ -34,6 +45,9 @@ public:
     [[nodiscard]] bool segmentBlocked(
         const assets::Vector3& start,
         const assets::Vector3& end) const noexcept;
+    [[nodiscard]] bool climbableWallContact(
+        const assets::Vector3& start, const assets::Vector3& end,
+        LevelWallContact& contact) const noexcept;
 
     [[nodiscard]] std::size_t triangleCount() const noexcept {
         return triangles_.size();
@@ -51,6 +65,9 @@ private:
         float maximumY{};
         float minimumZ{};
         float maximumZ{};
+        std::string geometryName;
+        std::string materialName;
+        std::uint32_t physicsFlags{};
     };
 
     void append(std::span<const assets::ColladaGeometry> geometries);
