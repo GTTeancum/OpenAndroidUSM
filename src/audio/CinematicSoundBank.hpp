@@ -19,6 +19,7 @@ using PlayCinematicSound =
                          bool loop)>;
 using StopCinematicSound =
     std::function<Result(std::string_view eventName)>;
+using PlayCinematicSpatialSound = PlayCinematicSound;
 
 // Predecoded sound events referenced by a CFF command stream. This keeps Ogg
 // decoding off the frame that dispatches the timestamped SoundControl command.
@@ -32,7 +33,8 @@ public:
     [[nodiscard]] Result dispatch(
         const game::CinematicCommand& command,
         const PlayCinematicSound& play,
-        const StopCinematicSound& stop = {}) const;
+        const StopCinematicSound& stop = {},
+        const PlayCinematicSpatialSound& playSpatial = {}) const;
 
     [[nodiscard]] std::size_t loadedEventCount() const noexcept {
         return decodedByEvent_.size();

@@ -105,14 +105,14 @@ Result VoxSoundTable::load(std::span<const std::byte> bytes) {
     for (std::uint16_t index = 0; index < recordCount; ++index) {
         VoxSoundRecord record;
         std::int16_t flag18{};
-        std::int16_t distanceCullingDisabled{};
+        std::int16_t distanceCullingEnabled{};
         if (!reader.u16(record.id) || !reader.string(record.eventName) ||
             !reader.string(record.resourcePath) ||
             !reader.s16(record.groupId) ||
             !reader.s16(record.maximumInstances) || !reader.f32(record.volume) ||
             !reader.s16(flag18) || !reader.f32(record.minimumDistance) ||
             !reader.f32(record.maximumDistance) ||
-            !reader.s16(distanceCullingDisabled) ||
+            !reader.s16(distanceCullingEnabled) ||
             !reader.s16(record.parameter28) ||
             !reader.s16(record.parameter2c)) {
             records_.clear();
@@ -120,12 +120,12 @@ Result VoxSoundTable::load(std::span<const std::byte> bytes) {
         }
         if (record.id != index || record.eventName.empty() ||
             record.resourcePath.empty() || (flag18 != 0 && flag18 != 1) ||
-            (distanceCullingDisabled != 0 && distanceCullingDisabled != 1)) {
+            (distanceCullingEnabled != 0 && distanceCullingEnabled != 1)) {
             records_.clear();
             return Result::failure("VoxSounds record contains invalid fields");
         }
         record.flag18 = flag18 == 1;
-        record.distanceCullingDisabled = distanceCullingDisabled == 1;
+        record.distanceCullingEnabled = distanceCullingEnabled == 1;
         records_.push_back(std::move(record));
     }
     if (reader.remaining() != 0) {

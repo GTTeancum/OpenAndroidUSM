@@ -85,6 +85,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/audio/OggAudio.cpp
     src/audio/PlayerStateSoundBank.cpp
     src/audio/SoundEventCatalog.cpp
+    src/audio/SpatialSound.cpp
     src/audio/VoxSoundTable.cpp
     src/assets/BresFile.cpp
     src/assets/BtexTexture.cpp

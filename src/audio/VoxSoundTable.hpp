@@ -22,7 +22,7 @@ struct VoxSoundRecord {
     bool flag18{};
     float minimumDistance{};
     float maximumDistance{};
-    bool distanceCullingDisabled{};
+    bool distanceCullingEnabled{};
     std::int16_t parameter28{};
     std::int16_t parameter2c{};
 };

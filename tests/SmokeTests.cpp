@@ -12,6 +12,7 @@
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
 #include "audio/VoxSoundTable.hpp"
+#include "audio/SpatialSound.hpp"
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
@@ -61,6 +62,29 @@ int main() {
     const auto failure = usm::Result::failure("expected failure");
     assert(!static_cast<bool>(failure));
     assert(failure.message() == "expected failure");
+
+    const usm::audio::SpatialSoundSource centeredSource{
+        {0.0F, 0.0F, 0.0F}, 100.0F, 2000.0F, false};
+    const auto centeredMix = usm::audio::calculateSpatialSoundMix(
+        {}, {1.0F, 0.0F, 0.0F}, centeredSource);
+    assert(!centeredMix.culled);
+    assert(std::abs(centeredMix.attenuation - 1.0F) < 0.001F);
+    assert(std::abs(centeredMix.leftGain - centeredMix.rightGain) < 0.001F);
+
+    const usm::audio::SpatialSoundSource rightSource{
+        {1000.0F, 0.0F, 0.0F}, 100.0F, 2000.0F, false};
+    const auto rightMix = usm::audio::calculateSpatialSoundMix(
+        {}, {1.0F, 0.0F, 0.0F}, rightSource);
+    assert(!rightMix.culled);
+    assert(rightMix.attenuation > 0.0F && rightMix.attenuation < 1.0F);
+    assert(rightMix.rightGain > rightMix.leftGain);
+
+    const usm::audio::SpatialSoundSource culledSource{
+        {2500.0F, 0.0F, 0.0F}, 100.0F, 2000.0F, true};
+    const auto culledMix = usm::audio::calculateSpatialSoundMix(
+        {}, {1.0F, 0.0F, 0.0F}, culledSource);
+    assert(culledMix.culled);
+    assert(culledMix.attenuation == 0.0F);
 
     usm::game::PlayerHudHealthState hudHealth;
     hudHealth.initialize(1000.0F, 1000.0F);
@@ -2572,6 +2596,8 @@ int main() {
 
         std::vector<const usm::game::CinematicScript*> gameplaySoundScripts;
         const usm::game::CinematicCommand* gameplayStopCommand = nullptr;
+        const usm::game::CinematicCommand* gameplay3DCommand = nullptr;
+        std::size_t gameplay3DSoundCount = 0;
         for (const auto& cinematic : bootstrap.cinematics()) {
             if (!cinematic.scriptAvailable) {
                 continue;
@@ -2581,6 +2607,27 @@ int main() {
                 for (const auto& command : thread.commands) {
                     const auto* stop2D = command.findAttribute("Stop2D");
                     const auto* stop = command.findAttribute("Stop");
+                    const auto* play3D = command.findAttribute("Play3D");
+                    if (command.name == "SoundControl" && play3D != nullptr &&
+                        play3D->value == "true") {
+                        ++gameplay3DSoundCount;
+                        gameplay3DCommand = &command;
+                        const bool hasSourceObject =
+                            thread.objectId == bootstrap.player().objectId ||
+                            std::any_of(
+                                bootstrap.enemies().begin(),
+                                bootstrap.enemies().end(),
+                                [&thread](const auto& enemy) {
+                                    return enemy.objectId == thread.objectId;
+                                }) ||
+                            std::any_of(
+                                bootstrap.objects().begin(),
+                                bootstrap.objects().end(),
+                                [&thread](const auto& object) {
+                                    return object.objectId == thread.objectId;
+                                });
+                        assert(hasSourceObject);
+                    }
                     if (command.name == "SoundControl" &&
                         ((stop2D != nullptr && stop2D->value == "true") ||
                          (stop != nullptr && stop->value == "true"))) {
@@ -2592,6 +2639,7 @@ int main() {
         usm::audio::CinematicSoundBank gameplaySounds;
         assert(gameplaySounds.preload(gameplaySoundScripts, soundCatalog));
         assert(gameplaySounds.loadedEventCount() == 60);
+        assert(gameplay3DSoundCount == 8);
         if (!gameplaySounds.unresolvedEvents().empty()) {
             std::cerr << "Unresolved gameplay cinematic sound:";
             for (const auto& event : gameplaySounds.unresolvedEvents()) {
@@ -2613,6 +2661,24 @@ int main() {
                 return usm::Result::success();
             }));
         assert(stoppedSoundCount == 1);
+        assert(gameplay3DCommand != nullptr);
+        std::size_t flat3DDispatchCount = 0;
+        std::size_t spatialDispatchCount = 0;
+        assert(gameplaySounds.dispatch(
+            *gameplay3DCommand,
+            [&flat3DDispatchCount](std::string_view,
+                                   const usm::audio::PcmAudio&, bool) {
+                ++flat3DDispatchCount;
+                return usm::Result::success();
+            },
+            {},
+            [&spatialDispatchCount](std::string_view,
+                                     const usm::audio::PcmAudio&, bool) {
+                ++spatialDispatchCount;
+                return usm::Result::success();
+            }));
+        assert(flat3DDispatchCount == 0);
+        assert(spatialDispatchCount == 1);
 
         std::vector<std::byte> roomResource;
         assert(levelOne.read("levelnew_01_0_Room1.irr", roomResource));

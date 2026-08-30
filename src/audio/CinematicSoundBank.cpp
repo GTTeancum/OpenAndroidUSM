@@ -9,6 +9,8 @@ namespace {
 constexpr std::string_view kSoundCommand = "SoundControl";
 constexpr std::string_view kEventAttribute = "$VoxSounds";
 constexpr std::string_view kLoopAttribute = "Loop";
+constexpr std::string_view kPlay2DAttribute = "Play2D";
+constexpr std::string_view kPlay3DAttribute = "Play3D";
 constexpr std::string_view kStopAttribute = "Stop";
 constexpr std::string_view kStop2DAttribute = "Stop2D";
 constexpr std::string_view kStop3DAttribute = "Stop3D";
@@ -77,7 +79,8 @@ Result CinematicSoundBank::preload(
 Result CinematicSoundBank::dispatch(
     const game::CinematicCommand& command,
     const PlayCinematicSound& play,
-    const StopCinematicSound& stop) const {
+    const StopCinematicSound& stop,
+    const PlayCinematicSpatialSound& playSpatial) const {
     if (command.name != kSoundCommand) {
         return Result::success();
     }
@@ -97,8 +100,25 @@ Result CinematicSoundBank::dispatch(
         // no arbitrary replacement sound is played.
         return Result::success();
     }
-    return play(event->value, decoded->second,
-                booleanAttribute(command, kLoopAttribute));
+    const bool loop = booleanAttribute(command, kLoopAttribute);
+    if (booleanAttribute(command, kPlay2DAttribute)) {
+        if (!play) {
+            return Result::failure(
+                "Cinematic 2D sound callback is not configured");
+        }
+        Result result = play(event->value, decoded->second, loop);
+        if (!result) {
+            return result;
+        }
+    }
+    if (booleanAttribute(command, kPlay3DAttribute)) {
+        if (!playSpatial) {
+            return Result::failure(
+                "Cinematic 3D sound callback is not configured");
+        }
+        return playSpatial(event->value, decoded->second, loop);
+    }
+    return Result::success();
 }
 
 } // namespace usm::audio

@@ -421,13 +421,24 @@ while configured events take precedence. This resolves aliases such as
 `audio::CinematicSoundBank` scans the typed CFF before playback and decodes
 each unique resolvable event once, keeping Vorbis work off its scheduled frame.
 The application advances `CinematicPlayer` from the same monotonic clock as
-the camera and dispatches 2D/loop flags to XAudio2. All 19 unique level-one
+the camera and independently dispatches the authored 2D, 3D, loop, and stop
+flags to XAudio2. All 19 unique level-one
 intro event names now resolve through the recovered table and preload before
 playback. The same deduplicated path scans all 42 runnable encounter scripts,
 preloads their 60 unique sound events with no unresolved aliases, and tags
 XAudio2 voices by Vox event name. Authored `Stop`/`Stop2D` commands can
 therefore stop every matching active voice instead of leaking looping sounds
 across cinematic boundaries.
+
+All eight level-one cinematic `Play3D` commands resolve their thread object to
+the live player, enemy, or static-object position. Enemy behavior cues use the
+same path with their source enemy ID. The listener follows the active intro,
+gameplay, or cinematic camera; active voices are re-panned as it moves. The
+Windows backend applies the Vox record's minimum/maximum emitter range and
+recovered distance-culling flag, then uses constant-power mono-to-stereo
+panning. The serialized 0x14 float is preserved in `VoxSoundRecord` but is not
+used as linear gain: the original `Get2DEmitter` and `Get3DEmitter` paths do
+not consult that field, and most shipped records store zero there.
 
 ## Native interface sprites and player HUD
 
