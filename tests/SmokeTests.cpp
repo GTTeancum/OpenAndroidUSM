@@ -950,6 +950,23 @@ int main() {
         assert(enemyGatePlayer.finished());
         usm::game::LevelEnemyRuntime enemyRuntime;
         assert(enemyRuntime.initialize(bootstrap));
+        constexpr std::array<std::int32_t, 11> conditionEnemyIds{
+            394, 395, 397, 398, 399, 401,
+            488, 489, 505, 506, 1251,
+        };
+        for (const std::int32_t enemyId : conditionEnemyIds) {
+            assert(enemyRuntime.find(enemyId) != nullptr);
+        }
+        usm::game::LevelEnemyRuntime killedEnemyRuntime;
+        assert(killedEnemyRuntime.initialize(bootstrap));
+        usm::game::CinematicThread killEnemyThread;
+        killEnemyThread.objectId = 400;
+        assert(killedEnemyRuntime.applyCinematicCommand(
+            bootstrap, killEnemyThread,
+            usm::game::CinematicCommand{0, -1, "KillObject", {}}));
+        assert(killedEnemyRuntime.find(400)->health == 0.0F);
+        assert(killedEnemyRuntime.find(400)->behavior ==
+               usm::game::EnemyBehaviorState::Dead);
         usm::game::CinematicPlayer encounterPlayer;
         assert(encounterPlayer.start(firstEncounterCinematic->script));
         usm::Result encounterCommandResult = usm::Result::success();

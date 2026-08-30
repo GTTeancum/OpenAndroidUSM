@@ -106,6 +106,10 @@ cinematic thread; unrelated threads continue. The condition is retried on
 subsequent updates and releases the authored trigger/cinematic chain only
 after the referenced native enemy state is dead. This is materially different
 from flattening every time-zero command into an unconditional batch.
+`KillObject` and `IfObjectDestroyed` share the same native death transition
+for enemy-backed objects: health reaches zero, AI stops, and the authored
+one-shot death animation and behavior sound are selected. This covers the
+enemy destruction gates used throughout the level-one encounter chain.
 
 Enemy melee timing is not guessed. The typed
 `EnemySpecialActionConfigDatabase` follows

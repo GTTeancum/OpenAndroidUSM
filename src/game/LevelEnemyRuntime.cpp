@@ -360,10 +360,7 @@ std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
     nearest->health = std::max(0.0F, nearest->health - damage);
     nearest->playerDetected = true;
     if (nearest->health == 0.0F) {
-        nearest->aiEnabled = false;
-        nearest->behavior = EnemyBehaviorState::Dead;
-        selectStateAnimation(*nearest, "ENEMY_BEHAVIOR_DEAD_STATE", false);
-        queueStateSound(*nearest, "ENEMY_BEHAVIOR_DEAD_STATE");
+        enterDeadState(*nearest);
     } else {
         nearest->behavior = EnemyBehaviorState::Hurt;
         selectStateAnimation(*nearest, "ENEMY_BEHAVIOR_HURT_STATE_COMMON",
@@ -371,6 +368,18 @@ std::optional<std::int32_t> LevelEnemyRuntime::applyPlayerMeleeHit(
         queueStateSound(*nearest, "ENEMY_BEHAVIOR_HURT_STATE_COMMON");
     }
     return nearest->asset->objectId;
+}
+
+bool LevelEnemyRuntime::destroy(std::int32_t objectId) noexcept {
+    LevelEnemyState* enemy = findMutable(objectId);
+    if (enemy == nullptr) {
+        return false;
+    }
+    if (enemy->health > 0.0F) {
+        enemy->health = 0.0F;
+        enterDeadState(*enemy);
+    }
+    return true;
 }
 
 std::vector<EnemyMeleeHit> LevelEnemyRuntime::consumePlayerHits() noexcept {
@@ -518,11 +527,22 @@ void LevelEnemyRuntime::selectStateAnimation(
     enemy.animationLoops = loop;
 }
 
+void LevelEnemyRuntime::enterDeadState(LevelEnemyState& enemy) {
+    enemy.aiEnabled = false;
+    enemy.behavior = EnemyBehaviorState::Dead;
+    selectStateAnimation(enemy, "ENEMY_BEHAVIOR_DEAD_STATE", false);
+    queueStateSound(enemy, "ENEMY_BEHAVIOR_DEAD_STATE");
+}
+
 Result LevelEnemyRuntime::applyCinematicCommand(
     const LevelOneBootstrap& level, const CinematicThread& thread,
     const CinematicCommand& command) {
     LevelEnemyState* enemy = findMutable(thread.objectId);
     if (enemy == nullptr) {
+        return Result::success();
+    }
+    if (command.name == "KillObject") {
+        (void)destroy(thread.objectId);
         return Result::success();
     }
     if (command.name == "DisableAI") {

@@ -338,6 +338,13 @@ int Application::run(HINSTANCE instance) {
                                 enemyRuntime_.find(enemyId);
                             return enemy != nullptr && enemy->health <= 0.0F;
                         }
+                        if (command.name == "IfObjectDestroyed") {
+                            std::int32_t objectId = thread.objectId;
+                            (void)commandInteger(command, "ObjectID", objectId);
+                            const game::LevelEnemyState* enemy =
+                                enemyRuntime_.find(objectId);
+                            return enemy != nullptr && enemy->health <= 0.0F;
+                        }
                         if (commandResult) {
                             commandResult = enemyRuntime_.applyCinematicCommand(
                                 levelOne_, thread, command);

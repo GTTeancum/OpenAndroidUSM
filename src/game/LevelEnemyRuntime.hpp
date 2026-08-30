@@ -68,6 +68,7 @@ public:
         float minimumForwardDot = 0.0F) noexcept;
     [[nodiscard]] std::vector<EnemyMeleeHit> consumePlayerHits() noexcept;
     [[nodiscard]] std::vector<EnemySoundCue> consumeSoundCues() noexcept;
+    [[nodiscard]] bool destroy(std::int32_t objectId) noexcept;
     [[nodiscard]] Result applyCinematicCommand(
         const LevelOneBootstrap& level, const CinematicThread& thread,
         const CinematicCommand& command);
@@ -90,6 +91,7 @@ private:
     void selectStateAnimation(LevelEnemyState& enemy,
                               std::string_view behaviorStateName,
                               bool loop);
+    void enterDeadState(LevelEnemyState& enemy);
 
     std::vector<LevelEnemyState> states_;
     std::vector<EnemyMeleeHit> pendingPlayerHits_;
