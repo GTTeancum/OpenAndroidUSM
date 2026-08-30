@@ -142,8 +142,14 @@ const assets::IrrSceneNode* findLevelNode(
 
 std::optional<LevelObjectKind> levelObjectKind(
     std::string_view gameType) noexcept {
+    if (gameType == "AnimatedObject") {
+        return LevelObjectKind::Animated;
+    }
     if (gameType == "DestroyableObject") {
         return LevelObjectKind::Destroyable;
+    }
+    if (gameType == "Comic") {
+        return LevelObjectKind::Comic;
     }
     if (gameType == "Car") {
         return LevelObjectKind::Car;
@@ -178,6 +184,7 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
                         nullptr) {
     output.clear();
     output.reserve(mesh.images().size());
+    std::vector<std::size_t> missingUnusedImageIndices;
     std::vector<std::byte> resource;
     for (std::size_t imageIndex = 0; imageIndex < mesh.images().size();
          ++imageIndex) {
@@ -189,12 +196,21 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
         while (source.starts_with("../")) {
             source.erase(0, 3);
         }
-        const std::vector<std::string> candidates{
+        std::vector<std::string> candidates{
             "textures_bin/" + image.sourcePath,
             "textures_bin/" + filename,
             "textures/" + filename,
             source,
         };
+        // comic_cover.bdae names its reflection layer envmap_ringx.tga, but
+        // the shipped entity archive stores that resource as envmap_ring.tga.
+        // Keep this data-level alias next to archive resolution rather than
+        // changing the material or substituting an unrelated texture.
+        if (asciiLower(filename) == "envmap_ringx.tga") {
+            candidates.push_back("textures_bin/envmap_ring.tga");
+            candidates.push_back("textures/envmap_ring.tga");
+            candidates.push_back("envmap_ring.tga");
+        }
         const std::string lowerFilename = asciiLower(filename);
         filesystem::GbmpArchive* selectedArchive = nullptr;
         std::string selectedPath;
@@ -234,12 +250,15 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
                     return material.diffuseImageIndex == imageIndex ||
                            material.secondaryImageIndex == imageIndex;
                 });
-            if (!referenced && !output.empty()) {
+            if (!referenced) {
                 // Some shipped BDAE image libraries retain editor-only image
                 // names that no material references (vat.bdae includes
-                // levelnew_01_01.tga this way). Preserve image indexing with
-                // an unused valid view instead of rejecting the mesh.
-                output.push_back(output.front());
+                // levelnew_01_01.tga and comic_cover.bdae includes book.tga
+                // this way). Defer the placeholder so a missing leading image
+                // can reuse the first valid decoded texture while preserving
+                // every material's image index.
+                missingUnusedImageIndices.push_back(imageIndex);
+                output.emplace_back();
                 continue;
             }
             output.clear();
@@ -263,6 +282,20 @@ Result loadTextures(filesystem::GbmpArchive& primaryArchive,
                                    image.sourcePath + ": " + result.message());
         }
         output.push_back(std::move(texture));
+    }
+    if (!missingUnusedImageIndices.empty()) {
+        const auto validTexture = std::find_if(
+            output.begin(), output.end(), [](const assets::BtexTexture& texture) {
+                return !texture.mipLevels().empty();
+            });
+        if (validTexture == output.end()) {
+            output.clear();
+            return Result::failure("Could not locate any referenced " +
+                                   std::string(assetName) + " texture");
+        }
+        for (const std::size_t imageIndex : missingUnusedImageIndices) {
+            output[imageIndex] = *validTexture;
+        }
     }
     return Result::success();
 }
@@ -715,11 +748,24 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
                             node.animationFile);
                     }
                     result = animationArchive->read(animationPath, resource);
-                    if (!result ||
-                        !(result = archetype.animationBank.load(resource))) {
+                    if (!result) {
                         return Result::failure(
                             "Could not load animation for level object " +
-                            node.name + ": " + result.message());
+                            node.name + " (ID " + std::to_string(node.id) +
+                            ", " + node.animationFile + "): " +
+                            result.message());
+                    }
+                    result = archetype.animationBank.load(resource);
+                    const bool authoredMeshWithoutAnimationLibrary =
+                        !result && animationPath == meshPath &&
+                        result.message() ==
+                            "BDAE animation library is invalid";
+                    if (!result && !authoredMeshWithoutAnimationLibrary) {
+                        return Result::failure(
+                            "Could not load animation for level object " +
+                            node.name + " (ID " + std::to_string(node.id) +
+                            ", " + node.animationFile + "): " +
+                            result.message());
                     }
                 }
                 objectArchetypes_.push_back(std::move(archetype));
@@ -1379,6 +1425,29 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     if (introActors_.empty()) {
         return Result::failure("Level-one intro has no cinematic actors");
     }
+    const auto isDedicatedCinematicActor = [this](std::int32_t objectId) {
+        if (std::any_of(
+                introActors_.begin(), introActors_.end(),
+                [objectId](const CinematicActorAsset& actor) {
+                    return actor.objectId == objectId;
+                })) {
+            return true;
+        }
+        return std::any_of(
+            cinematics_.begin(), cinematics_.end(),
+            [objectId](const LevelCinematicAsset& cinematic) {
+                return std::any_of(
+                    cinematic.actors.begin(), cinematic.actors.end(),
+                    [objectId](const CinematicActorAsset& actor) {
+                        return actor.objectId == objectId;
+                    });
+            });
+    };
+    std::erase_if(objects_, [&isDedicatedCinematicActor](
+                                const LevelObjectAsset& object) {
+        return object.kind == LevelObjectKind::Animated &&
+               isDedicatedCinematicActor(object.objectId);
+    });
     return Result::success();
 }
 

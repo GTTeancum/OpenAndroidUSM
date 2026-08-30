@@ -665,6 +665,65 @@ int main() {
         assert(triggerSoundEvents[0].kind ==
                usm::game::TriggerSoundEventKind::Stopped);
         assert(bootstrap.mainScene().nodes().size() == 154);
+        std::size_t animatedObjectNodeCount = 0;
+        std::size_t environmentAnimatedObjectCount = 0;
+        std::size_t cinematicActorObjectCount = 0;
+        std::size_t comicNodeCount = 0;
+        const auto verifyPresentationObjectCoverage =
+            [&](const usm::assets::IrrScene& scene) {
+            for (const auto& node : scene.nodes()) {
+                if (node.gameType != "AnimatedObject" &&
+                    node.gameType != "Comic") {
+                    continue;
+                }
+                const auto object = std::find_if(
+                    bootstrap.objects().begin(), bootstrap.objects().end(),
+                    [&node](const auto& candidate) {
+                        return candidate.objectId == node.id;
+                    });
+                if (node.gameType == "Comic") {
+                    ++comicNodeCount;
+                    assert(object != bootstrap.objects().end());
+                    assert(object->kind == usm::game::LevelObjectKind::Comic);
+                    continue;
+                }
+
+                ++animatedObjectNodeCount;
+                const bool isIntroActor = std::any_of(
+                    bootstrap.introActors().begin(),
+                    bootstrap.introActors().end(),
+                    [&node](const auto& actor) {
+                        return actor.objectId == node.id;
+                    });
+                const bool isGameplayCinematicActor = std::any_of(
+                    bootstrap.cinematics().begin(),
+                    bootstrap.cinematics().end(),
+                    [&node](const auto& cinematic) {
+                        return std::any_of(
+                            cinematic.actors.begin(), cinematic.actors.end(),
+                            [&node](const auto& actor) {
+                                return actor.objectId == node.id;
+                            });
+                    });
+                if (isIntroActor || isGameplayCinematicActor) {
+                    ++cinematicActorObjectCount;
+                    assert(object == bootstrap.objects().end());
+                } else {
+                    ++environmentAnimatedObjectCount;
+                    assert(object != bootstrap.objects().end());
+                    assert(object->kind ==
+                           usm::game::LevelObjectKind::Animated);
+                }
+            }
+        };
+        verifyPresentationObjectCoverage(bootstrap.mainScene());
+        for (const auto& room : bootstrap.rooms()) {
+            verifyPresentationObjectCoverage(room.scene);
+        }
+        assert(animatedObjectNodeCount == 28);
+        assert(environmentAnimatedObjectCount == 15);
+        assert(cinematicActorObjectCount == 13);
+        assert(comicNodeCount == 15);
         assert(bootstrap.textCatalog().level().size() == 18);
         assert(bootstrap.textCatalog().tutorial().size() == 17);
         const auto* openingCaption =
@@ -918,13 +977,18 @@ int main() {
         assert((authoredEffectTypes == std::vector<std::string>{
                                            "cartoon_hit_splash_big",
                                            "explode_new", "rock_splash"}));
-        assert(bootstrap.objects().size() == 106);
+        assert(bootstrap.objects().size() == 136);
         assert(!bootstrap.objectArchetypes().empty());
         usm::game::LevelObjectRuntime objectRuntime;
         assert(objectRuntime.initialize(bootstrap));
         assert(objectRuntime.states().size() == bootstrap.objects().size());
         assert(objectRuntime.find(20032) != nullptr);
         assert(objectRuntime.find(1151) != nullptr);
+        assert(objectRuntime.find(40010) != nullptr);
+        assert(objectRuntime.find(472) != nullptr);
+        assert(objectRuntime.find(472)->activeAnimation == "water");
+        assert(objectRuntime.find(40032) != nullptr);
+        assert(objectRuntime.find(1257) == nullptr);
         usm::game::CinematicThread objectThread;
         objectThread.objectId = 20032;
         usm::game::CinematicCommand moveLevelObject;

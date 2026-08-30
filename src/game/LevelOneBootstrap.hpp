@@ -200,6 +200,7 @@ struct LevelEnemyAsset {
 };
 
 enum class LevelObjectKind {
+    Animated,
     Destroyable,
     Comic,
     Car,

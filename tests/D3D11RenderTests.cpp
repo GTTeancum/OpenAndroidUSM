@@ -227,6 +227,66 @@ int main() {
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
 
+        usm::game::LevelObjectRuntime comicObjects;
+        assert(comicObjects.initialize(levelOne));
+        for (const auto& object : comicObjects.states()) {
+            assert(object.asset != nullptr);
+            usm::game::CinematicThread objectThread;
+            objectThread.objectId = object.asset->objectId;
+            usm::game::CinematicCommand hideObject;
+            hideObject.name = "SetVisible";
+            hideObject.attributes.push_back({"bool", "Visible", "false"});
+            assert(comicObjects.applyCinematicCommand(
+                levelOne, objectThread, hideObject));
+        }
+        usm::game::CinematicThread comicThread;
+        comicThread.objectId = 40010;
+        usm::game::CinematicCommand showComic;
+        showComic.name = "SetVisible";
+        showComic.attributes.push_back({"bool", "Visible", "true"});
+        assert(comicObjects.applyCinematicCommand(levelOne, comicThread,
+                                                   showComic));
+        usm::game::CinematicCommand moveComic;
+        moveComic.name = "MoveObject";
+        moveComic.attributes.push_back({"vector3d", "abspos", "0,0,0"});
+        assert(comicObjects.applyCinematicCommand(levelOne, comicThread,
+                                                   moveComic));
+        assert(gameRenderer.updateLevelOneObjects(levelOne, comicObjects));
+        cinematicVisibleRooms.fill(false);
+        cinematicVisibleRooms[0] = true;
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        const usm::game::CameraPose comicCamera{
+            {0.0F, -350.0F, 100.0F}, {0.0F, 0.0F, 25.0F},
+            {0.0F, 0.0F, 1.0F}, 60.0F, 10.0F, 2000.0F};
+        assert(gameRenderer.setCamera(comicCamera));
+        gameRenderer.renderFrame();
+        RgbaImage comicVisibleFrame;
+        assert(gameRenderer.readBackImage(comicVisibleFrame));
+        captureIfRequested(comicVisibleFrame, "gameplay-comic-cover.bmp");
+        showComic.attributes.front().value = "false";
+        assert(comicObjects.applyCinematicCommand(levelOne, comicThread,
+                                                   showComic));
+        assert(gameRenderer.updateLevelOneObjects(levelOne, comicObjects));
+        gameRenderer.renderFrame();
+        RgbaImage comicHiddenFrame;
+        assert(gameRenderer.readBackImage(comicHiddenFrame));
+        std::size_t comicChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < comicVisibleFrame.pixels.size(); component += 4) {
+            comicChangedPixels +=
+                comicVisibleFrame.pixels[component] !=
+                    comicHiddenFrame.pixels[component] ||
+                comicVisibleFrame.pixels[component + 1] !=
+                    comicHiddenFrame.pixels[component + 1] ||
+                comicVisibleFrame.pixels[component + 2] !=
+                    comicHiddenFrame.pixels[component + 2];
+        }
+        assert(comicChangedPixels > 20);
+        assert(gameRenderer.updateLevelOneObjects(levelOne, levelObjects));
+        cinematicVisibleRooms.fill(false);
+        gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
+        assert(gameRenderer.setCamera(gameplayPose));
+
         usm::game::LevelEffectRuntime environmentEffects;
         assert(environmentEffects.initialize(levelOne.effects().presets));
         const auto& environmentEffect = levelOne.environmentEffects().front();

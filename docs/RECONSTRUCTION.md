@@ -764,6 +764,27 @@ first-level target presents that last frame and exits cleanly. WARP
 regressions render both terminal sequences with their object-visibility
 commands and camera-area masks applied.
 
+## Animated environment and comic-cover objects
+
+The generic room-object path now includes all 28 authored `AnimatedObject`
+nodes and all 15 `Comic` nodes. Thirteen animated nodes are owned by the intro
+or an in-level Collada cinematic and remain on the dedicated cinematic-actor
+path; the other 15 are persistent environment props such as hint arrows,
+objective arrows, damaged cars, fire meshes, and the animated fountain water.
+This division prevents cinematic actors from being uploaded and drawn twice
+while allowing `SetVisible`, `SetAnim`, and `MoveObject` to address ordinary
+animated props through the renderer-independent `LevelObjectRuntime`.
+
+Comic nodes follow the preserved `CComicCover` constructor and `Init` at
+`0x00304720` and `0x00304440`: they are real collectible world objects backed
+by `IAnimatedObject`, not editor markers. Their shared mesh retains a stale,
+unreferenced leading `book.tga` image and calls its packaged reflection map
+`envmap_ringx.tga` although `entities.pack` stores `envmap_ring.tga`. Archive
+loading preserves all material image indices, fills only unused missing image
+slots with an already decoded view, and resolves that exact shipped alias so
+the D3D11 two-layer reflection material remains intact. WARP renders an
+isolated cover and verifies that its runtime visibility changes the frame.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a
