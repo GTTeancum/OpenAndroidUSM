@@ -45,6 +45,8 @@ private:
     audio::EnemyBehaviorSoundBank enemySounds_;
     audio::CinematicSoundBank introSounds_;
     audio::CinematicSoundBank gameplaySounds_;
+    audio::PcmAudio slowMotionEnterSound_;
+    audio::PcmAudio slowMotionExitSound_;
     game::CinematicPlayer introPlayer_;
     game::CinematicUiRuntime cinematicUi_;
     game::GameplayCamera gameplayCamera_;

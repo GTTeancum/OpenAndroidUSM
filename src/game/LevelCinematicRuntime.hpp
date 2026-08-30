@@ -11,6 +11,11 @@
 
 namespace usm::game {
 
+enum class SlowMotionSoundCue {
+    Enter,
+    Exit,
+};
+
 // Portable command-state reconstruction for the global commands issued by
 // CCinematicThread. Object-specific animation and AI commands remain owned by
 // their corresponding gameplay runtimes.
@@ -20,7 +25,18 @@ public:
               std::span<const LevelWayPointAsset> waypoints = {}) noexcept;
     [[nodiscard]] Result applyCommand(const CinematicCommand& command);
 
+    // Application::UpdateSlowMotion (0x003e05f0) scales the complete game
+    // update, while leaving audio and rendering on real time.
+    [[nodiscard]] float updateSlowMotion(
+        float realDeltaMilliseconds) noexcept;
+    // CGameCamera::UpdateShake (0x002f20cc) advances on the original 50 ms
+    // game tick and applies its decaying alternating offset to position only.
+    void advanceCameraShake(std::uint32_t deltaMilliseconds) noexcept;
+    [[nodiscard]] CameraPose applyCameraShake(CameraPose pose) const noexcept;
+
     [[nodiscard]] std::vector<std::int32_t> consumeCinematicStartRequests();
+    [[nodiscard]] std::vector<SlowMotionSoundCue>
+    consumeSlowMotionSoundCues();
     [[nodiscard]] bool levelEnded() const noexcept { return levelEnded_; }
     [[nodiscard]] bool goToNextLevel() const noexcept { return goToNextLevel_; }
     [[nodiscard]] bool gameEnded() const noexcept { return gameEnded_; }
@@ -36,6 +52,21 @@ private:
     GameplayCamera* camera_{};
     std::span<const LevelWayPointAsset> waypoints_;
     std::vector<std::int32_t> cinematicStartRequests_;
+    std::vector<SlowMotionSoundCue> slowMotionSoundCues_;
+    float slowMotionDenominator_{1.0F};
+    float slowMotionElapsedMilliseconds_{};
+    float slowMotionHoldMilliseconds_{};
+    float slowMotionRampMilliseconds_{};
+    bool slowMotionSoundEnabled_{};
+    float cameraShakeMaximumOffset_{};
+    std::int32_t cameraShakeFramesRemaining_{};
+    std::int32_t cameraShakeTotalFrames_{};
+    float cameraShakeXRate_{};
+    float cameraShakeYRate_{};
+    float cameraShakeZRate_{};
+    std::int32_t cameraShakeSign_{1};
+    std::uint32_t cameraShakeTickRemainderMilliseconds_{};
+    assets::Vector3 cameraShakeOffset_{};
     bool levelEnded_{};
     bool goToNextLevel_{};
     bool gameEnded_{};

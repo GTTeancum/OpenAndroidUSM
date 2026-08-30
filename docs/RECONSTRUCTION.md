@@ -652,6 +652,29 @@ success and failure branches therefore reproduce their scripted knockback,
 landing, recovery, and final positions instead of leaving the gameplay player
 idle underneath the recovered camera.
 
+## Slow motion and authored camera shake
+
+The global presentation timing path follows `Application::SetSlowMotion`,
+`UpdateSlowMotion`, and `ResetSlowMotion` at `0x003e0690`, `0x003e05f0`, and
+`0x003e0598`. `SetSlowMotion` commands scale the complete portable game-state
+update by their authored denominator, hold for `TimeOn`, and linearly return
+to real time over `TimeOnToEnd`. The reconstruction preserves the original
+one-millisecond update on the ramp-completion frame. Rendering and XAudio2
+continue on real time, matching the original application's separation of
+state and sound updates. VoxSound IDs `0x186`/`0x187`, recovered as
+`SFX_SPIDER_SENSE_IN` and `SFX_SPIDER_SENSE_OUT`, provide the optional
+authored transition cues.
+
+`ShakeCamera` and `StopShakeCamera` reproduce
+`CGameCamera::StartShake`, `UpdateShake`, and `StopShake` at `0x002f2098`,
+`0x002f20cc`, and `0x002f20c4`. Every original 50 ms update alternates the
+offset sign, decays it by frames remaining over total frames, and applies the
+authored X/Y/Z rates to camera position without disturbing its target. Native
+rendering holds each recovered offset between those ticks so the effect keeps
+its original duration on higher-refresh displays. Deterministic regressions
+cover command validation, hold/ramp timing, transition audio cues, alternating
+decay, and explicit shake cancellation.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

@@ -1719,6 +1719,78 @@ int main() {
             levelCommandRuntime.consumeCinematicStartRequests();
         assert(cinematicStarts.size() == 1 && cinematicStarts.front() == 1238);
         assert(levelCommandRuntime.consumeCinematicStartRequests().empty());
+        usm::game::CinematicCommand slowMotion;
+        slowMotion.name = "SetSlowMotion";
+        slowMotion.attributes = {
+            {"bool", "Enable", "true"},
+            {"int", "Denominator", "5"},
+            {"int", "TimeOn", "100"},
+            {"int", "TimeOnToEnd", "100"},
+            {"bool", "isSFX", "true"},
+        };
+        assert(levelCommandRuntime.applyCommand(slowMotion));
+        auto slowMotionCues =
+            levelCommandRuntime.consumeSlowMotionSoundCues();
+        assert(slowMotionCues.size() == 1);
+        assert(slowMotionCues.front() ==
+               usm::game::SlowMotionSoundCue::Enter);
+        assert(std::abs(levelCommandRuntime.updateSlowMotion(50.0F) - 10.0F) <
+               0.001F);
+        assert(std::abs(levelCommandRuntime.updateSlowMotion(50.0F) - 10.0F) <
+               0.001F);
+        assert(std::abs(levelCommandRuntime.updateSlowMotion(25.0F) - 6.25F) <
+               0.001F);
+        assert(std::abs(levelCommandRuntime.updateSlowMotion(75.0F) - 75.0F) <
+               0.001F);
+        assert(std::abs(levelCommandRuntime.updateSlowMotion(16.0F) - 1.0F) <
+               0.001F);
+        slowMotionCues = levelCommandRuntime.consumeSlowMotionSoundCues();
+        assert(slowMotionCues.size() == 1);
+        assert(slowMotionCues.front() ==
+               usm::game::SlowMotionSoundCue::Exit);
+        assert(levelCommandRuntime.applyCommand(slowMotion));
+        slowMotion.attributes.front().value = "false";
+        assert(levelCommandRuntime.applyCommand(slowMotion));
+        slowMotionCues = levelCommandRuntime.consumeSlowMotionSoundCues();
+        assert(slowMotionCues.size() == 2);
+        assert(slowMotionCues.front() ==
+               usm::game::SlowMotionSoundCue::Enter);
+        assert(slowMotionCues.back() ==
+               usm::game::SlowMotionSoundCue::Exit);
+
+        usm::game::CinematicCommand shakeCamera;
+        shakeCamera.name = "ShakeCamera";
+        shakeCamera.attributes = {
+            {"float", "MaxOff", "20"},
+            {"int", "ShakeFrame", "5"},
+            {"float", "XRate", "1"},
+            {"float", "YRate", "0.5"},
+            {"float", "ZRate", "-0.25"},
+        };
+        assert(levelCommandRuntime.applyCommand(shakeCamera));
+        usm::game::CameraPose unshakenPose;
+        unshakenPose.position = {100.0F, 200.0F, 300.0F};
+        levelCommandRuntime.advanceCameraShake(49);
+        auto shakenPose = levelCommandRuntime.applyCameraShake(unshakenPose);
+        assert(shakenPose.position.x == 100.0F);
+        levelCommandRuntime.advanceCameraShake(1);
+        shakenPose = levelCommandRuntime.applyCameraShake(unshakenPose);
+        assert(std::abs(shakenPose.position.x - 80.0F) < 0.001F);
+        assert(std::abs(shakenPose.position.y - 190.0F) < 0.001F);
+        assert(std::abs(shakenPose.position.z - 305.0F) < 0.001F);
+        levelCommandRuntime.advanceCameraShake(50);
+        shakenPose = levelCommandRuntime.applyCameraShake(unshakenPose);
+        assert(std::abs(shakenPose.position.x - 116.0F) < 0.001F);
+        assert(std::abs(shakenPose.position.y - 208.0F) < 0.001F);
+        assert(std::abs(shakenPose.position.z - 296.0F) < 0.001F);
+        levelCommandRuntime.advanceCameraShake(150);
+        shakenPose = levelCommandRuntime.applyCameraShake(unshakenPose);
+        assert(std::abs(shakenPose.position.x - 96.0F) < 0.001F);
+        levelCommandRuntime.advanceCameraShake(50);
+        shakenPose = levelCommandRuntime.applyCameraShake(unshakenPose);
+        assert(shakenPose.position.x == 100.0F);
+        assert(levelCommandRuntime.applyCommand(
+            usm::game::CinematicCommand{0, -1, "StopShakeCamera", {}}));
         usm::game::CinematicCommand startSlide = controlCommand(
             "StartSlide", "^SID^WayPoint", "429");
         startSlide.attributes.push_back(

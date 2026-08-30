@@ -77,6 +77,19 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    // Application::SetSlowMotion/ResetSlowMotion use VoxSound IDs 0x186 and
+    // 0x187 respectively. Their recovered event names make the native lookup
+    // independent of record ordering.
+    result = soundCatalog_.decode("SFX_SPIDER_SENSE_IN",
+                                  slowMotionEnterSound_);
+    if (!result) {
+        return fail(result.message());
+    }
+    result = soundCatalog_.decode("SFX_SPIDER_SENSE_OUT",
+                                  slowMotionExitSound_);
+    if (!result) {
+        return fail(result.message());
+    }
     result = playerStateConfigs_.load(gameDataRoot);
     if (!result) {
         return fail(result.message());
@@ -217,15 +230,26 @@ int Application::run(HINSTANCE instance) {
         [this](const audio::PcmAudio& clip, bool loop) {
             return audio_.play(clip, loop);
         };
+    float scaledDeltaRemainderMilliseconds = 0.0F;
     while (window_.pumpMessages()) {
         const auto frameTime = std::chrono::steady_clock::now();
         const auto frameElapsed =
             std::chrono::duration_cast<std::chrono::milliseconds>(
                 frameTime - previousFrame);
-        const auto deltaMilliseconds = static_cast<std::uint32_t>(
+        const auto realDeltaMilliseconds = static_cast<std::uint32_t>(
             std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
         previousFrame = frameTime;
-        objectRuntime_.advanceAnimations(deltaMilliseconds);
+        scaledDeltaRemainderMilliseconds +=
+            levelCinematicRuntime_.updateSlowMotion(
+                static_cast<float>(realDeltaMilliseconds));
+        const auto gameDeltaMilliseconds = static_cast<std::uint32_t>(
+            std::max(0.0F, std::floor(scaledDeltaRemainderMilliseconds)));
+        scaledDeltaRemainderMilliseconds -=
+            static_cast<float>(gameDeltaMilliseconds);
+        // CGameCamera::UpdateShake counts fixed Application update calls and
+        // is therefore paced by real 50 ms ticks, not the scaled game delta.
+        levelCinematicRuntime_.advanceCameraShake(realDeltaMilliseconds);
+        objectRuntime_.advanceAnimations(gameDeltaMilliseconds);
         audio_.update();
         keyRouter_.beginFrame();
         controller_.poll([this](const reconstructed::XperiaKeyEvent& event) {
@@ -275,8 +299,9 @@ int Application::run(HINSTANCE instance) {
             return fail(result.message());
         }
         if (elapsed.count() < introDuration) {
-            result =
-                renderer_.setCamera(levelOne_.introCamera().sample(timestamp));
+            result = renderer_.setCamera(
+                levelCinematicRuntime_.applyCameraShake(
+                    levelOne_.introCamera().sample(timestamp)));
         } else {
             const auto stick = controller_.leftStick();
             game::PlayerMotionInput motion{stick.x, stick.y};
@@ -316,7 +341,7 @@ int Application::run(HINSTANCE instance) {
             const auto cameraBeforeMovement =
                 gameplayCamera_.sample(gameplayPlayer_.position());
             gameplayPlayer_.update(motion, cameraBeforeMovement,
-                                   deltaMilliseconds);
+                                   gameDeltaMilliseconds);
             for (std::string_view enteredState =
                      gameplayPlayer_.consumeEnteredState();
                  !enteredState.empty();
@@ -346,7 +371,7 @@ int Application::run(HINSTANCE instance) {
                     normalPunchAttack->damage, minimumForwardDot);
             }
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
-                                             deltaMilliseconds);
+                                             gameDeltaMilliseconds);
             const auto triggerEvents =
                 triggerRuntime_.update(gameplayPlayer_.position());
             if (activeGameplayCinematic_ == nullptr &&
@@ -362,7 +387,7 @@ int Application::run(HINSTANCE instance) {
                 gameplayCinematicTimeMilliseconds_ =
                     std::min<std::uint32_t>(
                         gameplayCinematicTimeMilliseconds_ +
-                            deltaMilliseconds,
+                            gameDeltaMilliseconds,
                         gameplayCinematicDurationMilliseconds_);
                 Result commandResult = Result::success();
                 bool cinematicDamageApplied = false;
@@ -459,7 +484,7 @@ int Application::run(HINSTANCE instance) {
                 }
             }
             quickTimeEvent_.update(
-                deltaMilliseconds,
+                gameDeltaMilliseconds,
                 keyRouter_.state().quickTimeEvent.pressed);
             if (const auto qteCinematic =
                     quickTimeEvent_.consumeCinematicRequest()) {
@@ -467,7 +492,7 @@ int Application::run(HINSTANCE instance) {
             }
             if (activeGameplayCinematic_ == nullptr ||
                 !activeGameplayCinematic_->hasColladaPlayback()) {
-                enemyRuntime_.updateGameplay(deltaMilliseconds,
+                enemyRuntime_.updateGameplay(gameDeltaMilliseconds,
                                              gameplayPlayer_.position(),
                                              &levelCollision_);
             }
@@ -490,7 +515,7 @@ int Application::run(HINSTANCE instance) {
                 }
             }
             playerHudHealth_.update(gameplayPlayer_.health(),
-                                    deltaMilliseconds);
+                                    gameDeltaMilliseconds);
             result = renderer_.updatePlayerHud(
                 levelOne_.hud(), playerHudHealth_.currentRatio(),
                 playerHudHealth_.delayedRatio(), 1.0F,
@@ -527,20 +552,22 @@ int Application::run(HINSTANCE instance) {
                     enemyRuntime_.gunLines());
             }
             if (result) {
+                game::CameraPose cameraPose;
                 if (activeGameplayCinematic_ != nullptr &&
                     activeGameplayCinematic_->hasColladaPlayback()) {
-                    result = renderer_.setCamera(
+                    cameraPose =
                         activeGameplayCinematic_->animatedCamera.sample(
-                            gameplayCinematicTimeMilliseconds_));
+                            gameplayCinematicTimeMilliseconds_);
                 } else if (activeGameplayCinematic_ != nullptr &&
                            activeGameplayCinematic_->cameraTrack.valid()) {
-                    result = renderer_.setCamera(
-                        activeGameplayCinematic_->cameraTrack.sample(
-                            gameplayCinematicTimeMilliseconds_));
+                    cameraPose = activeGameplayCinematic_->cameraTrack.sample(
+                        gameplayCinematicTimeMilliseconds_);
                 } else {
-                    result = renderer_.setCamera(
-                        gameplayCamera_.sample(gameplayPlayer_.position()));
+                    cameraPose =
+                        gameplayCamera_.sample(gameplayPlayer_.position());
                 }
+                result = renderer_.setCamera(
+                    levelCinematicRuntime_.applyCameraShake(cameraPose));
             }
         }
         if (result) {
@@ -548,7 +575,7 @@ int Application::run(HINSTANCE instance) {
                                                      objectRuntime_);
         }
         cinematicUi_.update(
-            deltaMilliseconds,
+            gameDeltaMilliseconds,
             keyRouter_.state().quickTimeEvent.pressed);
         const float qteProgress =
             quickTimeEvent_.active() &&
@@ -560,6 +587,19 @@ int Application::run(HINSTANCE instance) {
         if (result) {
             result = renderer_.updateCinematicUi(cinematicUi_.frame(
                 quickTimeEvent_.active(), qteProgress));
+        }
+        if (result) {
+            for (const game::SlowMotionSoundCue cue :
+                 levelCinematicRuntime_.consumeSlowMotionSoundCues()) {
+                result = audio_.play(
+                    cue == game::SlowMotionSoundCue::Enter
+                        ? slowMotionEnterSound_
+                        : slowMotionExitSound_,
+                    false);
+                if (!result) {
+                    break;
+                }
+            }
         }
         if (!result) {
             return fail(result.message());
