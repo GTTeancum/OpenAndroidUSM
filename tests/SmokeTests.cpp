@@ -100,6 +100,48 @@ int main() {
         assert(levelOne.entries().size() == 250);
         assert(levelOne.find("meshes_bin/camera_Lv1_beforeboss.bdae") != nullptr);
 
+        usm::filesystem::GbmpArchive entities;
+        const usm::Result entitiesResult =
+            entities.open(dataRoot / "entities.pack");
+        if (!entitiesResult) {
+            std::cerr << entitiesResult.message() << '\n';
+            return 1;
+        }
+        std::vector<std::byte> playerAnimationResource;
+        const usm::Result playerAnimationRead = entities.read(
+            "meshes_bin/spiderman_anim.bdae", playerAnimationResource);
+        if (!playerAnimationRead) {
+            std::cerr << playerAnimationRead.message() << '\n';
+            return 1;
+        }
+        usm::assets::ColladaAnimationFile playerAnimations;
+        const usm::Result playerAnimationResult =
+            playerAnimations.load(playerAnimationResource);
+        if (!playerAnimationResult) {
+            std::cerr << playerAnimationResult.message() << '\n';
+            return 1;
+        }
+        if (playerAnimations.tracks().size() != 46 ||
+            playerAnimations.clips().size() != 242) {
+            std::cerr << "Unexpected Spider-Man animation bank: "
+                      << playerAnimations.tracks().size() << " tracks, "
+                      << playerAnimations.clips().size() << " clips\n";
+            return 1;
+        }
+        const auto* idleClip = playerAnimations.findClip("idle_stand");
+        if (idleClip == nullptr || idleClip->startMilliseconds != 3133 ||
+            idleClip->endMilliseconds != 4466 ||
+            idleClip->durationMilliseconds() != 1333) {
+            std::cerr << "idle_stand animation clip was not recovered\n";
+            return 1;
+        }
+        const auto* runClip = playerAnimations.findClip("run");
+        if (runClip == nullptr || runClip->startMilliseconds != 8033 ||
+            runClip->endMilliseconds != 8833) {
+            std::cerr << "run animation clip was not recovered\n";
+            return 1;
+        }
+
         std::vector<std::byte> meshResource;
         assert(levelOne.read("meshes_bin/geometry01.bdae", meshResource));
         usm::assets::BresFile meshFile;

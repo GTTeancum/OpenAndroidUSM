@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <optional>
 #include <vector>
 
@@ -46,7 +47,18 @@ struct ColladaCamera {
     float farPlane{1000.0F};
 };
 
-// Typed view of the SAnimation/SSource data used by CAnimationTrackEx.
+struct ColladaAnimationClip {
+    std::string name;
+    std::uint32_t startMilliseconds{};
+    std::uint32_t endMilliseconds{};
+
+    [[nodiscard]] std::uint32_t durationMilliseconds() const noexcept {
+        return endMilliseconds - startMilliseconds;
+    }
+};
+
+// Typed view of the SAnimation/SSource and SAnimationClip data used by
+// CAnimationTrackEx and CTimelineController.
 class ColladaAnimationFile final {
 public:
     [[nodiscard]] Result load(std::span<const std::byte> bytes);
@@ -55,6 +67,12 @@ public:
         return tracks_;
     }
     [[nodiscard]] std::uint32_t durationMilliseconds() const noexcept;
+    [[nodiscard]] const std::vector<ColladaAnimationClip>& clips() const
+        noexcept {
+        return clips_;
+    }
+    [[nodiscard]] const ColladaAnimationClip* findClip(
+        std::string_view name) const noexcept;
     [[nodiscard]] const std::optional<ColladaCamera>& camera() const noexcept {
         return camera_;
     }
@@ -62,6 +80,7 @@ public:
 private:
     BresFile resource_;
     std::vector<ColladaAnimationTrack> tracks_;
+    std::vector<ColladaAnimationClip> clips_;
     std::optional<ColladaCamera> camera_;
 };
 

@@ -120,6 +120,18 @@ D3D11 view/projection path. WARP regression coverage renders the intro
 environment from the actual time-zero camera rather than the earlier
 normalized overview.
 
+Gameplay animation banks also expose the adjacent `SLibraryAnimationClips` at
+`SCollada` offsets `0x1c/0x20`. Each 0x0c-byte `SAnimationClip` is a preserved
+name plus inclusive bank start/end timestamps; this matches the original
+`CColladaDatabase::getAnimationClip` and `CTimelineController` clip accessors.
+`spiderman_anim.bdae` contains 46 skeletal tracks and 242 named clips. The
+native parser resolves names such as `idle_stand` (3133–4466 ms), `run`
+(8033–8833 ms), and `walk` (15033–16100 ms), allowing source gameplay code to
+select authored animation ranges rather than using guessed frame intervals.
+Five FX attachment channels contain a duplicated pre-roll transform under a
+serialized `0xe5555700` timestamp before their time-zero key; the native view
+discards that sentinel and retains the monotonic authored bank timeline.
+
 The intro's `MustBeVisible` command names Rooms 1 through 5. The native level
 bootstrap loads those five authored room scenes, their `geometry01` through
 `geometry05` BDAEs, and every referenced texture as separate D3D11 resources.

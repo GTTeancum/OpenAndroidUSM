@@ -17,6 +17,9 @@ constexpr std::uint32_t kAnimationSize = 0x24;
 constexpr std::uint32_t kSourceSize = 0x0c;
 constexpr std::uint32_t kTimestampSourceType = 4;
 constexpr std::uint32_t kFloatingPointSourceType = 6;
+constexpr std::uint32_t kAnimationClipCountOffset = 0x1c;
+constexpr std::uint32_t kAnimationClipArrayOffset = 0x20;
+constexpr std::uint32_t kAnimationClipSize = 0x0c;
 constexpr std::uint32_t kCameraCountOffset = 0x24;
 constexpr std::uint32_t kCameraArrayOffset = 0x28;
 constexpr std::uint32_t kCameraSize = 0x1c;
@@ -121,12 +124,30 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         return Result::failure("BDAE animation component count is unsupported");
     }
 
+    std::uint32_t firstKey = 0;
+    if (*timeCount > 1) {
+        const auto firstTimestamp =
+            view.integer<std::uint32_t>(*timesOffset);
+        const auto secondTimestamp =
+            view.integer<std::uint32_t>(*timesOffset + 4);
+        if (!firstTimestamp || !secondTimestamp) {
+            return Result::failure("BDAE animation timestamps are truncated");
+        }
+        // The five Spider-Man FX attachment channels carry one serialized
+        // pre-roll key (0xe5555700) immediately before their time-zero key.
+        // Its transform is duplicated at time zero. CTimelineController uses
+        // the following monotonic bank range, so omit this pre-roll sentinel.
+        if (*firstTimestamp > *secondTimestamp) {
+            firstKey = 1;
+        }
+    }
+
     output.id = *id;
     output.targetNode = *target;
     output.property = propertyFromId(output.id);
     output.componentCount = componentCount;
-    output.timestampsMilliseconds.reserve(*timeCount);
-    for (std::uint32_t index = 0; index < *timeCount; ++index) {
+    output.timestampsMilliseconds.reserve(*timeCount - firstKey);
+    for (std::uint32_t index = firstKey; index < *timeCount; ++index) {
         const auto timestamp =
             view.integer<std::uint32_t>(*timesOffset + index * 4);
         if (!timestamp ||
@@ -136,8 +157,9 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         }
         output.timestampsMilliseconds.push_back(*timestamp);
     }
-    output.values.reserve(*valueCount);
-    for (std::uint32_t index = 0; index < *valueCount; ++index) {
+    output.values.reserve(*valueCount - firstKey * componentCount);
+    for (std::uint32_t index = firstKey * componentCount;
+         index < *valueCount; ++index) {
         const auto value = view.floating(*valuesOffset + index * 4);
         if (!value || !std::isfinite(*value)) {
             return Result::failure("BDAE animation values are invalid");
@@ -186,6 +208,40 @@ Result parseCamera(const BinaryView& view, std::uint32_t rootOffset,
     }
     output = ColladaCamera{*id, *target, *projection != 0, *fieldOfView,
                            *aspectRatio, *nearPlane, *farPlane};
+    return Result::success();
+}
+
+Result parseAnimationClips(const BinaryView& view, std::uint32_t rootOffset,
+                           std::vector<ColladaAnimationClip>& output) {
+    const auto count =
+        view.integer<std::uint32_t>(rootOffset + kAnimationClipCountOffset);
+    const auto array =
+        view.integer<std::uint32_t>(rootOffset + kAnimationClipArrayOffset);
+    if (!count || !array ||
+        (*count != 0 &&
+         !view.contains(*array, static_cast<std::uint64_t>(*count) *
+                                    kAnimationClipSize))) {
+        return Result::failure("BDAE animation-clip library is invalid");
+    }
+
+    output.clear();
+    output.reserve(*count);
+    for (std::uint32_t index = 0; index < *count; ++index) {
+        const std::uint32_t clipOffset = *array + index * kAnimationClipSize;
+        const auto nameOffset = view.integer<std::uint32_t>(clipOffset);
+        const auto start = view.integer<std::uint32_t>(clipOffset + 4);
+        const auto end = view.integer<std::uint32_t>(clipOffset + 8);
+        if (!nameOffset || !start || !end || *end < *start) {
+            output.clear();
+            return Result::failure("BDAE animation clip is invalid");
+        }
+        const auto name = view.string(*nameOffset);
+        if (!name || name->empty()) {
+            output.clear();
+            return Result::failure("BDAE animation clip name is invalid");
+        }
+        output.push_back({*name, *start, *end});
+    }
     return Result::success();
 }
 
@@ -250,6 +306,7 @@ ColladaAnimationSample ColladaAnimationTrack::sample(
 
 Result ColladaAnimationFile::load(std::span<const std::byte> bytes) {
     tracks_.clear();
+    clips_.clear();
     camera_.reset();
     Result result = resource_.load(bytes);
     if (!result) {
@@ -279,12 +336,25 @@ Result ColladaAnimationFile::load(std::span<const std::byte> bytes) {
         }
         tracks_.push_back(std::move(track));
     }
+    result = parseAnimationClips(view, *rootOffset, clips_);
+    if (!result) {
+        tracks_.clear();
+        return result;
+    }
     result = parseCamera(view, *rootOffset, camera_);
     if (!result) {
         tracks_.clear();
         return result;
     }
     return Result::success();
+}
+
+const ColladaAnimationClip* ColladaAnimationFile::findClip(
+    std::string_view name) const noexcept {
+    const auto match = std::find_if(
+        clips_.begin(), clips_.end(),
+        [name](const ColladaAnimationClip& clip) { return clip.name == name; });
+    return match == clips_.end() ? nullptr : &*match;
 }
 
 std::uint32_t ColladaAnimationFile::durationMilliseconds() const noexcept {
