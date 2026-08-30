@@ -17,6 +17,11 @@ constexpr std::uint32_t kPunchImpactMilliseconds = 180;
 
 float length2D(float x, float y) noexcept { return std::sqrt(x * x + y * y); }
 
+float length3D(const assets::Vector3& value) noexcept {
+    return std::sqrt(value.x * value.x + value.y * value.y +
+                     value.z * value.z);
+}
+
 bool calculateMovement(const PlayerMotionInput& input, const CameraPose& camera,
                        const assets::Vector3& fallbackFacing,
                        assets::Vector3& movement,
@@ -86,7 +91,10 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
                                   const LevelCollision* collision,
                                   const PlayerStateConfigDatabase* states,
                                   std::span<const LevelWebGrabPointAsset>
-                                      webGrabPoints) {
+                                      webGrabPoints,
+                                  std::span<const LevelSlideAsset> slides,
+                                  std::span<const LevelWayPointAsset>
+                                      waypoints) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
         asset.animationBank.findClip("run") == nullptr ||
         asset.animationBank.findClip("idle_to_punch_right") == nullptr ||
@@ -121,12 +129,17 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     swingThrowState_ = nullptr;
     swingHangState_ = nullptr;
     swingIdleState_ = nullptr;
+    sliderLandState_ = nullptr;
+    sliderMoveState_ = nullptr;
     activeLocomotionState_ = nullptr;
     locomotionState_ = LocomotionState::Grounded;
     verticalVelocityCentimetersPerSecond_ = 0.0F;
     swingReleaseVelocity_ = {};
+    swingReleaseHasTarget_ = false;
+    swingReleaseTarget_ = {};
     webGrabPointRuntime_.bind(webGrabPoints, collision);
     webSwingRuntime_ = {};
+    slideRuntime_.bind(slides, waypoints);
     selectedWebGrabPoint_ = nullptr;
     swingUsesLeftHand_ = false;
     webReleaseRequested_ = false;
@@ -145,6 +158,10 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
         swingThrowState_ = states->findState("k_state_swing_web_throw");
         swingHangState_ = states->findState("k_state_swing_hang");
         swingIdleState_ = states->findState("k_state_swing_idle");
+        sliderMoveState_ =
+            states->findState("k_state_trigger_slider_move");
+        sliderLandState_ =
+            states->findState("k_state_trigger_slider_land");
         if (stateClip(animationBank_, jumpStartState_) == nullptr ||
             stateClip(animationBank_, jumpFallState_) == nullptr ||
             stateClip(animationBank_, sustainedFallState_) == nullptr ||
@@ -163,6 +180,12 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
              clipById(animationBank_, 173) == nullptr)) {
             return Result::failure(
                 "Player swing states have invalid animation IDs");
+        }
+        if (!slides.empty() &&
+            (stateClip(animationBank_, sliderLandState_) == nullptr ||
+             stateClip(animationBank_, sliderMoveState_) == nullptr)) {
+            return Result::failure(
+                "Player slider states have invalid animation IDs");
         }
         const PlayerStateDefinition* punchState =
             states->findState("k_state_idle_to_punch_right");
@@ -312,6 +335,17 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
         }
         return;
     }
+    if ((locomotionState_ == LocomotionState::JumpFall ||
+         locomotionState_ == LocomotionState::SwingRelease) &&
+        tryCatchSlide()) {
+        updateSlideTraversal(elapsedMilliseconds);
+        return;
+    }
+    if (locomotionState_ == LocomotionState::SliderLand ||
+        locomotionState_ == LocomotionState::SliderMove) {
+        updateSlideTraversal(elapsedMilliseconds);
+        return;
+    }
     if (locomotionState_ == LocomotionState::WebThrow ||
         locomotionState_ == LocomotionState::SwingHang ||
         locomotionState_ == LocomotionState::SwingRelease) {
@@ -391,6 +425,14 @@ void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
     case LocomotionState::SwingHang:
     case LocomotionState::SwingRelease:
         break;
+    case LocomotionState::SliderLand:
+        activeLocomotionState_ = sliderLandState_;
+        selectedWebGrabPoint_ = nullptr;
+        break;
+    case LocomotionState::SliderMove:
+        activeLocomotionState_ = sliderMoveState_;
+        selectedWebGrabPoint_ = nullptr;
+        break;
     }
     if (activeLocomotionState_ != nullptr) {
         const assets::ColladaAnimationClip* clip =
@@ -399,7 +441,8 @@ void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
             setAnimation(clip->name);
         }
         if (state == LocomotionState::JumpStart ||
-            state == LocomotionState::JumpLand) {
+            state == LocomotionState::JumpLand ||
+            state == LocomotionState::SliderMove) {
             queueEnteredState(activeLocomotionState_->name);
         }
     }
@@ -469,6 +512,8 @@ void GameplayPlayer::enterSwingRelease() noexcept {
     }
     const WebSwingRelease released = webSwingRuntime_.release();
     swingReleaseVelocity_ = released.velocityCentimetersPerSecond;
+    swingReleaseHasTarget_ = released.hasTargetWaypoint;
+    swingReleaseTarget_ = released.targetWaypointPosition;
     activeLocomotionState_ = swingIdleState_;
     locomotionState_ = LocomotionState::SwingRelease;
     const assets::ColladaAnimationClip* clip =
@@ -549,7 +594,28 @@ void GameplayPlayer::updateWebTraversal(
     }
     const float elapsedSeconds =
         static_cast<float>(elapsedMilliseconds) / 1000.0F;
-    if (selectedWebGrabPoint_ != nullptr &&
+    if (swingReleaseHasTarget_) {
+        // Motion type 28 consumes CWebGrabPoint's linked WayPoint as a forced
+        // release destination. This is the authored bridge from point 443 to
+        // WayPoint 445, where CSlider's proximity test catches the player.
+        const assets::Vector3 toTarget{
+            swingReleaseTarget_.x - position_.x,
+            swingReleaseTarget_.y - position_.y,
+            swingReleaseTarget_.z - position_.z,
+        };
+        const float targetDistance = length3D(toTarget);
+        const float travelSpeed = std::max(
+            length3D(swingReleaseVelocity_),
+            kMaximumRunSpeedCentimetersPerSecond);
+        if (targetDistance > std::numeric_limits<float>::epsilon()) {
+            const float inverseDistance = 1.0F / targetDistance;
+            swingReleaseVelocity_ = {
+                toTarget.x * inverseDistance * travelSpeed,
+                toTarget.y * inverseDistance * travelSpeed,
+                toTarget.z * inverseDistance * travelSpeed,
+            };
+        }
+    } else if (selectedWebGrabPoint_ != nullptr &&
         !selectedWebGrabPoint_->cannotControl &&
         !selectedWebGrabPoint_->hasTargetWaypoint) {
         float inputMagnitude{};
@@ -565,8 +631,10 @@ void GameplayPlayer::updateWebTraversal(
                                        elapsedSeconds;
         }
     }
-    swingReleaseVelocity_.z +=
-        kSustainedFallSpeedCentimetersPerSecond * elapsedSeconds;
+    if (!swingReleaseHasTarget_) {
+        swingReleaseVelocity_.z +=
+            kSustainedFallSpeedCentimetersPerSecond * elapsedSeconds;
+    }
     const float previousHeight = position_.z;
     assets::Vector3 desired{
         position_.x + swingReleaseVelocity_.x * elapsedSeconds,
@@ -575,6 +643,19 @@ void GameplayPlayer::updateWebTraversal(
     };
     if (collision_ != nullptr) {
         collision_->resolveAirMotion(position_, desired, desired);
+    }
+    if (swingReleaseHasTarget_ &&
+        length3D({swingReleaseTarget_.x - position_.x,
+                  swingReleaseTarget_.y - position_.y,
+                  swingReleaseTarget_.z - position_.z}) <=
+            length3D(swingReleaseVelocity_) * elapsedSeconds) {
+        desired = swingReleaseTarget_;
+        swingReleaseHasTarget_ = false;
+    }
+    position_ = desired;
+    renderPosition_ = position_;
+    if (tryCatchSlide()) {
+        return;
     }
     float landingHeight{};
     const bool hasLanding = findLandingHeight(previousHeight, landingHeight);
@@ -588,8 +669,6 @@ void GameplayPlayer::updateWebTraversal(
         enterLocomotionState(LocomotionState::JumpLand);
         return;
     }
-    position_ = desired;
-    renderPosition_ = position_;
     const float horizontalLength = std::sqrt(
         swingReleaseVelocity_.x * swingReleaseVelocity_.x +
         swingReleaseVelocity_.y * swingReleaseVelocity_.y);
@@ -610,6 +689,101 @@ void GameplayPlayer::updateWebTraversal(
         return;
     }
     updateWorldTransform(facing_);
+}
+
+bool GameplayPlayer::tryCatchSlide() noexcept {
+    if (sliderLandState_ == nullptr || sliderMoveState_ == nullptr ||
+        slideRuntime_.active()) {
+        return false;
+    }
+    assets::Vector3 visualPosition = position_;
+    visualPosition.z = animatedFootHeight();
+    const SlideCatch caught = slideRuntime_.findCatch(visualPosition);
+    if (caught.slide == nullptr) {
+        return false;
+    }
+    float incomingSpeed = kMaximumRunSpeedCentimetersPerSecond;
+    if (locomotionState_ == LocomotionState::SwingRelease) {
+        incomingSpeed = length3D(swingReleaseVelocity_);
+    }
+    if (!slideRuntime_.start(caught, incomingSpeed)) {
+        return false;
+    }
+    position_ = slideRuntime_.position();
+    renderPosition_ = position_;
+    jumpAnchorHeight_ = position_.z;
+    const assets::Vector3 direction = slideRuntime_.direction();
+    const float horizontalLength = length2D(direction.x, direction.y);
+    if (horizontalLength > std::numeric_limits<float>::epsilon()) {
+        facing_ = {direction.x / horizontalLength,
+                   direction.y / horizontalLength, 0.0F};
+    }
+    swingReleaseHasTarget_ = false;
+    enterLocomotionState(LocomotionState::SliderLand);
+    return true;
+}
+
+void GameplayPlayer::updateSlideTraversal(
+    std::uint32_t elapsedMilliseconds) noexcept {
+    if (locomotionState_ == LocomotionState::SliderLand) {
+        const assets::ColladaAnimationClip* clip =
+            stateClip(animationBank_, sliderLandState_);
+        if (clip == nullptr) {
+            (void)slideRuntime_.finish();
+            enterLocomotionState(LocomotionState::SustainedFall);
+            return;
+        }
+        const std::uint32_t duration = clip->durationMilliseconds();
+        const std::uint32_t current = animationTimeMilliseconds();
+        const std::uint32_t step = std::min(
+            elapsedMilliseconds, duration > current ? duration - current : 0U);
+        animationTimeMilliseconds_ += step;
+        if (animationTimeMilliseconds_ < duration) {
+            updateWorldTransform(facing_);
+            return;
+        }
+        const std::uint32_t carry = elapsedMilliseconds - step;
+        enterLocomotionState(LocomotionState::SliderMove);
+        if (carry == 0) {
+            return;
+        }
+        elapsedMilliseconds = carry;
+    }
+
+    if (locomotionState_ != LocomotionState::SliderMove) {
+        return;
+    }
+    slideRuntime_.update(elapsedMilliseconds);
+    position_ = slideRuntime_.position();
+    renderPosition_ = position_;
+    const assets::Vector3 direction = slideRuntime_.direction();
+    const float horizontalLength = length2D(direction.x, direction.y);
+    if (horizontalLength > std::numeric_limits<float>::epsilon()) {
+        facing_ = {direction.x / horizontalLength,
+                   direction.y / horizontalLength, 0.0F};
+    }
+    const assets::ColladaAnimationClip* clip =
+        stateClip(animationBank_, sliderMoveState_);
+    if (clip != nullptr && clip->durationMilliseconds() > 0) {
+        animationTimeMilliseconds_ =
+            (animationTimeMilliseconds_ + elapsedMilliseconds) %
+            clip->durationMilliseconds();
+    }
+    updateWorldTransform(facing_);
+    if (slideRuntime_.active()) {
+        return;
+    }
+    const SlideExit exit = slideRuntime_.finish();
+    swingReleaseVelocity_ = exit.velocityCentimetersPerSecond;
+    if (exit.electricShock) {
+        (void)applyDamage(100.0F);
+    }
+    jumpAnchorHeight_ = position_.z;
+    enterLocomotionState(LocomotionState::SustainedFall);
+    if (!exit.useGravity) {
+        verticalVelocityCentimetersPerSecond_ =
+            exit.velocityCentimetersPerSecond.z;
+    }
 }
 
 float GameplayPlayer::currentRootHeight() const noexcept {

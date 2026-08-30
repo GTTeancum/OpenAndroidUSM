@@ -108,6 +108,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelEnemyRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
     src/game/LevelOneBootstrap.cpp
+    src/game/LevelSlideRuntime.cpp
     src/game/PlayerHudHealthState.cpp
     src/game/PlayerStateConfig.cpp
     src/game/WebGrabPointRuntime.cpp

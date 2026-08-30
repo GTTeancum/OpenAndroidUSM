@@ -68,11 +68,11 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::string_view, 7> gameplaySoundStates{
+    constexpr std::array<std::string_view, 8> gameplaySoundStates{
         "k_state_idle_to_punch_right", "k_state_hurt_light",
         "k_state_jump_start", "k_state_jump_land",
         "k_state_swing_web_throw", "k_state_swing_hang",
-        "k_state_swing_idle"};
+        "k_state_swing_idle", "k_state_trigger_slider_move"};
     result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
                                    soundCatalog_, gameplaySoundStates);
     if (!result) {
@@ -124,7 +124,9 @@ int Application::run(HINSTANCE instance) {
     }
     result = gameplayPlayer_.initialize(levelOne_.player(), &levelCollision_,
                                         &playerStateConfigs_,
-                                        levelOne_.webGrabPoints());
+                                        levelOne_.webGrabPoints(),
+                                        levelOne_.slides(),
+                                        levelOne_.waypoints());
     if (!result) {
         return fail(result.message());
     }

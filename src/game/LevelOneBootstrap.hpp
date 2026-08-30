@@ -126,6 +126,19 @@ struct LevelWebGrabPointAsset {
     std::int32_t targetSlideId{-1};
 };
 
+// CSlider::ProcessUserAttr (0x0031ce6c) stores the authored entry WayPoint,
+// Enabled flag, and electric-shock flag. Init (0x0031e7cc) follows the first
+// WayPoint link to materialize the ordered segment graph.
+struct LevelSlideAsset {
+    std::int32_t objectId{-1};
+    std::string name;
+    assets::Vector3 position;
+    std::int32_t linkedWaypointId{-1};
+    bool enabled{true};
+    bool electricShock{};
+    std::vector<std::int32_t> waypointIds;
+};
+
 struct LevelCinematicAsset {
     std::int32_t objectId{-1};
     std::string name;
@@ -234,6 +247,9 @@ public:
         const noexcept {
         return webGrabPoints_;
     }
+    [[nodiscard]] const std::vector<LevelSlideAsset>& slides() const noexcept {
+        return slides_;
+    }
     [[nodiscard]] const std::vector<LevelCinematicAsset>& cinematics() const
         noexcept {
         return cinematics_;
@@ -273,6 +289,7 @@ private:
     std::vector<LevelTriggerAsset> triggers_;
     std::vector<LevelWayPointAsset> waypoints_;
     std::vector<LevelWebGrabPointAsset> webGrabPoints_;
+    std::vector<LevelSlideAsset> slides_;
     std::vector<LevelCinematicAsset> cinematics_;
     std::vector<EnemyArchetypeAsset> enemyArchetypes_;
     std::vector<LevelEnemyAsset> enemies_;

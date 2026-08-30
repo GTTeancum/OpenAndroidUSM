@@ -15,6 +15,7 @@
 #include "core/Result.hpp"
 #include "filesystem/GbmpArchive.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/LevelSlideRuntime.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelCinematicRuntime.hpp"
@@ -286,6 +287,20 @@ int main() {
         assert(swingIdleState.nextStateId == -2);
         assert(swingIdleState.enterSoundConfigIds ==
                std::vector<std::int16_t>{13});
+        const auto& sliderMoveState = playerStateConfigs.states()[22];
+        const auto& sliderLandState = playerStateConfigs.states()[23];
+        assert(sliderMoveState.name == "k_state_trigger_slider_move");
+        assert(sliderMoveState.stateClass == 5);
+        assert(sliderMoveState.motionType == 400);
+        assert(sliderMoveState.primaryAnimationId == 136);
+        assert(sliderMoveState.nextStateId == -2);
+        assert(sliderMoveState.enterSoundConfigIds ==
+               std::vector<std::int16_t>{14});
+        assert(sliderLandState.name == "k_state_trigger_slider_land");
+        assert(sliderLandState.stateClass == 5);
+        assert(sliderLandState.motionType == 401);
+        assert(sliderLandState.primaryAnimationId == 42);
+        assert(sliderLandState.nextStateId == 22);
         assert(jumpStartState.enterSoundConfigIds ==
                std::vector<std::int16_t>{8});
         assert(jumpLandState.enterSoundConfigIds ==
@@ -303,6 +318,7 @@ int main() {
         const auto* webThrow = playerStateConfigs.findSoundConfig(9);
         const auto* swingStart = playerStateConfigs.findSoundConfig(12);
         const auto* swingEnd = playerStateConfigs.findSoundConfig(13);
+        const auto* slideSound = playerStateConfigs.findSoundConfig(14);
         assert(webThrow != nullptr);
         assert(webThrow->name == "k_mc_sfx_web_throw");
         assert(webThrow->voxSoundIds ==
@@ -315,6 +331,10 @@ int main() {
         assert(swingEnd->name == "k_mc_sfx_swing_end");
         assert(swingEnd->voxSoundIds ==
                std::vector<std::int16_t>{71});
+        assert(slideSound != nullptr);
+        assert(slideSound->name == "k_mc_sfx_sliding");
+        assert(slideSound->voxSoundIds ==
+               std::vector<std::int16_t>{77});
         const auto* punchState = playerStateConfigs.findState(
             "k_state_idle_to_punch_right");
         assert(punchState != nullptr);
@@ -357,20 +377,22 @@ int main() {
         assert(catalogAudio.frameCount() > 0);
 
         usm::audio::PlayerStateSoundBank playerSounds;
-        constexpr std::array<std::string_view, 7> gameplaySoundStates{
+        constexpr std::array<std::string_view, 8> gameplaySoundStates{
             "k_state_idle_to_punch_right", "k_state_hurt_light",
             "k_state_jump_start", "k_state_jump_land",
             "k_state_swing_web_throw", "k_state_swing_hang",
-            "k_state_swing_idle"};
+            "k_state_swing_idle", "k_state_trigger_slider_move"};
         assert(playerSounds.preload(playerStateConfigs, voxSounds,
                                     soundCatalog, gameplaySoundStates));
-        assert(playerSounds.decodedVariantCount() == 19);
+        assert(playerSounds.decodedVariantCount() == 20);
         std::size_t playerSoundPlayCount = 0;
+        std::size_t loopingPlayerSoundCount = 0;
         const auto countPlayerSound =
-            [&playerSoundPlayCount](const usm::audio::PcmAudio& clip,
-                                    bool loop) {
+            [&playerSoundPlayCount,
+             &loopingPlayerSoundCount](const usm::audio::PcmAudio& clip,
+                                       bool loop) {
                 assert(clip.frameCount() > 0);
-                assert(!loop);
+                loopingPlayerSoundCount += loop ? 1U : 0U;
                 ++playerSoundPlayCount;
                 return usm::Result::success();
             };
@@ -390,7 +412,10 @@ int main() {
                                                countPlayerSound));
         assert(playerSounds.dispatchStateEnter("k_state_swing_idle",
                                                countPlayerSound));
-        assert(playerSoundPlayCount == 8);
+        assert(playerSounds.dispatchStateEnter(
+            "k_state_trigger_slider_move", countPlayerSound));
+        assert(playerSoundPlayCount == 9);
+        assert(loopingPlayerSoundCount == 1);
 
         usm::filesystem::GbmpArchive archive;
         assert(archive.open(configArchive));
@@ -624,6 +649,18 @@ int main() {
         assert(swingHangLeft.durationMilliseconds() == 733);
         assert(swingHangRight.name == "swing_hang_fwd_right");
         assert(swingHangRight.durationMilliseconds() == 734);
+        const auto& sliderLandClip =
+            bootstrap.player().animationBank.clips()[42];
+        const auto& sliderMoveClip =
+            bootstrap.player().animationBank.clips()[136];
+        const auto& sliderJumpClip =
+            bootstrap.player().animationBank.clips()[141];
+        assert(sliderLandClip.name == "fall_to_slide");
+        assert(sliderLandClip.durationMilliseconds() == 401);
+        assert(sliderMoveClip.name == "slide");
+        assert(sliderMoveClip.durationMilliseconds() == 532);
+        assert(sliderJumpClip.name == "slide_to_jump");
+        assert(sliderJumpClip.durationMilliseconds() == 433);
         constexpr std::array<std::string_view, 6> releaseClipNames{
             "swing_hang_left_to_swing_idle_2",
             "swing_hang_left_to_swing_idle_3",
@@ -647,6 +684,62 @@ int main() {
                usm::assets::ColladaAnimationProperty::TranslationX);
         assert(bootstrap.waypoints().size() == 15);
         assert(bootstrap.webGrabPoints().size() == 9);
+        assert(bootstrap.slides().size() == 2);
+        const auto roofSlide = std::find_if(
+            bootstrap.slides().begin(), bootstrap.slides().end(),
+            [](const auto& slide) { return slide.objectId == 1038; });
+        assert(roofSlide != bootstrap.slides().end());
+        assert(roofSlide->linkedWaypointId == 429);
+        assert(roofSlide->enabled);
+        assert(!roofSlide->electricShock);
+        assert(roofSlide->waypointIds ==
+               (std::vector<std::int32_t>{429, 430}));
+        const auto exitSlide = std::find_if(
+            bootstrap.slides().begin(), bootstrap.slides().end(),
+            [](const auto& slide) { return slide.objectId == 1039; });
+        assert(exitSlide != bootstrap.slides().end());
+        assert(exitSlide->waypointIds ==
+               (std::vector<std::int32_t>{445, 446}));
+
+        std::array<usm::game::LevelWayPointAsset, 3> testSlideWaypoints;
+        testSlideWaypoints[0].objectId = 1;
+        testSlideWaypoints[0].position = {0.0F, 0.0F, 0.0F};
+        testSlideWaypoints[0].nextWaypointIds[0] = 2;
+        testSlideWaypoints[1].objectId = 2;
+        testSlideWaypoints[1].position = {100.0F, 0.0F, 0.0F};
+        testSlideWaypoints[1].nextWaypointIds[0] = 3;
+        testSlideWaypoints[2].objectId = 3;
+        testSlideWaypoints[2].position = {200.0F, 0.0F, 0.0F};
+        testSlideWaypoints[2].useGravityWhenEnd = false;
+        testSlideWaypoints[2].electricShock = true;
+        usm::game::LevelSlideAsset testSlide;
+        testSlide.objectId = 99;
+        testSlide.waypointIds = {1, 2, 3};
+        const std::array<usm::game::LevelSlideAsset, 1> testSlides{
+            testSlide};
+        usm::game::LevelSlideRuntime testSlideRuntime;
+        testSlideRuntime.bind(testSlides, testSlideWaypoints);
+        assert(testSlideRuntime.findCatch({25.0F, 801.0F, 0.0F}).slide ==
+               nullptr);
+        const auto caughtSlide =
+            testSlideRuntime.findCatch({25.0F, 10.0F, 0.0F});
+        assert(caughtSlide.slide == &testSlides[0]);
+        assert(caughtSlide.segmentIndex == 0);
+        assert(std::abs(caughtSlide.projectedPosition.x - 25.0F) < 0.001F);
+        assert(std::abs(caughtSlide.distanceSquared - 100.0F) < 0.001F);
+        assert(testSlideRuntime.start(caughtSlide, 100.0F));
+        assert(testSlideRuntime.active());
+        assert(std::abs(testSlideRuntime.position().x - 25.0F) < 0.001F);
+        testSlideRuntime.update(500);
+        assert(std::abs(testSlideRuntime.position().x - 75.0F) < 0.001F);
+        testSlideRuntime.update(2000);
+        assert(!testSlideRuntime.active());
+        assert(std::abs(testSlideRuntime.position().x - 200.0F) < 0.001F);
+        const auto slideExit = testSlideRuntime.finish();
+        assert(std::abs(slideExit.velocityCentimetersPerSecond.x - 100.0F) <
+               0.001F);
+        assert(!slideExit.useGravity);
+        assert(slideExit.electricShock);
         const auto webGrab377 = std::find_if(
             bootstrap.webGrabPoints().begin(),
             bootstrap.webGrabPoints().end(), [](const auto& point) {
@@ -1194,6 +1287,48 @@ int main() {
         assert(jumpingPlayer.activeStateId() == 0);
         assert(jumpingPlayer.activeAnimation() == "idle_stand");
         assert(jumpingPlayer.requestJump());
+
+        std::array<usm::game::LevelWayPointAsset, 2>
+            playerSlideWaypoints;
+        playerSlideWaypoints[0].objectId = 9101;
+        playerSlideWaypoints[0].position = {
+            bootstrap.player().position.x,
+            bootstrap.player().position.y,
+            bootstrap.player().position.z + 400.0F,
+        };
+        playerSlideWaypoints[0].nextWaypointIds[0] = 9102;
+        playerSlideWaypoints[1].objectId = 9102;
+        playerSlideWaypoints[1].position = {
+            bootstrap.player().position.x + 1000.0F,
+            bootstrap.player().position.y,
+            bootstrap.player().position.z + 400.0F,
+        };
+        usm::game::LevelSlideAsset playerSlideAsset;
+        playerSlideAsset.objectId = 9100;
+        playerSlideAsset.waypointIds = {9101, 9102};
+        const std::array<usm::game::LevelSlideAsset, 1> playerSlides{
+            playerSlideAsset};
+        usm::game::GameplayPlayer slidingPlayer;
+        assert(slidingPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs, {},
+            playerSlides, playerSlideWaypoints));
+        assert(slidingPlayer.requestJump());
+        slidingPlayer.update({}, gameplayCameraPose, 300);
+        assert(slidingPlayer.activeStateId() == 14);
+        slidingPlayer.update({}, gameplayCameraPose, 1);
+        assert(slidingPlayer.activeStateId() == 23);
+        assert(slidingPlayer.activeAnimation() == "fall_to_slide");
+        slidingPlayer.update({}, gameplayCameraPose, 401);
+        assert(slidingPlayer.activeStateId() == 22);
+        assert(slidingPlayer.activeAnimation() == "slide");
+        assert(slidingPlayer.consumeEnteredState() == "k_state_jump_start");
+        assert(slidingPlayer.consumeEnteredState() ==
+               "k_state_trigger_slider_move");
+        const float slideStartX = slidingPlayer.position().x;
+        slidingPlayer.update({}, gameplayCameraPose, 100);
+        assert(slidingPlayer.position().x > slideStartX + 60.0F);
+        slidingPlayer.update({}, gameplayCameraPose, 2000);
+        assert(slidingPlayer.activeStateId() == 15);
 
         usm::game::GameplayPlayer swingingPlayer;
         usm::game::LevelWebGrabPointAsset testGrabPoint;

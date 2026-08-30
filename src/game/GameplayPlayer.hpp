@@ -4,6 +4,7 @@
 #include "core/Result.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/LevelSlideRuntime.hpp"
 #include "game/PlayerStateConfig.hpp"
 #include "game/WebGrabPointRuntime.hpp"
 #include "game/WebSwingRuntime.hpp"
@@ -33,7 +34,10 @@ public:
                                     const PlayerStateConfigDatabase* states =
                                         nullptr,
                                     std::span<const LevelWebGrabPointAsset>
-                                        webGrabPoints = {});
+                                        webGrabPoints = {},
+                                    std::span<const LevelSlideAsset> slides = {},
+                                    std::span<const LevelWayPointAsset>
+                                        waypoints = {});
     [[nodiscard]] bool requestPunch() noexcept;
     [[nodiscard]] bool requestJump() noexcept;
     [[nodiscard]] bool requestWeb() noexcept;
@@ -84,6 +88,8 @@ private:
         WebThrow,
         SwingHang,
         SwingRelease,
+        SliderLand,
+        SliderMove,
     };
 
     void setAnimation(std::string_view animation) noexcept;
@@ -99,6 +105,8 @@ private:
                             std::uint32_t elapsedMilliseconds) noexcept;
     void enterSwingHang() noexcept;
     void enterSwingRelease() noexcept;
+    [[nodiscard]] bool tryCatchSlide() noexcept;
+    void updateSlideTraversal(std::uint32_t elapsedMilliseconds) noexcept;
     [[nodiscard]] float currentRootHeight() const noexcept;
     [[nodiscard]] bool findLandingHeight(float referenceHeight,
                                          float& height) const noexcept;
@@ -121,12 +129,17 @@ private:
     const PlayerStateDefinition* swingThrowState_{};
     const PlayerStateDefinition* swingHangState_{};
     const PlayerStateDefinition* swingIdleState_{};
+    const PlayerStateDefinition* sliderLandState_{};
+    const PlayerStateDefinition* sliderMoveState_{};
     const PlayerStateDefinition* activeLocomotionState_{};
     LocomotionState locomotionState_{LocomotionState::Grounded};
     float verticalVelocityCentimetersPerSecond_{};
     assets::Vector3 swingReleaseVelocity_;
+    bool swingReleaseHasTarget_{};
+    assets::Vector3 swingReleaseTarget_;
     WebGrabPointRuntime webGrabPointRuntime_;
     WebSwingRuntime webSwingRuntime_;
+    LevelSlideRuntime slideRuntime_;
     const LevelWebGrabPointAsset* selectedWebGrabPoint_{};
     bool swingUsesLeftHand_{};
     bool webReleaseRequested_{};

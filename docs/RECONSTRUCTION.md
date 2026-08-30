@@ -455,6 +455,26 @@ depth-tested, alpha-blended D3D11 line pass reconstructs the original
 logic. Core regressions cover throw, hang, release, rope constraint, sound
 states, and ballistics, while WARP compares a captured web-strand frame.
 
+## Authored slider traversal
+
+`LevelOneBootstrap` also materializes both level-one `Slide` objects as typed
+`LevelSlideAsset` graphs. `CSlider::ProcessUserAttr` at `0x0031ce6c` supplies
+the enabled, electric-shock, and entry-waypoint fields; `CSlider::Init` at
+`0x0031e7cc` follows the first waypoint link. The resulting graphs preserve
+Slide1038's 429-to-430 roof run and Slide1039's 445-to-446 exit run.
+
+`LevelSlideRuntime` reconstructs the renderer-independent segment work from
+`CSlider::Update` at `0x0031d920`, including the recovered 640000 cm² catch
+radius, nearest-segment projection, velocity preservation, linked-segment
+switching, and final waypoint gravity/electric metadata. Airborne player
+states can now enter state 23 (`k_state_trigger_slider_land`), advance through
+the authored `fall_to_slide` clip, and loop state 22
+(`k_state_trigger_slider_move`) with its looping Vox 77 slide sound. Forced
+web releases retain their linked waypoint destination, allowing grab point
+443 to feed waypoint 445 and the second authored slide. Deterministic tests
+cover graph extraction, proximity rejection, projected catches, segment
+switching, terminal metadata, player state transitions, and audio dispatch.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

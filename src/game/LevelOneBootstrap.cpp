@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <iterator>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace usm::game {
@@ -182,6 +183,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     triggers_.clear();
     waypoints_.clear();
     webGrabPoints_.clear();
+    slides_.clear();
     cinematics_.clear();
     enemyArchetypes_.clear();
     enemies_.clear();
@@ -471,6 +473,63 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     appendWaypoints(mainScene_);
     for (const LevelRoomAsset& room : rooms_) {
         appendWaypoints(room.scene);
+    }
+
+    const auto appendSlides = [this](const assets::IrrScene& scene) -> Result {
+        for (const assets::IrrSceneNode& node : scene.nodes()) {
+            if (node.gameType != "Slide") {
+                continue;
+            }
+            LevelSlideAsset slide;
+            slide.objectId = node.id;
+            slide.name = node.name;
+            slide.position = worldPosition(node);
+            slide.linkedWaypointId =
+                integerAttribute(node, "^Link^WayPoint");
+            slide.enabled = booleanAttribute(node, "Enabled", true);
+            slide.electricShock =
+                booleanAttribute(node, "ElectricShock", false);
+            std::unordered_set<std::int32_t> visited;
+            std::int32_t waypointId = slide.linkedWaypointId;
+            while (waypointId >= 0) {
+                if (!visited.insert(waypointId).second) {
+                    return Result::failure("Slide " +
+                                           std::to_string(slide.objectId) +
+                                           " has a cyclic waypoint graph");
+                }
+                const auto waypoint = std::find_if(
+                    waypoints_.begin(), waypoints_.end(),
+                    [waypointId](const LevelWayPointAsset& candidate) {
+                        return candidate.objectId == waypointId;
+                    });
+                if (waypoint == waypoints_.end()) {
+                    return Result::failure("Slide " +
+                                           std::to_string(slide.objectId) +
+                                           " has an invalid waypoint");
+                }
+                slide.waypointIds.push_back(waypointId);
+                waypointId = waypoint->nextWaypointIds[0];
+            }
+            if (slide.waypointIds.size() < 2) {
+                return Result::failure("Slide " +
+                                       std::to_string(slide.objectId) +
+                                       " has no traversable segment");
+            }
+            slides_.push_back(std::move(slide));
+        }
+        return Result::success();
+    };
+    result = appendSlides(mainScene_);
+    if (!result) {
+        slides_.clear();
+        return result;
+    }
+    for (const LevelRoomAsset& room : rooms_) {
+        result = appendSlides(room.scene);
+        if (!result) {
+            slides_.clear();
+            return result;
+        }
     }
 
     const auto appendWebGrabPoints = [this](const assets::IrrScene& scene)
