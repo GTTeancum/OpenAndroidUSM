@@ -10,6 +10,7 @@
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/PlayerHudHealthState.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -36,6 +37,7 @@ private:
     game::GameplayCamera gameplayCamera_;
     game::LevelCollision levelCollision_;
     game::GameplayPlayer gameplayPlayer_;
+    game::PlayerHudHealthState playerHudHealth_;
     game::LevelTriggerRuntime triggerRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::CinematicPlayer gameplayCinematicPlayer_;

@@ -43,6 +43,10 @@ public:
     [[nodiscard]] Result updateLevelOneEnemies(
         const game::LevelOneBootstrap& levelOne,
         const game::LevelEnemyRuntime& enemies);
+    [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
+                                         float currentHealthRatio,
+                                         float delayedHealthRatio,
+                                         float webPowerRatio);
     [[nodiscard]] Result setCamera(const game::CameraPose& camera);
     [[nodiscard]] Result readBackPixel(
         std::uint32_t x, std::uint32_t y,
@@ -98,6 +102,7 @@ private:
         GpuMesh& gpuMesh,
         std::span<const assets::ColladaGeometry> animatedGeometry,
         const std::array<float, 16>* worldTransform);
+    [[nodiscard]] Result uploadHudTexture(const game::LevelHudAsset& hud);
     void bindRenderTarget(std::uint32_t width, std::uint32_t height);
 
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
@@ -111,6 +116,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> hudVertexShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> hudPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> viewRotationBuffer_;
@@ -119,9 +126,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D11BlendState> alphaBlendState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthWriteState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthReadState_;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthDisabledState_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> hudVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
     std::size_t enemyMeshStart_{};
+    std::uint32_t hudVertexCount_{};
+    std::uint32_t hudVertexCapacity_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};

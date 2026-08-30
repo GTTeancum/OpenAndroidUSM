@@ -271,6 +271,35 @@ unique event names: 17 resolve to supplied Ogg files, while
 `SFX_THUG_KNIFE_HURT_1` and `SFX_VERTICAL_IMPACT` remain explicit evidence
 gaps because the absent VoxSound table is the only authoritative alias map.
 
+## Native interface sprites and player HUD
+
+`assets::SpriteAtlas` follows `CSprite::LoadSpriteData` at original address
+`0x002e88d4`. The compact `0xa9d1` stream is represented as named module,
+frame-module, frame, animation-frame, and animation records with every index
+and span bounds-checked. The shipped `interface.bsprite` resolves to 149
+modules, 257 frame modules, 158 frames, 134 animation frames, and 40
+animations. No touch-control frames are submitted by the Windows gameplay
+path.
+
+Despite their `.tga` names, the paired interface images are DDS resources.
+`assets::DdsAtcTexture` validates the DDS header and `ATCA` FourCC, then
+decodes ATC explicit-alpha blocks to RGBA8 using the MIT-licensed AMD
+Compressonator reconstruction rules. The decoded 1024x1024 interface atlas is
+uploaded once as a D3D11 shader resource.
+
+The native HUD follows `CLevel::Render2DInterface` at original address
+`0x00387a54`: UI item 0x14 is placed at authored 480x320 coordinates (46,32),
+frame 0x1b supplies the health surround, frames 0x1c/0x1d supply delayed and
+current health, frames 0x18/0x19 supply web power, and frame 0x1f supplies the
+Spider-Man badge. `PlayerHudHealthState` reconstructs the immediate and
+trailing damage values maintained by
+`CLevel::UpdateInferfaceHealthAndWebPower` at `0x0037d860`. D3D11 renders the
+result with the recovered 50 ms hold and 500 ms trailing drain through a
+backend-only alpha-blended sprite pass after the 3D scene,
+with a uniformly scaled and centered 3:2 safe canvas on widescreen displays.
+WARP regressions compare frames before and after HUD submission and produce a
+1280x720 capture for visual review.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

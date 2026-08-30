@@ -3,7 +3,9 @@
 #include "assets/ColladaAnimation.hpp"
 #include "assets/ColladaMesh.hpp"
 #include "assets/ColladaSkinning.hpp"
+#include "assets/DdsAtcTexture.hpp"
 #include "assets/IrrScene.hpp"
+#include "assets/SpriteAtlas.hpp"
 #include "audio/OggAudio.hpp"
 #include "audio/CinematicSoundBank.hpp"
 #include "audio/SoundEventCatalog.hpp"
@@ -13,6 +15,7 @@
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+#include "game/PlayerHudHealthState.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
@@ -35,6 +38,24 @@ int main() {
     const auto failure = usm::Result::failure("expected failure");
     assert(!static_cast<bool>(failure));
     assert(failure.message() == "expected failure");
+
+    usm::game::PlayerHudHealthState hudHealth;
+    hudHealth.initialize(1000.0F, 1000.0F);
+    assert(hudHealth.currentRatio() == 1.0F);
+    assert(hudHealth.delayedRatio() == 1.0F);
+    hudHealth.update(750.0F, 25);
+    assert(std::abs(hudHealth.currentRatio() - 0.75F) < 0.001F);
+    assert(hudHealth.delayedRatio() == 1.0F);
+    hudHealth.update(750.0F, 25);
+    assert(hudHealth.delayedRatio() == 1.0F);
+    hudHealth.update(750.0F, 250);
+    assert(hudHealth.delayedRatio() < 1.0F);
+    assert(hudHealth.delayedRatio() > hudHealth.currentRatio());
+    hudHealth.update(750.0F, 250);
+    assert(std::abs(hudHealth.delayedRatio() - 0.75F) < 0.001F);
+    hudHealth.update(900.0F, 16);
+    assert(std::abs(hudHealth.currentRatio() - 0.9F) < 0.001F);
+    assert(std::abs(hudHealth.delayedRatio() - 0.9F) < 0.001F);
 
     using namespace usm::reconstructed;
     XperiaKeyRouter router;
@@ -135,6 +156,52 @@ int main() {
         assert(levelOne.open(dataRoot / "levelnew_01.pack"));
         assert(levelOne.entries().size() == 250);
         assert(levelOne.find("meshes_bin/camera_Lv1_beforeboss.bdae") != nullptr);
+
+        usm::filesystem::GbmpArchive sprites;
+        assert(sprites.open(dataRoot / "sprites.pack"));
+        std::vector<std::byte> spriteMetadataBytes;
+        assert(sprites.read("interface.bsprite", spriteMetadataBytes));
+        usm::assets::SpriteAtlas interfaceAtlas;
+        const usm::Result atlasResult =
+            interfaceAtlas.load(spriteMetadataBytes);
+        if (!atlasResult) {
+            std::cerr << "Interface sprite metadata failed: "
+                      << atlasResult.message() << '\n';
+            return 1;
+        }
+        assert(interfaceAtlas.flags() == 0x2000);
+        assert(interfaceAtlas.modules().size() == 149);
+        assert(interfaceAtlas.frameModules().size() == 257);
+        assert(interfaceAtlas.frames().size() == 158);
+        assert(interfaceAtlas.animationFrames().size() == 134);
+        assert(interfaceAtlas.animations().size() == 40);
+        for (const std::size_t hudFrame : {0x18U, 0x19U, 0x1bU, 0x1cU,
+                                          0x1dU, 0x1fU}) {
+            assert(!interfaceAtlas.modulesForFrame(hudFrame).empty());
+        }
+
+        std::vector<std::byte> interfaceTextureBytes;
+        assert(sprites.read("interface.tga", interfaceTextureBytes));
+        usm::assets::DdsAtcTexture interfaceTexture;
+        const usm::Result interfaceTextureResult =
+            interfaceTexture.load(interfaceTextureBytes);
+        if (!interfaceTextureResult) {
+            std::cerr << "Interface texture failed: "
+                      << interfaceTextureResult.message() << '\n';
+            return 1;
+        }
+        assert(interfaceTexture.image().width == 1024);
+        assert(interfaceTexture.image().height == 1024);
+        assert(interfaceTexture.image().pixels.size() == 1024U * 1024U * 4U);
+        bool hasTransparentPixel = false;
+        bool hasOpaquePixel = false;
+        for (std::size_t alpha = 3;
+             alpha < interfaceTexture.image().pixels.size(); alpha += 4) {
+            hasTransparentPixel |=
+                interfaceTexture.image().pixels[alpha] == 0;
+            hasOpaquePixel |= interfaceTexture.image().pixels[alpha] == 0xff;
+        }
+        assert(hasTransparentPixel && hasOpaquePixel);
 
         usm::filesystem::GbmpArchive entities;
         const usm::Result entitiesResult =

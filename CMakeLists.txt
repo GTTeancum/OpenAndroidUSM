@@ -85,10 +85,12 @@ add_library(OpenAndroidUSM.Core STATIC
     src/audio/SoundEventCatalog.cpp
     src/assets/BresFile.cpp
     src/assets/BtexTexture.cpp
+    src/assets/DdsAtcTexture.cpp
     src/assets/ColladaAnimation.cpp
     src/assets/ColladaMesh.cpp
     src/assets/ColladaSkinning.cpp
     src/assets/IrrScene.cpp
+    src/assets/SpriteAtlas.cpp
     src/filesystem/GbmpArchive.cpp
     src/game/CinematicScript.cpp
     src/game/AttackConfig.cpp
@@ -101,6 +103,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelEnemyRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
     src/game/LevelOneBootstrap.cpp
+    src/game/PlayerHudHealthState.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)

@@ -166,6 +166,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     cinematics_.clear();
     enemyArchetypes_.clear();
     enemies_.clear();
+    hud_ = {};
     Result result = attackConfigs_.load(gameDataRoot);
     if (!result) {
         return Result::failure("Could not load attack configs: " +
@@ -187,7 +188,34 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
         return result;
     }
 
+    filesystem::GbmpArchive spriteArchive;
+    result = spriteArchive.open(gameDataRoot / "sprites.pack");
+    if (!result) {
+        return result;
+    }
+
     std::vector<std::byte> resource;
+    result = spriteArchive.read("interface.bsprite", resource);
+    if (!result) {
+        return Result::failure("Could not load interface sprite metadata: " +
+                               result.message());
+    }
+    result = hud_.interfaceAtlas.load(resource);
+    if (!result) {
+        return Result::failure("Could not parse interface sprite metadata: " +
+                               result.message());
+    }
+    result = spriteArchive.read("interface.tga", resource);
+    if (!result) {
+        return Result::failure("Could not load interface sprite texture: " +
+                               result.message());
+    }
+    result = hud_.interfaceTexture.load(resource);
+    if (!result) {
+        return Result::failure("Could not decode interface sprite texture: " +
+                               result.message());
+    }
+
     result = levelArchive.read("levelnew_01.irr", resource);
     if (!result) {
         return result;

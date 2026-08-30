@@ -87,6 +87,8 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
+    playerHudHealth_.initialize(gameplayPlayer_.health(),
+                                gameplayPlayer_.maximumHealth());
     triggerRuntime_.bind(levelOne_.triggers());
     result = enemyRuntime_.initialize(levelOne_);
     if (!result) {
@@ -220,16 +222,23 @@ int Application::run(HINSTANCE instance) {
                  enemyRuntime_.consumePlayerHits()) {
                 (void)gameplayPlayer_.applyDamage(hit.damage);
             }
+            playerHudHealth_.update(gameplayPlayer_.health(),
+                                    deltaMilliseconds);
+            result = renderer_.updatePlayerHud(
+                levelOne_.hud(), playerHudHealth_.currentRatio(),
+                playerHudHealth_.delayedRatio(), 1.0F);
             const assets::ColladaAnimationClip* activeClip =
                 levelOne_.player().animationBank.findClip(
                     gameplayPlayer_.activeAnimation());
             if (activeClip == nullptr) {
                 return fail("The active player animation is missing");
             }
-            result = renderer_.updateLevelOnePlayer(
-                levelOne_, *activeClip,
-                gameplayPlayer_.animationTimeMilliseconds(),
-                gameplayPlayer_.worldTransform());
+            if (result) {
+                result = renderer_.updateLevelOnePlayer(
+                    levelOne_, *activeClip,
+                    gameplayPlayer_.animationTimeMilliseconds(),
+                    gameplayPlayer_.worldTransform());
+            }
             if (result) {
                 result = renderer_.updateLevelOneEnemies(levelOne_,
                                                          enemyRuntime_);

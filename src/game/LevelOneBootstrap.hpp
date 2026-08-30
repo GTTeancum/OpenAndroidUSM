@@ -3,7 +3,9 @@
 #include "assets/BtexTexture.hpp"
 #include "assets/ColladaAnimation.hpp"
 #include "assets/ColladaMesh.hpp"
+#include "assets/DdsAtcTexture.hpp"
 #include "assets/IrrScene.hpp"
+#include "assets/SpriteAtlas.hpp"
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/AttackConfig.hpp"
@@ -121,6 +123,11 @@ struct LevelEnemyAsset {
     float awarenessAngleDegrees{};
 };
 
+struct LevelHudAsset {
+    assets::SpriteAtlas interfaceAtlas;
+    assets::DdsAtcTexture interfaceTexture;
+};
+
 class LevelOneBootstrap final {
 public:
     [[nodiscard]] Result load(const std::filesystem::path& gameDataRoot);
@@ -198,6 +205,7 @@ public:
     enemySpecialActions() const noexcept {
         return enemySpecialActions_;
     }
+    [[nodiscard]] const LevelHudAsset& hud() const noexcept { return hud_; }
 
 private:
     assets::IrrScene mainScene_;
@@ -217,6 +225,7 @@ private:
     std::vector<LevelEnemyAsset> enemies_;
     AttackConfigDatabase attackConfigs_;
     EnemySpecialActionConfigDatabase enemySpecialActions_;
+    LevelHudAsset hud_;
 };
 
 } // namespace usm::game

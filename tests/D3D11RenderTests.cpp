@@ -89,6 +89,8 @@ int main() {
     if (std::filesystem::exists(dataRoot / "levelnew_01.pack")) {
         usm::game::LevelOneBootstrap levelOne;
         assert(levelOne.load(dataRoot));
+        captureIfRequested(levelOne.hud().interfaceTexture.image(),
+                           "interface-atlas.bmp");
         for (std::size_t textureIndex = 0;
              textureIndex < levelOne.introSky().textures.size();
              ++textureIndex) {
@@ -115,9 +117,11 @@ int main() {
         }
 
         usm::renderer::D3D11Renderer gameRenderer;
-        const std::uint32_t captureSize =
-            std::getenv("OPENANDROIDUSM_CAPTURE_DIR") == nullptr ? 256U : 1024U;
-        assert(gameRenderer.initializeOffscreen(captureSize, captureSize));
+        const bool capturing =
+            std::getenv("OPENANDROIDUSM_CAPTURE_DIR") != nullptr;
+        const std::uint32_t captureWidth = capturing ? 1280U : 256U;
+        const std::uint32_t captureHeight = capturing ? 720U : 256U;
+        assert(gameRenderer.initializeOffscreen(captureWidth, captureHeight));
         assert(gameRenderer.uploadLevelOneScene(levelOne));
         assert(gameRenderer.updateLevelOneActors(levelOne, 0));
         assert(gameRenderer.setCamera(levelOne.introCamera().sample(0)));
@@ -185,6 +189,24 @@ int main() {
         assert(gameRenderer.readBackImage(gameplayFrame));
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
+        assert(gameRenderer.updatePlayerHud(levelOne.hud(), 0.65F, 0.85F,
+                                            1.0F));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayHudFrame;
+        assert(gameRenderer.readBackImage(gameplayHudFrame));
+        captureIfRequested(gameplayHudFrame, "gameplay-hud.bmp");
+        std::size_t hudChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < gameplayHudFrame.pixels.size(); component += 4) {
+            hudChangedPixels +=
+                gameplayHudFrame.pixels[component] !=
+                    gameplayFrame.pixels[component] ||
+                gameplayHudFrame.pixels[component + 1] !=
+                    gameplayFrame.pixels[component + 1] ||
+                gameplayHudFrame.pixels[component + 2] !=
+                    gameplayFrame.pixels[component + 2];
+        }
+        assert(hudChangedPixels > 100);
         assert(gameRenderer.updateLevelOnePlayer(
             levelOne, *idleClip, idleClip->durationMilliseconds() / 2,
             levelOne.player().worldTransform));

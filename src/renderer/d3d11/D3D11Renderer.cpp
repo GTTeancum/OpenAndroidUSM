@@ -127,6 +127,45 @@ float4 main(PixelInput input) : SV_TARGET {
 }
 )hlsl";
 
+constexpr std::string_view kHudVertexShader = R"hlsl(
+struct VertexInput {
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+PixelInput main(VertexInput input) {
+    PixelInput output;
+    output.position = float4(input.position, 1.0);
+    output.textureCoordinate = input.textureCoordinate;
+    output.color = input.color;
+    return output;
+}
+)hlsl";
+
+constexpr std::string_view kHudPixelShader = R"hlsl(
+Texture2D InterfaceTexture : register(t0);
+SamplerState InterfaceSampler : register(s0);
+
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    return InterfaceTexture.Sample(InterfaceSampler,
+                                   input.textureCoordinate) * input.color;
+}
+)hlsl";
+
 Result hresultFailure(std::string_view operation, HRESULT value) {
     std::ostringstream message;
     message << operation << " failed: 0x" << std::hex
@@ -439,6 +478,30 @@ Result D3D11Renderer::createPipeline() {
         return hresultFailure(
             "ID3D11Device::CreatePixelShader(reflection)", callResult);
     }
+    ComPtr<ID3DBlob> hudVertexBytecode;
+    result = compileShader(kHudVertexShader, "vs_5_0", hudVertexBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreateVertexShader(
+        hudVertexBytecode->GetBufferPointer(),
+        hudVertexBytecode->GetBufferSize(), nullptr, &hudVertexShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateVertexShader(HUD)",
+                              callResult);
+    }
+    ComPtr<ID3DBlob> hudPixelBytecode;
+    result = compileShader(kHudPixelShader, "ps_5_0", hudPixelBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreatePixelShader(
+        hudPixelBytecode->GetBufferPointer(),
+        hudPixelBytecode->GetBufferSize(), nullptr, &hudPixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreatePixelShader(HUD)",
+                              callResult);
+    }
 
     constexpr std::array inputElements{
         D3D11_INPUT_ELEMENT_DESC{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
@@ -527,6 +590,13 @@ Result D3D11Renderer::createPipeline() {
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreateDepthStencilState(read)",
                               callResult);
+    }
+    depthDescription.DepthEnable = FALSE;
+    callResult = device_->CreateDepthStencilState(&depthDescription,
+                                                   &depthDisabledState_);
+    if (FAILED(callResult)) {
+        return hresultFailure(
+            "ID3D11Device::CreateDepthStencilState(disabled)", callResult);
     }
 
     D3D11_RASTERIZER_DESC rasterizerDescription{};
@@ -654,7 +724,7 @@ Result D3D11Renderer::uploadLevelOneScene(
         }
         gpuMeshes_.back().visible = enemy.visible;
     }
-    return Result::success();
+    return uploadHudTexture(levelOne.hud());
 }
 
 Result D3D11Renderer::updateLevelOneActors(
@@ -842,6 +912,158 @@ Result D3D11Renderer::updateDynamicMesh(
         }
     }
     context_->Unmap(gpuMesh.vertexBuffer.Get(), 0);
+    return Result::success();
+}
+
+Result D3D11Renderer::uploadHudTexture(const game::LevelHudAsset& hud) {
+    hudTexture_.Reset();
+    hudVertexBuffer_.Reset();
+    hudVertexCount_ = 0;
+    hudVertexCapacity_ = 0;
+    const assets::RgbaImage& image = hud.interfaceTexture.image();
+    if (image.width == 0 || image.height == 0 ||
+        image.pixels.size() !=
+            static_cast<std::size_t>(image.width) * image.height * 4) {
+        return Result::failure("Interface texture image is invalid");
+    }
+    return createTextureView(
+        std::span<const assets::RgbaImage>(&image, 1), hudTexture_);
+}
+
+Result D3D11Renderer::updatePlayerHud(const game::LevelHudAsset& hud,
+                                      float currentHealthRatio,
+                                      float delayedHealthRatio,
+                                      float webPowerRatio) {
+    if (!device_ || !context_ || !hudTexture_ || width_ == 0 || height_ == 0) {
+        return Result::failure("HUD GPU resources are incomplete");
+    }
+
+    const assets::SpriteAtlas& atlas = hud.interfaceAtlas;
+    const assets::RgbaImage& texture = hud.interfaceTexture.image();
+    constexpr float virtualWidth = 480.0F;
+    constexpr float virtualHeight = 320.0F;
+    constexpr float hudX = 46.0F;
+    constexpr float hudY = 32.0F;
+    const float screenScale =
+        std::min(static_cast<float>(width_) / virtualWidth,
+                 static_cast<float>(height_) / virtualHeight);
+    const float screenOffsetX =
+        (static_cast<float>(width_) - virtualWidth * screenScale) * 0.5F;
+    const float screenOffsetY =
+        (static_cast<float>(height_) - virtualHeight * screenScale) * 0.5F;
+
+    std::vector<GpuVertex> vertices;
+    vertices.reserve(36);
+    bool valid = true;
+    const auto appendFrame = [&](std::size_t frameIndex, float fillRatio,
+                                 float rightClipPixels) {
+        const float clampedRatio = std::clamp(fillRatio, 0.0F, 1.0F);
+        for (const assets::SpriteFrameModule& frameModule :
+             atlas.modulesForFrame(frameIndex)) {
+            if (frameModule.moduleIndex >= atlas.modules().size()) {
+                valid = false;
+                continue;
+            }
+            const assets::SpriteModule& module =
+                atlas.modules()[frameModule.moduleIndex];
+            if (module.imageIndex != 0 || frameModule.flags != 0) {
+                valid = false;
+                continue;
+            }
+            const float unclippedWidth =
+                std::max(0.0F, static_cast<float>(module.width) -
+                                   rightClipPixels);
+            const float visibleWidth = unclippedWidth * clampedRatio;
+            if (visibleWidth <= 0.0F || module.height == 0) {
+                continue;
+            }
+
+            const float left =
+                screenOffsetX +
+                (hudX + static_cast<float>(frameModule.x)) * screenScale;
+            const float top = screenOffsetY +
+                              (hudY + static_cast<float>(frameModule.y)) *
+                                  screenScale;
+            const float right = left + visibleWidth * screenScale;
+            const float bottom =
+                top + static_cast<float>(module.height) * screenScale;
+            const float x0 = left / static_cast<float>(width_) * 2.0F - 1.0F;
+            const float x1 = right / static_cast<float>(width_) * 2.0F - 1.0F;
+            const float y0 = 1.0F - top / static_cast<float>(height_) * 2.0F;
+            const float y1 =
+                1.0F - bottom / static_cast<float>(height_) * 2.0F;
+
+            const float u0 =
+                static_cast<float>(module.x) / texture.width;
+            const float v0 =
+                static_cast<float>(module.y) / texture.height;
+            const float u1 =
+                (static_cast<float>(module.x) + visibleWidth) / texture.width;
+            const float v1 =
+                (static_cast<float>(module.y) + module.height) /
+                texture.height;
+            constexpr std::uint32_t white = 0xffffffffU;
+            const GpuVertex topLeft{{x0, y0, 0.0F}, {}, {u0, v0}, white};
+            const GpuVertex topRight{{x1, y0, 0.0F}, {}, {u1, v0}, white};
+            const GpuVertex bottomLeft{{x0, y1, 0.0F}, {}, {u0, v1}, white};
+            const GpuVertex bottomRight{{x1, y1, 0.0F}, {}, {u1, v1}, white};
+            vertices.insert(vertices.end(),
+                            {topLeft, topRight, bottomLeft, topRight,
+                             bottomRight, bottomLeft});
+        }
+    };
+
+    currentHealthRatio = std::clamp(currentHealthRatio, 0.0F, 1.0F);
+    delayedHealthRatio =
+        std::clamp(delayedHealthRatio, currentHealthRatio, 1.0F);
+    appendFrame(0x1b, 1.0F, 0.0F);
+    if (delayedHealthRatio > currentHealthRatio) {
+        appendFrame(0x1c, delayedHealthRatio, 0.0F);
+    }
+    appendFrame(0x1d, currentHealthRatio, 0.0F);
+    appendFrame(0x18, 1.0F, 0.0F);
+    appendFrame(0x19, webPowerRatio, 5.0F);
+    appendFrame(0x1f, 1.0F, 0.0F);
+    if (!valid) {
+        return Result::failure(
+            "HUD frame uses an unsupported image or sprite transform");
+    }
+    if (vertices.size() > std::numeric_limits<std::uint32_t>::max()) {
+        return Result::failure("HUD vertex count exceeds D3D11 limits");
+    }
+
+    if (vertices.size() > hudVertexCapacity_) {
+        hudVertexBuffer_.Reset();
+        hudVertexCapacity_ = static_cast<std::uint32_t>(
+            std::max<std::size_t>(vertices.size(), 64));
+        D3D11_BUFFER_DESC description{};
+        description.ByteWidth =
+            hudVertexCapacity_ * static_cast<UINT>(sizeof(GpuVertex));
+        description.Usage = D3D11_USAGE_DYNAMIC;
+        description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        description.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        const HRESULT createResult = device_->CreateBuffer(
+            &description, nullptr, &hudVertexBuffer_);
+        if (FAILED(createResult)) {
+            hudVertexCapacity_ = 0;
+            return hresultFailure("ID3D11Device::CreateBuffer(HUD)",
+                                  createResult);
+        }
+    }
+
+    hudVertexCount_ = static_cast<std::uint32_t>(vertices.size());
+    if (vertices.empty()) {
+        return Result::success();
+    }
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    const HRESULT mapResult = context_->Map(
+        hudVertexBuffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (FAILED(mapResult)) {
+        return hresultFailure("ID3D11DeviceContext::Map(HUD)", mapResult);
+    }
+    std::memcpy(mapped.pData, vertices.data(),
+                vertices.size() * sizeof(GpuVertex));
+    context_->Unmap(hudVertexBuffer_.Get(), 0);
     return Result::success();
 }
 
@@ -1213,6 +1435,25 @@ void D3D11Renderer::renderFrame() {
                                       batch.baseVertex);
             }
         }
+    }
+
+    if (hudVertexCount_ != 0 && hudVertexBuffer_ && hudTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(0, 1, hudVertexBuffer_.GetAddressOf(),
+                                     &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
+        context_->PSSetShader(hudPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(0, 1, hudTexture_.GetAddressOf());
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        context_->Draw(hudVertexCount_, 0);
     }
 
     if (swapChain_) {
