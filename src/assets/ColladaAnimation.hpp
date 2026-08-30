@@ -21,6 +21,7 @@ enum class ColladaAnimationProperty {
     TranslationY,
     TranslationZ,
     Rotation,
+    RotationAngle,
 };
 
 struct ColladaAnimationSample {

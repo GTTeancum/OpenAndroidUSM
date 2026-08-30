@@ -152,6 +152,20 @@ const ColladaAnimationTrack* findTrack(
     return match == animation.tracks().end() ? nullptr : &*match;
 }
 
+Quaternion withAnimatedAngle(Quaternion base, float angle) noexcept {
+    const float vectorLength =
+        std::sqrt(base.x * base.x + base.y * base.y + base.z * base.z);
+    Vector3 axis{0.0F, 1.0F, 0.0F};
+    if (vectorLength > 1.0e-6F) {
+        axis = {base.x / vectorLength, base.y / vectorLength,
+                base.z / vectorLength};
+    }
+    const float halfAngle = angle * 0.5F;
+    const float sine = std::sin(halfAngle);
+    return {axis.x * sine, axis.y * sine, axis.z * sine,
+            std::cos(halfAngle)};
+}
+
 Result buildWorldMatrices(const ColladaMeshFile& mesh,
                           const ColladaAnimationFile& animation,
                           std::uint32_t timestampMilliseconds,
@@ -186,6 +200,14 @@ Result buildWorldMatrices(const ColladaMeshFile& mesh,
                 rotationTrack->sample(timestampMilliseconds);
             rotation = {sample.value[0], sample.value[1], sample.value[2],
                         sample.value[3]};
+        } else if (const ColladaAnimationTrack* angleTrack = findTrack(
+                       animation, node.id,
+                       ColladaAnimationProperty::RotationAngle)) {
+            // CQuaternionAngleEx::getKeyBasedValueEx (0x004190e0) extracts
+            // the axis from the node's existing quaternion and rebuilds it
+            // from the sampled scalar angle. Its zero-axis fallback is +Y.
+            rotation = withAnimatedAngle(
+                rotation, angleTrack->sample(timestampMilliseconds).value[0]);
         }
         const Matrix4 local = localMatrix(position, rotation, node.scale);
         if (node.parentIndex < 0) {

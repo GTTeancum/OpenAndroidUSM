@@ -88,6 +88,8 @@ ColladaAnimationProperty propertyFromChannel(
         return ColladaAnimationProperty::TranslationZ;
     case 5:
         return ColladaAnimationProperty::Rotation;
+    case 9:
+        return ColladaAnimationProperty::RotationAngle;
     default:
         break;
     }
@@ -157,6 +159,9 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     case ColladaAnimationProperty::Rotation:
         componentCount = 4;
         break;
+    case ColladaAnimationProperty::RotationAngle:
+        componentCount = 1;
+        break;
     default:
         break;
     }
@@ -171,9 +176,6 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         !valuesOffset) {
         return Result::failure("BDAE animation sampler sources are truncated");
     }
-    const bool compactRotationAngles =
-        property == ColladaAnimationProperty::Rotation &&
-        *valueCount == *timeCount;
     if (componentCount == 0) {
         if (*timeCount == 0 || *valueCount % *timeCount != 0) {
             return Result::failure(
@@ -184,19 +186,14 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     if (componentCount == 0 || componentCount > 4) {
         return Result::failure("BDAE animation component count is unsupported");
     }
-    const std::uint64_t serializedValueCount =
-        compactRotationAngles
-            ? static_cast<std::uint64_t>(*timeCount)
-            : static_cast<std::uint64_t>(*timeCount) * componentCount;
     const std::uint64_t decodedValueCount =
         static_cast<std::uint64_t>(*timeCount) * componentCount;
     if (*timeType != kTimestampSourceType ||
         *valueType != kFloatingPointSourceType || *timeCount == 0 ||
-        (*valueCount != *timeCount && *valueCount != decodedValueCount) ||
+        *valueCount != decodedValueCount ||
         !view.contains(*timesOffset,
                        static_cast<std::uint64_t>(*timeCount) * 4) ||
-        !view.contains(*valuesOffset,
-                       serializedValueCount * 4)) {
+        !view.contains(*valuesOffset, decodedValueCount * 4)) {
         return Result::failure(
             "BDAE animation source streams are invalid (time type " +
             std::to_string(*timeType) + ", output type " +
@@ -237,33 +234,17 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
     }
     output.values.reserve(static_cast<std::size_t>(decodedValueCount) -
                           firstKey * componentCount);
-    if (compactRotationAngles) {
-        // The BDAE compiler stores rotations constrained to the local Z axis
-        // as one radian angle per key. Expand that compact representation to
-        // the quaternion consumed by CQuaternionEx and the scene nodes.
-        for (std::uint32_t key = firstKey; key < *timeCount; ++key) {
-            const auto angle = view.floating(*valuesOffset + key * 4);
-            if (!angle || !std::isfinite(*angle)) {
-                return Result::failure(
-                    "BDAE compact rotation is invalid for " + *id +
-                    " at key " + std::to_string(key));
-            }
-            const float halfAngle = *angle * 0.5F;
-            output.values.insert(output.values.end(),
-                                 {0.0F, 0.0F, std::sin(halfAngle),
-                                  std::cos(halfAngle)});
+    // Channel type 5 uses CQuaternionEx and four floats per key. Type 9 uses
+    // the distinct CQuaternionAngleEx scalar-angle representation.
+    for (std::uint32_t index = firstKey * componentCount;
+         index < decodedValueCount; ++index) {
+        const auto value = view.floating(*valuesOffset + index * 4);
+        if (!value || !std::isfinite(*value)) {
+            return Result::failure(
+                "BDAE animation values are invalid for " + *id +
+                " at scalar " + std::to_string(index));
         }
-    } else {
-        for (std::uint32_t index = firstKey * componentCount;
-             index < decodedValueCount; ++index) {
-            const auto value = view.floating(*valuesOffset + index * 4);
-            if (!value || !std::isfinite(*value)) {
-                return Result::failure(
-                    "BDAE animation values are invalid for " + *id +
-                    " at scalar " + std::to_string(index));
-            }
-            output.values.push_back(*value);
-        }
+        output.values.push_back(*value);
     }
     return Result::success();
 }

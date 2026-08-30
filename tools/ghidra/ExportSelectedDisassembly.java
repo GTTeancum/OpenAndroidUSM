@@ -17,7 +17,8 @@ import java.util.List;
 
 public class ExportSelectedDisassembly extends GhidraScript {
     private static String safeFileName(String value) {
-        return value.replaceAll("[^A-Za-z0-9_.-]", "_");
+        String safe = value.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return safe.length() <= 96 ? safe : safe.substring(0, 96);
     }
 
     @Override

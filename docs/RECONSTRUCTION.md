@@ -558,15 +558,17 @@ not by assuming that the first two `SSource` records are input and output.
 The sampler at `SAnimation + 0x10` stores the input/output source indices at
 `+0x04`/`+0x08`; the portable loader resolves those indices before decoding
 the streams. `CColladaDatabase::getAnimationTrackEx` at `0x00418348` maps
-channel type 5 to a quaternion track, and `CQuaternionEx::getKeyBasedValue` at
-`0x0045182c` consumes four quaternion components per key. The Android BDAE
-compiler also has a compact form for rotations constrained to local Z: the
-output source contains one radian angle per timestamp instead of four scalar
-components. These streams are expanded to
-`{0, 0, sin(angle / 2), cos(angle / 2)}` while loading. Without that expansion,
-the scalar was normalized as quaternion X and produced the officer's stretched
-forearms. A level-one regression checks the three compact police limb tracks,
-their decoded quaternion values, and the corrected skinned-pose bounds.
+channel type 5 to `CQuaternionEx`, whose `getKeyBasedValue` at `0x0045182c`
+consumes four quaternion components per key. Channel type 9 is not a compact
+type-5 stream; it selects the distinct `CQuaternionAngleEx`. Its preserved
+`getKeyBasedValueEx` at `0x004190e0` linearly samples one angle, calls
+`quaternion::toAngleAxis` on the joint's existing rotation, and rebuilds the
+quaternion with `fromAngleAxis`; a degenerate axis falls back to positive Y.
+The portable loader and pose evaluator preserve that track type explicitly.
+Treating those police limb channels as rotations constrained to local Z kept
+the mesh bounded but left the officer's arms visibly dislocated. Level-one
+regressions now check the serialized scalar angles and vertices dominated by
+both forearm joints, in addition to the corrected skinned-pose bounds.
 
 Spider-Man's material directly selects `spiderman_red.tga` as its primary
 layer and the 32x32 `spiderman_rim.tga` sphere map as its secondary layer. Its

@@ -3617,14 +3617,57 @@ int main() {
         assert(leftForearm != copActor->animation.tracks().end());
         assert(rightCalf != copActor->animation.tracks().end());
         assert(rightForearm != copActor->animation.tracks().end());
-        assert(std::abs(leftForearm->values[2] - 0.441178F) < 0.00001F);
-        assert(std::abs(leftForearm->values[3] - 0.897420F) < 0.00001F);
-        assert(std::abs(rightCalf->values[2] - 0.240411F) < 0.00001F);
-        assert(std::abs(rightForearm->values[2] - 0.327971F) < 0.00001F);
+        assert(leftForearm->property ==
+               usm::assets::ColladaAnimationProperty::RotationAngle);
+        assert(rightCalf->property ==
+               usm::assets::ColladaAnimationProperty::RotationAngle);
+        assert(rightForearm->property ==
+               usm::assets::ColladaAnimationProperty::RotationAngle);
+        assert(leftForearm->componentCount == 1);
+        assert(std::abs(leftForearm->values[0] - 0.913822F) < 0.0001F);
+        assert(std::abs(rightCalf->values[0] - 0.485579F) < 0.0001F);
+        assert(std::abs(rightForearm->values[0] - 0.668310F) < 0.0001F);
         std::vector<usm::assets::ColladaGeometry> copPose;
         assert(usm::assets::evaluateColladaPose(
             copActor->mesh, copActor->animation, 0, copPose));
         assert(copPose.size() == 1);
+        const auto copJointVertex = [&](std::string_view nodeId) {
+            const auto& skin = copActor->mesh.skins().front();
+            std::size_t jointIndex = skin.jointNames.size();
+            for (std::size_t index = 0; index < skin.jointNames.size(); ++index) {
+                const auto* node =
+                    copActor->mesh.findSceneNodeByScopeId(skin.jointNames[index]);
+                if (node != nullptr && node->id == nodeId) {
+                    jointIndex = index;
+                    break;
+                }
+            }
+            assert(jointIndex < skin.jointNames.size());
+            std::size_t bestVertex = 0;
+            float bestWeight = -1.0F;
+            for (std::size_t vertex = 0;
+                 vertex < skin.vertexInfluences.size(); ++vertex) {
+                for (const auto& influence : skin.vertexInfluences[vertex]) {
+                    if (influence.jointIndex == jointIndex &&
+                        influence.weight > bestWeight) {
+                        bestWeight = influence.weight;
+                        bestVertex = vertex;
+                    }
+                }
+            }
+            assert(bestWeight > 0.8F);
+            return copPose.front().vertices[bestVertex].position;
+        };
+        const auto leftForearmPoint =
+            copJointVertex("Bip01_L_Forearm-node");
+        const auto rightForearmPoint =
+            copJointVertex("Bip01_R_Forearm-node");
+        assert(std::abs(leftForearmPoint.x - 15593.4F) < 0.1F);
+        assert(std::abs(leftForearmPoint.y + 9831.05F) < 0.1F);
+        assert(std::abs(leftForearmPoint.z - 144.155F) < 0.1F);
+        assert(std::abs(rightForearmPoint.x - 15642.5F) < 0.1F);
+        assert(std::abs(rightForearmPoint.y + 9807.28F) < 0.1F);
+        assert(std::abs(rightForearmPoint.z - 141.827F) < 0.1F);
         assert(std::abs(copPose.front().bounds.minimum.z - 36.6302F) < 0.01F);
         assert(std::abs(copPose.front().bounds.maximum.x - 15654.8F) < 0.1F);
         std::vector<usm::assets::ColladaGeometry> spiderStartPose;
