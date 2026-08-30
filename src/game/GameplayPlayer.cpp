@@ -69,11 +69,24 @@ const assets::ColladaAnimationClip* stateClip(
         static_cast<std::size_t>(state->primaryAnimationId)];
 }
 
+const assets::ColladaAnimationClip* clipById(
+    const assets::ColladaAnimationFile* animationBank,
+    std::int32_t animationId) noexcept {
+    if (animationBank == nullptr || animationId < 0 ||
+        static_cast<std::size_t>(animationId) >=
+            animationBank->clips().size()) {
+        return nullptr;
+    }
+    return &animationBank->clips()[static_cast<std::size_t>(animationId)];
+}
+
 } // namespace
 
 Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
                                   const LevelCollision* collision,
-                                  const PlayerStateConfigDatabase* states) {
+                                  const PlayerStateConfigDatabase* states,
+                                  std::span<const LevelWebGrabPointAsset>
+                                      webGrabPoints) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
         asset.animationBank.findClip("run") == nullptr ||
         asset.animationBank.findClip("idle_to_punch_right") == nullptr ||
@@ -105,9 +118,18 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     jumpFallState_ = nullptr;
     sustainedFallState_ = nullptr;
     jumpLandState_ = nullptr;
+    swingThrowState_ = nullptr;
+    swingHangState_ = nullptr;
+    swingIdleState_ = nullptr;
     activeLocomotionState_ = nullptr;
     locomotionState_ = LocomotionState::Grounded;
     verticalVelocityCentimetersPerSecond_ = 0.0F;
+    swingReleaseVelocity_ = {};
+    webGrabPointRuntime_.bind(webGrabPoints, collision);
+    webSwingRuntime_ = {};
+    selectedWebGrabPoint_ = nullptr;
+    swingUsesLeftHand_ = false;
+    webReleaseRequested_ = false;
     attackState_ = AttackState::None;
     punchImpactPending_ = false;
     punchImpactEmitted_ = false;
@@ -120,12 +142,27 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
         jumpFallState_ = states->findState("k_state_jump_fall");
         sustainedFallState_ = states->findState("k_state_jump_fall_idle");
         jumpLandState_ = states->findState("k_state_jump_land");
+        swingThrowState_ = states->findState("k_state_swing_web_throw");
+        swingHangState_ = states->findState("k_state_swing_hang");
+        swingIdleState_ = states->findState("k_state_swing_idle");
         if (stateClip(animationBank_, jumpStartState_) == nullptr ||
             stateClip(animationBank_, jumpFallState_) == nullptr ||
             stateClip(animationBank_, sustainedFallState_) == nullptr ||
             stateClip(animationBank_, jumpLandState_) == nullptr) {
             return Result::failure(
                 "Player jump states have invalid animation IDs");
+        }
+        if (!webGrabPoints.empty() &&
+            (swingThrowState_ == nullptr || swingHangState_ == nullptr ||
+             swingIdleState_ == nullptr ||
+             clipById(animationBank_, 98) == nullptr ||
+             clipById(animationBank_, 99) == nullptr ||
+             clipById(animationBank_, 168) == nullptr ||
+             clipById(animationBank_, 169) == nullptr ||
+             clipById(animationBank_, 170) == nullptr ||
+             clipById(animationBank_, 173) == nullptr)) {
+            return Result::failure(
+                "Player swing states have invalid animation IDs");
         }
         const PlayerStateDefinition* punchState =
             states->findState("k_state_idle_to_punch_right");
@@ -177,6 +214,61 @@ bool GameplayPlayer::requestJump() noexcept {
     return true;
 }
 
+bool GameplayPlayer::requestWeb() noexcept {
+    if (!airborne() || locomotionState_ == LocomotionState::WebThrow ||
+        locomotionState_ == LocomotionState::SwingHang ||
+        locomotionState_ == LocomotionState::SwingRelease || dead() ||
+        swingThrowState_ == nullptr) {
+        return false;
+    }
+    assets::Vector3 visualPosition = position_;
+    visualPosition.z = animatedFootHeight();
+    selectedWebGrabPoint_ =
+        webGrabPointRuntime_.search(visualPosition, facing_);
+    if (selectedWebGrabPoint_ == nullptr) {
+        return false;
+    }
+    const assets::Vector3 toPoint{
+        selectedWebGrabPoint_->position.x - visualPosition.x,
+        selectedWebGrabPoint_->position.y - visualPosition.y,
+        selectedWebGrabPoint_->position.z - visualPosition.z,
+    };
+    // TryGrabPoint (0x00344990) selects hand 1 when
+    // dot(cross(toPoint, globalUp), pointDirection) is negative.
+    const float side =
+        toPoint.y * selectedWebGrabPoint_->direction.x -
+        toPoint.x * selectedWebGrabPoint_->direction.y;
+    swingUsesLeftHand_ = side < 0.0F;
+    position_ = visualPosition;
+    renderPosition_ = visualPosition;
+    jumpAnchorHeight_ = visualPosition.z;
+    activeLocomotionState_ = swingThrowState_;
+    locomotionState_ = LocomotionState::WebThrow;
+    webReleaseRequested_ = false;
+    const assets::ColladaAnimationClip* clip =
+        clipById(animationBank_, swingUsesLeftHand_ ? 98 : 99);
+    if (clip == nullptr) {
+        selectedWebGrabPoint_ = nullptr;
+        return false;
+    }
+    setAnimation(clip->name);
+    queueEnteredState(swingThrowState_->name);
+    updateWorldTransform(facing_);
+    return true;
+}
+
+bool GameplayPlayer::releaseWeb() noexcept {
+    if (locomotionState_ == LocomotionState::WebThrow) {
+        webReleaseRequested_ = true;
+        return true;
+    }
+    if (locomotionState_ != LocomotionState::SwingHang) {
+        return false;
+    }
+    enterSwingRelease();
+    return true;
+}
+
 bool GameplayPlayer::applyDamage(float damage) noexcept {
     if (damage <= 0.0F || dead()) {
         return false;
@@ -218,6 +310,12 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
             attackState_ = AttackState::None;
             setAnimation("idle_stand");
         }
+        return;
+    }
+    if (locomotionState_ == LocomotionState::WebThrow ||
+        locomotionState_ == LocomotionState::SwingHang ||
+        locomotionState_ == LocomotionState::SwingRelease) {
+        updateWebTraversal(input, camera, elapsedMilliseconds);
         return;
     }
     if (locomotionState_ != LocomotionState::Grounded) {
@@ -267,6 +365,7 @@ void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
     switch (state) {
     case LocomotionState::Grounded:
         activeLocomotionState_ = nullptr;
+        selectedWebGrabPoint_ = nullptr;
         verticalVelocityCentimetersPerSecond_ = 0.0F;
         renderPosition_ = position_;
         setAnimation("idle_stand");
@@ -287,6 +386,10 @@ void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
         activeLocomotionState_ = jumpLandState_;
         verticalVelocityCentimetersPerSecond_ = 0.0F;
         renderPosition_ = position_;
+        break;
+    case LocomotionState::WebThrow:
+    case LocomotionState::SwingHang:
+    case LocomotionState::SwingRelease:
         break;
     }
     if (activeLocomotionState_ != nullptr) {
@@ -326,6 +429,187 @@ void GameplayPlayer::updateAirHorizontalMotion(
     renderPosition_.x = position_.x;
     renderPosition_.y = position_.y;
     facing_ = movement;
+}
+
+void GameplayPlayer::enterSwingHang() noexcept {
+    if (selectedWebGrabPoint_ == nullptr || swingHangState_ == nullptr) {
+        enterLocomotionState(LocomotionState::SustainedFall);
+        return;
+    }
+    const assets::Vector3 incomingVelocity{
+        facing_.x * kMaximumRunSpeedCentimetersPerSecond,
+        facing_.y * kMaximumRunSpeedCentimetersPerSecond, 0.0F,
+    };
+    if (!webSwingRuntime_.start(*selectedWebGrabPoint_, position_,
+                                incomingVelocity)) {
+        selectedWebGrabPoint_ = nullptr;
+        enterLocomotionState(LocomotionState::SustainedFall);
+        return;
+    }
+    position_ = webSwingRuntime_.position();
+    renderPosition_ = position_;
+    activeLocomotionState_ = swingHangState_;
+    locomotionState_ = LocomotionState::SwingHang;
+    const assets::ColladaAnimationClip* clip =
+        clipById(animationBank_, swingUsesLeftHand_ ? 168 : 169);
+    if (clip != nullptr) {
+        setAnimation(clip->name);
+    }
+    queueEnteredState(swingHangState_->name);
+    updateWorldTransform(facing_);
+    if (webReleaseRequested_) {
+        enterSwingRelease();
+    }
+}
+
+void GameplayPlayer::enterSwingRelease() noexcept {
+    if (locomotionState_ != LocomotionState::SwingHang ||
+        swingIdleState_ == nullptr) {
+        return;
+    }
+    const WebSwingRelease released = webSwingRuntime_.release();
+    swingReleaseVelocity_ = released.velocityCentimetersPerSecond;
+    activeLocomotionState_ = swingIdleState_;
+    locomotionState_ = LocomotionState::SwingRelease;
+    const assets::ColladaAnimationClip* clip =
+        clipById(animationBank_, swingUsesLeftHand_ ? 170 : 173);
+    if (clip != nullptr) {
+        setAnimation(clip->name);
+    }
+    queueEnteredState(swingIdleState_->name);
+    webReleaseRequested_ = false;
+}
+
+void GameplayPlayer::updateWebTraversal(
+    const PlayerMotionInput& input, const CameraPose& camera,
+    std::uint32_t elapsedMilliseconds) noexcept {
+    if (locomotionState_ == LocomotionState::WebThrow) {
+        const assets::ColladaAnimationClip* clip =
+            animationBank_ == nullptr
+                ? nullptr
+                : animationBank_->findClip(activeAnimation_);
+        if (clip == nullptr) {
+            selectedWebGrabPoint_ = nullptr;
+            enterLocomotionState(LocomotionState::SustainedFall);
+            return;
+        }
+        const std::uint32_t duration = clip->durationMilliseconds();
+        const std::uint32_t current = animationTimeMilliseconds();
+        const std::uint32_t step = std::min(
+            elapsedMilliseconds, duration > current ? duration - current : 0U);
+        animationTimeMilliseconds_ += step;
+        if (animationTimeMilliseconds_ < duration) {
+            return;
+        }
+        const std::uint32_t carry = elapsedMilliseconds - step;
+        enterSwingHang();
+        if (locomotionState_ == LocomotionState::SwingHang && carry > 0) {
+            webSwingRuntime_.update(carry);
+            position_ = webSwingRuntime_.position();
+            renderPosition_ = position_;
+            updateWorldTransform(facing_);
+        }
+        return;
+    }
+
+    if (locomotionState_ == LocomotionState::SwingHang) {
+        if (webReleaseRequested_) {
+            enterSwingRelease();
+            if (locomotionState_ != LocomotionState::SwingHang) {
+                updateWebTraversal(input, camera, elapsedMilliseconds);
+            }
+            return;
+        }
+        webSwingRuntime_.update(elapsedMilliseconds);
+        position_ = webSwingRuntime_.position();
+        renderPosition_ = position_;
+        const assets::Vector3 velocity =
+            webSwingRuntime_.velocityCentimetersPerSecond();
+        const float horizontalLength =
+            std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+        if (horizontalLength > std::numeric_limits<float>::epsilon()) {
+            facing_ = {velocity.x / horizontalLength,
+                       velocity.y / horizontalLength, 0.0F};
+        }
+        const assets::ColladaAnimationClip* clip =
+            animationBank_ == nullptr
+                ? nullptr
+                : animationBank_->findClip(activeAnimation_);
+        if (clip != nullptr && clip->durationMilliseconds() > 0) {
+            animationTimeMilliseconds_ =
+                (animationTimeMilliseconds_ + elapsedMilliseconds) %
+                clip->durationMilliseconds();
+        }
+        updateWorldTransform(facing_);
+        return;
+    }
+
+    if (locomotionState_ != LocomotionState::SwingRelease) {
+        return;
+    }
+    const float elapsedSeconds =
+        static_cast<float>(elapsedMilliseconds) / 1000.0F;
+    if (selectedWebGrabPoint_ != nullptr &&
+        !selectedWebGrabPoint_->cannotControl &&
+        !selectedWebGrabPoint_->hasTargetWaypoint) {
+        float inputMagnitude{};
+        assets::Vector3 movement;
+        if (calculateMovement(input, camera, facing_, movement,
+                              inputMagnitude)) {
+            constexpr float kReleaseSteeringAcceleration = 700.0F;
+            swingReleaseVelocity_.x += movement.x * inputMagnitude *
+                                       kReleaseSteeringAcceleration *
+                                       elapsedSeconds;
+            swingReleaseVelocity_.y += movement.y * inputMagnitude *
+                                       kReleaseSteeringAcceleration *
+                                       elapsedSeconds;
+        }
+    }
+    swingReleaseVelocity_.z +=
+        kSustainedFallSpeedCentimetersPerSecond * elapsedSeconds;
+    const float previousHeight = position_.z;
+    assets::Vector3 desired{
+        position_.x + swingReleaseVelocity_.x * elapsedSeconds,
+        position_.y + swingReleaseVelocity_.y * elapsedSeconds,
+        position_.z + swingReleaseVelocity_.z * elapsedSeconds,
+    };
+    if (collision_ != nullptr) {
+        collision_->resolveAirMotion(position_, desired, desired);
+    }
+    float landingHeight{};
+    const bool hasLanding = findLandingHeight(previousHeight, landingHeight);
+    if (hasLanding && swingReleaseVelocity_.z <= 0.0F &&
+        previousHeight >= landingHeight - 1.0F &&
+        desired.z <= landingHeight) {
+        position_ = {desired.x, desired.y, landingHeight};
+        renderPosition_ = position_;
+        jumpAnchorHeight_ = landingHeight;
+        selectedWebGrabPoint_ = nullptr;
+        enterLocomotionState(LocomotionState::JumpLand);
+        return;
+    }
+    position_ = desired;
+    renderPosition_ = position_;
+    const float horizontalLength = std::sqrt(
+        swingReleaseVelocity_.x * swingReleaseVelocity_.x +
+        swingReleaseVelocity_.y * swingReleaseVelocity_.y);
+    if (horizontalLength > std::numeric_limits<float>::epsilon()) {
+        facing_ = {swingReleaseVelocity_.x / horizontalLength,
+                   swingReleaseVelocity_.y / horizontalLength, 0.0F};
+    }
+    animationTimeMilliseconds_ += elapsedMilliseconds;
+    const assets::ColladaAnimationClip* clip =
+        animationBank_ == nullptr
+            ? nullptr
+            : animationBank_->findClip(activeAnimation_);
+    if (clip != nullptr && animationTimeMilliseconds_ >=
+                               clip->durationMilliseconds() &&
+        swingReleaseVelocity_.z <= 0.0F) {
+        selectedWebGrabPoint_ = nullptr;
+        enterLocomotionState(LocomotionState::SustainedFall);
+        return;
+    }
+    updateWorldTransform(facing_);
 }
 
 float GameplayPlayer::currentRootHeight() const noexcept {
@@ -485,7 +769,10 @@ std::uint32_t GameplayPlayer::animationTimeMilliseconds() const noexcept {
 bool GameplayPlayer::airborne() const noexcept {
     return locomotionState_ == LocomotionState::JumpStart ||
            locomotionState_ == LocomotionState::JumpFall ||
-           locomotionState_ == LocomotionState::SustainedFall;
+           locomotionState_ == LocomotionState::SustainedFall ||
+           locomotionState_ == LocomotionState::WebThrow ||
+           locomotionState_ == LocomotionState::SwingHang ||
+           locomotionState_ == LocomotionState::SwingRelease;
 }
 
 std::uint16_t GameplayPlayer::activeStateId() const noexcept {
@@ -499,6 +786,27 @@ float GameplayPlayer::animatedFootHeight() const noexcept {
         return jumpAnchorHeight_ + currentRootHeight();
     }
     return position_.z;
+}
+
+bool GameplayPlayer::webLineActive() const noexcept {
+    return selectedWebGrabPoint_ != nullptr &&
+           (locomotionState_ == LocomotionState::WebThrow ||
+            locomotionState_ == LocomotionState::SwingHang);
+}
+
+assets::Vector3 GameplayPlayer::webLineAnchor() const noexcept {
+    return selectedWebGrabPoint_ == nullptr
+               ? assets::Vector3{}
+               : selectedWebGrabPoint_->position;
+}
+
+assets::Vector3 GameplayPlayer::webLineAttachPosition() const noexcept {
+    assets::Vector3 attach = renderPosition_;
+    // The original CobWeb endpoint follows the selected animated hand node.
+    // The portable gameplay API stays skeleton-independent and exposes a
+    // shoulder-height root endpoint for the renderer's line pass.
+    attach.z += 100.0F;
+    return attach;
 }
 
 void GameplayPlayer::setAnimation(std::string_view animation) noexcept {

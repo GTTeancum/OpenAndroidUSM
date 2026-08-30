@@ -434,6 +434,27 @@ available as the closest line-of-sight point. Deterministic tests cover
 facing, current-point rejection, nearest selection, the post-selection
 range rule, and triangle occlusion.
 
+The native player now follows the recovered traversal graph: state 17
+`k_state_swing_web_throw` chooses `jump_to_throw_web_left/right`, state 18
+`k_state_swing_hang` chooses `swing_hang_fwd_left/right`, and state 19
+`k_state_swing_idle` chooses the matching release family. This distinction is
+important because animation IDs 138–140 belong to slider-fall motion 25, not
+the swing states. Circle press invokes the recovered grab search while
+airborne; release advances to motion 28. SoundConfigs 9, 12, and 13 provide
+the three web-throw variants, swing-start cue, and swing-end cue through the
+predecoded XAudio2 player-state path.
+
+`WebSwingRuntime` projects Spider-Man into the vertical plane supplied by the
+grab point's linked direction, constrains him to the authored rope length,
+and integrates the pendulum with the 120-based acceleration recovered from
+`Player::GetPalstance` at `0x00341ff8`. Release uses the authored `OutSpeed`
+times the recovered 1000 ms scale and preserves motion 28's doubled vertical
+component. The gameplay API exposes only world-space strand endpoints; a
+depth-tested, alpha-blended D3D11 line pass reconstructs the original
+`CobWeb`/`CTexLineSceneNode` visual without leaking Direct3D types into game
+logic. Core regressions cover throw, hang, release, rope constraint, sound
+states, and ballistics, while WARP compares a captured web-strand frame.
+
 ## BTEX/PVRTC textures
 
 Level and entity textures use an eight-byte `BTEXpvr` wrapper followed by a

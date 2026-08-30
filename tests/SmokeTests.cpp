@@ -23,6 +23,7 @@
 #include "game/PlayerStateConfig.hpp"
 #include "game/LevelTriggerRuntime.hpp"
 #include "game/WebGrabPointRuntime.hpp"
+#include "game/WebSwingRuntime.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -159,6 +160,39 @@ int main() {
     assert(webGrabSelection.search({400.0F, 500.0F, 0.0F}, selectionFacing) ==
            nullptr);
 
+    usm::game::LevelWebGrabPointAsset swingPoint;
+    swingPoint.objectId = 377;
+    swingPoint.position = {0.0F, 0.0F, 600.0F};
+    swingPoint.direction = {1.0F, 0.0F, 0.0F};
+    swingPoint.length = 600.0F;
+    swingPoint.exitSpeed = 0.45F;
+    usm::game::WebSwingRuntime webSwing;
+    assert(webSwing.start(swingPoint, {-300.0F, 0.0F, 80.0F},
+                          {500.0F, 0.0F, 0.0F}));
+    assert(webSwing.active());
+    const auto swingStartPosition = webSwing.position();
+    const auto ropeLength = [&swingPoint](const usm::assets::Vector3& value) {
+        const float x = value.x - swingPoint.position.x;
+        const float y = value.y - swingPoint.position.y;
+        const float z = value.z - swingPoint.position.z;
+        return std::sqrt(x * x + y * y + z * z);
+    };
+    assert(std::abs(ropeLength(swingStartPosition) - 600.0F) < 0.01F);
+    webSwing.update(100);
+    assert(std::abs(ropeLength(webSwing.position()) - 600.0F) < 0.01F);
+    assert(std::abs(webSwing.position().y) < 0.001F);
+    assert(std::abs(webSwing.position().x - swingStartPosition.x) > 0.01F);
+    const auto swingRelease = webSwing.release();
+    assert(!webSwing.active());
+    assert(!swingRelease.hasTargetWaypoint);
+    const float horizontalReleaseSpeed = std::sqrt(
+        swingRelease.velocityCentimetersPerSecond.x *
+            swingRelease.velocityCentimetersPerSecond.x +
+        swingRelease.velocityCentimetersPerSecond.y *
+            swingRelease.velocityCentimetersPerSecond.y);
+    assert(horizontalReleaseSpeed <= 450.0F);
+    assert(std::abs(swingRelease.velocityCentimetersPerSecond.z) <= 900.0F);
+
     router.beginFrame();
     router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, true},
                  InputContext::UpgradeMenu);
@@ -228,6 +262,30 @@ int main() {
         assert(jumpLandState.motionType == 23);
         assert(jumpLandState.primaryAnimationId == 40);
         assert(jumpLandState.nextStateId == 0);
+        const auto& swingThrowState = playerStateConfigs.states()[17];
+        const auto& swingHangState = playerStateConfigs.states()[18];
+        const auto& swingIdleState = playerStateConfigs.states()[19];
+        assert(swingThrowState.name == "k_state_swing_web_throw");
+        assert(swingThrowState.stateClass == 1);
+        assert(swingThrowState.motionType == 26);
+        assert(swingThrowState.primaryAnimationId == -1);
+        assert(swingThrowState.animationIds ==
+               (std::vector<std::int16_t>{98, 99}));
+        assert(swingThrowState.nextStateId == 18);
+        assert(swingThrowState.enterSoundConfigIds ==
+               std::vector<std::int16_t>{9});
+        assert(swingHangState.name == "k_state_swing_hang");
+        assert(swingHangState.motionType == 27);
+        assert(swingHangState.primaryAnimationId == -1);
+        assert(swingHangState.nextStateId == -2);
+        assert(swingHangState.enterSoundConfigIds ==
+               std::vector<std::int16_t>{12});
+        assert(swingIdleState.name == "k_state_swing_idle");
+        assert(swingIdleState.motionType == 28);
+        assert(swingIdleState.primaryAnimationId == -1);
+        assert(swingIdleState.nextStateId == -2);
+        assert(swingIdleState.enterSoundConfigIds ==
+               std::vector<std::int16_t>{13});
         assert(jumpStartState.enterSoundConfigIds ==
                std::vector<std::int16_t>{8});
         assert(jumpLandState.enterSoundConfigIds ==
@@ -242,6 +300,21 @@ int main() {
         assert(jumpLand->name == "k_mc_sfx_land");
         assert(jumpLand->voxSoundIds ==
                std::vector<std::int16_t>{38});
+        const auto* webThrow = playerStateConfigs.findSoundConfig(9);
+        const auto* swingStart = playerStateConfigs.findSoundConfig(12);
+        const auto* swingEnd = playerStateConfigs.findSoundConfig(13);
+        assert(webThrow != nullptr);
+        assert(webThrow->name == "k_mc_sfx_web_throw");
+        assert(webThrow->voxSoundIds ==
+               (std::vector<std::int16_t>{67, 68, 69}));
+        assert(swingStart != nullptr);
+        assert(swingStart->name == "k_mc_sfx_swing_start");
+        assert(swingStart->voxSoundIds ==
+               std::vector<std::int16_t>{70});
+        assert(swingEnd != nullptr);
+        assert(swingEnd->name == "k_mc_sfx_swing_end");
+        assert(swingEnd->voxSoundIds ==
+               std::vector<std::int16_t>{71});
         const auto* punchState = playerStateConfigs.findState(
             "k_state_idle_to_punch_right");
         assert(punchState != nullptr);
@@ -284,12 +357,14 @@ int main() {
         assert(catalogAudio.frameCount() > 0);
 
         usm::audio::PlayerStateSoundBank playerSounds;
-        constexpr std::array<std::string_view, 4> gameplaySoundStates{
+        constexpr std::array<std::string_view, 7> gameplaySoundStates{
             "k_state_idle_to_punch_right", "k_state_hurt_light",
-            "k_state_jump_start", "k_state_jump_land"};
+            "k_state_jump_start", "k_state_jump_land",
+            "k_state_swing_web_throw", "k_state_swing_hang",
+            "k_state_swing_idle"};
         assert(playerSounds.preload(playerStateConfigs, voxSounds,
                                     soundCatalog, gameplaySoundStates));
-        assert(playerSounds.decodedVariantCount() == 14);
+        assert(playerSounds.decodedVariantCount() == 19);
         std::size_t playerSoundPlayCount = 0;
         const auto countPlayerSound =
             [&playerSoundPlayCount](const usm::audio::PcmAudio& clip,
@@ -309,7 +384,13 @@ int main() {
                                                countPlayerSound));
         assert(playerSounds.dispatchStateEnter("k_state_jump_land",
                                                countPlayerSound));
-        assert(playerSoundPlayCount == 5);
+        assert(playerSounds.dispatchStateEnter("k_state_swing_web_throw",
+                                               countPlayerSound));
+        assert(playerSounds.dispatchStateEnter("k_state_swing_hang",
+                                               countPlayerSound));
+        assert(playerSounds.dispatchStateEnter("k_state_swing_idle",
+                                               countPlayerSound));
+        assert(playerSoundPlayCount == 8);
 
         usm::filesystem::GbmpArchive archive;
         assert(archive.open(configArchive));
@@ -527,6 +608,37 @@ int main() {
         assert(bootstrap.player().textures.size() == 2);
         assert(bootstrap.player().animationBank.tracks().size() == 46);
         assert(bootstrap.player().animationBank.clips().size() == 242);
+        const auto& swingThrowLeft =
+            bootstrap.player().animationBank.clips()[98];
+        const auto& swingThrowRight =
+            bootstrap.player().animationBank.clips()[99];
+        const auto& swingHangLeft =
+            bootstrap.player().animationBank.clips()[168];
+        const auto& swingHangRight =
+            bootstrap.player().animationBank.clips()[169];
+        assert(swingThrowLeft.name == "jump_to_throw_web_left");
+        assert(swingThrowLeft.durationMilliseconds() == 134);
+        assert(swingThrowRight.name == "jump_to_throw_web_right");
+        assert(swingThrowRight.durationMilliseconds() == 267);
+        assert(swingHangLeft.name == "swing_hang_fwd_left");
+        assert(swingHangLeft.durationMilliseconds() == 733);
+        assert(swingHangRight.name == "swing_hang_fwd_right");
+        assert(swingHangRight.durationMilliseconds() == 734);
+        constexpr std::array<std::string_view, 6> releaseClipNames{
+            "swing_hang_left_to_swing_idle_2",
+            "swing_hang_left_to_swing_idle_3",
+            "swing_hang_left_to_swing_idle_4",
+            "swing_hang_right_to_swing_idle_2",
+            "swing_hang_right_to_swing_idle_3",
+            "swing_hang_right_to_swing_idle_4",
+        };
+        for (std::size_t index = 0; index < releaseClipNames.size(); ++index) {
+            const auto& clip =
+                bootstrap.player().animationBank.clips()[170 + index];
+            assert(clip.name == releaseClipNames[index]);
+            assert(clip.durationMilliseconds() >= 1066);
+            assert(clip.durationMilliseconds() <= 1067);
+        }
         assert(bootstrap.player().animationBank.tracks()[1].property ==
                usm::assets::ColladaAnimationProperty::TranslationZ);
         assert(bootstrap.player().animationBank.tracks()[40].property ==
@@ -1082,6 +1194,52 @@ int main() {
         assert(jumpingPlayer.activeStateId() == 0);
         assert(jumpingPlayer.activeAnimation() == "idle_stand");
         assert(jumpingPlayer.requestJump());
+
+        usm::game::GameplayPlayer swingingPlayer;
+        usm::game::LevelWebGrabPointAsset testGrabPoint;
+        testGrabPoint.objectId = 9001;
+        const auto initialFacing = jumpingPlayer.facing();
+        testGrabPoint.position = {
+            bootstrap.player().position.x + initialFacing.x * 400.0F,
+            bootstrap.player().position.y + initialFacing.y * 400.0F,
+            bootstrap.player().position.z + 500.0F,
+        };
+        testGrabPoint.direction = {initialFacing.y, -initialFacing.x, 0.0F};
+        testGrabPoint.length = 600.0F;
+        testGrabPoint.visibleLength = 2000.0F;
+        testGrabPoint.exitSpeed = 0.45F;
+        const std::array<usm::game::LevelWebGrabPointAsset, 1>
+            testGrabPoints{testGrabPoint};
+        assert(swingingPlayer.initialize(bootstrap.player(), nullptr,
+                                         &playerStateConfigs,
+                                         testGrabPoints));
+        assert(swingingPlayer.requestJump());
+        assert(swingingPlayer.consumeEnteredState() ==
+               "k_state_jump_start");
+        swingingPlayer.update({}, gameplayCameraPose, 150);
+        assert(swingingPlayer.requestWeb());
+        assert(swingingPlayer.activeStateId() == 17);
+        assert(swingingPlayer.activeAnimation() ==
+               "jump_to_throw_web_right");
+        assert(swingingPlayer.webLineActive());
+        assert(swingingPlayer.consumeEnteredState() ==
+               "k_state_swing_web_throw");
+        swingingPlayer.update({}, gameplayCameraPose, 267);
+        assert(swingingPlayer.activeStateId() == 18);
+        assert(swingingPlayer.activeAnimation() ==
+               "swing_hang_fwd_right");
+        assert(swingingPlayer.webLineActive());
+        assert(swingingPlayer.consumeEnteredState() ==
+               "k_state_swing_hang");
+        assert(swingingPlayer.releaseWeb());
+        assert(swingingPlayer.activeStateId() == 19);
+        assert(swingingPlayer.activeAnimation() ==
+               "swing_hang_right_to_swing_idle_2");
+        assert(!swingingPlayer.webLineActive());
+        assert(swingingPlayer.consumeEnteredState() ==
+               "k_state_swing_idle");
+        swingingPlayer.update({}, gameplayCameraPose, 100);
+        assert(swingingPlayer.airborne());
 
         auto makeCameraArea = [](std::int32_t id, float minimumX,
                                  float maximumX) {

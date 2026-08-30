@@ -104,6 +104,19 @@ float4 main(PixelInput input) : SV_TARGET {
 }
 )hlsl";
 
+constexpr std::string_view kColorPixelShader = R"hlsl(
+struct PixelInput {
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 textureCoordinate : TEXCOORD0;
+    float4 color : COLOR0;
+};
+
+float4 main(PixelInput input) : SV_TARGET {
+    return input.color;
+}
+)hlsl";
+
 constexpr std::string_view kAlphaTestPixelShader = R"hlsl(
 Texture2D DiffuseTexture : register(t0);
 SamplerState DiffuseSampler : register(s0);
@@ -450,6 +463,18 @@ Result D3D11Renderer::createPipeline() {
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreatePixelShader", callResult);
     }
+    ComPtr<ID3DBlob> colorPixelBytecode;
+    result = compileShader(kColorPixelShader, "ps_5_0", colorPixelBytecode);
+    if (!result) {
+        return result;
+    }
+    callResult = device_->CreatePixelShader(
+        colorPixelBytecode->GetBufferPointer(),
+        colorPixelBytecode->GetBufferSize(), nullptr, &colorPixelShader_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreatePixelShader(color)",
+                              callResult);
+    }
     ComPtr<ID3DBlob> alphaTestPixelBytecode;
     result = compileShader(kAlphaTestPixelShader, "ps_5_0",
                            alphaTestPixelBytecode);
@@ -542,6 +567,17 @@ Result D3D11Renderer::createPipeline() {
                                        &viewRotationBuffer_);
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreateBuffer(view rotation)",
+                              callResult);
+    }
+    D3D11_BUFFER_DESC webLineDescription{};
+    webLineDescription.ByteWidth = 2U * sizeof(GpuVertex);
+    webLineDescription.Usage = D3D11_USAGE_DYNAMIC;
+    webLineDescription.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    webLineDescription.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    callResult = device_->CreateBuffer(&webLineDescription, nullptr,
+                                       &webLineVertexBuffer_);
+    if (FAILED(callResult)) {
+        return hresultFailure("ID3D11Device::CreateBuffer(web line)",
                               callResult);
     }
 
@@ -858,6 +894,49 @@ Result D3D11Renderer::updateLevelOnePlayer(
     return !result ? Result::failure("Could not update player clip " +
                                      clip.name + ": " + result.message())
                    : Result::success();
+}
+
+Result D3D11Renderer::updateWebLine(
+    bool visible, const assets::Vector3& anchor,
+    const assets::Vector3& attachPosition) {
+    webLineVertexCount_ = 0;
+    if (!visible) {
+        return Result::success();
+    }
+    const auto finite = [](const assets::Vector3& value) {
+        return std::isfinite(value.x) && std::isfinite(value.y) &&
+               std::isfinite(value.z);
+    };
+    const float differenceX = anchor.x - attachPosition.x;
+    const float differenceY = anchor.y - attachPosition.y;
+    const float differenceZ = anchor.z - attachPosition.z;
+    if (!context_ || !webLineVertexBuffer_ || !finite(anchor) ||
+        !finite(attachPosition) ||
+        differenceX * differenceX + differenceY * differenceY +
+                differenceZ * differenceZ <=
+            std::numeric_limits<float>::epsilon()) {
+        return Result::failure("Web line endpoints are invalid");
+    }
+    // CobWeb/CTexLineSceneNode uses a bright translucent strand. The native
+    // line retains scene depth and alpha while gameplay remains DX-agnostic.
+    constexpr std::uint32_t webColor = 0xd9ffffffU;
+    const std::array<GpuVertex, 2> vertices{{
+        {{attachPosition.x, attachPosition.y, attachPosition.z},
+         {0.0F, 0.0F, 1.0F}, {}, webColor},
+        {{anchor.x, anchor.y, anchor.z},
+         {0.0F, 0.0F, 1.0F}, {}, webColor},
+    }};
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    const HRESULT mapResult = context_->Map(
+        webLineVertexBuffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (FAILED(mapResult)) {
+        return hresultFailure("ID3D11DeviceContext::Map(web line)",
+                              mapResult);
+    }
+    std::memcpy(mapped.pData, vertices.data(), sizeof(vertices));
+    context_->Unmap(webLineVertexBuffer_.Get(), 0);
+    webLineVertexCount_ = static_cast<std::uint32_t>(vertices.size());
+    return Result::success();
 }
 
 Result D3D11Renderer::updateDynamicMesh(
@@ -1438,6 +1517,30 @@ void D3D11Renderer::renderFrame() {
                                       batch.baseVertex);
             }
         }
+    }
+
+    if (webLineVertexCount_ != 0 && webLineVertexBuffer_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                    &worldViewProjection_, 0, 0);
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(0, 1,
+                                     webLineVertexBuffer_.GetAddressOf(),
+                                     &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        const std::array<ID3D11Buffer*, 2> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
+        context_->PSSetShader(colorPixelShader_.Get(), nullptr, 0);
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
+        context_->RSSetState(rasterizerState_.Get());
+        context_->Draw(webLineVertexCount_, 0);
     }
 
     if (hudVertexCount_ != 0 && hudVertexBuffer_ && hudTexture_) {

@@ -287,6 +287,31 @@ int main() {
         }
         assert(jumpChangedPixels > 100);
 
+        usm::assets::Vector3 testWebAttach = jumpingPlayer.position();
+        testWebAttach.z += 100.0F;
+        usm::assets::Vector3 testWebAnchor = testWebAttach;
+        testWebAnchor.x += 100.0F;
+        testWebAnchor.z += 500.0F;
+        assert(gameRenderer.updateWebLine(true, testWebAnchor,
+                                          testWebAttach));
+        gameRenderer.renderFrame();
+        RgbaImage playerWebLineFrame;
+        assert(gameRenderer.readBackImage(playerWebLineFrame));
+        captureIfRequested(playerWebLineFrame, "gameplay-web-line.bmp");
+        std::size_t webLineChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < playerWebLineFrame.pixels.size(); component += 4) {
+            webLineChangedPixels +=
+                playerWebLineFrame.pixels[component] !=
+                    playerJumpFrame.pixels[component] ||
+                playerWebLineFrame.pixels[component + 1] !=
+                    playerJumpFrame.pixels[component + 1] ||
+                playerWebLineFrame.pixels[component + 2] !=
+                    playerJumpFrame.pixels[component + 2];
+        }
+        assert(webLineChangedPixels > 2);
+        assert(gameRenderer.updateWebLine(false));
+
         assert(gameplayPlayer.requestPunch());
         gameplayPlayer.update({},
                               gameplayCamera.sample(gameplayPlayer.position()),

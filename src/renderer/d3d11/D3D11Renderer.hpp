@@ -43,6 +43,9 @@ public:
     [[nodiscard]] Result updateLevelOneEnemies(
         const game::LevelOneBootstrap& levelOne,
         const game::LevelEnemyRuntime& enemies);
+    [[nodiscard]] Result updateWebLine(
+        bool visible, const assets::Vector3& anchor = {},
+        const assets::Vector3& attachPosition = {});
     [[nodiscard]] Result updatePlayerHud(const game::LevelHudAsset& hud,
                                          float currentHealthRatio,
                                          float delayedHealthRatio,
@@ -116,6 +119,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> colorPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> hudVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> hudPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
@@ -128,12 +132,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthReadState_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilState> depthDisabledState_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> hudVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> webLineVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
     std::vector<GpuMesh> gpuMeshes_;
     std::size_t environmentMeshCount_{};
     std::size_t enemyMeshStart_{};
     std::uint32_t hudVertexCount_{};
     std::uint32_t hudVertexCapacity_{};
+    std::uint32_t webLineVertexCount_{};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};

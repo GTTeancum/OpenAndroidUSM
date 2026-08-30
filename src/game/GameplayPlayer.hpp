@@ -5,11 +5,14 @@
 #include "game/CinematicCamera.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/PlayerStateConfig.hpp"
+#include "game/WebGrabPointRuntime.hpp"
+#include "game/WebSwingRuntime.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <span>
 
 namespace usm::game {
 
@@ -28,9 +31,13 @@ public:
     [[nodiscard]] Result initialize(const LevelPlayerAsset& asset,
                                     const LevelCollision* collision = nullptr,
                                     const PlayerStateConfigDatabase* states =
-                                        nullptr);
+                                        nullptr,
+                                    std::span<const LevelWebGrabPointAsset>
+                                        webGrabPoints = {});
     [[nodiscard]] bool requestPunch() noexcept;
     [[nodiscard]] bool requestJump() noexcept;
+    [[nodiscard]] bool requestWeb() noexcept;
+    [[nodiscard]] bool releaseWeb() noexcept;
     [[nodiscard]] bool applyDamage(float damage) noexcept;
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
@@ -57,6 +64,9 @@ public:
     [[nodiscard]] bool airborne() const noexcept;
     [[nodiscard]] std::uint16_t activeStateId() const noexcept;
     [[nodiscard]] float animatedFootHeight() const noexcept;
+    [[nodiscard]] bool webLineActive() const noexcept;
+    [[nodiscard]] assets::Vector3 webLineAnchor() const noexcept;
+    [[nodiscard]] assets::Vector3 webLineAttachPosition() const noexcept;
 
 private:
     enum class AttackState {
@@ -71,6 +81,9 @@ private:
         JumpFall,
         SustainedFall,
         JumpLand,
+        WebThrow,
+        SwingHang,
+        SwingRelease,
     };
 
     void setAnimation(std::string_view animation) noexcept;
@@ -81,6 +94,11 @@ private:
     void updateAirHorizontalMotion(const PlayerMotionInput& input,
                                    const CameraPose& camera,
                                    std::uint32_t elapsedMilliseconds) noexcept;
+    void updateWebTraversal(const PlayerMotionInput& input,
+                            const CameraPose& camera,
+                            std::uint32_t elapsedMilliseconds) noexcept;
+    void enterSwingHang() noexcept;
+    void enterSwingRelease() noexcept;
     [[nodiscard]] float currentRootHeight() const noexcept;
     [[nodiscard]] bool findLandingHeight(float referenceHeight,
                                          float& height) const noexcept;
@@ -100,9 +118,18 @@ private:
     const PlayerStateDefinition* jumpFallState_{};
     const PlayerStateDefinition* sustainedFallState_{};
     const PlayerStateDefinition* jumpLandState_{};
+    const PlayerStateDefinition* swingThrowState_{};
+    const PlayerStateDefinition* swingHangState_{};
+    const PlayerStateDefinition* swingIdleState_{};
     const PlayerStateDefinition* activeLocomotionState_{};
     LocomotionState locomotionState_{LocomotionState::Grounded};
     float verticalVelocityCentimetersPerSecond_{};
+    assets::Vector3 swingReleaseVelocity_;
+    WebGrabPointRuntime webGrabPointRuntime_;
+    WebSwingRuntime webSwingRuntime_;
+    const LevelWebGrabPointAsset* selectedWebGrabPoint_{};
+    bool swingUsesLeftHand_{};
+    bool webReleaseRequested_{};
     AttackState attackState_{AttackState::None};
     bool punchImpactPending_{};
     bool punchImpactEmitted_{};

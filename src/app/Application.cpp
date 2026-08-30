@@ -68,9 +68,11 @@ int Application::run(HINSTANCE instance) {
     if (!result) {
         return fail(result.message());
     }
-    constexpr std::array<std::string_view, 4> gameplaySoundStates{
+    constexpr std::array<std::string_view, 7> gameplaySoundStates{
         "k_state_idle_to_punch_right", "k_state_hurt_light",
-        "k_state_jump_start", "k_state_jump_land"};
+        "k_state_jump_start", "k_state_jump_land",
+        "k_state_swing_web_throw", "k_state_swing_hang",
+        "k_state_swing_idle"};
     result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
                                    soundCatalog_, gameplaySoundStates);
     if (!result) {
@@ -121,7 +123,8 @@ int Application::run(HINSTANCE instance) {
         return fail(result.message());
     }
     result = gameplayPlayer_.initialize(levelOne_.player(), &levelCollision_,
-                                        &playerStateConfigs_);
+                                        &playerStateConfigs_,
+                                        levelOne_.webGrabPoints());
     if (!result) {
         return fail(result.message());
     }
@@ -239,6 +242,12 @@ int Application::run(HINSTANCE instance) {
             }
             if (keyRouter_.state().jump.pressed) {
                 (void)gameplayPlayer_.requestJump();
+            }
+            if (keyRouter_.state().web.pressed) {
+                (void)gameplayPlayer_.requestWeb();
+            }
+            if (keyRouter_.state().web.released) {
+                (void)gameplayPlayer_.releaseWeb();
             }
             if (keyRouter_.state().punch.pressed &&
                 gameplayPlayer_.requestPunch()) {
@@ -382,6 +391,12 @@ int Application::run(HINSTANCE instance) {
                     levelOne_, *activeClip,
                     gameplayPlayer_.animationTimeMilliseconds(),
                     gameplayPlayer_.worldTransform());
+            }
+            if (result) {
+                result = renderer_.updateWebLine(
+                    gameplayPlayer_.webLineActive(),
+                    gameplayPlayer_.webLineAnchor(),
+                    gameplayPlayer_.webLineAttachPosition());
             }
             if (result) {
                 result = renderer_.updateLevelOneEnemies(levelOne_,
