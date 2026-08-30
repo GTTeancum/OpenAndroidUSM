@@ -84,6 +84,25 @@ void collectSceneNodes(const pugi::xml_node& parent,
             node.gameType = valueOf(userAttributes, "!GameType");
             node.meshFile =
                 normalizeResourcePath(valueOf(userAttributes, "MeshFile"));
+            node.animationFile = normalizeResourcePath(
+                valueOf(userAttributes, "AnimationFile"));
+            node.initialAnimation = valueOf(userAttributes, "@Anim");
+            node.hasCollision = findNamedAttribute(userAttributes,
+                                                   "HasCollision")
+                                    .attribute("value")
+                                    .as_bool(false);
+            node.initialCameraAreaId =
+                findNamedAttribute(userAttributes, "^Init^CameraArea")
+                    .attribute("value")
+                    .as_int(-1);
+            node.linkedCinematicId =
+                findNamedAttribute(userAttributes, "^Link^Cinematic")
+                    .attribute("value")
+                    .as_int(-1);
+            node.endGameCinematicId =
+                findNamedAttribute(userAttributes, "^EndGame^Cinematic")
+                    .attribute("value")
+                    .as_int(-1);
             node.parentId = findNamedAttribute(userAttributes, "#ParentID")
                                 .attribute("value")
                                 .as_int(-1);

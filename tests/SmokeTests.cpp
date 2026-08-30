@@ -229,6 +229,26 @@ int main() {
         assert(bootstrap.mainScene().nodes().size() == 154);
         assert(bootstrap.mainScene().findNode(288) != nullptr);
         assert(bootstrap.mainScene().findNode(288)->gameType == "SpiderMan");
+        assert(bootstrap.mainScene().findNode(288)->animationFile ==
+               "../entities/meshes_bin/spiderman_anim.bdae");
+        assert(bootstrap.mainScene().findNode(288)->initialAnimation ==
+               "kick_left_double_kick");
+        assert(bootstrap.mainScene().findNode(288)->hasCollision);
+        assert(bootstrap.mainScene().findNode(288)->initialCameraAreaId == 283);
+        assert(bootstrap.mainScene().findNode(288)->linkedCinematicId == 1265);
+        assert(bootstrap.mainScene().findNode(288)->endGameCinematicId == 1267);
+        assert(bootstrap.player().objectId == 288);
+        assert(bootstrap.player().sceneNodeName == "SpiderMan");
+        assert(bootstrap.player().initialAnimation ==
+               "kick_left_double_kick");
+        assert(bootstrap.player().initialCameraAreaId == 283);
+        assert(bootstrap.player().linkedCinematicId == 1265);
+        assert(bootstrap.player().endGameCinematicId == 1267);
+        assert(bootstrap.player().hasCollision);
+        assert(bootstrap.player().mesh.skins().size() == 1);
+        assert(bootstrap.player().textures.size() == 2);
+        assert(bootstrap.player().animationBank.tracks().size() == 46);
+        assert(bootstrap.player().animationBank.clips().size() == 242);
         assert(bootstrap.introRooms().size() == 5);
         assert(bootstrap.introRooms()[4].name == "Room5");
         assert(!bootstrap.introRooms()[4].geometry.geometries().empty());

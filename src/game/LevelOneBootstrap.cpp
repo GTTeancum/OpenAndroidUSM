@@ -99,6 +99,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     introRooms_.clear();
     introSky_ = {};
     introActors_.clear();
+    player_ = {};
     filesystem::GbmpArchive levelArchive;
     Result result = levelArchive.open(gameDataRoot / "levelnew_01.pack");
     if (!result) {
@@ -118,6 +119,59 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot) {
     result = mainScene_.load(resource);
     if (!result) {
         return result;
+    }
+
+    const auto playerNode = std::find_if(
+        mainScene_.nodes().begin(), mainScene_.nodes().end(),
+        [](const assets::IrrSceneNode& node) {
+            return node.gameType == "SpiderMan";
+        });
+    if (playerNode == mainScene_.nodes().end() ||
+        playerNode->meshFile.empty() || playerNode->animationFile.empty()) {
+        return Result::failure(
+            "Level 1 scene has no complete Spider-Man player node");
+    }
+    player_.objectId = playerNode->id;
+    player_.sceneNodeName = playerNode->name;
+    player_.initialAnimation = playerNode->initialAnimation;
+    player_.initialCameraAreaId = playerNode->initialCameraAreaId;
+    player_.linkedCinematicId = playerNode->linkedCinematicId;
+    player_.endGameCinematicId = playerNode->endGameCinematicId;
+    player_.hasCollision = playerNode->hasCollision;
+    player_.position = playerNode->position;
+    player_.rotation = playerNode->rotation;
+    player_.scale = playerNode->scale;
+    player_.worldTransform = playerNode->absoluteTransform;
+
+    result = entityArchive.read(normalizeArchivePath(playerNode->meshFile),
+                                resource);
+    if (!result) {
+        return Result::failure("Could not load player mesh: " +
+                               result.message());
+    }
+    result = player_.mesh.load(resource);
+    if (!result) {
+        return Result::failure("Could not parse player mesh: " +
+                               result.message());
+    }
+    result = loadTextures(entityArchive, nullptr, player_.mesh,
+                          player_.textures, player_.sceneNodeName);
+    if (!result) {
+        return result;
+    }
+    result = entityArchive.read(
+        normalizeArchivePath(playerNode->animationFile), resource);
+    if (!result) {
+        return Result::failure("Could not load player animation bank: " +
+                               result.message());
+    }
+    result = player_.animationBank.load(resource);
+    if (!result) {
+        return Result::failure("Could not parse player animation bank: " +
+                               result.message());
+    }
+    if (player_.animationBank.findClip(player_.initialAnimation) == nullptr) {
+        return Result::failure("Player initial animation is not in its bank");
     }
 
     introRooms_.reserve(5);

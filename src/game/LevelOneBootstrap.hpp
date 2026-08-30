@@ -45,6 +45,23 @@ struct LevelStaticMeshAsset {
     bool cameraRelative{};
 };
 
+struct LevelPlayerAsset {
+    std::int32_t objectId{-1};
+    std::string sceneNodeName;
+    std::string initialAnimation;
+    std::int32_t initialCameraAreaId{-1};
+    std::int32_t linkedCinematicId{-1};
+    std::int32_t endGameCinematicId{-1};
+    bool hasCollision{};
+    assets::Vector3 position;
+    assets::Quaternion rotation;
+    assets::Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::array<float, 16> worldTransform{};
+    assets::ColladaMeshFile mesh;
+    std::vector<assets::BtexTexture> textures;
+    assets::ColladaAnimationFile animationBank;
+};
+
 class LevelOneBootstrap final {
 public:
     [[nodiscard]] Result load(const std::filesystem::path& gameDataRoot);
@@ -95,6 +112,9 @@ public:
         noexcept {
         return introActors_;
     }
+    [[nodiscard]] const LevelPlayerAsset& player() const noexcept {
+        return player_;
+    }
 
 private:
     assets::IrrScene mainScene_;
@@ -106,6 +126,7 @@ private:
     assets::ColladaAnimationFile introCameraAnimation_;
     CinematicCamera introCamera_;
     std::vector<CinematicActorAsset> introActors_;
+    LevelPlayerAsset player_;
 };
 
 } // namespace usm::game

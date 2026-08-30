@@ -52,6 +52,12 @@ node IDs, hierarchy, transforms, visibility, semantic game type, and referenced
 mesh path. Level 1 currently validates as 154 main-scene nodes and 60 nodes in
 Room 1.
 
+The persistent player is main-scene object 288, named `SpiderMan`. Its typed
+scene metadata selects `spiderman_mesh.bdae`, `spiderman_anim.bdae`, initial
+clip `kick_left_double_kick`, collision, initial camera area 283, linked intro
+cinematic 1265, and end-level cinematic 1267. `LevelPlayerAsset` loads those
+references from the scene rather than hard-coding parallel asset choices.
+
 ## Collada mesh layout
 
 The BRES root points to `SCollada`; its geometry library contains named

@@ -36,6 +36,12 @@ struct IrrSceneNode {
     std::string name;
     std::string gameType;
     std::string meshFile;
+    std::string animationFile;
+    std::string initialAnimation;
+    bool hasCollision{};
+    std::int32_t initialCameraAreaId{-1};
+    std::int32_t linkedCinematicId{-1};
+    std::int32_t endGameCinematicId{-1};
 };
 
 // Parser for the UTF-16 Irrlicht scene files stored in the level archives.
