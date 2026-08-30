@@ -19,6 +19,8 @@ struct EffectEmitterPreset {
     assets::Vector3 box;
     assets::Vector3 direction;
     assets::Vector3 gravity;
+    assets::Vector3 rotationPivot;
+    assets::Vector3 rotationSpeedDegreesPerSecond;
     std::int32_t systemMinimumLifetimeMilliseconds{};
     std::int32_t systemMaximumLifetimeMilliseconds{};
     std::int32_t startDelayMilliseconds{};
@@ -41,7 +43,16 @@ struct EffectEmitterPreset {
     std::int32_t fadeEndPercent{100};
     std::int32_t sizeStartPercent{};
     std::int32_t sizeEndPercent{100};
+    std::int32_t gravityStartPercent{};
+    std::int32_t gravityEndPercent{100};
+    std::int32_t spinMinimumDegrees{};
+    std::int32_t spinMaximumDegrees{};
+    std::int32_t spinStartPercent{};
+    std::int32_t spinEndPercent{100};
     std::int32_t frameId{-1};
+    bool hasGravity{};
+    bool hasRotation{};
+    bool hasSpin{};
     bool additive{};
 };
 

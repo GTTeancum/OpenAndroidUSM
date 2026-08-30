@@ -46,6 +46,55 @@ std::uint32_t interpolateColor(std::uint32_t from, std::uint32_t to,
     return result;
 }
 
+float intervalProgress(float lifeProgress, std::int32_t startPercent,
+                       std::int32_t endPercent) noexcept {
+    const float start = static_cast<float>(startPercent) / 100.0F;
+    const float end = static_cast<float>(endPercent) / 100.0F;
+    if (lifeProgress < start) {
+        return 0.0F;
+    }
+    return end <= start
+               ? 1.0F
+               : std::clamp((lifeProgress - start) / (end - start), 0.0F,
+                            1.0F);
+}
+
+void rotateAroundX(assets::Vector3& position, float degrees,
+                   const assets::Vector3& pivot) noexcept {
+    constexpr float degreesToRadians = 0.017453292519943295F;
+    const float angle = degrees * degreesToRadians;
+    const float cosine = std::cos(angle);
+    const float sine = std::sin(angle);
+    const float y = position.y - pivot.y;
+    const float z = position.z - pivot.z;
+    position.y = y * cosine - z * sine + pivot.y;
+    position.z = z * cosine + y * sine + pivot.z;
+}
+
+void rotateAroundY(assets::Vector3& position, float degrees,
+                   const assets::Vector3& pivot) noexcept {
+    constexpr float degreesToRadians = 0.017453292519943295F;
+    const float angle = degrees * degreesToRadians;
+    const float cosine = std::cos(angle);
+    const float sine = std::sin(angle);
+    const float x = position.x - pivot.x;
+    const float z = position.z - pivot.z;
+    position.x = x * cosine - z * sine + pivot.x;
+    position.z = z * cosine + x * sine + pivot.z;
+}
+
+void rotateAroundZ(assets::Vector3& position, float degrees,
+                   const assets::Vector3& pivot) noexcept {
+    constexpr float degreesToRadians = 0.017453292519943295F;
+    const float angle = degrees * degreesToRadians;
+    const float cosine = std::cos(angle);
+    const float sine = std::sin(angle);
+    const float x = position.x - pivot.x;
+    const float y = position.y - pivot.y;
+    position.x = x * cosine - y * sine + pivot.x;
+    position.y = y * cosine + x * sine + pivot.y;
+}
+
 } // namespace
 
 struct LevelEffectRuntime::PendingEmitter {
@@ -58,12 +107,17 @@ struct LevelEffectRuntime::Particle {
     const EffectEmitterPreset* preset{};
     assets::Vector3 position;
     assets::Vector3 velocity;
+    assets::Vector3 initialVelocity;
+    assets::Vector3 rotationPivot;
     std::uint32_t ageMilliseconds{};
     std::uint32_t lifetimeMilliseconds{};
     float initialWidth{};
     float initialHeight{};
     float rotationDegrees{};
+    float spinBaseRotationDegrees{};
+    float spinDeltaDegrees{};
     std::uint32_t startColor{0xffffffffU};
+    bool spinInitialized{};
 };
 
 LevelEffectRuntime::LevelEffectRuntime() = default;
@@ -133,18 +187,64 @@ void LevelEffectRuntime::update(
         particle.position.x += particle.velocity.x * delta;
         particle.position.y += particle.velocity.y * delta;
         particle.position.z += particle.velocity.z * delta;
-        // Fps gravity affectors interpolate velocity toward the configured
-        // vector over lifetime; a frame-rate-independent blend preserves that
-        // behavior without importing Irrlicht particle objects.
-        const float gravityBlend =
-            std::min(delta / static_cast<float>(particle.lifetimeMilliseconds),
-                     1.0F);
-        particle.velocity.x +=
-            (particle.preset->gravity.x - particle.velocity.x) * gravityBlend;
-        particle.velocity.y +=
-            (particle.preset->gravity.y - particle.velocity.y) * gravityBlend;
-        particle.velocity.z +=
-            (particle.preset->gravity.z - particle.velocity.z) * gravityBlend;
+        const EffectEmitterPreset& preset = *particle.preset;
+        const float lifeProgress =
+            static_cast<float>(particle.ageMilliseconds) /
+            static_cast<float>(particle.lifetimeMilliseconds);
+        if (preset.hasGravity) {
+            // CFpsParticleGravityAffector::affect (0x0039d7d4) captures the
+            // entry velocity and linearly reaches Gravity at EndTime(%).
+            const float progress =
+                intervalProgress(lifeProgress, preset.gravityStartPercent,
+                                 preset.gravityEndPercent);
+            particle.velocity.x = particle.initialVelocity.x +
+                                  (preset.gravity.x -
+                                   particle.initialVelocity.x) *
+                                      progress;
+            particle.velocity.y = particle.initialVelocity.y +
+                                  (preset.gravity.y -
+                                   particle.initialVelocity.y) *
+                                      progress;
+            particle.velocity.z = particle.initialVelocity.z +
+                                  (preset.gravity.z -
+                                   particle.initialVelocity.z) *
+                                      progress;
+        }
+        if (preset.hasRotation) {
+            // CFpsParticleRotationAffector::affect (0x0039df08) applies the
+            // three authored angular speeds in degrees per second.
+            const float seconds = delta * 0.001F;
+            rotateAroundX(particle.position,
+                          preset.rotationSpeedDegreesPerSecond.x * seconds,
+                          particle.rotationPivot);
+            rotateAroundY(particle.position,
+                          preset.rotationSpeedDegreesPerSecond.y * seconds,
+                          particle.rotationPivot);
+            rotateAroundZ(particle.position,
+                          preset.rotationSpeedDegreesPerSecond.z * seconds,
+                          particle.rotationPivot);
+        }
+        if (preset.hasSpin) {
+            const float spinStart =
+                static_cast<float>(preset.spinStartPercent) / 100.0F;
+            if (lifeProgress >= spinStart && !particle.spinInitialized) {
+                particle.spinBaseRotationDegrees = particle.rotationDegrees;
+                particle.spinDeltaDegrees = std::floor(randomRange(
+                    static_cast<float>(preset.spinMinimumDegrees),
+                    static_cast<float>(preset.spinMaximumDegrees)));
+                particle.spinInitialized = true;
+            }
+            if (particle.spinInitialized) {
+                // CFpsParticleSpinAffector::affect (0x0039e9c4) treats the
+                // chosen spin as a total angle across the authored interval.
+                particle.rotationDegrees =
+                    particle.spinBaseRotationDegrees +
+                    particle.spinDeltaDegrees *
+                        intervalProgress(lifeProgress,
+                                         preset.spinStartPercent,
+                                         preset.spinEndPercent);
+            }
+        }
     }
     std::erase_if(particles_, [](const Particle& particle) {
         return particle.ageMilliseconds >= particle.lifetimeMilliseconds;
@@ -232,6 +332,12 @@ void LevelEffectRuntime::spawnEmitter(
         particle.velocity = {preset.direction.x * speedScale,
                              preset.direction.y * speedScale,
                              preset.direction.z * speedScale};
+        particle.initialVelocity = particle.velocity;
+        particle.rotationPivot = {
+            emitter.origin.x + preset.position.x + preset.rotationPivot.x,
+            emitter.origin.y + preset.position.y + preset.rotationPivot.y,
+            emitter.origin.z + preset.position.z + preset.rotationPivot.z,
+        };
         particle.lifetimeMilliseconds = static_cast<std::uint32_t>(
             std::max(1.0F,
                      randomRange(

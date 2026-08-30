@@ -256,6 +256,40 @@ int main() {
         effects.update(300);
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
                                                    effects));
+        const auto renderAuthoredEffect =
+            [&](std::string_view effectType,
+                std::uint32_t elapsedMilliseconds,
+                std::string_view captureName) {
+                assert(effects.initialize(levelOne.effects().presets));
+                playEffect.attributes.front().value = effectType;
+                assert(effects.applyCinematicCommand(playEffect));
+                effects.update(elapsedMilliseconds);
+                assert(!effects.particles().empty());
+                assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
+                                                           effects));
+                gameRenderer.renderFrame();
+                RgbaImage frame;
+                assert(gameRenderer.readBackImage(frame));
+                captureIfRequested(frame, captureName);
+                std::size_t changedPixels = 0;
+                for (std::size_t component = 0;
+                     component < frame.pixels.size(); component += 4) {
+                    changedPixels +=
+                        frame.pixels[component] !=
+                            gameplayFrame.pixels[component] ||
+                        frame.pixels[component + 1] !=
+                            gameplayFrame.pixels[component + 1] ||
+                        frame.pixels[component + 2] !=
+                            gameplayFrame.pixels[component + 2];
+                }
+                assert(changedPixels > 2);
+                return frame;
+            };
+        const RgbaImage explosionEffectFrame = renderAuthoredEffect(
+            "explode_new", 120, "gameplay-explosion-effect.bmp");
+        const RgbaImage rockSplashEffectFrame = renderAuthoredEffect(
+            "rock_splash", 50, "gameplay-rock-splash-effect.bmp");
+        assert(explosionEffectFrame.pixels != rockSplashEffectFrame.pixels);
         const auto beforeBossCinematic = std::find_if(
             levelOne.cinematics().begin(), levelOne.cinematics().end(),
             [](const usm::game::LevelCinematicAsset& cinematic) {

@@ -34,6 +34,7 @@
 #include "game/CinematicUiRuntime.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <array>
 #include <cmath>
@@ -693,9 +694,33 @@ int main() {
         assert(bootstrap.player().textures.size() == 2);
         assert(bootstrap.player().animationBank.tracks().size() == 46);
         assert(bootstrap.player().animationBank.clips().size() == 242);
-        assert(bootstrap.effects().presets.find("explode_new") != nullptr);
-        assert(bootstrap.effects().presets.find("explode_new")
-                   ->emitters.size() == 4);
+        const auto* explodePreset =
+            bootstrap.effects().presets.find("explode_new");
+        assert(explodePreset != nullptr);
+        assert(explodePreset->emitters.size() == 4);
+        const auto findEmitter = [](const usm::game::EffectPreset& preset,
+                                    std::string_view name) {
+            const auto match = std::find_if(
+                preset.emitters.begin(), preset.emitters.end(),
+                [name](const auto& emitter) { return emitter.name == name; });
+            return match == preset.emitters.end() ? nullptr : &*match;
+        };
+        const auto* explosionFire = findEmitter(*explodePreset, "fire");
+        const auto* explosionSparks = findEmitter(*explodePreset, "sparks");
+        const auto* explosionRock = findEmitter(*explodePreset, "rock");
+        assert(explosionFire != nullptr && explosionFire->hasRotation);
+        assert(explosionFire->rotationPivot.x == 0.0F);
+        assert(explosionFire->rotationSpeedDegreesPerSecond.x == 5.0F);
+        assert(explosionFire->rotationSpeedDegreesPerSecond.y == 5.0F);
+        assert(explosionFire->rotationSpeedDegreesPerSecond.z == 5.0F);
+        assert(explosionSparks != nullptr && explosionSparks->hasGravity);
+        assert(explosionSparks->gravity.z == -0.5F);
+        assert(explosionSparks->gravityStartPercent == 0);
+        assert(explosionSparks->gravityEndPercent == 100);
+        assert(explosionRock != nullptr && explosionRock->hasSpin);
+        assert(explosionRock->hasGravity);
+        assert(explosionRock->spinMinimumDegrees == 0);
+        assert(explosionRock->spinMaximumDegrees == 360);
         assert(bootstrap.effects().presets.find("rock_splash") != nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash_big") !=
                nullptr);
@@ -716,11 +741,58 @@ int main() {
         assert(effectRuntime.particles().size() == 2);
         assert(effectRuntime.particles().front().frameId == 2);
         assert(effectRuntime.particles().front().width > 0.0F);
-        effectRuntime.update(300);
+        const auto movingHitParticle = std::find_if(
+            effectRuntime.particles().begin(), effectRuntime.particles().end(),
+            [](const auto& particle) { return particle.height > 25.0F; });
+        assert(movingHitParticle != effectRuntime.particles().end());
+        const std::size_t movingHitIndex = static_cast<std::size_t>(
+            movingHitParticle - effectRuntime.particles().begin());
+        const float movingHitStartZ = movingHitParticle->position.z;
+        effectRuntime.update(50);
+        assert(effectRuntime.particles()[movingHitIndex].position.z -
+                   movingHitStartZ >
+               95.0F);
+        effectRuntime.update(250);
         assert(effectRuntime.particles().empty());
+        assert(effectRuntime.initialize(bootstrap.effects().presets));
+        usm::game::CinematicCommand playExplosion;
+        playExplosion.name = "PlayEffect";
+        playExplosion.attributes = {
+            {"string", "$EffectType", "explode_new"},
+            {"vector3d", "abspos", "10.0, 20.0, 30.0"},
+        };
+        assert(effectRuntime.applyCinematicCommand(playExplosion));
+        effectRuntime.update(1);
+        const auto firstParticleWithFrame =
+            [&](std::int32_t frameId) -> const usm::game::EffectParticleState* {
+            const auto match = std::find_if(
+                effectRuntime.particles().begin(),
+                effectRuntime.particles().end(),
+                [frameId](const auto& particle) {
+                    return particle.frameId == frameId;
+                });
+            return match == effectRuntime.particles().end() ? nullptr : &*match;
+        };
+        const auto* initialSpark = firstParticleWithFrame(5);
+        const auto* initialRock = firstParticleWithFrame(3);
+        assert(initialSpark != nullptr && initialRock != nullptr);
+        const float initialSparkZ = initialSpark->position.z;
+        const float initialRockRotation = initialRock->rotationDegrees;
+        effectRuntime.update(100);
+        const float firstSparkStep =
+            firstParticleWithFrame(5)->position.z - initialSparkZ;
+        effectRuntime.update(100);
+        const float secondSparkStep =
+            firstParticleWithFrame(5)->position.z - initialSparkZ -
+            firstSparkStep;
+        assert(secondSparkStep < firstSparkStep);
+        assert(std::abs(firstParticleWithFrame(3)->rotationDegrees -
+                        initialRockRotation) >
+               0.01F);
         playHitEffect.attributes.front().value = "missing_effect";
         assert(!effectRuntime.applyCinematicCommand(playHitEffect));
         std::size_t authoredEffectCommandCount = 0;
+        std::vector<std::string> authoredEffectTypes;
         const auto validateEffectCommands =
             [&](const usm::game::CinematicScript& script) {
                 for (const auto& thread : script.threads()) {
@@ -735,6 +807,12 @@ int main() {
                         assert(command.findAttribute("abspos") != nullptr);
                         assert(bootstrap.effects().presets.find(type->value) !=
                                nullptr);
+                        if (std::find(authoredEffectTypes.begin(),
+                                      authoredEffectTypes.end(),
+                                      type->value) ==
+                            authoredEffectTypes.end()) {
+                            authoredEffectTypes.push_back(type->value);
+                        }
                     }
                 }
             };
@@ -746,6 +824,10 @@ int main() {
             }
         }
         assert(authoredEffectCommandCount > 0);
+        std::sort(authoredEffectTypes.begin(), authoredEffectTypes.end());
+        assert((authoredEffectTypes == std::vector<std::string>{
+                                           "cartoon_hit_splash_big",
+                                           "explode_new", "rock_splash"}));
         assert(bootstrap.objects().size() == 106);
         assert(!bootstrap.objectArchetypes().empty());
         usm::game::LevelObjectRuntime objectRuntime;

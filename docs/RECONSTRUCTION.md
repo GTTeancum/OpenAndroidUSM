@@ -11,6 +11,11 @@ comment or mapping file until the source database can map it automatically.
 Behavior is checked against the original executable using deterministic inputs
 and captured state wherever practical.
 
+`tools/ghidra/ExportSelectedDisassembly.java` complements the selected
+decompilation exporter with address-stamped ARM instruction listings and the
+adjacent literal pool. It is used when the decompiler elides constants or ABI
+arguments that are material to a reviewed reconstruction.
+
 ## Naming order
 
 1. Original ELF symbol name
@@ -682,9 +687,19 @@ decay, and explicit shake cancellation.
 `effects.xml`, `effects.bsprite`, and shared `effects.tga` atlas. The portable
 runtime handles `CCinematicThread::PlayEffect` at `0x003712f8`, preserves each
 authored emitter's delay, lifetime, box, direction, size/color variation,
-gravity, fade, size curve, sprite frame, and material type, and exposes only
-renderer-neutral billboard state. The deterministic generator keeps test and
-capture results stable without importing Irrlicht particle objects.
+gravity, fade, size curve, spin, pivot rotation, sprite frame, and material
+type, and exposes only renderer-neutral billboard state. The deterministic
+generator keeps test and capture results stable without importing Irrlicht
+particle objects.
+
+The affector math follows the preserved implementations rather than treating
+the XML values as generic forces. `CFpsParticleGravityAffector::affect` at
+`0x0039d7d4` captures the incoming velocity and linearly reaches its target
+over the configured lifetime interval. `CFpsParticleSpinAffector::affect` at
+`0x0039e9c4` selects a total billboard angle for that interval.
+`CFpsParticleRotationAffector::affect` at `0x0039df08` rotates particle
+positions about its pivot using degrees per second. Emitters without a gravity
+affector retain their velocity instead of being damped toward zero.
 
 The D3D11 backend expands those states into camera-facing sprite quads and
 separates standard vertex-alpha particles from `trans_add` particles. Ghidra's
@@ -695,7 +710,9 @@ the native additive blend state. A dedicated effect pixel shader retains the
 world vertex shader's full interpolant signature; the HUD shader cannot be
 shared because its compact signature assigns texture coordinates and color to
 different compiled registers. WARP regressions verify preset decoding,
-deterministic expiry, and a visible authored hit-splash frame.
+deterministic motion and expiry, and visible frames for all three effect types
+authored by level one: `cartoon_hit_splash_big`, `explode_new`, and
+`rock_splash`.
 
 ## BTEX/PVRTC textures
 

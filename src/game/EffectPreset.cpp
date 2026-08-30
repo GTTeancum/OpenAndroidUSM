@@ -158,16 +158,41 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                         emitter.fadeEndPercent =
                             value.attribute("value").as_int(100);
                     }
-                } else if (currentAffector == "Gravity" &&
-                           field == "Gravity") {
-                    std::string gravityText =
-                        value.attribute("value").as_string();
-                    pugi::xml_document temporary;
-                    pugi::xml_node root = temporary.append_child("root");
-                    pugi::xml_node vector = root.append_child("vector3d");
-                    vector.append_attribute("name") = "Gravity";
-                    vector.append_attribute("value") = gravityText.c_str();
-                    emitter.gravity = vectorValue(root, "Gravity");
+                } else if (currentAffector == "Gravity") {
+                    emitter.hasGravity = true;
+                    if (field == "Gravity") {
+                        emitter.gravity = vectorValue(attributes, "Gravity");
+                    } else if (field == "StartTime(%)") {
+                        emitter.gravityStartPercent =
+                            value.attribute("value").as_int();
+                    } else if (field == "EndTime(%)") {
+                        emitter.gravityEndPercent =
+                            value.attribute("value").as_int(100);
+                    }
+                } else if (currentAffector == "Spin") {
+                    emitter.hasSpin = true;
+                    if (field == "MinSpin") {
+                        emitter.spinMinimumDegrees =
+                            value.attribute("value").as_int();
+                    } else if (field == "MaxSpin") {
+                        emitter.spinMaximumDegrees =
+                            value.attribute("value").as_int();
+                    } else if (field == "StartTime(%)") {
+                        emitter.spinStartPercent =
+                            value.attribute("value").as_int();
+                    } else if (field == "EndTime(%)") {
+                        emitter.spinEndPercent =
+                            value.attribute("value").as_int(100);
+                    }
+                } else if (currentAffector == "Rotate") {
+                    emitter.hasRotation = true;
+                    if (field == "PivotPoint") {
+                        emitter.rotationPivot =
+                            vectorValue(attributes, "PivotPoint");
+                    } else if (field == "Speed") {
+                        emitter.rotationSpeedDegreesPerSecond =
+                            vectorValue(attributes, "Speed");
+                    }
                 } else if (currentAffector == "Size") {
                     if (field == "TargetWidth") {
                         emitter.targetWidth =
