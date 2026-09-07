@@ -736,9 +736,12 @@ The three enemies fall from their serialized rooftop staging positions to the
 street under runtime physics. Cinematic 1140 waits for all three native enemy
 death states before opening the web wall and advancing the checkpoint. The
 autoplay probe approaches the trigger from outside, waits for cinematic 974,
-waits for all three enemies to be both visible and grounded, and only then
-uses ordinary authored melee. This keeps route traversal separate while still
-testing the real spawn, presentation, physics, combat, and completion path.
+requires all three enemies to be visible with AI and physics active, waits for
+all three to ground, and verifies their exact 500-point authored starting
+health before ordinary combat. It also requires watcher 1140 to save
+checkpoint 30027 after the last death. This keeps route traversal separate
+while still testing the real spawn, presentation, physics, combat, and
+completion path.
 
 ## Authored room objects
 

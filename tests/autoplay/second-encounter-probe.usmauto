@@ -16,9 +16,19 @@ move_until_cinematic 8430 -5710 7 974 5000
 # three revealed enemies' landing states.
 wait 2600
 wait_controls 12000
+# The authored reveal commands must make all three actors visible and AI/
+# physics-active before their rooftop fall can settle on the Room 2 street.
+wait_enemies_active 5000 398 399 401
 wait_enemies_grounded 10000 398 399 401
+assert_enemy_health_near 398 500 0.01
+assert_enemy_health_near 399 500 0.01
+assert_enemy_health_near 401 500 0.01
 capture second-encounter-landed
-attack 30000 135 398 399 401
+attack 45000 190 398 399 401
+# Cinematic 1140 is the native destroyed-object watcher. The final death
+# closes/removes web wall 1116 and saves authored checkpoint 30027.
+wait_controls 10000
+assert_last_checkpoint 30027
 capture second-encounter-cleared
 assert_health_above 0
 finish
