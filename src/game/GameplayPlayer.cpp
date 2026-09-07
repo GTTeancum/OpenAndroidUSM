@@ -541,6 +541,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     inputFrameAdvanceMilliseconds_ = 0;
     inputFramePrepared_ = false;
     attackEnteredDuringPreparedInputFrame_ = false;
+    hitEffectUpdateInProgress_ = false;
+    hitEffectFrameAdvanceMilliseconds_ = 0;
     ultimateActive_ = false;
     locomotionRootTranslation_ = {};
     nextAttackImpactFrameIndex_ = 0;
@@ -762,7 +764,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
 
 bool GameplayPlayer::requestPunch(
     const std::optional<PlayerAttackTarget>& target,
-    const std::optional<assets::Vector3>& directionalInput) noexcept {
+    const std::optional<assets::Vector3>& directionalInput,
+    PlayerButtonPhase phase) noexcept {
     lastActionRejectionReason_ = {};
     if (dead()) {
         lastActionRejectionReason_ = "dead";
@@ -773,6 +776,10 @@ bool GameplayPlayer::requestPunch(
         return false;
     }
     if (onWall()) {
+        if (phase != PlayerButtonPhase::Pressed) {
+            lastActionRejectionReason_ = "wall_attack_requires_press";
+            return false;
+        }
         if (activeAttackState_ != nullptr || wallWeb_.active() || stateDatabase_ == nullptr ||
             (locomotionState_ != LocomotionState::WallIdle &&
              locomotionState_ != LocomotionState::WallMove)) {
@@ -834,8 +841,15 @@ bool GameplayPlayer::requestPunch(
             lastActionRejectionReason_ = "attack_window_closed";
             return false;
         }
-        requested = punchTransition();
+        requested = punchTransition(phase);
     } else if (beganAirborne) {
+        if (phase != PlayerButtonPhase::Pressed ||
+            !locomotionInputWindowOpen()) {
+            lastActionRejectionReason_ = phase != PlayerButtonPhase::Pressed
+                ? "attack_unavailable"
+                : "attack_window_closed";
+            return false;
+        }
         // Jump states 13-15 contain two Square transitions. Predicate 109 is
         // the CEnemy::IsInAir target-special branch; otherwise the ordinary
         // press enters state 81.
@@ -843,6 +857,10 @@ bool GameplayPlayer::requestPunch(
                         ? airTargetKickState_
                         : airPunchState_;
     } else if (locomotionState_ == LocomotionState::Grounded) {
+        if (phase == PlayerButtonPhase::Released) {
+            lastActionRejectionReason_ = "attack_unavailable";
+            return false;
+        }
         requested = initialPunchState_;
     } else {
         lastActionRejectionReason_ = "attack_unavailable";
@@ -875,7 +893,8 @@ bool GameplayPlayer::requestPunch(
     // NeedDashToTarget is reached from UpdateKeyTrigger's target-search
     // predicate for the opening attack. A direct 0x65/0x96 combo transition
     // does not re-run it merely because knockback moved the retained victim.
-    if (!beganAirborne && !continuingAttack) {
+    if (!beganAirborne && !continuingAttack &&
+        phase == PlayerButtonPhase::Pressed) {
         requested = attackStateForTarget(*requested, selectedTarget);
     }
     const bool requestedAirborne = beganAirborne ||
@@ -945,6 +964,13 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
                 queueAttackTransition(*transition, activeAttackTarget_, true);
                 return true;
             }
+        }
+        if (phase == PlayerButtonPhase::Pressed) {
+            // A fresh Cross/A edge is not predicate 103. Native IsHold(key, 2)
+            // becomes true only after CKeyPad's state has advanced past 2;
+            // treating states 1/2 as held selected the uppercut branch before
+            // the player had actually held the button.
+            return false;
         }
         const std::array<std::int16_t, 1> predicates{
             phase == PlayerButtonPhase::Released
@@ -1058,7 +1084,10 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
     if ((locomotionState_ == LocomotionState::JumpStart ||
          locomotionState_ == LocomotionState::JumpFall ||
          locomotionState_ == LocomotionState::SustainedFall) &&
-        shortWebJumpState_ != nullptr) {
+         shortWebJumpState_ != nullptr) {
+        if (!locomotionInputWindowOpen()) {
+            return false;
+        }
         locomotionRootTranslation_ = {};
         enterLocomotionState(LocomotionState::ShortWebJump);
         return true;
@@ -1234,6 +1263,10 @@ bool GameplayPlayer::requestWeb(
         locomotionState_ == LocomotionState::SwingHang || dead() ||
         swingThrowState_ == nullptr) {
         lastActionRejectionReason_ = dead() ? "dead" : "traversal_unavailable";
+        return false;
+    }
+    if (!locomotionInputWindowOpen()) {
+        lastActionRejectionReason_ = "attack_window_closed";
         return false;
     }
     if (phase != PlayerButtonPhase::Pressed) {
@@ -1896,6 +1929,13 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     const bool movementPressed = nextMovementVirtualKey >= 0 &&
         nextMovementVirtualKey != movementVirtualKey_;
     movementVirtualKey_ = nextMovementVirtualKey;
+    // EffectManager::Update (0x00391b7c) tests IsAlive before calling
+    // CAnimObjEffect::Update (0x00390a88). An effect whose duration reaches
+    // zero during this tick therefore survives through the ensuing render and
+    // is reclaimed at the start of the next effect-manager tick.
+    std::erase_if(activeHitEffects_, [](const PlayerHitEffectState& effect) {
+        return effect.elapsedMilliseconds >= effect.lifetimeMilliseconds;
+    });
     for (PlayerHitEffectState& effect : activeHitEffects_) {
         const float seconds =
             static_cast<float>(elapsedMilliseconds) / 1000.0F;
@@ -1908,9 +1948,17 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
                     elapsedMilliseconds,
                 effect.lifetimeMilliseconds));
     }
-    std::erase_if(activeHitEffects_, [](const PlayerHitEffectState& effect) {
-        return effect.elapsedMilliseconds >= effect.lifetimeMilliseconds;
-    });
+    hitEffectFrameAdvanceMilliseconds_ = elapsedMilliseconds;
+    hitEffectUpdateInProgress_ = true;
+    struct HitEffectUpdateScope final {
+        bool& active;
+        std::uint32_t& elapsed;
+        ~HitEffectUpdateScope() {
+            active = false;
+            elapsed = 0;
+        }
+    } hitEffectUpdateScope{hitEffectUpdateInProgress_,
+                           hitEffectFrameAdvanceMilliseconds_};
     slideRuntime_.advanceCooldown(elapsedMilliseconds);
     if (dead()) {
         enterDeadState();
@@ -4145,8 +4193,7 @@ void GameplayPlayer::cancelAttack() noexcept {
 
 void GameplayPlayer::updateAttack(
     std::uint32_t elapsedMilliseconds) noexcept {
-    std::uint32_t remaining = elapsedMilliseconds;
-    while (activeAttackState_ != nullptr && remaining != 0) {
+    if (activeAttackState_ != nullptr && elapsedMilliseconds != 0) {
         const assets::ColladaAnimationClip* clip =
             animationBank_ == nullptr
                 ? nullptr
@@ -4160,7 +4207,7 @@ void GameplayPlayer::updateAttack(
         const std::uint32_t previousLocal = static_cast<std::uint32_t>(
             std::min<std::uint64_t>(animationTimeMilliseconds_, duration));
         std::uint32_t step =
-            std::min(remaining, duration - previousLocal);
+            std::min(elapsedMilliseconds, duration - previousLocal);
         if (activeAttackState_->motionType == 136 &&
             ultimatePhaseRemainingMilliseconds_ != 0) {
             step = std::min(step, ultimatePhaseRemainingMilliseconds_);
@@ -4174,7 +4221,6 @@ void GameplayPlayer::updateAttack(
         const std::uint32_t currentTimeline = static_cast<std::uint32_t>(
             std::min<std::uint64_t>(attackTimelineMilliseconds_,
                                     std::numeric_limits<std::uint32_t>::max()));
-        remaining -= step;
         if (activeAttackState_->motionType == 136) {
             ultimatePhaseElapsedMilliseconds_ += step;
             ultimatePhaseRemainingMilliseconds_ -= std::min(
@@ -4274,7 +4320,10 @@ void GameplayPlayer::updateAttack(
                 setAnimation("idle_stand");
                 return;
             }
-            continue;
+            // Native UpdateAttacks reaches SetNextStateId at 0x00353352 and
+            // returns. The new state's animation is not advanced by leftover
+            // time from the clip that finished in this tick.
+            return;
         }
 
         // Player::SwitchToNextLinkAnim (0x00340370) is a generic attack-state
@@ -4284,13 +4333,13 @@ void GameplayPlayer::updateAttack(
         // independent 1200 ms phase timer expires.
         if (!ultimateWheelFinished &&
             switchToNextAttackLinkAnimation()) {
-            continue;
+            return;
         }
         if (!ultimateWheelFinished && activeAttackState_->motionType == 136 &&
             !activeAttackState_->animationIds.empty()) {
             nextAttackLinkAnimationIndex_ = 0;
             if (switchToNextAttackLinkAnimation()) {
-                continue;
+                return;
             }
         }
 
@@ -4328,7 +4377,7 @@ void GameplayPlayer::updateAttack(
                 jumpAnchorHeight_ = position_.z;
                 enterLocomotionState(LocomotionState::SustainedFall);
             }
-            continue;
+            return;
         }
         if (nextState == nullptr || !enterAttackState(*nextState)) {
             activeAttackState_ = nullptr;
@@ -4755,25 +4804,37 @@ void GameplayPlayer::queueHitEffect(
                 clips[clipIndex].durationMilliseconds(), 1);
         }
     }
-    if (lifetime == 0 || elapsedMilliseconds >= lifetime) {
+    if (lifetime == 0) {
         return;
     }
+    // CLevel::Update (0x003820bc) updates Player before EffectManager. A hit
+    // effect created by Player::UpdateNormalEffect (0x00348f24) is therefore
+    // advanced by the full current tick in CAnimObjEffect::Update
+    // (0x00390a88), regardless of where its authored threshold fell inside
+    // that tick. AddHitEffect (0x00348dc4) captures the player's current bone
+    // pose before that manager update; it never back-dates the attachment to
+    // the threshold pose. Keep those two clocks separate here.
+    const std::uint32_t initialAge = std::min(
+        hitEffectUpdateInProgress_ ? hitEffectFrameAdvanceMilliseconds_
+                                   : elapsedMilliseconds,
+        lifetime);
+    const assets::Vector3 capturedVelocity =
+        definition->snapshotBoneTransform ? assets::Vector3{}
+                                          : attackPhysicsVelocity_;
+    const float initialAgeSeconds =
+        static_cast<float>(initialAge) / 1000.0F;
     activeHitEffects_.push_back({
         effectId,
-        elapsedMilliseconds,
+        initialAge,
         lifetime,
         fadeDuration,
         activeAnimation_,
-        static_cast<std::uint32_t>(animationTimeMilliseconds_ >=
-                                           elapsedMilliseconds
-                                       ? animationTimeMilliseconds_ -
-                                             elapsedMilliseconds
-                                       : 0),
+        static_cast<std::uint32_t>(animationTimeMilliseconds_),
         worldTransform_,
-        definition->snapshotBoneTransform
-            ? assets::Vector3{}
-            : attackPhysicsVelocity_,
-        {},
+        capturedVelocity,
+        {capturedVelocity.x * initialAgeSeconds,
+         capturedVelocity.y * initialAgeSeconds,
+         capturedVelocity.z * initialAgeSeconds},
         !definition->snapshotBoneTransform,
         boneNameOverride,
         uniformScale,
@@ -4876,7 +4937,15 @@ void GameplayPlayer::queueSpecialAttackEffects(
     }
 }
 
-const PlayerStateDefinition* GameplayPlayer::punchTransition() const noexcept {
+const PlayerStateDefinition* GameplayPlayer::punchTransition(
+    PlayerButtonPhase phase) const noexcept {
+    if (phase == PlayerButtonPhase::Held) {
+        constexpr std::array<std::int16_t, 1> held{kHeldTransition};
+        return transitionForButton(kPunchButton, held);
+    }
+    if (phase == PlayerButtonPhase::Released) {
+        return nullptr;
+    }
     constexpr std::array<std::int16_t, 2> predicates{
         kPressedTransition, kNormalSuitPressedTransition};
     return transitionForButton(kPunchButton, predicates);
@@ -4947,6 +5016,27 @@ bool GameplayPlayer::attackInputWindowOpen() const noexcept {
         activeAttackState_->auxiliaryParameters[0];
     const std::int16_t lastFrame =
         activeAttackState_->auxiliaryParameters[1];
+    return (firstFrame < 0 || frame >= static_cast<std::uint64_t>(firstFrame)) &&
+           (lastFrame < 0 || frame <= static_cast<std::uint64_t>(lastFrame));
+}
+
+bool GameplayPlayer::locomotionInputWindowOpen() const noexcept {
+    if (activeLocomotionState_ == nullptr) {
+        return true;
+    }
+    // Player::UpdateKeyTrigger (0x0034d0a4) applies StateBasic+0x34/+0x38
+    // to every state that owns transitions, not only class-four attacks.
+    // In particular k_state_jump_start does not accept its punch, web, or
+    // second-jump rows until runtime frame 2. The app dispatches input before
+    // update(), while native PreUpdate has already sampled this tick, so test
+    // the same pending delta used by attackInputWindowOpen.
+    const std::uint64_t sampledTimeline = animationTimeMilliseconds_ +
+        (inputFramePrepared_ ? inputFrameAdvanceMilliseconds_ : 0U);
+    const std::uint64_t frame = runtimeAnimationFrame(sampledTimeline);
+    const std::int16_t firstFrame =
+        activeLocomotionState_->auxiliaryParameters[0];
+    const std::int16_t lastFrame =
+        activeLocomotionState_->auxiliaryParameters[1];
     return (firstFrame < 0 || frame >= static_cast<std::uint64_t>(firstFrame)) &&
            (lastFrame < 0 || frame <= static_cast<std::uint64_t>(lastFrame));
 }

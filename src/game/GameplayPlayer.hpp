@@ -195,7 +195,8 @@ public:
     [[nodiscard]] bool requestPunch(
         const std::optional<PlayerAttackTarget>& target = std::nullopt,
         const std::optional<assets::Vector3>& directionalInput =
-            std::nullopt) noexcept;
+            std::nullopt,
+        PlayerButtonPhase phase = PlayerButtonPhase::Pressed) noexcept;
     [[nodiscard]] bool requestJump() noexcept;
     [[nodiscard]] bool requestJump(const PlayerMotionInput& input,
                                    const CameraPose& camera,
@@ -485,7 +486,8 @@ private:
     void queueSpecialAttackEffects(std::uint32_t previousMilliseconds,
                                    std::uint32_t currentMilliseconds) noexcept;
     [[nodiscard]] const PlayerStateDefinition*
-    punchTransition() const noexcept;
+    punchTransition(PlayerButtonPhase phase =
+                        PlayerButtonPhase::Pressed) const noexcept;
     [[nodiscard]] const PlayerStateDefinition*
     webTransition(PlayerButtonPhase phase =
                       PlayerButtonPhase::Pressed) const noexcept;
@@ -493,6 +495,7 @@ private:
     transitionForButton(std::int16_t button,
                         std::span<const std::int16_t> predicates) const noexcept;
     [[nodiscard]] bool attackInputWindowOpen() const noexcept;
+    [[nodiscard]] bool locomotionInputWindowOpen() const noexcept;
     [[nodiscard]] bool canEnableSpiderSense() const noexcept;
     void enterLocomotionState(LocomotionState state) noexcept;
     void updateJump(const PlayerMotionInput& input, const CameraPose& camera,
@@ -627,6 +630,8 @@ private:
     std::uint32_t inputFrameAdvanceMilliseconds_{};
     bool inputFramePrepared_{};
     bool attackEnteredDuringPreparedInputFrame_{};
+    bool hitEffectUpdateInProgress_{};
+    std::uint32_t hitEffectFrameAdvanceMilliseconds_{};
     bool ultimateActive_{};
     assets::Vector3 attackRootTranslation_;
     assets::Vector3 attackVisualRootTranslation_;

@@ -9021,6 +9021,9 @@ int main() {
         assert(gameplayPlayer.hitEffects().front().fadeDurationMilliseconds ==
                300);
         assert(!gameplayPlayer.hitEffects().front().followsPlayerBone);
+        assert(gameplayPlayer.hitEffects().front().elapsedMilliseconds == 1);
+        assert(gameplayPlayer.hitEffects().front()
+                   .spawnAnimationMilliseconds == 175);
         assert(!gameplayPlayer.consumeMeleeImpact().has_value());
         assert(gameplayPlayer.punchTransitionReadyAfterImpact());
         assert(!gameplayPlayer.consumeAttackSoundTrigger().has_value());
@@ -9096,8 +9099,14 @@ int main() {
         assert(retainedComboTargetPlayer.requestPunch(newBestCandidate));
         assert(retainedComboTargetPlayer.trackedAttackTargetObjectId() ==
                8101);
-        retainedComboTargetPlayer.update({}, gameplayCameraPose, 183);
+        // Player::UpdateAttacks returns immediately after SetNextStateId.
+        // Deliberately overshoot the remaining 183 ms of state 74 and prove
+        // that the queued state still begins at time zero rather than
+        // inheriting the unused portion of this update.
+        retainedComboTargetPlayer.update({}, gameplayCameraPose, 300);
         assert(retainedComboTargetPlayer.activeStateId() == 75);
+        assert(retainedComboTargetPlayer.animationTimeMilliseconds() == 0);
+        assert(retainedComboTargetPlayer.attackTimelineMilliseconds() == 0);
         assert(retainedComboTargetPlayer.trackedAttackTargetObjectId() ==
                8101);
 
@@ -9217,7 +9226,12 @@ int main() {
         assert(mixedComboPlayer.activeStateName() ==
                "k_state_kick_to_air_web_bind");
         mixedComboPlayer.update({}, gameplayCameraPose, 1070);
+        assert(mixedComboPlayer.activeStateId() == 93);
+        assert(mixedComboPlayer.animationTimeMilliseconds() == 0);
+        mixedComboPlayer.update({}, gameplayCameraPose, 1070);
         assert(mixedComboPlayer.activeStateId() == 95);
+        assert(mixedComboPlayer.animationTimeMilliseconds() == 0);
+        mixedComboPlayer.update({}, gameplayCameraPose, 100);
         const auto mixedComboOpeningPunch =
             mixedComboPlayer.consumeMeleeImpact();
         assert(mixedComboOpeningPunch &&
@@ -9237,7 +9251,13 @@ int main() {
                                         &playerStateConfigs));
         assert(launcherPlayer.requestPunch());
         launcherPlayer.update({}, gameplayCameraPose, 150);
-        assert(launcherPlayer.requestJump());
+        // CKeyPadCustomer::isKeyDown(key, 2) (0x002f9788) does not satisfy
+        // predicate 103 on the two wasKeyPressed samples. A new Cross/A press
+        // must not select the held uppercut; it becomes eligible only on the
+        // third keypad update while the key remains down.
+        assert(!launcherPlayer.requestJump());
+        assert(launcherPlayer.requestJump(
+            {}, {}, usm::game::PlayerButtonPhase::Held));
         assert(launcherPlayer.activeStateId() == 74);
         launcherPlayer.update({}, gameplayCameraPose, 183);
         assert(launcherPlayer.activeStateId() == 76);
@@ -9289,7 +9309,7 @@ int main() {
              aerialComboPlayer.position().z},
             40.0F, 9239, false, 150.0F};
         assert(aerialComboPlayer.requestJump());
-        aerialComboPlayer.update({}, gameplayCameraPose, 50);
+        aerialComboPlayer.update({}, gameplayCameraPose, 100);
         assert(aerialComboPlayer.requestPunch(flyKickTarget));
         assert(aerialComboPlayer.activeStateId() == 81);
         aerialComboPlayer.update({}, gameplayCameraPose, 100);
@@ -9371,6 +9391,7 @@ int main() {
                                            &bootstrap.playerHitEffectConfigs(),
                                            bootstrap.playerHitEffects()));
         assert(targetedAirPlayer.requestJump());
+        targetedAirPlayer.update({}, gameplayCameraPose, 100);
         const auto targetedAirStart = targetedAirPlayer.position();
         const usm::assets::Vector3 targetedAirTarget{
             100.0F, 0.0F, 100.0F};
@@ -9574,6 +9595,10 @@ int main() {
         assert(blinkStrikeChargeStop->stateId == 42);
         assert(blinkStrikeChargeStop->voxSoundId == 0x53);
         blinkStrikePlayer.update({}, gameplayCameraPose, 66);
+        assert(blinkStrikePlayer.activeAnimation() ==
+               "super_web_final_to_idle");
+        assert(blinkStrikePlayer.animationTimeMilliseconds() == 0);
+        blinkStrikePlayer.update({}, gameplayCameraPose, 34);
         const auto blinkStrikeImpact =
             blinkStrikePlayer.consumeMeleeImpact();
         assert(blinkStrikeImpact);
@@ -9581,7 +9606,7 @@ int main() {
         assert(blinkStrikeImpact->damage == 200.0F);
         assert(blinkStrikeImpact->hitType == 509);
         assert(blinkStrikeImpact->senseAttack);
-        blinkStrikePlayer.update({}, gameplayCameraPose, 67);
+        blinkStrikePlayer.update({}, gameplayCameraPose, 33);
         const auto blinkStrikeSplash =
             blinkStrikePlayer.consumeCombatEffect();
         assert(blinkStrikeSplash);
@@ -9653,13 +9678,24 @@ int main() {
         assert(ultimateWheelImpact && ultimateWheelImpact->stateId == 108);
         assert(ultimateWheelImpact->radialAttack);
         assert(ultimateWheelImpact->ultimateAttack);
-        ultimatePlayer.update({}, gameplayCameraPose, 299);
+        ultimatePlayer.update({}, gameplayCameraPose, 166);
+        // The state-108 entry effect was already aged by the complete native
+        // EffectManager tick in which it spawned. It survives that render at
+        // zero lifetime, then is reclaimed at the start of this next tick.
         assert(std::count_if(
                    ultimatePlayer.hitEffects().begin(),
                    ultimatePlayer.hitEffects().end(),
                    [](const auto& effect) { return effect.effectId == 23; }) ==
-               1);
-        ultimatePlayer.update({}, gameplayCameraPose, 900);
+               0);
+        // State 108 uses a 167 ms start clip followed by repeated 201 ms
+        // circle links until its independent 1200 ms phase expires. Native
+        // SwitchToNextLinkAnim returns for the tick at every boundary.
+        for (int circle = 0; circle < 5; ++circle) {
+            ultimatePlayer.update({}, gameplayCameraPose, 201);
+            assert(ultimatePlayer.activeStateId() == 108);
+            assert(ultimatePlayer.animationTimeMilliseconds() == 0);
+        }
+        ultimatePlayer.update({}, gameplayCameraPose, 28);
         assert(ultimatePlayer.activeStateId() == 109);
         assert(ultimatePlayer.hitEffects().size() == 1);
         assert(ultimatePlayer.hitEffects().front().effectId == 25);
@@ -10073,6 +10109,8 @@ int main() {
                     .durationMilliseconds() +
                 1U);
         assert(airWebDragPlayer.activeStateId() == 116);
+        assert(airWebDragPlayer.animationTimeMilliseconds() == 0);
+        airWebDragPlayer.update({}, gameplayCameraPose, 1);
         const auto whirlwindImpact = airWebDragPlayer.consumeMeleeImpact();
         assert(whirlwindImpact.has_value());
         assert(whirlwindImpact->stateId == 116);
@@ -10320,6 +10358,22 @@ int main() {
         assert(shortWebJumpPlayer.activeStateId() == 15);
         assert(shortWebJumpPlayer.activeAnimation() == "fall_idle");
         assert(shortWebJumpPlayer.airborne());
+
+        // UpdateKeyTrigger's StateBasic+0x34 gate also applies to movement
+        // states. Jump-start's authored first frame is 2, so none of its
+        // second-jump, punch, or web transitions may fire from frame zero.
+        usm::game::GameplayPlayer jumpGatePlayer;
+        assert(jumpGatePlayer.initialize(bootstrap.player(), nullptr,
+                                         &playerStateConfigs));
+        jumpGatePlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                 {1.0F, 0.0F, 0.0F});
+        assert(jumpGatePlayer.requestJump());
+        assert(!jumpGatePlayer.requestJump());
+        assert(!jumpGatePlayer.requestPunch());
+        assert(!jumpGatePlayer.requestWeb());
+        jumpGatePlayer.update({}, gameplayCameraPose, 100);
+        assert(jumpGatePlayer.requestPunch());
+        assert(jumpGatePlayer.activeStateId() == 81);
 
         usm::game::GameplayPlayer wallPlayer;
         assert(wallPlayer.initialize(bootstrap.player(),

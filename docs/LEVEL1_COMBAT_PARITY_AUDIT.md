@@ -127,6 +127,29 @@ makes a premature counter available.
   updates rather than two input samples inside one gameplay tick. The former
   one-update edge shortened every real controller/keyboard combo opportunity
   relative to the original even though scripted autoplay taps still passed.
+- `CKeyPadCustomer::isKeyDown(key, 2)` (`0x002f9788`) accepts only keypad
+  states greater than 2. `Player::UpdateKeyTrigger` (`0x0034d0a4`) uses that
+  call for predicate 103, so a new Cross/A press during a punch is not the
+  held uppercut branch: states 1 and 2 remain press edges, and the held branch
+  begins on the third update. Jump-start's state-level frame-2 input gate is
+  now applied to punch, web, and second-jump requests as well as class-four
+  attacks. The former path accepted all four actions too early.
+- `Player::UpdateAttacks` (`0x00351204`) returns immediately after
+  `SetNextStateId` at `0x00353352`, and also after
+  `SwitchToNextLinkAnim`. A combo state or recovery clip entered on the
+  current tick therefore starts at animation time zero; unused time from the
+  completed predecessor is not applied to it. The portable attack runner now
+  preserves this tick boundary, including under deliberately oversized test
+  deltas.
+- `CLevel::Update` (`0x003820bc`) updates Player before EffectManager.
+  `Player::AddHitEffect` (`0x00348dc4`) therefore captures the current animated
+  bone pose, then `EffectManager::Update`/`CAnimObjEffect::Update`
+  (`0x00391b7c`/`0x00390a88`) age and drift the newly created effect by the full
+  current tick. The portable effect clock now preserves that ordering instead
+  of back-dating both the captured pose and age to the authored event
+  threshold. As in the native pool, an effect that reaches zero during the
+  update remains allocated through that render and is reclaimed on the next
+  manager update.
 - `Player::CheckFrame` (`0x003403fc`) converts authored frames through integer
   `(frame * 2) / 3`. `FrameFixedTimelineController::getCurrentClipFrame`
   (`0x003906c8`) rounds the 50 ms runtime frame with `time / 50 + 0.5`, so

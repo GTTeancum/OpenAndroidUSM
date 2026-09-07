@@ -2933,6 +2933,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             const bool punchPressed = autoplay
                 ? autoplayInput.punchPressed
                 : keyRouter_.state().punch.pressed;
+            const bool punchHeld = !punchPressed && !autoplay &&
+                keyRouter_.state().punch.held;
             const bool spiderSensePressed = autoplay
                 ? autoplayInput.spiderSensePressed
                 : keyRouter_.state().spiderSense.pressed;
@@ -3359,9 +3361,13 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     playerAttackTarget = attackTarget->target;
                 }
             }
-            if (controlsEnabled && punchPressed && !rescuePressed) {
+            if (controlsEnabled && (punchPressed || punchHeld) &&
+                !rescuePressed) {
                 const bool accepted = gameplayPlayer_.requestPunch(
-                    playerAttackTarget, attackDirection);
+                    punchPressed ? playerAttackTarget : std::nullopt,
+                    punchPressed ? attackDirection : std::nullopt,
+                    punchPressed ? game::PlayerButtonPhase::Pressed
+                                 : game::PlayerButtonPhase::Held);
                 if (autoplay && accepted) {
                     autoplay->recordEvent(
                         syntheticElapsedMilliseconds, "player_action",
