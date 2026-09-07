@@ -416,6 +416,7 @@ int main() {
         assert(gameRenderer.readBackImage(punchWithTrail));
         captureIfRequested(punchWithTrail, "gameplay-punch-hit-trail.bmp");
         std::size_t hitTrailChangedPixels = 0;
+        std::size_t hitTrailDarkenedChannels = 0;
         for (std::size_t component = 0;
              component < punchWithTrail.pixels.size(); component += 4) {
             hitTrailChangedPixels +=
@@ -425,8 +426,19 @@ int main() {
                     punchWithTrail.pixels[component + 1] ||
                 punchWithoutTrail.pixels[component + 2] !=
                     punchWithTrail.pixels[component + 2];
+            for (std::size_t channel = 0; channel < 3; ++channel) {
+                hitTrailDarkenedChannels +=
+                    punchWithTrail.pixels[component + channel] <
+                    punchWithoutTrail.pixels[component + channel];
+            }
         }
         assert(hitTrailChangedPixels > 5);
+        // Ordinary trails select native material 0x1d. Registration order in
+        // Application::Init (0x003e1c78) resolves that to
+        // ADDITIVE_MODULATE_NONTRANSPARENT; its onSetMaterial at 0x00396f68
+        // installs GL_SRC_ALPHA,GL_ONE. The effect may brighten or saturate a
+        // destination channel, but it cannot darken one.
+        assert(hitTrailDarkenedChannels == 0);
 
         usm::game::GameplayPlayer noHitEffectsPlayer;
         assert(noHitEffectsPlayer.initialize(levelOne.player()));

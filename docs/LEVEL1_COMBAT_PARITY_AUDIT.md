@@ -180,8 +180,12 @@ makes a premature counter available.
   `0x00348fb2`/`0x00348ff0`). The `0x00348f00` wrapper preserves that value,
   `Player::AddHitEffect` at `0x00348dc4` forwards it as the final
   `EffectManager::ThrowAnimEffect` argument, and `CAnimObjEffect::Init`
-  (`0x00390bb8`) consequently assigns material type `0x1d`. Ordinary
-  punch/kick trails therefore use the subtract-ambient renderer, not `0x1e`.
+  (`0x00390bb8`) consequently assigns material type `0x1d`. The OpenGLES
+  driver installs 27 built-ins at `0x00443d70`, and `Application::Init`
+  (`0x003e1c78`) registers `ADDITIVE_MODULATE_NONTRANSPARENT` third, so
+  ordinary punch/kick trails use its `GL_MODULATE` plus
+  `GL_SRC_ALPHA,GL_ONE` renderer at `0x00396f68`. They do not use an ambient
+  add/subtract combiner.
 - `CAnimObjEffect::Init` (`0x00390bb8`) gives snapshot trails the player's
   orientation plus the authored bone position; it does not retain the bone's
   rotation. Live attachments retain the complete bone transform.
@@ -301,8 +305,8 @@ than parity with this shipped build.
 ## Automated acceptance
 
 The coherent Release run in
-`analysis/generated/first-encounter-parity-verified/suite-manifest.json`
-completed all 23 selected scenarios with 23 passes and zero failures. The
+`analysis/generated/first-encounter-material-id-fix/suite-manifest.json`
+completed all 33 selected scenarios with 33 passes and zero failures. The
 current retained gates are:
 
 - `OpenAndroidUSM.CoreTests.exe`
@@ -310,30 +314,36 @@ current retained gates are:
 - `first-encounter-health-damage-audit.usmauto` (53/53)
 - `first-encounter-full-combo-effects.usmauto` (47/47)
 - `first-encounter-simultaneous-input-order.usmauto` (20/20)
-- `first-encounter-alternate-combat-effects.usmauto` (80/80)
+- `first-encounter-alternate-combat-effects.usmauto` (82/82)
 - `combat-effects-parity-gate.usmauto` (43/43)
 - `first-encounter-normal-progression.usmauto` (14/14)
 - `first-encounter-ground-web-bind-parity.usmauto` (21/21)
 - `first-encounter-ground-web-throw-parity.usmauto` (32/32)
 - `first-encounter-punch-web-throw-parity.usmauto` (30/30)
-- `first-encounter-air-web-knockdown-parity.usmauto` (26/26)
-- `first-encounter-air-web-throw-parity.usmauto` (25/25)
-- `first-encounter-air-kick-down-combo-parity.usmauto` (29/29)
+- `first-encounter-air-web-knockdown-parity.usmauto` (27/27)
+- `first-encounter-air-web-throw-parity.usmauto` (26/26)
+- `first-encounter-air-kick-down-combo-parity.usmauto` (30/30)
 - `first-encounter-jump-release-parity.usmauto` (37/37)
 - `first-encounter-launcher-parity.usmauto` (23/23)
 - `first-encounter-crowd-separation.usmauto` (11/11)
 - `first-encounter-spider-sense-counter.usmauto` (17/17)
+- `first-encounter-spider-sense-back-counter.usmauto` (17/17)
+- `first-encounter-spider-sense-left-counter.usmauto` (17/17)
+- `first-encounter-spider-sense-right-counter.usmauto` (17/17)
 - `first-encounter-spider-sense-air-evade.usmauto` (16/16)
-- `first-encounter-spider-sense-blink-strike.usmauto` (23/23)
+- `first-encounter-spider-sense-blink-strike.usmauto` (24/24)
 - `first-encounter-ground-web-directional-throw-parity.usmauto` (23/23)
 - `first-encounter-ground-web-drag-down-parity.usmauto` (32/32)
-- `first-encounter-air-target-kick-parity.usmauto` (31/31)
-- `first-encounter-air-web-grab-parity.usmauto` (32/32)
+- `first-encounter-air-target-kick-parity.usmauto` (32/32)
+- `first-encounter-air-web-grab-parity.usmauto` (33/33)
 - `first-encounter-melee-miss-parity.usmauto` (18/18)
 - `first-encounter-enemy-interruption-parity.usmauto` (18/18)
 - `first-encounter-enemy-offense-parity.usmauto` (31/31)
 - `first-encounter-web-pellet-render.usmauto` (12/12)
-- `player-button-combat-probe.usmauto` (29/29)
+- `first-encounter-far-combo-parity.usmauto` (20/20)
+- `first-encounter-manual-combat.usmauto` (19/19)
+- `first-encounter-presentation.usmauto` (10/10)
+- `player-button-combat-probe.usmauto` (30/30)
 
 These gates establish the audited source facts and catch their regressions.
 They are not a blanket claim of parity for later-level enemy types,
@@ -350,24 +360,3 @@ behavior-slot-8 block state, so adding a block response would be invention.
   selection/randomization path and its asset/material inputs from the native
   executable and data, then reproduce that distribution deterministically in
   tests. Do not substitute a hand-authored palette or guessed random choice.
-- Finish the hit-effect alpha-combiner audit before changing its presentation.
-  Native material renderers `0x00397028` and `0x00397360` both install
-  `GL_COMBINE_ALPHA = GL_SUBTRACT` with texture alpha as source zero and the
-  material constant as source one, then use source-alpha blending.
-  A complete `glTexEnvi` caller inventory and whole-program instruction scan
-  found no write to `GL_OPERAND0_ALPHA` (`0x8598`) or
-  `GL_OPERAND1_ALPHA` (`0x8599`), so the default `GL_SRC_ALPHA` operands
-  apply. The right-punch BDAE stores ambient bytes `95 95 95 FF`; native
-  `ISceneNode::setMaterialAmbientColor` (`0x0040879c`) and the renderer's byte
-  reads confirm a constant alpha of one. This makes the literal native alpha
-  equation clamp to zero and remains a real unresolved contradiction, not
-  permission to substitute an appearance-derived blend.
-  A complete hit-effect animation census also rules out an animated ambient
-  constant: effects 0--23 and 26--28 have no animation tracks; effects
-  24/25/29/30 contain only node rotation, node scale, and morph-weight tracks,
-  with no material-color target.
-  `CAnimObjEffect::Update` (`0x00390a88`) separately animates the material's
-  diffuse alpha. The portable shader currently multiplies coverage by that
-  animated alpha; resolve how the original fixed-function vertex/material
-  path combines those two values and pin it with pixels rather than replacing
-  it from appearance alone.

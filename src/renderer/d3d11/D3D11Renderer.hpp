@@ -150,12 +150,11 @@ private:
         bool alphaTest{};
         bool alphaBlend{};
         bool additiveBlend{};
-        bool effectColorMask{};
-        // CAnimObjEffect::Init replaces every effect material with native
-        // type 0x1d (-1, subtract ambient RGB) or 0x1e (+1, add ambient RGB).
-        // Zero leaves ordinary scene materials on their authored renderer.
-        std::int8_t effectMaterialMode{};
-        std::array<float, 4> effectAmbientColor{};
+        // Native material 0x1e performs GL_GREATER against the source
+        // material's SMaterial::MaterialTypeParam. This is separate from the
+        // fixed 0.5 alpha-test material used by ordinary scene geometry.
+        bool effectAlphaTest{};
+        float effectAlphaReference{};
         std::uint32_t renderingLayer{};
         bool backFaceCulling{true};
         bool frontFaceCulling{};
@@ -241,7 +240,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> lightmapVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> effectColorMaskPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> effectAlphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> lightmapPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> lightmapAlphaTestPixelShader_;
@@ -255,7 +254,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> viewRotationBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> textureTransformBuffer_;
-    Microsoft::WRL::ComPtr<ID3D11Buffer> effectMaterialBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> effectAlphaTestBuffer_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> frontCullRasterizerState_;

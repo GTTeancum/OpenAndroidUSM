@@ -71,8 +71,13 @@ struct ColladaMaterial {
     bool backFaceCulling{};
     bool frontFaceCulling{};
     bool transparentAlphaChannel{};
+    // CMaterial::prepareMaterial (0x0041ca8c-0x0041ca9e) copies SEffect+0x2c
+    // into SMaterial::MaterialTypeParam (+0x4c). Custom material 0x1e uses
+    // that value as its GL_GREATER alpha-test reference at 0x00397842.
+    float materialTypeParameter{};
     // SEffect ambient is copied byte-for-byte into SMaterial::AmbientColor.
-    // The game's custom combat-effect renderers use it as GL_TEXTURE_ENV_COLOR.
+    // The later custom ambient-combiner renderers use it as
+    // GL_TEXTURE_ENV_COLOR; CAnimObjEffect's 0x1d/0x1e pair does not.
     std::array<float, 4> ambientColor{};
 };
 

@@ -4786,8 +4786,9 @@ void GameplayPlayer::queueAttackFrameEvents(
                 // at 0x00348fae and 0x00348fec. Player::AddHitEffect
                 // (0x00348f00/0x00348dc4) forwards that value as the final
                 // ThrowAnimEffect argument, so CAnimObjEffect::Init
-                // (0x00390bb8) selects material 0x1d, the native
-                // subtract-ambient renderer, for ordinary combat trails.
+                // (0x00390bb8) selects material 0x1d. Application::Init's
+                // registration order maps that ID to the native
+                // additive-modulate renderer at 0x00396f68.
                 queueHitEffect(effectId,
                                latestCrossedEffectElapsedMilliseconds, 0, {},
                                1.0F, true);
@@ -4883,7 +4884,7 @@ void GameplayPlayer::queueHitEffect(
     std::int16_t effectId, std::uint32_t elapsedMilliseconds,
     std::uint32_t lifetimeOverrideMilliseconds,
     std::string_view boneNameOverride, float uniformScale,
-    bool subtractAmbientMaterial) noexcept {
+    bool additiveModulateMaterial) noexcept {
     if (hitEffectDatabase_ == nullptr) {
         return;
     }
@@ -4950,7 +4951,7 @@ void GameplayPlayer::queueHitEffect(
         boneNameOverride,
         uniformScale,
         fadeWithLifetime,
-        subtractAmbientMaterial,
+        additiveModulateMaterial,
     });
     if (pendingHitEffectSpawnCount_ < pendingHitEffectSpawns_.size()) {
         pendingHitEffectSpawns_[pendingHitEffectSpawnCount_++] = {
@@ -4962,7 +4963,7 @@ void GameplayPlayer::queueHitEffect(
             fadeDuration,
             uniformScale,
             !definition->snapshotBoneTransform,
-            subtractAmbientMaterial,
+            additiveModulateMaterial,
             definition->snapshotBoneTransform
                 ? assets::Vector3{}
                 : attackPhysicsVelocity_,

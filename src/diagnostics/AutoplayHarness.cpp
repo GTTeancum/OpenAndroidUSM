@@ -299,7 +299,7 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
            "secondary_index,secondary_image,secondary_path,"
            "secondary_has_alpha,lightmap_index,lightmap_image,lightmap_path,"
            "lightmap_has_alpha,secondary_mode,material_additive,back_face_culling,"
-           "front_face_culling,transparent_alpha_channel,"
+           "front_face_culling,transparent_alpha_channel,material_type_parameter,"
            "uses_uv2,vertex_alpha_min,vertex_alpha_max,min_x,min_y,min_z,"
            "max_x,max_y,max_z\n";
     textureAssetLog_
@@ -4288,6 +4288,9 @@ void AutoplayHarness::recordMaterialAssets(
                     << ','
                     << (material != nullptr &&
                         material->transparentAlphaChannel)
+                    << ','
+                    << (material == nullptr ? 0.0F
+                                            : material->materialTypeParameter)
                     << ',' << buffer.usesSecondaryTextureCoordinates << ','
                     << alphaMinimum << ',' << alphaMaximum << ','
                     << indexedBounds.minimum.x << ','
@@ -4396,6 +4399,17 @@ void AutoplayHarness::recordMaterialAssets(
     for (const game::CinematicActorAsset& actor : level.introActors()) {
         recordMesh("intro_actor", actor.objectId, actor.sceneNodeName, 0, false,
                    actor.sceneNodeName, actor.mesh, actor.textures);
+    }
+    for (const game::PlayerHitEffectAsset& effect :
+         level.playerHitEffects()) {
+        // Player::LoadHitEffects (0x00344ab4) preloads this complete table.
+        // Keep its source materials and decoded texture alpha in every asset
+        // census so CAnimObjEffect's 0x1d/0x1e override can be audited from
+        // shipped data rather than renderer screenshots.
+        recordMesh("player_hit_effect", effect.definition.id,
+                   effect.definition.name, 0, false,
+                   effect.definition.meshFile, effect.mesh,
+                   effect.textures);
     }
     for (const game::LevelCinematicAsset& cinematic : level.cinematics()) {
         for (const game::CinematicActorAsset& actor : cinematic.actors) {

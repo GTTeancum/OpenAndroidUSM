@@ -116,9 +116,10 @@ struct PlayerHitEffectState {
     float uniformScale{1.0F};
     bool fadeWithLifetime{true};
     // CAnimObjEffect::Init selects custom material 0x1d when true and 0x1e
-    // otherwise. The native renderers are TRANSPARENT_SUB_AMBIENT_COLOR and
-    // TRANSPARENT_ADD_COLOR_SUB_ALPHA respectively.
-    bool subtractAmbientMaterial{};
+    // otherwise. Application::Init registers those IDs as
+    // ADDITIVE_MODULATE_NONTRANSPARENT and
+    // TRANSPARENT_ALPHA_CHANNEL_WITH_VERTEX_ALPHA respectively.
+    bool additiveModulateMaterial{};
 };
 
 struct PlayerHitEffectSpawnEvent {
@@ -129,7 +130,7 @@ struct PlayerHitEffectSpawnEvent {
     std::uint32_t fadeDurationMilliseconds{};
     float uniformScale{1.0F};
     bool followsPlayerBone{};
-    bool subtractAmbientMaterial{};
+    bool additiveModulateMaterial{};
     assets::Vector3 capturedPhysicsVelocity;
 };
 
@@ -499,7 +500,7 @@ private:
                         std::uint32_t lifetimeOverrideMilliseconds = 0,
                         std::string_view boneNameOverride = {},
                         float uniformScale = 1.0F,
-                        bool subtractAmbientMaterial = false) noexcept;
+                        bool additiveModulateMaterial = false) noexcept;
     void queueSpecialAttackEffects(std::uint32_t previousMilliseconds,
                                    std::uint32_t currentMilliseconds) noexcept;
     [[nodiscard]] const PlayerStateDefinition*

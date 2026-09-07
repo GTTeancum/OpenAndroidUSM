@@ -1995,16 +1995,37 @@ as evidence for death behavior.
 
 ## Native combat effects and ultimate timing
 
-Normal-suit attack trails are driven by the packaged `PlayerHitEffect.xml`
+Normal-suit attack trails are driven by the packaged `MCHitEffects.bin`
 records and their referenced Collada meshes rather than by generated desktop
 particles. `Player::SetNextStateId` installs the ordinary attack effects and
-the ultimate sequence's IDs 24, 22/23, and 25. Native material selectors
-`0x1e` and `0x1d` use the fixed-function add/subtract combine paths with
-source-alpha blending; the D3D11 effect mask path derives coverage from the
-shipped PVRTC color map so those meshes do not become opaque black planes.
-The production autoplay trace records every effect ID, bone, lifetime, scale,
-follow mode, and native material selector, while renderer A/B regressions pin
-the first punch, ultimate wheel, and ultimate-in pixels.
+the ultimate sequence's IDs 24, 22/23, and 25.
+
+The complete native material-ID chain is now resolved. OpenGLES driver
+`createMaterialRenderers` (`0x00443d70`) installs 27 built-in renderers, so
+the first custom renderer registered by `Application::Init` (`0x003e1c78`)
+is ID `0x1b`; `CMaterial::prepareMaterial` independently confirms that base by
+assigning `0x1b` to the first registered `nontransparent_alpha_test` type.
+The third and fourth registrations are consequently:
+
+- `0x1d`: `ADDITIVE_MODULATE_NONTRANSPARENT`; its renderer at `0x00396f68`
+  selects `GL_MODULATE`, enables blending, and installs
+  `GL_SRC_ALPHA, GL_ONE`.
+- `0x1e`: `TRANSPARENT_ALPHA_CHANNEL_WITH_VERTEX_ALPHA`; its renderer at
+  `0x00397780` modulates texture RGBA with primary `COLOR0`, installs
+  `GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA`, and performs `GL_GREATER` against
+  `SMaterial::MaterialTypeParam` at `+0x4c`.
+
+The previous association of these IDs with the later ambient add/subtract
+renderers was incorrect: those appear at IDs `0x24` and `0x25`. The D3D11
+path now reproduces the actual `0x1d/0x1e` blend and alpha-test states and no
+longer synthesizes coverage or applies ambient RGB arithmetic. The BDAE asset
+census records `SEffect+0x2c`, which `CMaterial::prepareMaterial`
+(`0x0041ca8c`--`0x0041ca9e`) copies to the alpha reference; all 57 material
+records across the 31 shipped hit-effect meshes author `0.0`. The production
+autoplay trace records every effect ID, bone, lifetime, scale, follow mode,
+and native material selector, while renderer regressions pin the first punch
+as a non-darkening additive pass plus the ultimate wheel and ultimate-in
+pixels.
 
 The event clock is native rather than an assumed 30 FPS conversion.
 `Player::CheckFrame` at `0x003403fc` maps each authored combat frame through

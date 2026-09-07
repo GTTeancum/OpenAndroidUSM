@@ -1704,8 +1704,10 @@ int main() {
             bootstrap.playerHitEffects()[0].mesh.materials();
         assert(!rightPunchMaterials.empty());
         for (const auto& material : rightPunchMaterials) {
-            // SEffect stores FF959595. Material 0x1e consumes its RGB as the
-            // exact GL_TEXTURE_ENV_COLOR for the add combiner.
+            // SEffect stores FF959595, but CAnimObjEffect's 0x1d/0x1e
+            // renderers do not consume AmbientColor. Retain it so the BDAE
+            // mapping remains complete and distinct from the later custom
+            // ambient-combiner IDs 0x20-0x25.
             assert(std::abs(material.ambientColor[0] - 149.0F / 255.0F) <
                    0.0001F);
             assert(std::abs(material.ambientColor[1] - 149.0F / 255.0F) <
@@ -1713,6 +1715,7 @@ int main() {
             assert(std::abs(material.ambientColor[2] - 149.0F / 255.0F) <
                    0.0001F);
             assert(material.ambientColor[3] == 1.0F);
+            assert(material.materialTypeParameter == 0.0F);
         }
         const auto& rightPunchTextures =
             bootstrap.playerHitEffects()[0].textures;
@@ -1741,6 +1744,13 @@ int main() {
             assert(effect.definition.id == effectIndex);
             assert(!effect.mesh.sceneGeometries().empty());
             assert(effect.mesh.images().size() == effect.textures.size());
+            for (const auto& material : effect.mesh.materials()) {
+                // CMaterial::prepareMaterial (0x0041ca8c) copies SEffect+0x2c
+                // to SMaterial+0x4c. Material 0x1e reads this exact value at
+                // 0x00397842 for GL_GREATER; all shipped hit-effect records
+                // author zero, not the unrelated 0.5 alpha-test constant.
+                assert(material.materialTypeParameter == 0.0F);
+            }
         }
         assert(bootstrap.playerHitEffects()[24].animation.clips().size() == 2);
         assert(bootstrap.playerHitEffects()[24].animation.clips()[1].name ==
@@ -8077,12 +8087,12 @@ int main() {
                usm::game::EnemyLandingAnimatedEffectKind::Shockwave);
         assert(landingModels[0].scale == 1.5F);
         assert(landingModels[0].lifetimeMilliseconds == 1000);
-        assert(landingModels[0].subtractAmbientMaterial);
+        assert(landingModels[0].additiveModulateMaterial);
         assert(landingModels[1].kind ==
                usm::game::EnemyLandingAnimatedEffectKind::CrashWall);
         assert(landingModels[1].scale == 5.0F);
         assert(landingModels[1].lifetimeMilliseconds == 5000);
-        assert(!landingModels[1].subtractAmbientMaterial);
+        assert(!landingModels[1].additiveModulateMaterial);
         const auto landingModelSpawns =
             kickdownLandingRuntime
                 .consumeLandingAnimatedEffectSpawnEvents();
@@ -8091,12 +8101,12 @@ int main() {
                usm::game::EnemyLandingAnimatedEffectKind::Shockwave);
         assert(landingModelSpawns[0].scale == 1.5F);
         assert(landingModelSpawns[0].lifetimeMilliseconds == 1000);
-        assert(landingModelSpawns[0].subtractAmbientMaterial);
+        assert(landingModelSpawns[0].additiveModulateMaterial);
         assert(landingModelSpawns[1].kind ==
                usm::game::EnemyLandingAnimatedEffectKind::CrashWall);
         assert(landingModelSpawns[1].scale == 5.0F);
         assert(landingModelSpawns[1].lifetimeMilliseconds == 5000);
-        assert(!landingModelSpawns[1].subtractAmbientMaterial);
+        assert(!landingModelSpawns[1].additiveModulateMaterial);
         assert(kickdownLandingRuntime
                    .consumeLandingAnimatedEffectSpawnEvents()
                    .empty());
@@ -9078,7 +9088,7 @@ int main() {
                300);
         assert(gameplayPlayer.hitEffects().front().fadeDurationMilliseconds ==
                300);
-        assert(gameplayPlayer.hitEffects().front().subtractAmbientMaterial);
+        assert(gameplayPlayer.hitEffects().front().additiveModulateMaterial);
         assert(!gameplayPlayer.hitEffects().front().followsPlayerBone);
         assert(gameplayPlayer.hitEffects().front().elapsedMilliseconds == 1);
         assert(gameplayPlayer.hitEffects().front()
@@ -9260,7 +9270,7 @@ int main() {
             gameplayPlayer.hitEffects().end(),
             [](const auto& effect) {
                 return effect.effectId == 1 &&
-                       effect.subtractAmbientMaterial;
+                       effect.additiveModulateMaterial;
             }));
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.activeStateId() == 75);
@@ -9277,7 +9287,7 @@ int main() {
             gameplayPlayer.hitEffects().end(),
             [](const auto& effect) {
                 return effect.effectId == 10 &&
-                       effect.subtractAmbientMaterial;
+                       effect.additiveModulateMaterial;
             }));
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.activeStateId() == 79);
@@ -9305,7 +9315,7 @@ int main() {
                    gameplayPlayer.hitEffects().begin(),
                    gameplayPlayer.hitEffects().end(), [](const auto& effect) {
                        return effect.effectId == 5 &&
-                              effect.subtractAmbientMaterial;
+                              effect.additiveModulateMaterial;
                    }) == 1);
         assert(gameplayPlayer.punchTransitionReadyAfterImpact());
         assert(gameplayPlayer.requestPunch());
@@ -9551,7 +9561,7 @@ int main() {
         assert(targetedAirPlayer.hitEffects().front().lifetimeMilliseconds ==
                targetedAirEffectLifetime);
         assert(!targetedAirPlayer.hitEffects().front()
-                    .subtractAmbientMaterial);
+                    .additiveModulateMaterial);
 
         usm::game::GameplayPlayer sensePlayer;
         assert(sensePlayer.initialize(bootstrap.player(), nullptr,
@@ -9795,7 +9805,7 @@ int main() {
             ultimatePlayer.hitEffects().begin(),
             ultimatePlayer.hitEffects().end(), [](const auto& effect) {
                 return effect.effectId != 22 ||
-                       effect.subtractAmbientMaterial;
+                       effect.additiveModulateMaterial;
             }));
         assert(std::count_if(
                    ultimatePlayer.hitEffects().begin(),

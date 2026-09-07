@@ -417,7 +417,7 @@ struct EnemyLandingAnimatedEffectState {
     float scale{1.0F};
     std::uint32_t lifetimeMilliseconds{};
     std::uint32_t elapsedMilliseconds{};
-    bool subtractAmbientMaterial{};
+    bool additiveModulateMaterial{};
     bool active{};
 };
 
@@ -429,7 +429,7 @@ struct EnemyLandingAnimatedEffectSpawnEvent {
     assets::Vector3 position;
     float scale{1.0F};
     std::uint32_t lifetimeMilliseconds{};
-    bool subtractAmbientMaterial{};
+    bool additiveModulateMaterial{};
 };
 
 enum class EnemyProjectileEventKind {

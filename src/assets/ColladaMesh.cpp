@@ -637,6 +637,12 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
         material.diffuseImageIndex = imageIndexFromReference(*primaryImage);
         material.secondaryImageIndex = imageIndexFromReference(*secondaryImage);
         const std::uint32_t effect = *effectArray + *effectIndex * kEffectSize;
+        const auto materialTypeParameter = view.floating(effect + 0x2c);
+        if (!materialTypeParameter) {
+            return Result::failure(
+                "BDAE material type parameter is truncated");
+        }
+        material.materialTypeParameter = *materialTypeParameter;
         const auto ambientUsesTextures =
             view.integer<std::uint8_t>(effect + 0x08);
         const auto ambientPayload =

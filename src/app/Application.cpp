@@ -3762,8 +3762,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ";follows_bone=" +
                             std::to_string(effect->followsPlayerBone) +
                             ";material=" +
-                            (effect->subtractAmbientMaterial ? "0x1d"
-                                                             : "0x1e") +
+                            (effect->additiveModulateMaterial ? "0x1d"
+                                                              : "0x1e") +
                             ";velocity_x=" +
                             std::to_string(
                                 effect->capturedPhysicsVelocity.x) +
@@ -4794,9 +4794,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ";lifetime_ms=" +
                             std::to_string(event.lifetimeMilliseconds) +
                             ";material=" +
-                            std::string(event.subtractAmbientMaterial
-                                            ? "0x1d_sub_ambient"
-                                            : "0x1e_add_color_sub_alpha") +
+                            std::string(event.additiveModulateMaterial
+                                            ? "0x1d_additive_modulate"
+                                            : "0x1e_texture_vertex_alpha") +
                             ";x=" + std::to_string(event.position.x) +
                             ";y=" + std::to_string(event.position.y) +
                             ";z=" + std::to_string(event.position.z));

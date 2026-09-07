@@ -35,8 +35,7 @@ struct GpuVertex {
     std::uint32_t color;
 };
 
-struct EffectMaterialConstants {
-    DirectX::XMFLOAT4 ambientColor;
+struct EffectAlphaTestConstants {
     DirectX::XMFLOAT4 parameters;
 };
 
@@ -208,18 +207,17 @@ float4 main(PixelInput input) : SV_TARGET {
 }
 )hlsl";
 
-// CAnimObjEffect::Init selects material 0x1d or 0x1e. Their native GLES
-// renderers at 0x00397360/0x00397028 select GL_SUBTRACT/GL_ADD for RGB with
-// the material ambient color as GL_CONSTANT. Both select the texture as the
-// alpha source. Diffuse alpha is animated by CAnimObjEffect::Update and is
-// carried in COLOR0 here. RGB-only PVRTC maps need their authored intensity
-// as coverage because the native loader supplies a synthetic alpha of one.
-constexpr std::string_view kEffectColorMaskPixelShader = R"hlsl(
+// CAnimObjEffect material 0x1e maps to
+// TRANSPARENT_ALPHA_CHANNEL_WITH_VERTEX_ALPHA (0x00397780). It modulates
+// texture RGBA with primary COLOR0, uses source-alpha blending, and performs
+// GL_GREATER against SMaterial::MaterialTypeParam (+0x4c). The comparison is
+// kept explicit because HLSL clip() accepts equality while GL_GREATER does
+// not.
+constexpr std::string_view kEffectAlphaTestPixelShader = R"hlsl(
 Texture2D DiffuseTexture : register(t0);
 SamplerState DiffuseSampler : register(s0);
-cbuffer EffectMaterialBuffer : register(b0) {
-    float4 AmbientColor;
-    float4 EffectMaterialParameters;
+cbuffer EffectAlphaTestBuffer : register(b0) {
+    float4 EffectAlphaTestParameters;
 };
 
 struct PixelInput {
@@ -230,17 +228,13 @@ struct PixelInput {
 };
 
 float4 main(PixelInput input) : SV_TARGET {
-    float4 textureColor =
-        DiffuseTexture.Sample(DiffuseSampler, input.textureCoordinate);
-    float mode = EffectMaterialParameters.x;
-    float syntheticAlpha = EffectMaterialParameters.y;
-    float3 combinedRgb = mode < 0.0
-        ? saturate(textureColor.rgb - AmbientColor.rgb)
-        : saturate(textureColor.rgb + AmbientColor.rgb);
-    float rgbCoverage = max(textureColor.r,
-                            max(textureColor.g, textureColor.b));
-    float coverage = lerp(textureColor.a, rgbCoverage, syntheticAlpha);
-    return float4(combinedRgb, coverage * input.color.a);
+    float4 diffuse =
+        DiffuseTexture.Sample(DiffuseSampler, input.textureCoordinate) *
+        input.color;
+    if (diffuse.a <= EffectAlphaTestParameters.x) {
+        discard;
+    }
+    return diffuse;
 }
 )hlsl";
 
@@ -1077,19 +1071,19 @@ Result D3D11Renderer::createPipeline() {
     if (FAILED(callResult)) {
         return hresultFailure("ID3D11Device::CreatePixelShader", callResult);
     }
-    ComPtr<ID3DBlob> effectColorMaskPixelBytecode;
-    result = compileShader(kEffectColorMaskPixelShader, "ps_5_0",
-                           effectColorMaskPixelBytecode);
+    ComPtr<ID3DBlob> effectAlphaTestPixelBytecode;
+    result = compileShader(kEffectAlphaTestPixelShader, "ps_5_0",
+                           effectAlphaTestPixelBytecode);
     if (!result) {
         return result;
     }
     callResult = device_->CreatePixelShader(
-        effectColorMaskPixelBytecode->GetBufferPointer(),
-        effectColorMaskPixelBytecode->GetBufferSize(), nullptr,
-        &effectColorMaskPixelShader_);
+        effectAlphaTestPixelBytecode->GetBufferPointer(),
+        effectAlphaTestPixelBytecode->GetBufferSize(), nullptr,
+        &effectAlphaTestPixelShader_);
     if (FAILED(callResult)) {
         return hresultFailure(
-            "ID3D11Device::CreatePixelShader(effect color mask)",
+            "ID3D11Device::CreatePixelShader(effect alpha test)",
             callResult);
     }
     ComPtr<ID3DBlob> lightmapPixelBytecode;
@@ -1277,15 +1271,15 @@ Result D3D11Renderer::createPipeline() {
         return hresultFailure(
             "ID3D11Device::CreateBuffer(texture transform)", callResult);
     }
-    D3D11_BUFFER_DESC effectMaterialDescription{};
-    effectMaterialDescription.ByteWidth = sizeof(EffectMaterialConstants);
-    effectMaterialDescription.Usage = D3D11_USAGE_DEFAULT;
-    effectMaterialDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    callResult = device_->CreateBuffer(&effectMaterialDescription, nullptr,
-                                       &effectMaterialBuffer_);
+    D3D11_BUFFER_DESC effectAlphaTestDescription{};
+    effectAlphaTestDescription.ByteWidth = sizeof(EffectAlphaTestConstants);
+    effectAlphaTestDescription.Usage = D3D11_USAGE_DEFAULT;
+    effectAlphaTestDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    callResult = device_->CreateBuffer(&effectAlphaTestDescription, nullptr,
+                                       &effectAlphaTestBuffer_);
     if (FAILED(callResult)) {
         return hresultFailure(
-            "ID3D11Device::CreateBuffer(effect material)", callResult);
+            "ID3D11Device::CreateBuffer(effect alpha test)", callResult);
     }
     D3D11_BUFFER_DESC webLineDescription{};
     // Player owns at most two simultaneous CobWebs in the reconstructed
@@ -1331,7 +1325,10 @@ Result D3D11Renderer::createPipeline() {
     blendDescription.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
     blendDescription.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     blendDescription.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blendDescription.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    // Every native glBlendFunc call applies the same factors to RGB and
+    // alpha. Preserve GL_SRC_ALPHA rather than substituting D3D's common
+    // straight-alpha convention for the alpha channel.
+    blendDescription.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
     blendDescription.RenderTarget[0].DestBlendAlpha =
         D3D11_BLEND_INV_SRC_ALPHA;
     blendDescription.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
@@ -1896,16 +1893,14 @@ Result D3D11Renderer::uploadLevelOneScene(
             // CAnimObjEffect::Init (0x00390bb8) replaces every source
             // material with native type 0x1d or 0x1e (selected per spawn),
             // disables both culling modes, and puts the complete effect node
-            // on rendering layer 7.
-            // CAnimObjEffect::Update then fades that material's diffuse alpha.
+            // on rendering layer 7. Application::Init (0x003e1c78) maps
+            // those IDs to additive-modulate and texture/vertex-alpha,
+            // respectively. CAnimObjEffect::Update then fades diffuse alpha.
             for (DrawBatch& batch : gpuMeshes_.back().drawBatches) {
                 batch.alphaTest = false;
                 batch.alphaBlend = true;
                 batch.additiveBlend = false;
-                batch.effectColorMask =
-                    batch.textureIndex < effect.textures.size() &&
-                    !textureHasTransparency(
-                        effect.textures[batch.textureIndex]);
+                batch.effectAlphaTest = true;
                 batch.reflectionTwoLayer = false;
                 batch.lightmapTwoLayer = false;
                 batch.backFaceCulling = false;
@@ -2157,10 +2152,7 @@ Result D3D11Renderer::uploadLevelOneScene(
                     batch.alphaTest = false;
                     batch.alphaBlend = true;
                     batch.additiveBlend = false;
-                    batch.effectColorMask =
-                        batch.textureIndex < effect.textures.size() &&
-                        !textureHasTransparency(
-                            effect.textures[batch.textureIndex]);
+                    batch.effectAlphaTest = true;
                     batch.reflectionTwoLayer = false;
                     batch.lightmapTwoLayer = false;
                     batch.backFaceCulling = false;
@@ -2749,10 +2741,12 @@ Result D3D11Renderer::updatePlayerHitEffects(
         setMeshVisible(gpuMeshes_[playerHitEffectMeshStart_ + index], false);
     }
 
-    // CAnimObjEffect chooses one of two native color/alpha combiners (0x1d
-    // or 0x1e) per spawn. Both treat the source RGB as coverage when the PVR
-    // has no alpha; preserve that authored cutout instead of drawing its black
-    // texels as opaque geometry.
+    // Application::Init (0x003e1c78) appends custom materials after the 27
+    // OpenGLES built-ins created at 0x00443d70. CAnimObjEffect's true branch
+    // therefore selects 0x1d ADDITIVE_MODULATE_NONTRANSPARENT (0x00396f68),
+    // while false selects 0x1e TRANSPARENT_ALPHA_CHANNEL_WITH_VERTEX_ALPHA
+    // (0x00397780). Both modulate the texture with COLOR0; only their blend
+    // and alpha-test state differ.
     std::vector<std::size_t> usedSlots(assets.size());
     for (const game::PlayerHitEffectState& state : player.hitEffects()) {
         if (state.effectId < 0 ||
@@ -2818,8 +2812,10 @@ Result D3D11Renderer::updatePlayerHitEffects(
             gpuMeshes_[playerHitEffectMeshStart_ +
                        effectIndex * hitEffectSlotsPerDefinition + slot++];
         for (DrawBatch& batch : gpuMesh.drawBatches) {
-            batch.effectMaterialMode =
-                state.subtractAmbientMaterial ? -1 : 1;
+            batch.alphaTest = false;
+            batch.additiveBlend = state.additiveModulateMaterial;
+            batch.alphaBlend = !state.additiveModulateMaterial;
+            batch.effectAlphaTest = !state.additiveModulateMaterial;
         }
         std::vector<assets::ColladaGeometry> animatedGeometry;
         std::span<const assets::ColladaGeometry> geometry =
@@ -3412,8 +3408,10 @@ Result D3D11Renderer::updateEnemyElectroEffects(
                 result.message());
         }
         for (DrawBatch& batch : gpuMesh->drawBatches) {
-            batch.effectMaterialMode =
-                state.subtractAmbientMaterial ? -1 : 1;
+            batch.alphaTest = false;
+            batch.additiveBlend = state.additiveModulateMaterial;
+            batch.alphaBlend = !state.additiveModulateMaterial;
+            batch.effectAlphaTest = !state.additiveModulateMaterial;
         }
         gpuMesh->roomId = state.roomId;
         setMeshVisible(*gpuMesh, true);
@@ -6184,7 +6182,8 @@ Result D3D11Renderer::uploadGeometrySet(
                     batch.indexCount = 0;
                 }
                 if (material != nullptr) {
-                    batch.effectAmbientColor = material->ambientColor;
+                    batch.effectAlphaReference =
+                        material->materialTypeParameter;
                     batch.materialAnimationTarget = material->effectId;
                     if (!batch.materialAnimationTarget.empty() &&
                         batch.materialAnimationTarget.front() == '#') {
@@ -6503,23 +6502,16 @@ void D3D11Renderer::renderFrame() {
                                 : batch.backFaceCulling
                                       ? rasterizerState_.Get()
                                       : noCullRasterizerState_.Get());
-                        if (batch.effectMaterialMode != 0) {
-                            const EffectMaterialConstants constants{
+                        if (batch.effectAlphaTest) {
+                            const EffectAlphaTestConstants constants{
                                 DirectX::XMFLOAT4{
-                                    batch.effectAmbientColor[0],
-                                    batch.effectAmbientColor[1],
-                                    batch.effectAmbientColor[2],
-                                    batch.effectAmbientColor[3]},
-                                DirectX::XMFLOAT4{
-                                    static_cast<float>(
-                                        batch.effectMaterialMode),
-                                    batch.effectColorMask ? 1.0F : 0.0F,
-                                    0.0F, 0.0F}};
+                                    batch.effectAlphaReference,
+                                    0.0F, 0.0F, 0.0F}};
                             context_->UpdateSubresource(
-                                effectMaterialBuffer_.Get(), 0, nullptr,
+                                effectAlphaTestBuffer_.Get(), 0, nullptr,
                                 &constants, 0, 0);
                             context_->PSSetConstantBuffers(
-                                0, 1, effectMaterialBuffer_.GetAddressOf());
+                                0, 1, effectAlphaTestBuffer_.GetAddressOf());
                         }
                         context_->PSSetShader(
                             batch.lightmapTwoLayer
@@ -6530,8 +6522,8 @@ void D3D11Renderer::renderFrame() {
                                       ? reflectionPixelShader_.Get()
                                       : batch.alphaTest
                                             ? alphaTestPixelShader_.Get()
-                                            : batch.effectMaterialMode != 0
-                                                  ? effectColorMaskPixelShader_
+                                            : batch.effectAlphaTest
+                                                  ? effectAlphaTestPixelShader_
                                                         .Get()
                                                   : pixelShader_.Get(),
                             nullptr, 0);
