@@ -4508,6 +4508,8 @@ void GameplayPlayer::queueAttackFrameEvents(
         activeAttackState_->motionType == 111;
     const auto& hitFrames = activeAttackState_->auxiliaryIdLists[0];
     bool queuedGenericImpact = false;
+    std::optional<std::size_t> latestCrossedEffectFrameIndex;
+    std::uint32_t latestCrossedEffectElapsedMilliseconds{};
     while (nextAttackImpactFrameIndex_ < hitFrames.size()) {
         const std::size_t hitFrameIndex = nextAttackImpactFrameIndex_;
         const std::int16_t frame = hitFrames[hitFrameIndex];
@@ -4604,21 +4606,33 @@ void GameplayPlayer::queueAttackFrameEvents(
                 impact.attackPosition.z += kPlayerCollisionRadiusCentimeters;
             }
         }
-        if (threshold >= previousMilliseconds &&
-            hitEffectDatabase_ != nullptr) {
-            const auto& effectIds = activeAttackState_->auxiliaryIdLists[1];
-            if (hitFrames.size() > 1 && !effectIds.empty()) {
-                queueHitEffect(effectIds[std::min(hitFrameIndex,
-                                                  effectIds.size() - 1)],
-                               currentMilliseconds - threshold);
-            } else {
-                for (const std::int16_t effectId : effectIds) {
-                    queueHitEffect(effectId,
-                                   currentMilliseconds - threshold);
-                }
-            }
+        if (threshold >= previousMilliseconds) {
+            latestCrossedEffectFrameIndex = hitFrameIndex;
+            latestCrossedEffectElapsedMilliseconds =
+                currentMilliseconds - threshold;
         }
         ++nextAttackImpactFrameIndex_;
+    }
+    if (latestCrossedEffectFrameIndex.has_value() &&
+        hitEffectDatabase_ != nullptr) {
+        const auto& effectIds = activeAttackState_->auxiliaryIdLists[1];
+        if (hitFrames.size() > 1 && !effectIds.empty()) {
+            // UpdateNormalEffect (0x00348f24) scans every crossed hit frame
+            // but stores only the latest qualifying index in Player+0x620,
+            // then calls AddHitEffect once. This prevents several delayed
+            // effects from bunching into one rendered frame after a hitch.
+            queueHitEffect(
+                effectIds[std::min(*latestCrossedEffectFrameIndex,
+                                   effectIds.size() - 1)],
+                latestCrossedEffectElapsedMilliseconds);
+        } else {
+            // A single-contact state treats its auxiliary effect list as a
+            // simultaneous set and creates every listed effect once.
+            for (const std::int16_t effectId : effectIds) {
+                queueHitEffect(effectId,
+                               latestCrossedEffectElapsedMilliseconds);
+            }
+        }
     }
 
     // UpdateAttackParam (0x00340fa0) does not make the aerial pursuit family

@@ -13,6 +13,8 @@
 
 namespace usm::game {
 
+class LevelCollision;
+
 enum class LevelObjectDestructionPhase {
     Intact,
     Breaking,
@@ -191,6 +193,20 @@ public:
         const assets::Vector3& attackPosition,
         const assets::Vector3& attackDirection, float radius, float damage,
         float minimumForwardDot = 0.0F) noexcept;
+    // Player::SearchTargetByAttackRange (0x003430c8) competes the nearest
+    // visible, live entry from CLevel::GetTargetedDestroyableList against the
+    // nearest enemy using strict three-dimensional distance.
+    [[nodiscard]] const LevelObjectState* findPlayerAttackRangeTarget(
+        const assets::Vector3& playerPosition,
+        float maximumRange) const noexcept;
+    // Player::SearchTargetByEyeHorizon (0x00343b70) appends targeted
+    // destroyables after CTargetHelper's enemy lists, walks the combined list
+    // backwards, and selects the strictly best horizontal facing dot.
+    [[nodiscard]] const LevelObjectState* findPlayerEyeAttackTarget(
+        const assets::Vector3& playerPosition,
+        const assets::Vector3& attackDirection, float maximumRange,
+        const LevelCollision* collision = nullptr,
+        float minimumForwardDot = 0.5F) const noexcept;
     [[nodiscard]] bool destroy(std::int32_t objectId) noexcept;
     [[nodiscard]] bool isDestroyed(std::int32_t objectId) const noexcept;
     [[nodiscard]] bool isComicCollected(

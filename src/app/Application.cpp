@@ -2948,20 +2948,119 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 gameplayCamera_.sample(gameplayPlayer_.position());
             const auto attackDirection =
                 gameplayPlayer_.attackDirection(motion, cameraBeforeMovement);
+            struct PlayerTargetSelection {
+                const game::LevelEnemyState* enemy{};
+                const game::LevelObjectState* object{};
+                game::PlayerAttackTarget target;
+            };
+            const auto selectEnemyTarget =
+                [this](const game::LevelEnemyState* enemy)
+                    -> std::optional<PlayerTargetSelection> {
+                if (enemy == nullptr || enemy->asset == nullptr) {
+                    return std::nullopt;
+                }
+                return PlayerTargetSelection{
+                    enemy,
+                    nullptr,
+                    {enemy->position,
+                     enemy->collisionRadius,
+                     enemy->asset->objectId,
+                     !enemy->grounded,
+                     enemy->collisionHeight,
+                     enemy->canBeTiedUp,
+                     enemy->canBeDraggedTo,
+                     enemy->onWall,
+                     enemyRuntime_.canEnterWallWeb(enemy->asset->objectId),
+                     enemyRuntime_.nodeWorldPosition(enemy->asset->objectId,
+                                                     "Bip01_Head")}};
+            };
+            const auto selectObjectTarget =
+                [](const game::LevelObjectState* object)
+                    -> std::optional<PlayerTargetSelection> {
+                if (object == nullptr || object->asset == nullptr) {
+                    return std::nullopt;
+                }
+                return PlayerTargetSelection{
+                    nullptr,
+                    object,
+                    {object->position,
+                     object->asset->collisionRadius,
+                     object->asset->objectId,
+                     false,
+                     object->asset->collisionHeight}};
+            };
             const auto acquireAttackTarget =
-                [this, &attackDirection](float directionalRange,
-                                          float neutralRange) {
+                [this, &attackDirection, &selectEnemyTarget,
+                 &selectObjectTarget](float directionalRange,
+                                      float neutralRange)
+                    -> std::optional<PlayerTargetSelection> {
                     if (gameplayPlayer_.onWall()) {
-                        return enemyRuntime_.findPlayerWallAttackTarget(
-                            gameplayPlayer_.position());
+                        return selectEnemyTarget(
+                            enemyRuntime_.findPlayerWallAttackTarget(
+                                gameplayPlayer_.position()));
                     }
-                    return enemyRuntime_.findPlayerAttackTarget(
+                    const float maximumRange = attackDirection.has_value()
+                        ? directionalRange
+                        : neutralRange;
+                    const game::LevelEnemyState* enemy =
+                        enemyRuntime_.findPlayerAttackTarget(
                         gameplayPlayer_.position(),
                         attackDirection.value_or(gameplayPlayer_.facing()),
                         attackDirection.has_value(),
-                        attackDirection.has_value() ? directionalRange
-                                                    : neutralRange,
+                        maximumRange,
                         &levelCollision_);
+                    const game::LevelObjectState* object =
+                        attackDirection.has_value()
+                        ? objectRuntime_.findPlayerEyeAttackTarget(
+                              gameplayPlayer_.position(), *attackDirection,
+                              maximumRange, &levelCollision_)
+                        : objectRuntime_.findPlayerAttackRangeTarget(
+                              gameplayPlayer_.position(), maximumRange);
+                    if (enemy == nullptr) {
+                        return selectObjectTarget(object);
+                    }
+                    if (object == nullptr) {
+                        return selectEnemyTarget(enemy);
+                    }
+                    const auto squaredDistance = [this](
+                        const assets::Vector3& position) {
+                        const float x =
+                            position.x - gameplayPlayer_.position().x;
+                        const float y =
+                            position.y - gameplayPlayer_.position().y;
+                        const float z =
+                            position.z - gameplayPlayer_.position().z;
+                        return x * x + y * y + z * z;
+                    };
+                    if (!attackDirection.has_value()) {
+                        // SearchTargetByAttackRange (0x003430c8) keeps the
+                        // helper enemy only when it is strictly nearer. A tie
+                        // therefore resolves to the targeted destroyable.
+                        return squaredDistance(enemy->position) <
+                                       squaredDistance(object->position)
+                            ? selectEnemyTarget(enemy)
+                            : selectObjectTarget(object);
+                    }
+                    const auto facingDot = [this, &attackDirection](
+                        const assets::Vector3& position) {
+                        const float x =
+                            position.x - gameplayPlayer_.position().x;
+                        const float y =
+                            position.y - gameplayPlayer_.position().y;
+                        const float length = std::hypot(x, y);
+                        return length > std::numeric_limits<float>::epsilon()
+                            ? (x * attackDirection->x +
+                               y * attackDirection->y) /
+                                  length
+                            : -1.0F;
+                    };
+                    // SearchTargetByEyeHorizon (0x00343b70) evaluates the
+                    // appended destroyables first during its reverse walk;
+                    // an enemy replaces one only for a strictly better dot.
+                    return facingDot(enemy->position) >
+                                   facingDot(object->position)
+                        ? selectEnemyTarget(enemy)
+                        : selectObjectTarget(object);
                 };
             if (controlsEnabled && spiderSensePressed) {
                 const game::LevelEnemyState* attacker =
@@ -3077,7 +3176,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 const auto candidates = autoplay && traversalRequest
                     ? gameplayPlayer_.webGrabCandidateDiagnostics()
                     : std::vector<game::WebGrabCandidateDiagnostics>{};
-                const game::LevelEnemyState* webTarget = nullptr;
+                std::optional<PlayerTargetSelection> webTarget;
                 const std::int32_t retainedWebTargetId =
                     gameplayPlayer_.webAttackTransitionReady()
                         ? gameplayPlayer_.trackedAttackTargetObjectId()
@@ -3086,36 +3185,39 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     // UpdateKeyTrigger keeps Player+0x594 across an authored
                     // attack-window transition. Reacquiring here lets a
                     // nearer bystander steal state 84/85 or state 92/95.
-                    webTarget = enemyRuntime_.find(retainedWebTargetId);
+                    webTarget = selectEnemyTarget(
+                        enemyRuntime_.find(retainedWebTargetId));
+                    if (!webTarget.has_value()) {
+                        webTarget = selectObjectTarget(
+                            objectRuntime_.find(retainedWebTargetId));
+                    }
                 } else if (traversalRequest) {
                     // GetAirWebSpecialState first asks CTargetHelper for mask
                     // 2: its nearest non-airborne enemy from the 2000 cm
                     // helper census. Only an empty helper list falls through
                     // to the ordinary 1000 cm eye/range search.
-                    webTarget = enemyRuntime_.findNearestGroundedPlayerTarget(
-                        gameplayPlayer_.position());
-                    if (webTarget == nullptr) {
+                    webTarget = selectEnemyTarget(
+                        enemyRuntime_.findNearestGroundedPlayerTarget(
+                            gameplayPlayer_.position()));
+                    if (!webTarget.has_value()) {
                         webTarget = acquireAttackTarget(1000.0F, 1000.0F);
                     }
                 } else {
                     webTarget = acquireAttackTarget(3000.0F, 2000.0F);
                 }
                 const std::optional<game::PlayerAttackTarget>
-                    playerWebTarget = webTarget == nullptr
+                    playerWebTarget = !webTarget.has_value()
                         ? std::nullopt
-                        : std::optional<game::PlayerAttackTarget>{
-                              {webTarget->position,
-                               webTarget->collisionRadius,
-                               webTarget->asset->objectId,
-                               !webTarget->grounded,
-                               webTarget->collisionHeight,
-                               webTarget->canBeTiedUp,
-                               webTarget->canBeDraggedTo,
-                               webTarget->onWall,
-                               enemyRuntime_.canEnterWallWeb(webTarget->asset->objectId) &&
+                        : std::optional<game::PlayerAttackTarget>{[&] {
+                              game::PlayerAttackTarget selected =
+                                  webTarget->target;
+                              if (webTarget->enemy != nullptr) {
+                                  selected.canEnterWallWeb =
+                                      selected.canEnterWallWeb &&
                                    [&] {
                                        const auto spine = enemyRuntime_.nodeWorldPosition(
-                                           webTarget->asset->objectId, "Bip01_Spine1");
+                                           webTarget->enemy->asset->objectId,
+                                           "Bip01_Spine1");
                                        const float aspect = autoplay
                                            ? static_cast<float>(autoplay->renderWidth()) /
                                                  autoplay->renderHeight()
@@ -3123,10 +3225,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                                  std::max(1U, window_.clientHeight());
                                        return spine && game::isPointInScreen(
                                            cameraBeforeMovement, aspect, *spine);
-                                   }(),
-                               enemyRuntime_.nodeWorldPosition(
-                                   webTarget->asset->objectId,
-                                   "Bip01_Head")}};
+                                   }();
+                              }
+                              return selected;
+                          }()};
                 const bool accepted = gameplayPlayer_.requestWeb(
                     playerWebTarget, attackDirection,
                     game::PlayerButtonPhase::Pressed,
@@ -3140,16 +3242,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         std::string(
                             traversalAccepted
                                 ? "traversal"
-                                : traversalRequest && webTarget != nullptr &&
-                                    (webTarget->canBeTiedUp ||
-                                     webTarget->canBeDraggedTo)
+                                : traversalRequest && webTarget.has_value() &&
+                                    (webTarget->target.canBeTiedUp ||
+                                     webTarget->target.canBeDraggedTo)
                                 ? "air_combat"
                                 : traversalRequest ? "traversal"
                                                    : "combat") +
                         ";target=" +
-                        (webTarget == nullptr
+                        (!webTarget.has_value()
                              ? std::string{"none"}
-                             : std::to_string(webTarget->asset->objectId)) +
+                             : std::to_string(webTarget->target.objectId)) +
                         ";state=" +
                         std::to_string(gameplayPlayer_.activeStateId()) +
                         ";rejection=" +
@@ -3249,23 +3351,12 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             if (controlsEnabled && webReleased) {
                 (void)gameplayPlayer_.releaseWeb();
             }
-            const game::LevelEnemyState* attackTarget = nullptr;
+            std::optional<PlayerTargetSelection> attackTarget;
             std::optional<game::PlayerAttackTarget> playerAttackTarget;
             if (controlsEnabled && punchPressed && !rescuePressed) {
                 attackTarget = acquireAttackTarget(1000.0F, 1000.0F);
-                if (attackTarget != nullptr) {
-                    playerAttackTarget = game::PlayerAttackTarget{
-                        attackTarget->position, attackTarget->collisionRadius,
-                        attackTarget->asset->objectId,
-                        !attackTarget->grounded,
-                        attackTarget->collisionHeight,
-                        attackTarget->canBeTiedUp,
-                        attackTarget->canBeDraggedTo,
-                        attackTarget->onWall,
-                        enemyRuntime_.canEnterWallWeb(
-                            attackTarget->asset->objectId),
-                        enemyRuntime_.nodeWorldPosition(
-                            attackTarget->asset->objectId, "Bip01_Head")};
+                if (attackTarget.has_value()) {
+                    playerAttackTarget = attackTarget->target;
                 }
             }
             if (controlsEnabled && punchPressed && !rescuePressed) {
@@ -3279,10 +3370,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ";name=" +
                             std::string(gameplayPlayer_.activeStateName()) +
                             ";target=" +
-                            (attackTarget == nullptr
+                            (!attackTarget.has_value()
                                  ? std::string{"none"}
                                  : std::to_string(
-                                       attackTarget->asset->objectId)));
+                                       attackTarget->target.objectId)));
                 } else if (autoplay) {
                     autoplay->recordEvent(
                         syntheticElapsedMilliseconds, "player_action",
@@ -3297,10 +3388,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             std::to_string(gameplayPlayer_
                                                .hurtReactionRemainingMilliseconds()) +
                             ";target=" +
-                            (attackTarget == nullptr
+                            (!attackTarget.has_value()
                                  ? std::string{"none"}
                                  : std::to_string(
-                                       attackTarget->asset->objectId)));
+                                       attackTarget->target.objectId)));
                 }
             }
             const auto previousWallWebPhase = gameplayPlayer_.wallWeb().phase();
@@ -3335,7 +3426,19 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             trackedAttackTarget->asset->objectId,
                             "Bip01_Head")});
             } else if (trackedAttackTargetId >= 0) {
-                gameplayPlayer_.refreshTrackedAttackTarget(std::nullopt);
+                const game::LevelObjectState* trackedObjectTarget =
+                    objectRuntime_.find(trackedAttackTargetId);
+                if (trackedObjectTarget != nullptr &&
+                    trackedObjectTarget->asset != nullptr &&
+                    trackedObjectTarget->visible &&
+                    trackedObjectTarget->health > 0.0F &&
+                    trackedObjectTarget->destructionPhase ==
+                        game::LevelObjectDestructionPhase::Intact) {
+                    gameplayPlayer_.refreshTrackedAttackTarget(
+                        selectObjectTarget(trackedObjectTarget)->target);
+                } else {
+                    gameplayPlayer_.refreshTrackedAttackTarget(std::nullopt);
+                }
             }
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    gameDeltaMilliseconds);
@@ -3988,6 +4091,23 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                 std::to_string(spine->y) + "|" +
                                 std::to_string(spine->z);
                         }
+                    } else if (const auto* trackedObject =
+                                   objectRuntime_.find(
+                                       trackedTargetObjectId);
+                               trackedObject != nullptr &&
+                               trackedObject->asset != nullptr) {
+                        detail +=
+                            ";tracked_base=" +
+                            std::to_string(trackedObject->position.x) + "|" +
+                            std::to_string(trackedObject->position.y) + "|" +
+                            std::to_string(trackedObject->position.z) +
+                            ";tracked_size=" +
+                            std::to_string(
+                                trackedObject->asset->collisionRadius) +
+                            "|" +
+                            std::to_string(
+                                trackedObject->asset->collisionHeight) +
+                            ";tracked_kind=destroyable";
                     }
                     if (!hitEnemies.empty() || !hitObjects.empty()) {
                         for (const auto& hit : hitEnemies) {
@@ -4967,6 +5087,13 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                 webLineAnchor = *bone;
                             }
                         }
+                    } else if (const game::LevelObjectState* liveObject =
+                                   objectRuntime_.find(webLineTargetId);
+                               liveObject != nullptr &&
+                               liveObject->asset != nullptr) {
+                        webLineAnchor = liveObject->position;
+                        webLineAnchor.z +=
+                            liveObject->asset->collisionHeight * 0.5F;
                     }
                 }
                 const assets::Vector3 firstWebAttach =

@@ -5356,6 +5356,81 @@ int main() {
         assert(destroyableAsset->collisionAfterDestruction);
         assert(destroyableAsset->hitVoxSoundId == 0x6b);
         assert(destroyableAsset->collisionRadius > 1.0F);
+        assert(destroyableAsset->collisionHeight > 1.0F);
+
+        // CLevel::GetTargetedDestroyableList (0x0037df54),
+        // Player::SearchTargetByAttackRange (0x003430c8), and
+        // Player::SearchTargetByEyeHorizon (0x00343b70) place live,
+        // attackable scenery in the same player target decision as enemies.
+        usm::game::LevelObjectRuntime targetObjectRuntime;
+        assert(targetObjectRuntime.initialize(bootstrap));
+        for (const auto& object : bootstrap.objects()) {
+            if (object.kind == usm::game::LevelObjectKind::Destroyable &&
+                object.attackable) {
+                assert(targetObjectRuntime.setRuntimeState(
+                    object.objectId, object.position, false, true));
+            }
+        }
+        const auto secondTargetObject = std::find_if(
+            bootstrap.objects().begin(), bootstrap.objects().end(),
+            [destroyableAsset](const auto& object) {
+                return object.kind ==
+                           usm::game::LevelObjectKind::Destroyable &&
+                       object.attackable &&
+                       object.objectId != destroyableAsset->objectId;
+            });
+        assert(secondTargetObject != bootstrap.objects().end());
+        assert(targetObjectRuntime.setRuntimeState(
+            destroyableAsset->objectId, {100.0F, 0.0F, 0.0F}, true, true));
+        assert(targetObjectRuntime.setRuntimeState(
+            secondTargetObject->objectId, {-200.0F, 0.0F, 0.0F}, true,
+            true));
+        const usm::assets::Vector3 targetSearchOrigin{};
+        assert(targetObjectRuntime.findPlayerAttackRangeTarget(
+                   targetSearchOrigin, 100.0F) == nullptr);
+        const auto* strictRangeObject =
+            targetObjectRuntime.findPlayerAttackRangeTarget(
+                targetSearchOrigin, 100.1F);
+        assert(strictRangeObject != nullptr &&
+               strictRangeObject->asset->objectId ==
+                   destroyableAsset->objectId);
+        const auto* directionalObject =
+            targetObjectRuntime.findPlayerEyeAttackTarget(
+                targetSearchOrigin, {1.0F, 0.0F, 0.0F}, 1.0F);
+        assert(directionalObject != nullptr &&
+               directionalObject->asset->objectId ==
+                   destroyableAsset->objectId);
+        usm::assets::ColladaGeometry objectTargetOccluder;
+        objectTargetOccluder.name = "double_destroyable_target_occluder";
+        objectTargetOccluder.vertices = {
+            {{1.0F, -1000.0F, -1000.0F}},
+            {{1.0F, 1000.0F, -1000.0F}},
+            {{1.0F, -1000.0F, 1000.0F}},
+            {{1.0F, 1000.0F, 1000.0F}},
+        };
+        usm::assets::ColladaMeshBuffer objectTargetOccluderBuffer;
+        objectTargetOccluderBuffer.indices = {0, 2, 3, 0, 3, 1};
+        objectTargetOccluder.meshBuffers.push_back(
+            objectTargetOccluderBuffer);
+        const std::array objectTargetOccluderSet{objectTargetOccluder};
+        usm::game::LevelCollision objectTargetOcclusionWorld;
+        assert(objectTargetOcclusionWorld.build(objectTargetOccluderSet));
+        assert(objectTargetOcclusionWorld.segmentBlocked(
+            {100.0F, 0.0F, destroyableAsset->collisionHeight},
+            {0.0F, 0.0F,
+             usm::game::kPlayerCollisionHeightCentimeters},
+            0xffff7f18U));
+        assert(targetObjectRuntime.findPlayerEyeAttackTarget(
+                   targetSearchOrigin, {1.0F, 0.0F, 0.0F}, 1.0F,
+                   &objectTargetOcclusionWorld) == nullptr);
+        assert(targetObjectRuntime.destroy(destroyableAsset->objectId));
+        const auto* nextLiveObject =
+            targetObjectRuntime.findPlayerAttackRangeTarget(
+                targetSearchOrigin, 201.0F);
+        assert(nextLiveObject != nullptr &&
+               nextLiveObject->asset->objectId ==
+                   secondTargetObject->objectId);
+
         const auto destroyedObject = objectRuntime.applyPlayerMeleeHit(
             destroyableAsset->position, {1.0F, 0.0F, 0.0F}, 10.0F,
             destroyableAsset->health, -1.0F);
@@ -9075,6 +9150,14 @@ int main() {
             gameplayPlayer.hitEffects().begin(),
             gameplayPlayer.hitEffects().end(),
             [](const auto& effect) { return effect.effectId == 5; }));
+        // UpdateNormalEffect (0x00348f24) retains only the latest crossed
+        // multi-hit frame during a long update. State 90 maps both of its
+        // still-live late contacts to effect 5, but must spawn it only once.
+        assert(std::count_if(
+                   gameplayPlayer.hitEffects().begin(),
+                   gameplayPlayer.hitEffects().end(), [](const auto& effect) {
+                       return effect.effectId == 5;
+                   }) == 1);
         assert(gameplayPlayer.punchTransitionReadyAfterImpact());
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.activeStateId() == 90);

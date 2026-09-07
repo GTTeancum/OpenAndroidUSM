@@ -377,6 +377,11 @@ struct LevelObjectAsset {
     // material type 0x0d (GL_SRC_ALPHA, GL_ONE) for the whole scene node.
     bool additiveBlend{};
     float collisionRadius{};
+    // CDestroyableObject targeting uses the Unit top point for its
+    // IsBlockedByWorld ray (Player::SearchTargetByEyeHorizon, 0x00343b70).
+    // Keep the authored scene-bound height alongside the existing bound
+    // radius so portable target rays terminate at the same vertical extent.
+    float collisionHeight{};
     float health{};
     float damageRadius{};
     float damage{};

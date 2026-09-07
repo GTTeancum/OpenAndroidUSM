@@ -1,5 +1,6 @@
 #include "game/LevelObjectRuntime.hpp"
 
+#include "game/LevelCollision.hpp"
 #include "game/PlayerPhysicsConstants.hpp"
 
 #include <algorithm>
@@ -10,6 +11,12 @@
 
 namespace usm::game {
 namespace {
+
+// Physics::processCollision ignored-mask argument used by
+// Unit::IsBlockedByWorld's center-ray path (0x00324670). This is the same
+// native query made for enemies and targeted destroyables by
+// Player::SearchTargetByEyeHorizon (0x00343b70).
+constexpr std::uint32_t kTargetOcclusionIgnoredPhysicsFlags = 0xffff7f18U;
 
 bool parseInteger(std::string_view text, std::int32_t& value) noexcept {
     const char* begin = text.data();
@@ -1591,6 +1598,94 @@ LevelObjectRuntime::applyPlayerMeleeHits(
                         std::max(0.0F, healthBefore - object.health)});
     }
     return hits;
+}
+
+const LevelObjectState* LevelObjectRuntime::findPlayerAttackRangeTarget(
+    const assets::Vector3& playerPosition, float maximumRange) const noexcept {
+    if (!(maximumRange > 0.0F) || !std::isfinite(maximumRange)) {
+        return nullptr;
+    }
+    const LevelObjectState* nearest = nullptr;
+    float nearestDistanceSquared = maximumRange * maximumRange;
+    // CLevel::GetTargetedDestroyableList (0x0037df54) preserves CLevel's
+    // object order. SearchTargetByAttackRange (0x003430c8) walks it forward
+    // and replaces only for a strictly shorter three-dimensional distance.
+    for (const LevelObjectState& object : states_) {
+        if (object.asset == nullptr ||
+            object.asset->kind != LevelObjectKind::Destroyable ||
+            !object.asset->attackable || !object.visible ||
+            object.destructionPhase != LevelObjectDestructionPhase::Intact ||
+            object.health <= 0.0F) {
+            continue;
+        }
+        const float x = object.position.x - playerPosition.x;
+        const float y = object.position.y - playerPosition.y;
+        const float z = object.position.z - playerPosition.z;
+        const float distanceSquared = x * x + y * y + z * z;
+        if (distanceSquared < nearestDistanceSquared) {
+            nearest = &object;
+            nearestDistanceSquared = distanceSquared;
+        }
+    }
+    return nearest;
+}
+
+const LevelObjectState* LevelObjectRuntime::findPlayerEyeAttackTarget(
+    const assets::Vector3& playerPosition,
+    const assets::Vector3& attackDirection, float maximumRange,
+    const LevelCollision* collision, float minimumForwardDot) const noexcept {
+    if (!(maximumRange > 0.0F) || !std::isfinite(maximumRange)) {
+        return nullptr;
+    }
+    const float directionLength =
+        std::hypot(attackDirection.x, attackDirection.y);
+    if (directionLength <= std::numeric_limits<float>::epsilon()) {
+        return nullptr;
+    }
+    const float directionX = attackDirection.x / directionLength;
+    const float directionY = attackDirection.y / directionLength;
+    const LevelObjectState* selected = nullptr;
+    float bestForwardDot = minimumForwardDot;
+    // SearchTargetByEyeHorizon (0x00343b70) appends CLevel's targeted
+    // destroyables after the enemy lists and then traverses the resulting
+    // array backwards. A tie therefore retains the later-authored object.
+    for (auto iterator = states_.rbegin(); iterator != states_.rend();
+         ++iterator) {
+        const LevelObjectState& object = *iterator;
+        if (object.asset == nullptr ||
+            object.asset->kind != LevelObjectKind::Destroyable ||
+            !object.asset->attackable || !object.visible ||
+            object.destructionPhase != LevelObjectDestructionPhase::Intact ||
+            object.health <= 0.0F) {
+            continue;
+        }
+        const float x = object.position.x - playerPosition.x;
+        const float y = object.position.y - playerPosition.y;
+        const float z = object.position.z - playerPosition.z;
+        const float distance = std::sqrt(x * x + y * y + z * z);
+        if (distance - object.asset->collisionRadius > maximumRange) {
+            continue;
+        }
+        if (collision != nullptr && collision->segmentBlocked(
+                {object.position.x, object.position.y,
+                 object.position.z + object.asset->collisionHeight},
+                {playerPosition.x, playerPosition.y,
+                 playerPosition.z + kPlayerCollisionHeightCentimeters},
+                kTargetOcclusionIgnoredPhysicsFlags)) {
+            continue;
+        }
+        const float horizontalLength = std::hypot(x, y);
+        if (horizontalLength <= std::numeric_limits<float>::epsilon()) {
+            continue;
+        }
+        const float forwardDot =
+            (x * directionX + y * directionY) / horizontalLength;
+        if (forwardDot > bestForwardDot) {
+            selected = &object;
+            bestForwardDot = forwardDot;
+        }
+    }
+    return selected;
 }
 
 bool LevelObjectRuntime::destroy(std::int32_t objectId) noexcept {

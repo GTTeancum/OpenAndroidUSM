@@ -111,7 +111,13 @@ foreach ($scriptFile in $scripts) {
               $applicationSucceeded -and $harnessComplete -and
               $totalSteps -gt 0 -and $completedSteps -eq $totalSteps
     if (Test-Path -LiteralPath $summaryPath -PathType Leaf) {
-        if ((Get-Item -LiteralPath $summaryPath).LastWriteTimeUtc -lt $scenarioStartedUtc) {
+        # A very fast mocked run can observe an NTFS write timestamp a few
+        # sub-milliseconds behind GetUtcNow even though the file was created
+        # after launch. Preserve stale-output rejection while allowing one
+        # second for filesystem/clock quantization; the stale fixture remains
+        # one hour old and real game runs write after many rendered frames.
+        if ((Get-Item -LiteralPath $summaryPath).LastWriteTimeUtc.AddSeconds(1) -lt
+            $scenarioStartedUtc) {
             $passed = $false
             $detail = 'Scenario did not produce a fresh summary'
         }

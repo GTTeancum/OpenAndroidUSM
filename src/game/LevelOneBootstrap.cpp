@@ -1687,6 +1687,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
                 object.collisionRadius =
                     0.5F * std::sqrt(extentX * extentX + extentY * extentY +
                                      extentZ * extentZ);
+                object.collisionHeight = extentZ;
                 if (*kind == LevelObjectKind::Comic) {
                     assets::Vector3 worldMinimum{
                         std::numeric_limits<float>::max(),

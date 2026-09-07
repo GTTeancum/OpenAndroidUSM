@@ -119,6 +119,12 @@ makes a premature counter available.
   `(frame * 2) / 3`. `FrameFixedTimelineController::getCurrentClipFrame`
   (`0x003906c8`) rounds the 50 ms runtime frame with `time / 50 + 0.5`, so
   state 74's authored hit frame 7 first becomes runtime frame 4 at 175 ms.
+- `Player::UpdateNormalEffect` (`0x00348f24`) scans every hit marker crossed
+  by the current update, but a multi-hit state stores only the latest crossed
+  marker and emits one corresponding effect. A single-hit state emits its
+  complete auxiliary effect set once. The portable catch-up path now follows
+  that distinction, so a slow frame cannot stack several delayed fast-kick
+  trails into the same rendered frame.
 - `CAnimObjEffect::Init` (`0x00390bb8`) gives snapshot trails the player's
   orientation plus the authored bone position; it does not retain the bone's
   rotation. Live attachments retain the complete bone transform.
@@ -201,6 +207,27 @@ makes a premature counter available.
   web-whirlwind motion 116, wall-attack motion 131, and air-bounce states
   117/118. These are now native state-data predicates rather than an
   unrestricted attack cancellation.
+
+## Player target selection
+
+`CLevel::GetTargetedDestroyableList` (`0x0037df54`) returns every destroyable
+whose authored `IsAttack` byte is enabled. Both native player searches include
+that list; scenery is not merely checked after a free-form enemy attack.
+
+`Player::SearchTargetByAttackRange` (`0x003430c8`) walks visible, live
+destroyables in authored order, retains the strictly nearest object inside the
+raw three-dimensional range, obtains the enemy candidate from
+`CTargetHelper::getNearestTarget(mask=3)`, and keeps the enemy only when it is
+strictly nearer. Equal distance therefore selects the destroyable.
+`Player::SearchTargetByEyeHorizon` (`0x00343b70`) appends the same objects after
+the helper's airborne/non-airborne enemy lists, traverses the combined list
+backwards, applies the 0.5 horizontal-facing threshold and the target-radius
+range allowance, rejects `Unit::IsBlockedByWorld` (`0x00324670`) occlusion,
+and replaces a candidate only for a strictly better facing dot. Equal facing
+therefore also retains the destroyable. The runtime now preserves those
+filters, ordering, ties, world rays, and target IDs through the attack update;
+web lines aimed at targetable scenery also follow the retained object rather
+than snapping back to a stale launch point.
 
 ## Shopping-center doorway
 
