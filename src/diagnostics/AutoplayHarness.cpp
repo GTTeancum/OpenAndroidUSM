@@ -300,7 +300,9 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
            "secondary_has_alpha,lightmap_index,lightmap_image,lightmap_path,"
            "lightmap_has_alpha,secondary_mode,material_additive,back_face_culling,"
            "front_face_culling,transparent_alpha_channel,material_type_parameter,"
-           "uses_uv2,vertex_alpha_min,vertex_alpha_max,min_x,min_y,min_z,"
+           "uses_uv2,vertex_alpha_min,vertex_alpha_max,uv_min_u,uv_min_v,"
+           "uv_max_u,uv_max_v,texture_m00,texture_m01,texture_m10,texture_m11,"
+           "texture_m20,texture_m21,min_x,min_y,min_z,"
            "max_x,max_y,max_z\n";
     textureAssetLog_
         << "owner_kind,owner_id,owner_name,mesh_source,image_index,image_name,"
@@ -4212,6 +4214,8 @@ void AutoplayHarness::recordMaterialAssets(
                     mesh.findMaterial(buffer.materialName);
                 std::uint32_t alphaMinimum = 255;
                 std::uint32_t alphaMaximum = 0;
+                std::array<float, 2> textureCoordinateMinimum{};
+                std::array<float, 2> textureCoordinateMaximum{};
                 assets::AxisAlignedBounds indexedBounds{};
                 bool hasIndexedVertex = false;
                 for (const std::uint16_t vertexIndex : buffer.indices) {
@@ -4225,6 +4229,8 @@ void AutoplayHarness::recordMaterialAssets(
                     alphaMaximum = std::max(alphaMaximum, alpha);
                     if (!hasIndexedVertex) {
                         indexedBounds = {vertex.position, vertex.position};
+                        textureCoordinateMinimum = vertex.textureCoordinate;
+                        textureCoordinateMaximum = vertex.textureCoordinate;
                         hasIndexedVertex = true;
                     } else {
                         indexedBounds.minimum.x = std::min(
@@ -4239,6 +4245,18 @@ void AutoplayHarness::recordMaterialAssets(
                             indexedBounds.maximum.y, vertex.position.y);
                         indexedBounds.maximum.z = std::max(
                             indexedBounds.maximum.z, vertex.position.z);
+                        textureCoordinateMinimum[0] = std::min(
+                            textureCoordinateMinimum[0],
+                            vertex.textureCoordinate[0]);
+                        textureCoordinateMinimum[1] = std::min(
+                            textureCoordinateMinimum[1],
+                            vertex.textureCoordinate[1]);
+                        textureCoordinateMaximum[0] = std::max(
+                            textureCoordinateMaximum[0],
+                            vertex.textureCoordinate[0]);
+                        textureCoordinateMaximum[1] = std::max(
+                            textureCoordinateMaximum[1],
+                            vertex.textureCoordinate[1]);
                     }
                 }
                 if (buffer.indices.empty()) {
@@ -4293,6 +4311,21 @@ void AutoplayHarness::recordMaterialAssets(
                                             : material->materialTypeParameter)
                     << ',' << buffer.usesSecondaryTextureCoordinates << ','
                     << alphaMinimum << ',' << alphaMaximum << ','
+                    << textureCoordinateMinimum[0] << ','
+                    << textureCoordinateMinimum[1] << ','
+                    << textureCoordinateMaximum[0] << ','
+                    << textureCoordinateMaximum[1];
+                const std::array<float, 6> identityTextureTransform{
+                    1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F};
+                const auto& textureTransform =
+                    material == nullptr
+                        ? identityTextureTransform
+                        : material->diffuseTextureTransform;
+                for (const float value : textureTransform) {
+                    materialAssetLog_ << ',' << value;
+                }
+                materialAssetLog_
+                    << ','
                     << indexedBounds.minimum.x << ','
                     << indexedBounds.minimum.y << ','
                     << indexedBounds.minimum.z << ','

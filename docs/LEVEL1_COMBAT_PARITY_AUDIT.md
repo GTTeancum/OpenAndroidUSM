@@ -302,10 +302,35 @@ a door. Therefore the source assets do **not** contain an intact-to-broken door
 transition at the bus impact. Implementing one would be an invention rather
 than parity with this shipped build.
 
+## Opening-thug authored appearances
+
+The opening knife, bat, and gun appearances use authored regions of the
+shared 512-by-512 `thug.tga` atlas. This is not interchangeable with assigning
+an invented random tint. The indexed UVs select the lower-right atlas tile for
+the bat mesh and the upper-right tile for the gun mesh. The knife mesh carries
+the same lower-right UV range as the bat but its first diffuse texture record
+adds `U=-0.498`, selecting the lower-left tile.
+
+`CMaterial::prepareMaterial` (`0x0041c7e2`--`0x0041c84e`) reads translation,
+rotation, and scale from each 0x1c-byte texture record and calls
+`CMatrix4<float>::buildTextureTransform` at `0x00419260`. The BDAE parser and
+D3D11 vertex path now retain that full row-vector affine transform. Material
+animation remains distinct: `CTextureTransformEx::applyValueEx` at
+`0x0041a5bc` replaces the prepared matrix with its animated SData transform,
+rather than incrementally adding an offset to the static matrix.
+
+The asset census logs both raw indexed UV bounds and all six affine matrix
+components. Core tests pin the bat identity matrix and the knife's authored
+`U=-0.498` matrix. The first-encounter presentation gate consequently renders
+the knife thug in red and both bat thugs in blue from the shipped atlas. The
+remaining queue item is deliberately narrower: determine whether any native
+spawn path additionally varies appearances among enemies of the same weapon
+archetype.
+
 ## Automated acceptance
 
 The coherent Release run in
-`analysis/generated/first-encounter-material-id-fix/suite-manifest.json`
+`analysis/generated/first-encounter-thug-atlas-transform/suite-manifest.json`
 completed all 33 selected scenarios with 33 passes and zero failures. The
 current retained gates are:
 
@@ -356,7 +381,8 @@ behavior-slot-8 block state, so adding a block response would be invention.
 
 ## Queued native parity audits
 
-- Opening thugs have multiple shipped color appearances. Recover the original
-  selection/randomization path and its asset/material inputs from the native
-  executable and data, then reproduce that distribution deterministically in
+- Audit whether opening thugs of the same weapon archetype have an additional
+  native appearance-selection path. The weapon-authored atlas transforms are
+  recovered; any further selection/randomization must still be proven from
+  executable calls and shipped inputs, then reproduced deterministically in
   tests. Do not substitute a hand-authored palette or guessed random choice.

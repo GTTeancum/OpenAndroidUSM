@@ -2062,6 +2062,22 @@ animated `Bip01_Spine1` node. The runtime resolves that exact world-space bone
 on every accepted hit; it does not synthesize an effect on a miss or place
 contact feedback at Spider-Man's origin.
 
+Opening-thug material variation also comes from serialized BDAE data.
+`CMaterial::prepareMaterial` (`0x0041c7e2`--`0x0041c84e`) reads U/V
+translation, rotation, and U/V scale from the first diffuse 0x1c-byte texture
+record and passes them to `CMatrix4<float>::buildTextureTransform`
+(`0x00419260`) with a zero center. The portable material now stores the six
+relevant row-vector affine components and the D3D11 vertex shader applies the
+same matrix. This matters immediately: `thug_bat_mesh.bdae` uses the identity
+matrix over the lower-right quadrant of the shared `thug.tga` atlas, while
+`thug_knife_mesh.bdae` authors `U=-0.498` over the same raw UV range to select
+the lower-left quadrant. The gun mesh's UVs directly select the upper-right
+quadrant. `CTextureTransformEx::applyValueEx` (`0x0041a5bc`) is a separate
+animated path that replaces the static matrix with the current SData matrix;
+it does not add an offset to the prepared transform. Core assertions and the
+asset census retain both the raw UV bounds and matrix values so later
+appearance work cannot regress into a guessed tint or texture choice.
+
 Enemy-on-player presentation is a separate native path. Opening attack rows
 6, 7, and 11 all serialize zero horizontal/vertical force and zero post-hit
 protection, and their special-action records have empty effect names.

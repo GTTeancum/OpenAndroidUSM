@@ -1357,6 +1357,32 @@ int main() {
             std::cerr << entitiesResult.message() << '\n';
             return 1;
         }
+        const auto assertThugTextureTransform =
+            [&entities](std::string_view path,
+                        const std::array<float, 6>& expected) {
+            std::vector<std::byte> bytes;
+            assert(entities.read(path, bytes));
+            usm::assets::ColladaMeshFile mesh;
+            assert(mesh.load(bytes));
+            bool found = false;
+            for (const auto& material : mesh.materials()) {
+                bool matches = true;
+                for (std::size_t component = 0; component < expected.size();
+                     ++component) {
+                    matches &= std::abs(
+                                   material.diffuseTextureTransform[component] -
+                                   expected[component]) < 0.00001F;
+                }
+                found |= matches;
+            }
+            assert(found);
+        };
+        assertThugTextureTransform(
+            "meshes_bin/thug_bat_mesh.bdae",
+            {1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F});
+        assertThugTextureTransform(
+            "meshes_bin/thug_knife_mesh.bdae",
+            {1.0F, 0.0F, 0.0F, 1.0F, -0.498F, 0.0F});
         std::vector<std::byte> playerAnimationResource;
         const usm::Result playerAnimationRead = entities.read(
             "meshes_bin/spiderman_anim.bdae", playerAnimationResource);

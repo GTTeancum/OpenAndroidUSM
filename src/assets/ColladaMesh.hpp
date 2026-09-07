@@ -71,6 +71,12 @@ struct ColladaMaterial {
     bool backFaceCulling{};
     bool frontFaceCulling{};
     bool transparentAlphaChannel{};
+    // CMaterial::prepareMaterial (0x0041c7e2-0x0041c84e) builds the native
+    // layer-zero texture matrix from the first 0x1c-byte diffuse texture
+    // descriptor. Storage is {m00,m01,m10,m11,m20,m21}, matching the
+    // row-vector Irrlicht matrix used for (u,v,1) transformation.
+    std::array<float, 6> diffuseTextureTransform{
+        1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F};
     // CMaterial::prepareMaterial (0x0041ca8c-0x0041ca9e) copies SEffect+0x2c
     // into SMaterial::MaterialTypeParam (+0x4c). Custom material 0x1e uses
     // that value as its GL_GREATER alpha-test reference at 0x00397842.

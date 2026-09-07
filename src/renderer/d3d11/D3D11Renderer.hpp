@@ -161,7 +161,10 @@ private:
         bool reflectionTwoLayer{};
         bool lightmapTwoLayer{};
         std::string materialAnimationTarget;
-        std::array<float, 2> textureOffset{};
+        std::array<float, 6> baseTextureTransform{1.0F, 0.0F, 0.0F,
+                                                  1.0F, 0.0F, 0.0F};
+        std::array<float, 6> textureTransform{1.0F, 0.0F, 0.0F,
+                                              1.0F, 0.0F, 0.0F};
     };
 
     struct GpuMesh {

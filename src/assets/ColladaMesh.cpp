@@ -667,9 +667,8 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
             view.integer<std::uint8_t>(effect + 0x10);
         const auto diffusePayload =
             view.integer<std::uint32_t>(effect + 0x14);
-        if (!material.diffuseImageIndex && diffuseUsesTextures &&
-            *diffuseUsesTextures == 1 && diffusePayload &&
-            *diffusePayload != 0) {
+        if (diffuseUsesTextures && *diffuseUsesTextures == 1 &&
+            diffusePayload && *diffusePayload != 0) {
             const auto textureCount =
                 view.integer<std::uint32_t>(*diffusePayload);
             const auto textureArray =
@@ -678,44 +677,85 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
                 view.contains(*textureArray,
                               static_cast<std::uint64_t>(*textureCount) *
                                   0x1c)) {
-                std::vector<std::uint32_t> layerImages;
-                for (std::uint32_t layer = 0; layer < *textureCount; ++layer) {
-                    const auto descriptorOwner = view.integer<std::uint32_t>(
-                        *textureArray + layer * 0x1c);
-                    const auto descriptor =
-                        descriptorOwner && *descriptorOwner != 0
-                            ? view.integer<std::uint32_t>(*descriptorOwner)
-                            : std::nullopt;
-                    const auto imageIdOffset =
-                        descriptor && *descriptor != 0
-                            ? view.integer<std::uint32_t>(*descriptor)
-                            : std::nullopt;
-                    const auto sourceType =
-                        descriptor && *descriptor != 0
-                            ? view.integer<std::uint32_t>(*descriptor + 0x0c)
-                            : std::nullopt;
-                    if (!imageIdOffset || !sourceType || *sourceType != 1) {
-                        continue;
+                if (*textureCount != 0) {
+                    const auto translationU =
+                        view.floating(*textureArray + 0x08);
+                    const auto translationV =
+                        view.floating(*textureArray + 0x0c);
+                    const auto rotation =
+                        view.floating(*textureArray + 0x10);
+                    const auto scaleU =
+                        view.floating(*textureArray + 0x14);
+                    const auto scaleV =
+                        view.floating(*textureArray + 0x18);
+                    if (!translationU || !translationV || !rotation ||
+                        !scaleU || !scaleV ||
+                        !std::isfinite(*translationU) ||
+                        !std::isfinite(*translationV) ||
+                        !std::isfinite(*rotation) ||
+                        !std::isfinite(*scaleU) ||
+                        !std::isfinite(*scaleV)) {
+                        return Result::failure(
+                            "BDAE diffuse texture transform is invalid");
                     }
-                    const auto imageId = view.string(*imageIdOffset);
-                    if (!imageId) {
-                        continue;
-                    }
-                    const auto image = std::find_if(
-                        images.begin(), images.end(),
-                        [&imageId](const ColladaImage& candidate) {
-                            return candidate.id == *imageId;
-                        });
-                    if (image != images.end()) {
-                        layerImages.push_back(static_cast<std::uint32_t>(
-                            image - images.begin()));
-                    }
+                    // buildTextureTransform at 0x00419260 receives a zero
+                    // center from CMaterial::prepareMaterial. Retain the
+                    // resulting 2D affine portion exactly; notably the knife
+                    // thug authors translation U=-0.498 to select a different
+                    // quadrant of the shared 2x2 thug atlas.
+                    const float cosine = std::cos(*rotation);
+                    const float sine = std::sin(*rotation);
+                    material.diffuseTextureTransform = {
+                        cosine * *scaleU,
+                        sine * *scaleU,
+                        -sine * *scaleV,
+                        cosine * *scaleV,
+                        *translationU,
+                        *translationV,
+                    };
                 }
-                if (!layerImages.empty()) {
-                    material.diffuseImageIndex = layerImages[0];
-                }
-                if (layerImages.size() > 1) {
-                    material.secondaryImageIndex = layerImages[1];
+                if (!material.diffuseImageIndex) {
+                    std::vector<std::uint32_t> layerImages;
+                    for (std::uint32_t layer = 0; layer < *textureCount;
+                         ++layer) {
+                        const auto descriptorOwner =
+                            view.integer<std::uint32_t>(
+                                *textureArray + layer * 0x1c);
+                        const auto descriptor =
+                            descriptorOwner && *descriptorOwner != 0
+                                ? view.integer<std::uint32_t>(*descriptorOwner)
+                                : std::nullopt;
+                        const auto imageIdOffset =
+                            descriptor && *descriptor != 0
+                                ? view.integer<std::uint32_t>(*descriptor)
+                                : std::nullopt;
+                        const auto sourceType =
+                            descriptor && *descriptor != 0
+                                ? view.integer<std::uint32_t>(*descriptor + 0x0c)
+                                : std::nullopt;
+                        if (!imageIdOffset || !sourceType || *sourceType != 1) {
+                            continue;
+                        }
+                        const auto imageId = view.string(*imageIdOffset);
+                        if (!imageId) {
+                            continue;
+                        }
+                        const auto image = std::find_if(
+                            images.begin(), images.end(),
+                            [&imageId](const ColladaImage& candidate) {
+                                return candidate.id == *imageId;
+                            });
+                        if (image != images.end()) {
+                            layerImages.push_back(static_cast<std::uint32_t>(
+                                image - images.begin()));
+                        }
+                    }
+                    if (!layerImages.empty()) {
+                        material.diffuseImageIndex = layerImages[0];
+                    }
+                    if (layerImages.size() > 1) {
+                        material.secondaryImageIndex = layerImages[1];
+                    }
                 }
             }
         }

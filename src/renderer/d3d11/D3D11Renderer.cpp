@@ -39,6 +39,11 @@ struct EffectAlphaTestConstants {
     DirectX::XMFLOAT4 parameters;
 };
 
+struct TextureTransformConstants {
+    DirectX::XMFLOAT4 u;
+    DirectX::XMFLOAT4 v;
+};
+
 constexpr std::string_view kVertexShader = R"hlsl(
 cbuffer TransformBuffer : register(b0) {
     float4x4 WorldViewProjection;
@@ -47,7 +52,8 @@ cbuffer ViewRotationBuffer : register(b1) {
     float4x4 ViewRotation;
 };
 cbuffer TextureTransformBuffer : register(b2) {
-    float4 TextureTransform;
+    float4 TextureTransformU;
+    float4 TextureTransformV;
 };
 
 struct VertexInput {
@@ -68,7 +74,10 @@ PixelInput main(VertexInput input) {
     PixelInput output;
     output.position = mul(float4(input.position, 1.0), WorldViewProjection);
     output.normal = mul(float4(input.normal, 0.0), ViewRotation).xyz;
-    output.textureCoordinate = input.textureCoordinate + TextureTransform.xy;
+    float3 sourceTextureCoordinate = float3(input.textureCoordinate, 1.0);
+    output.textureCoordinate =
+        float2(dot(sourceTextureCoordinate, TextureTransformU.xyz),
+               dot(sourceTextureCoordinate, TextureTransformV.xyz));
     output.color = input.color;
     return output;
 }
@@ -82,7 +91,8 @@ cbuffer ViewRotationBuffer : register(b1) {
     float4x4 ViewRotation;
 };
 cbuffer TextureTransformBuffer : register(b2) {
-    float4 TextureTransform;
+    float4 TextureTransformU;
+    float4 TextureTransformV;
 };
 
 struct VertexInput {
@@ -105,7 +115,10 @@ PixelInput main(VertexInput input) {
     PixelInput output;
     output.position = mul(float4(input.position, 1.0), WorldViewProjection);
     output.normal = mul(float4(input.normal, 0.0), ViewRotation).xyz;
-    output.textureCoordinate = input.textureCoordinate + TextureTransform.xy;
+    float3 sourceTextureCoordinate = float3(input.textureCoordinate, 1.0);
+    output.textureCoordinate =
+        float2(dot(sourceTextureCoordinate, TextureTransformU.xyz),
+               dot(sourceTextureCoordinate, TextureTransformV.xyz));
     output.color = input.color;
     output.secondaryTextureCoordinate = input.secondaryTextureCoordinate;
     return output;
@@ -1262,7 +1275,7 @@ Result D3D11Renderer::createPipeline() {
                               callResult);
     }
     D3D11_BUFFER_DESC textureTransformDescription{};
-    textureTransformDescription.ByteWidth = sizeof(DirectX::XMFLOAT4);
+    textureTransformDescription.ByteWidth = sizeof(TextureTransformConstants);
     textureTransformDescription.Usage = D3D11_USAGE_DEFAULT;
     textureTransformDescription.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     callResult = device_->CreateBuffer(&textureTransformDescription, nullptr,
@@ -2685,7 +2698,7 @@ Result D3D11Renderer::updateLevelOneObjects(
                                     *animationTimestamp);
         } else {
             for (DrawBatch& batch : gpuMesh.drawBatches) {
-                batch.textureOffset = {};
+                batch.textureTransform = batch.baseTextureTransform;
             }
         }
     }
@@ -3950,28 +3963,35 @@ void D3D11Renderer::updateMaterialAnimation(
     GpuMesh& gpuMesh, const assets::ColladaAnimationFile& animation,
     std::uint32_t timestampMilliseconds) noexcept {
     for (DrawBatch& batch : gpuMesh.drawBatches) {
-        batch.textureOffset = {};
-    }
-    for (const assets::ColladaAnimationTrack& track : animation.tracks()) {
-        const bool offsetU =
-            track.property ==
-            assets::ColladaAnimationProperty::TextureOffsetU;
-        const bool offsetV =
-            track.property ==
-            assets::ColladaAnimationProperty::TextureOffsetV;
-        if (!offsetU && !offsetV) {
-            continue;
-        }
-        const assets::ColladaAnimationSample sample =
-            track.sample(timestampMilliseconds);
-        if (sample.componentCount != 1) {
-            continue;
-        }
-        for (DrawBatch& batch : gpuMesh.drawBatches) {
+        batch.textureTransform = batch.baseTextureTransform;
+        bool animatedTransform = false;
+        for (const assets::ColladaAnimationTrack& track : animation.tracks()) {
+            const bool offsetU =
+                track.property ==
+                assets::ColladaAnimationProperty::TextureOffsetU;
+            const bool offsetV =
+                track.property ==
+                assets::ColladaAnimationProperty::TextureOffsetV;
+            if (!offsetU && !offsetV) {
+                continue;
+            }
+            const assets::ColladaAnimationSample sample =
+                track.sample(timestampMilliseconds);
+            if (sample.componentCount != 1) {
+                continue;
+            }
             if (batch.materialAnimationTarget != track.targetNode) {
                 continue;
             }
-            batch.textureOffset[offsetV ? 1U : 0U] = sample.value[0];
+            if (!animatedTransform) {
+                // CTextureTransformEx::applyValueEx (0x0041a5bc) replaces
+                // the prepared material matrix with a new matrix built from
+                // the animated SData (identity scale/rotation by default).
+                batch.textureTransform = {1.0F, 0.0F, 0.0F,
+                                          1.0F, 0.0F, 0.0F};
+                animatedTransform = true;
+            }
+            batch.textureTransform[offsetV ? 5U : 4U] = sample.value[0];
         }
     }
 }
@@ -6182,6 +6202,9 @@ Result D3D11Renderer::uploadGeometrySet(
                     batch.indexCount = 0;
                 }
                 if (material != nullptr) {
+                    batch.baseTextureTransform =
+                        material->diffuseTextureTransform;
+                    batch.textureTransform = batch.baseTextureTransform;
                     batch.effectAlphaReference =
                         material->materialTypeParameter;
                     batch.materialAnimationTarget = material->effectId;
@@ -6456,9 +6479,13 @@ void D3D11Renderer::renderFrame() {
                             // triangle.
                             continue;
                         }
-                        const DirectX::XMFLOAT4 textureTransform{
-                            batch.textureOffset[0], batch.textureOffset[1],
-                            0.0F, 0.0F};
+                        const TextureTransformConstants textureTransform{
+                            {batch.textureTransform[0],
+                             batch.textureTransform[2],
+                             batch.textureTransform[4], 0.0F},
+                            {batch.textureTransform[1],
+                             batch.textureTransform[3],
+                             batch.textureTransform[5], 0.0F}};
                         context_->UpdateSubresource(
                             textureTransformBuffer_.Get(), 0, nullptr,
                             &textureTransform, 0, 0);
@@ -6547,7 +6574,9 @@ void D3D11Renderer::renderFrame() {
                 }
             }
         }
-        const DirectX::XMFLOAT4 identityTextureTransform{};
+        const TextureTransformConstants identityTextureTransform{
+            {1.0F, 0.0F, 0.0F, 0.0F},
+            {0.0F, 1.0F, 0.0F, 0.0F}};
         context_->UpdateSubresource(textureTransformBuffer_.Get(), 0, nullptr,
                                     &identityTextureTransform, 0, 0);
     }
