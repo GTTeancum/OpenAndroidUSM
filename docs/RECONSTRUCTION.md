@@ -2109,6 +2109,21 @@ animation bank contains no texture-transform channels. Consequently these
 opening appearances are authored, deterministic weapon variants; adding a
 same-archetype random palette would not match the shipped executable.
 
+This result is not limited to the opening trio. A 12-level IRR/BDAE census
+finds 178 thug instances and exactly seven authored presentation families:
+46 knife, 46 bat, 16 gun, 18 electrode, 30 molotov, 11 big/bazooka, and 11
+hammer. Every instance of a family names the same family mesh and material
+presentation; the seven meshes select their own atlas region or dedicated
+texture. No thug node serializes a per-instance color or texture override.
+`CEnemy::ProcessUserAttr` (`0x00332870`) passes the authored `MeshFile`
+directly to `IAnimatedObject` and, unlike `CAnimatedObject::ProcessUserAttr`
+(`0x002fd560`), never executes the unrelated high-quality yellow-car texture
+replacement. The complete references to global `random` (`0x003730b0`) and
+material/vertex mutation helpers contain no enemy construction or reset
+caller. Core tests now census all 178 instances across all 12 levels and pin
+their exact game-type-to-mesh mapping. Replacing these families with random
+tints would discard shipped variation rather than reconstruct it.
+
 Enemy-on-player presentation is a separate native path. Opening attack rows
 6, 7, and 11 all serialize zero horizontal/vertical force and zero post-hit
 protection, and their special-action records have empty effect names.

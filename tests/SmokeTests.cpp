@@ -2907,6 +2907,64 @@ int main() {
         // process-local census harness. These later assets exercise native
         // virtual-filesystem rebasing, optional collision/nav nodes,
         // camera-only cinematics, and valid levels with no Bonus nodes.
+        struct ExpectedThugPresentation {
+            std::string_view gameType;
+            std::string_view meshFile;
+            std::size_t instanceCount{};
+        };
+        constexpr std::array expectedThugPresentations{
+            ExpectedThugPresentation{
+                "MeleeThug_gun",
+                "../entities/meshes_bin/thug_gun_mesh.bdae", 16},
+            ExpectedThugPresentation{
+                "MeleeThugEnemy_bat",
+                "../entities/meshes_bin/thug_bat_mesh.bdae", 46},
+            ExpectedThugPresentation{
+                "MeleeThugEnemy_electrodes",
+                "../entities/meshes_bin/thug_electric_mesh.bdae", 18},
+            ExpectedThugPresentation{
+                "MeleeThugEnemy_knife",
+                "../entities/meshes_bin/thug_knife_mesh.bdae", 46},
+            ExpectedThugPresentation{
+                "RangeThug_big",
+                "../entities/meshes_bin/thug_big_mesh.bdae", 11},
+            ExpectedThugPresentation{
+                "RangeThug_hammer",
+                "../entities/meshes_bin/thug_hammer_mesh.bdae", 11},
+            ExpectedThugPresentation{
+                "RangeThug_molotov",
+                "../entities/meshes_bin/thug_molotov_mesh.bdae", 30},
+        };
+        std::array<std::size_t, expectedThugPresentations.size()>
+            thugPresentationCounts{};
+        const auto censusThugPresentations =
+            [&expectedThugPresentations, &thugPresentationCounts](
+                const usm::game::LevelOneBootstrap& level) {
+                for (const auto& enemy : level.enemies()) {
+                    const auto expected = std::find_if(
+                        expectedThugPresentations.begin(),
+                        expectedThugPresentations.end(),
+                        [&enemy](const auto& presentation) {
+                            return presentation.gameType == enemy.gameType;
+                        });
+                    if (enemy.gameType.find("Thug") == std::string::npos) {
+                        assert(expected == expectedThugPresentations.end());
+                        continue;
+                    }
+                    assert(expected != expectedThugPresentations.end());
+                    assert(enemy.archetypeIndex <
+                           level.enemyArchetypes().size());
+                    const auto& archetype =
+                        level.enemyArchetypes()[enemy.archetypeIndex];
+                    assert(archetype.meshFile == expected->meshFile);
+                    ++thugPresentationCounts[static_cast<std::size_t>(
+                        std::distance(expectedThugPresentations.begin(),
+                                      expected))];
+                }
+            };
+        censusThugPresentations(bootstrap);
+        censusThugPresentations(levelTwo);
+        censusThugPresentations(levelThree);
         constexpr std::array<std::size_t, 9> laterLevelRoomCounts{
             8, 9, 8, 23, 7, 8, 4, 15, 12};
         for (std::uint32_t levelNumber = 4; levelNumber <= 12;
@@ -2924,6 +2982,7 @@ int main() {
             assert(laterLevel.rooms().size() ==
                    laterLevelRoomCounts[levelNumber - 4]);
             assert(!laterLevel.introSky().geometry.geometries().empty());
+            censusThugPresentations(laterLevel);
             const auto assertNativeBoss =
                 [&laterLevel](std::int32_t objectId,
                               std::int16_t authoredType) {
@@ -4238,6 +4297,11 @@ int main() {
                 assert(laterLevel.introSky().textures.front()
                            .mipLevels().front().width == 512);
             }
+        }
+        for (std::size_t index = 0;
+             index < expectedThugPresentations.size(); ++index) {
+            assert(thugPresentationCounts[index] ==
+                   expectedThugPresentations[index].instanceCount);
         }
         const auto levelThreeBeam = std::find_if(
             levelThree.objects().begin(), levelThree.objects().end(),
