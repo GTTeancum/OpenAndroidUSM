@@ -1785,6 +1785,79 @@ int main() {
                "shrink");
         assert(bootstrap.playerHitEffects()[25].animation.clips()[0]
                    .durationMilliseconds() == 566);
+        const auto& ultimateWebEffect = bootstrap.playerHitEffects()[24];
+        assert(ultimateWebEffect.mesh.morphs().size() == 2);
+        const auto& ultimateObjectOneMorph =
+            ultimateWebEffect.mesh.morphs()[0];
+        assert(ultimateObjectOneMorph.controllerId ==
+               "Object01-mesh-morpher");
+        assert(ultimateObjectOneMorph.sourceGeometryId == "Object01-mesh");
+        assert(ultimateObjectOneMorph.method == 0);
+        assert((ultimateObjectOneMorph.targetGeometryIndices ==
+                std::vector<std::uint32_t>{6, 7}));
+        assert((ultimateObjectOneMorph.weights ==
+                std::vector<float>{1.0F, 0.0F}));
+        const auto& ultimateObjectFourMorph =
+            ultimateWebEffect.mesh.morphs()[1];
+        assert(ultimateObjectFourMorph.controllerId ==
+               "Object04-mesh-morpher");
+        assert(ultimateObjectFourMorph.method == 0);
+        assert((ultimateObjectFourMorph.targetGeometryIndices ==
+                std::vector<std::uint32_t>{8, 9}));
+        assert((ultimateObjectFourMorph.weights ==
+                std::vector<float>{1.0F, 0.0F}));
+        assert(ultimateWebEffect.mesh.sceneNodes().size() == 7);
+        assert(ultimateWebEffect.mesh.sceneNodes()[0]
+                   .geometryControllerIds.front() ==
+               "Object01-mesh-morpher");
+        assert(ultimateWebEffect.mesh.sceneNodes()[2]
+                   .geometryControllerIds.front() ==
+               "Object04-mesh-morpher");
+        const auto findUltimateTrack =
+            [&ultimateWebEffect](std::string_view id) {
+                return std::find_if(
+                    ultimateWebEffect.animation.tracks().begin(),
+                    ultimateWebEffect.animation.tracks().end(),
+                    [id](const auto& track) { return track.id == id; });
+            };
+        const auto objectOneWeight =
+            findUltimateTrack("Object01-mesh-morpher-weights");
+        assert(objectOneWeight != ultimateWebEffect.animation.tracks().end());
+        assert(objectOneWeight->property ==
+               usm::assets::ColladaAnimationProperty::MorphWeight);
+        // ISceneNodeAnimator::forceBind (0x00429870) consumes SChannel+0x0c,
+        // not the textual "weights" suffix. This channel really addresses
+        // target slot 1 while Object04's two channels address slots 0 and 1.
+        assert(objectOneWeight->targetIndex == 1);
+        const auto objectFourWeight =
+            findUltimateTrack("Object04-mesh-morpher-weights");
+        const auto objectFourWeightOne =
+            findUltimateTrack("Object04-mesh-morpher-weights1");
+        assert(objectFourWeight != ultimateWebEffect.animation.tracks().end());
+        assert(objectFourWeightOne !=
+               ultimateWebEffect.animation.tracks().end());
+        assert(objectFourWeight->targetIndex == 0);
+        assert(objectFourWeightOne->targetIndex == 1);
+        std::vector<usm::assets::ColladaGeometry> ultimateShrinkStart;
+        std::vector<usm::assets::ColladaGeometry> ultimateExplodeEnd;
+        assert(usm::assets::evaluateColladaPose(
+            ultimateWebEffect.mesh, ultimateWebEffect.animation, 0,
+            ultimateShrinkStart));
+        assert(usm::assets::evaluateColladaPose(
+            ultimateWebEffect.mesh, ultimateWebEffect.animation, 1399,
+            ultimateExplodeEnd));
+        assert(ultimateShrinkStart.size() == 6);
+        assert(ultimateExplodeEnd.size() == 6);
+        const auto& shrinkVertex =
+            ultimateShrinkStart[0].vertices.front().position;
+        const auto& explodeVertex =
+            ultimateExplodeEnd[0].vertices.front().position;
+        assert(std::abs(shrinkVertex.x - -7.49384F) < 0.001F);
+        assert(std::abs(shrinkVertex.y - -56.4381F) < 0.001F);
+        assert(std::abs(shrinkVertex.z - -7.66562F) < 0.001F);
+        assert(std::abs(explodeVertex.x - -179.866F) < 0.001F);
+        assert(std::abs(explodeVertex.y - -553.851F) < 0.001F);
+        assert(std::abs(explodeVertex.z - 14.2984F) < 0.001F);
         // GS_Confirmation shipped resources recovered from Create/Render at
         // 0x002dc2ec/0x002dbfa8.
         assert(bootstrap.hud().mainMenuAtlas.modules().size() == 78);
@@ -11641,9 +11714,12 @@ int main() {
                 std::vector<std::uint32_t>{2, 3, 4}));
         assert((carActor->mesh.morphs()[0].weights ==
                 std::vector<float>{0.0F, 0.0F, 0.0F}));
+        assert(carActor->mesh.morphs()[0].method == 0);
         assert(carActor->mesh.sceneNodes().size() == 2);
         assert(carActor->mesh.sceneNodes()[0].geometryIndices.size() == 1);
         assert(carActor->mesh.sceneNodes()[0].geometryIndices[0] == 0);
+        assert(carActor->mesh.sceneNodes()[0].geometryControllerIds[0] ==
+               "car_plice-mesh-morpher");
         assert(carActor->mesh.sceneNodes()[1].geometryIndices.size() == 1);
         assert(carActor->mesh.sceneNodes()[1].geometryIndices[0] == 1);
         std::vector<usm::assets::ColladaGeometry> carStartPose;

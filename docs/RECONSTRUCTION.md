@@ -2053,6 +2053,28 @@ animation precedence over the duration counter. The duration can still fade
 alpha in `Update`, so animated effects retain separate survival and fade
 clocks rather than disappearing when the wrong one expires first.
 
+The ultimate in/out meshes also require native morph animation; rigid node
+animation alone is incomplete. `CColladaDatabase::getAnimationTrackEx`
+(`0x00418348`) maps `SChannel` type `0x0e` to `CWeightEx`.
+`ISceneNodeAnimator::forceBind` (`0x00429870`) matches the channel target URI
+to the morph controller ID and uses the byte at `SChannel+0x0c` as the target
+index after the implicit base mesh. This is materially different from parsing
+the textual suffix: `Object01-mesh-morpher-weights` addresses target 1, while
+the two Object04 channels address targets 0 and 1. `CWeightEx` linearly samples
+one float and copies it into that bound weight (`0x00451e3c`--`0x00451ef8`).
+
+`CColladaMorphingMesh::instanciateMesh` (`0x004206c8`) builds its target array
+as the source geometry followed by every serialized target and initial weight.
+`CColladaMorphingMesh::morph` (`0x00420384`) restores the base weight to one on
+each render preparation; when `SMorph+0x04` is zero it subtracts every target
+weight from that base, otherwise it retains base one. It then accumulates both
+positions and normals with the exact weights. The portable parser now retains
+the method, controller-instance URI, initial weights, target indices, and raw
+channel target index. Pose evaluation performs that blend before applying the
+animated scene-node transform. The red and black ultimate banks each contain
+two normalized morph controllers; deterministic asset events and numeric pose
+regressions cover their slot bindings and the red bank's shrink/explode ends.
+
 Enemy contact effects are separate from those limb trails.
 `CEnemy::ProcessHitInfo` at `0x00330fe4` requests `cartoon_hit_splash` for an
 accepted ordinary strike and `cartoon_hit_splash_big` for native hit types

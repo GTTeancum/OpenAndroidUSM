@@ -261,6 +261,14 @@ makes a premature counter available.
   VoxSound `0x53`; the shipped table resolves it to `SFX_SUPER_WEB_ATTACK`.
   The corresponding live gate separately proves that exact stop and this
   narrow path without replacing the earlier directional-counter coverage.
+- Effects 24/25 are not rigid-only meshes. Native channel type `0x0e` selects
+  `CWeightEx` in `CColladaDatabase::getAnimationTrackEx` (`0x00418348`), and
+  `ISceneNodeAnimator::forceBind` (`0x00429870`) binds `SChannel+0x0c` to the
+  exact morph target slot. `CColladaMorphingMesh::morph` (`0x00420384`) then
+  applies the serialized normalized blend to positions and normals before the
+  node transform. Both the shrink and explode clips now use those authored
+  weights; the Object01 `weights` channel is proven to select slot 1 rather
+  than a name-derived slot 0.
 - `Player::CanEnableSpiderSense` (`0x00341c98`) gates chained sense input at
   the current class-6 state's inclusive `StateBasic+0x30` frame (the parsed
   `soundTriggerFrame`: 3 for evades, 7/8 for directional counters, and 6 for

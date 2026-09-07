@@ -320,7 +320,7 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
            "node_id,node_name,scope_id,local_x,local_y,local_z,quaternion_x,"
            "quaternion_y,quaternion_z,quaternion_w,scale_x,scale_y,scale_z,"
            "world_x,world_y,world_z,m00,m01,m02,m10,m11,m12,m20,m21,m22,"
-           "geometry_indices\n";
+           "geometry_indices,geometry_controller_ids\n";
     collisionAssetLog_
         << "room,geometry,surface_class,min_x,min_y,min_z,max_x,max_y,max_z\n";
     collisionTriangleLog_
@@ -4187,6 +4187,16 @@ void AutoplayHarness::recordMaterialAssets(
                 }
                 geometryIndices += std::to_string(geometryIndex);
             }
+            std::string geometryControllerIds;
+            for (const std::string& controllerId :
+                 node.geometryControllerIds) {
+                if (!geometryControllerIds.empty()) {
+                    geometryControllerIds += '|';
+                }
+                geometryControllerIds += controllerId.empty()
+                                             ? "<direct>"
+                                             : controllerId;
+            }
             colladaNodeAssetLog_
                 << csv(ownerKind) << ',' << ownerId << ',' << csv(ownerName)
                 << ',' << csv(meshSource) << ',' << nodeIndex << ','
@@ -4202,7 +4212,8 @@ void AutoplayHarness::recordMaterialAssets(
             for (const float component : node.worldLinear) {
                 colladaNodeAssetLog_ << ',' << component;
             }
-            colladaNodeAssetLog_ << ',' << csv(geometryIndices) << '\n';
+            colladaNodeAssetLog_ << ',' << csv(geometryIndices) << ','
+                                 << csv(geometryControllerIds) << '\n';
         }
         for (const assets::ColladaGeometry& geometry :
              mesh.sceneGeometries()) {

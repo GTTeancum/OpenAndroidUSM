@@ -104,6 +104,9 @@ struct ColladaSkin {
 struct ColladaMorph {
     std::string controllerId;
     std::string sourceGeometryId;
+    // SMorph+0x04. CColladaMorphingMesh::morph (0x00420384) treats zero as
+    // normalized (base = 1 - sum(targets)); every other value keeps base 1.
+    std::uint32_t method{};
     std::vector<std::uint32_t> targetGeometryIndices;
     std::vector<float> weights;
 };
@@ -121,6 +124,9 @@ struct ColladaSceneNode {
                                      0.0F, 0.0F, 1.0F};
     Vector3 worldPosition;
     std::vector<std::uint32_t> geometryIndices;
+    // Parallel to geometryIndices. Empty denotes a direct geometry instance;
+    // otherwise this is the exact SInstanceController URL without '#'.
+    std::vector<std::string> geometryControllerIds;
 };
 
 // Typed native view of the SGeometry/SMesh/SMeshBuffer graph consumed by

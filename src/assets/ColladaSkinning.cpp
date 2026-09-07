@@ -143,6 +143,104 @@ const ColladaAnimationTrack* findTrack(
     return match == animation.tracks().end() ? nullptr : &*match;
 }
 
+const ColladaAnimationTrack* findMorphWeightTrack(
+    const ColladaAnimationFile& animation, std::string_view controllerId,
+    std::uint32_t targetIndex) noexcept {
+    const auto match = std::find_if(
+        animation.tracks().begin(), animation.tracks().end(),
+        [controllerId, targetIndex](const ColladaAnimationTrack& track) {
+            return track.targetNode == controllerId &&
+                   track.property == ColladaAnimationProperty::MorphWeight &&
+                   track.targetIndex == targetIndex;
+        });
+    return match == animation.tracks().end() ? nullptr : &*match;
+}
+
+const ColladaMorph* findMorph(const ColladaMeshFile& mesh,
+                              std::string_view controllerId) noexcept {
+    const auto match = std::find_if(
+        mesh.morphs().begin(), mesh.morphs().end(),
+        [controllerId](const ColladaMorph& morph) {
+            return morph.controllerId == controllerId;
+        });
+    return match == mesh.morphs().end() ? nullptr : &*match;
+}
+
+Result evaluateMorphGeometry(const ColladaMeshFile& mesh,
+                             const ColladaAnimationFile& animation,
+                             const ColladaMorph& morph,
+                             std::uint32_t timestampMilliseconds,
+                             ColladaGeometry& output) {
+    const auto source = std::find_if(
+        mesh.geometries().begin(), mesh.geometries().end(),
+        [&morph](const ColladaGeometry& geometry) {
+            return geometry.id == morph.sourceGeometryId;
+        });
+    if (source == mesh.geometries().end() ||
+        morph.targetGeometryIndices.size() != morph.weights.size()) {
+        return Result::failure("BDAE morph does not match its source geometry");
+    }
+
+    std::vector<float> weights = morph.weights;
+    for (std::uint32_t targetIndex = 0;
+         targetIndex < weights.size(); ++targetIndex) {
+        if (const ColladaAnimationTrack* track = findMorphWeightTrack(
+                animation, morph.controllerId, targetIndex)) {
+            weights[targetIndex] =
+                track->sample(timestampMilliseconds).value[0];
+        }
+    }
+
+    float baseWeight = 1.0F;
+    // CColladaMorphingMesh::morph (0x00420384) always restores the implicit
+    // base entry to one, then subtracts every target only for method zero.
+    if (morph.method == 0) {
+        for (const float weight : weights) {
+            baseWeight -= weight;
+        }
+    }
+
+    std::vector<const ColladaGeometry*> targets;
+    targets.reserve(morph.targetGeometryIndices.size());
+    for (const std::uint32_t geometryIndex : morph.targetGeometryIndices) {
+        if (geometryIndex >= mesh.geometries().size() ||
+            mesh.geometries()[geometryIndex].vertices.size() !=
+                source->vertices.size()) {
+            return Result::failure(
+                "BDAE morph target geometry is incompatible");
+        }
+        targets.push_back(&mesh.geometries()[geometryIndex]);
+    }
+
+    output = *source;
+    for (std::size_t vertexIndex = 0;
+         vertexIndex < output.vertices.size(); ++vertexIndex) {
+        const ColladaVertex& base = source->vertices[vertexIndex];
+        Vector3 position{base.position.x * baseWeight,
+                         base.position.y * baseWeight,
+                         base.position.z * baseWeight};
+        Vector3 normal{base.normal.x * baseWeight,
+                       base.normal.y * baseWeight,
+                       base.normal.z * baseWeight};
+        for (std::size_t targetIndex = 0; targetIndex < targets.size();
+             ++targetIndex) {
+            const ColladaVertex& target =
+                targets[targetIndex]->vertices[vertexIndex];
+            const float weight = weights[targetIndex];
+            position.x += target.position.x * weight;
+            position.y += target.position.y * weight;
+            position.z += target.position.z * weight;
+            normal.x += target.normal.x * weight;
+            normal.y += target.normal.y * weight;
+            normal.z += target.normal.z * weight;
+        }
+        output.vertices[vertexIndex].position = position;
+        output.vertices[vertexIndex].normal = normal;
+    }
+    updateBounds(output);
+    return Result::success();
+}
+
 Quaternion withAnimatedAngle(Quaternion base, float angle) noexcept {
     const float vectorLength =
         std::sqrt(base.x * base.x + base.y * base.y + base.z * base.z);
@@ -267,13 +365,39 @@ Result evaluateColladaPose(
         for (std::size_t nodeIndex = 0;
              nodeIndex < mesh.sceneNodes().size(); ++nodeIndex) {
             const ColladaSceneNode& node = mesh.sceneNodes()[nodeIndex];
-            for (const std::uint32_t geometryIndex : node.geometryIndices) {
+            if (node.geometryControllerIds.size() !=
+                node.geometryIndices.size()) {
+                output.clear();
+                return Result::failure(
+                    "BDAE scene controller instances are inconsistent");
+            }
+            for (std::size_t instanceIndex = 0;
+                 instanceIndex < node.geometryIndices.size(); ++instanceIndex) {
+                const std::uint32_t geometryIndex =
+                    node.geometryIndices[instanceIndex];
                 if (geometryIndex >= mesh.geometries().size()) {
                     output.clear();
                     return Result::failure(
                         "BDAE scene node geometry index is invalid");
                 }
-                output.push_back(mesh.geometries()[geometryIndex]);
+                const std::string& controllerId =
+                    node.geometryControllerIds[instanceIndex];
+                const ColladaMorph* morph = controllerId.empty()
+                                                  ? nullptr
+                                                  : findMorph(mesh, controllerId);
+                if (morph == nullptr) {
+                    output.push_back(mesh.geometries()[geometryIndex]);
+                } else {
+                    ColladaGeometry morphed;
+                    result = evaluateMorphGeometry(
+                        mesh, animation, *morph, timestampMilliseconds,
+                        morphed);
+                    if (!result) {
+                        output.clear();
+                        return result;
+                    }
+                    output.push_back(std::move(morphed));
+                }
                 ColladaGeometry& geometry = output.back();
                 geometry.name = node.name;
                 transformGeometry(geometry, worldMatrices[nodeIndex]);

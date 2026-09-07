@@ -884,6 +884,7 @@ Result parseSceneNodes(
                               *scale,
                               worldTransform.linear,
                               worldTransform.translation,
+                              {},
                               {}});
         for (std::uint32_t instanceIndex = 0;
              instanceIndex < *instanceCount; ++instanceIndex) {
@@ -928,6 +929,11 @@ Result parseSceneNodes(
             }
             sceneNodes[static_cast<std::size_t>(currentNodeIndex)]
                 .geometryIndices.push_back(geometry->second);
+            sceneNodes[static_cast<std::size_t>(currentNodeIndex)]
+                .geometryControllerIds.push_back(
+                    *type == kControllerInstanceType
+                        ? geometryUrl->substr(1)
+                        : std::string{});
             ColladaGeometry instance = geometries[geometry->second];
             instance.name = *name;
             transformGeometry(instance, worldTransform);
@@ -1050,6 +1056,8 @@ Result parseMorphControllers(const BinaryView& view,
         const auto controllerId = view.string(*idOffset);
         const auto sourceUrlOffset =
             view.integer<std::uint32_t>(*morphOffset);
+        const auto method =
+            view.integer<std::uint32_t>(*morphOffset + 4);
         const auto targetCount =
             view.integer<std::uint32_t>(*morphOffset + 0x10);
         const auto targetIndices =
@@ -1058,7 +1066,7 @@ Result parseMorphControllers(const BinaryView& view,
             view.integer<std::uint32_t>(*morphOffset + 0x18);
         const auto weights =
             view.integer<std::uint32_t>(*morphOffset + 0x1c);
-        if (!controllerId || !sourceUrlOffset || !targetCount ||
+        if (!controllerId || !sourceUrlOffset || !method || !targetCount ||
             !targetIndices || !weightCount || !weights ||
             *targetCount != *weightCount ||
             (*targetCount != 0 &&
@@ -1075,6 +1083,7 @@ Result parseMorphControllers(const BinaryView& view,
         ColladaMorph morph;
         morph.controllerId = *controllerId;
         morph.sourceGeometryId = sourceUrl->substr(1);
+        morph.method = *method;
         morph.targetGeometryIndices.reserve(*targetCount);
         morph.weights.reserve(*weightCount);
         for (std::uint32_t target = 0; target < *targetCount; ++target) {

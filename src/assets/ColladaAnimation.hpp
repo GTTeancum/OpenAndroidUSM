@@ -23,6 +23,7 @@ enum class ColladaAnimationProperty {
     Scale,
     Rotation,
     RotationAngle,
+    MorphWeight,
     TextureOffsetU,
     TextureOffsetV,
 };
@@ -36,6 +37,10 @@ struct ColladaAnimationTrack {
     std::string id;
     std::string targetNode;
     ColladaAnimationProperty property{ColladaAnimationProperty::Unknown};
+    // Weight channels use SChannel+0x0c to select one morph target. Native
+    // ISceneNodeAnimator::forceBind (0x00429870) indexes the controller's
+    // target array with this byte after its implicit base-mesh entry.
+    std::uint32_t targetIndex{};
     std::uint32_t componentCount{};
     std::vector<std::uint32_t> timestampsMilliseconds;
     std::vector<float> values;

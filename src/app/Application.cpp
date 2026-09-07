@@ -998,6 +998,29 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     std::to_string(effect.mesh.sceneGeometries().size()) +
                     ";textures=" +
                     std::to_string(effect.textures.size()));
+            for (std::size_t morphIndex = 0;
+                 morphIndex < effect.mesh.morphs().size(); ++morphIndex) {
+                const assets::ColladaMorph& morph =
+                    effect.mesh.morphs()[morphIndex];
+                std::string detail =
+                    "effect_id=" + std::to_string(effect.definition.id) +
+                    ";morph_index=" + std::to_string(morphIndex) +
+                    ";controller=" + morph.controllerId +
+                    ";source=" + morph.sourceGeometryId +
+                    ";method=" + std::to_string(morph.method);
+                for (std::size_t targetIndex = 0;
+                     targetIndex < morph.targetGeometryIndices.size();
+                     ++targetIndex) {
+                    detail += ";target" + std::to_string(targetIndex) +
+                              "=" + std::to_string(
+                                  morph.targetGeometryIndices[targetIndex]) +
+                              ";weight" + std::to_string(targetIndex) +
+                              "=" + std::to_string(
+                                  morph.weights[targetIndex]);
+                }
+                autoplay->recordEvent(
+                    0, "player_hit_mesh_morph_asset", detail);
+            }
             for (std::size_t materialIndex = 0;
                  materialIndex < effect.mesh.materials().size();
                  ++materialIndex) {
@@ -1057,6 +1080,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     ";target=" + track.targetNode +
                     ";property=" +
                     std::to_string(static_cast<std::int32_t>(track.property)) +
+                    ";target_index=" +
+                    std::to_string(track.targetIndex) +
                     ";components=" +
                     std::to_string(track.componentCount) +
                     ";keys=" +

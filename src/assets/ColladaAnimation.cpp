@@ -94,6 +94,10 @@ ColladaAnimationProperty propertyFromChannel(
         return ColladaAnimationProperty::RotationAngle;
     case 10:
         return ColladaAnimationProperty::Scale;
+    case 0x0e:
+        // CColladaDatabase::getAnimationTrackEx (0x00418348) selects
+        // CWeightEx for native SChannel type 0x0e.
+        return ColladaAnimationProperty::MorphWeight;
     case 0x101:
         return ColladaAnimationProperty::TextureOffsetU;
     case 0x102:
@@ -118,7 +122,8 @@ Result parseTrackChannel(const BinaryView& view, std::string_view id,
                          ColladaAnimationTrack& output) {
     const auto targetOffset = view.integer<std::uint32_t>(channelOffset + 4);
     const auto channelType = view.integer<std::uint32_t>(channelOffset + 8);
-    if (!targetOffset || !channelType) {
+    const auto targetIndex = view.integer<std::uint8_t>(channelOffset + 0x0c);
+    if (!targetOffset || !channelType || !targetIndex) {
         return Result::failure("BDAE animation channel is truncated");
     }
     const auto target = view.string(*targetOffset);
@@ -154,6 +159,7 @@ Result parseTrackChannel(const BinaryView& view, std::string_view id,
         componentCount = 4;
         break;
     case ColladaAnimationProperty::RotationAngle:
+    case ColladaAnimationProperty::MorphWeight:
     case ColladaAnimationProperty::TextureOffsetU:
     case ColladaAnimationProperty::TextureOffsetV:
         componentCount = 1;
@@ -216,6 +222,7 @@ Result parseTrackChannel(const BinaryView& view, std::string_view id,
     output.id = id;
     output.targetNode = *target;
     output.property = property;
+    output.targetIndex = *targetIndex;
     output.componentCount = componentCount;
     output.timestampsMilliseconds.reserve(*timeCount - firstKey);
     for (std::uint32_t index = firstKey; index < *timeCount; ++index) {
