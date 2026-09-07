@@ -1,6 +1,7 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
 
 #include "assets/ColladaSkinning.hpp"
+#include "game/EffectBillboard.hpp"
 #include "game/WebLineGeometry.hpp"
 
 #include <d3dcompiler.h>
@@ -3513,20 +3514,23 @@ Result D3D11Renderer::updateLevelOneEffects(
             valid = false;
             return;
         }
-        const float radians =
-            particle.rotationDegrees * 0.017453292519943295F;
-        const float cosine = std::cos(radians);
-        const float sine = std::sin(radians);
+        const assets::Vector3 cameraForward{
+            cameraUp_.y * cameraRight_.z -
+                cameraUp_.z * cameraRight_.y,
+            cameraUp_.z * cameraRight_.x -
+                cameraUp_.x * cameraRight_.z,
+            cameraUp_.x * cameraRight_.y -
+                cameraUp_.y * cameraRight_.x};
+        const game::EffectBillboardAxes axes = game::effectBillboardAxes(
+            particle, cameraRight_, cameraUp_, cameraForward);
         const auto point = [&](float localX, float localY) {
-            const float rotatedX = localX * cosine - localY * sine;
-            const float rotatedY = localX * sine + localY * cosine;
             return DirectX::XMFLOAT3{
-                particle.position.x + cameraRight_.x * rotatedX +
-                    cameraUp_.x * rotatedY,
-                particle.position.y + cameraRight_.y * rotatedX +
-                    cameraUp_.y * rotatedY,
-                particle.position.z + cameraRight_.z * rotatedX +
-                    cameraUp_.z * rotatedY};
+                particle.position.x + axes.right.x * localX +
+                    axes.up.x * localY,
+                particle.position.y + axes.right.y * localX +
+                    axes.up.y * localY,
+                particle.position.z + axes.right.z * localX +
+                    axes.up.z * localY};
         };
         for (const assets::SpriteFrameModule& frameModule : modules) {
             if (frameModule.moduleIndex >= atlas.modules().size()) {

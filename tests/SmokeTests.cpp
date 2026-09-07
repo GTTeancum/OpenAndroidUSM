@@ -19,6 +19,7 @@
 #include "core/Result.hpp"
 #include "diagnostics/AutoplayHarness.hpp"
 #include "filesystem/GbmpArchive.hpp"
+#include "game/EffectBillboard.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelSlideRuntime.hpp"
 #include "game/GameplayPlayer.hpp"
@@ -5419,6 +5420,18 @@ int main() {
         assert(effectRandomizer.state() == 66400094);
         assert(effectRuntime.particles().front().frameId == 2);
         assert(effectRuntime.particles().front().width > 0.0F);
+        assert(std::all_of(
+            effectRuntime.particles().begin(), effectRuntime.particles().end(),
+            [](const auto& particle) {
+                return particle.directionalRotation &&
+                       !particle.hasSpinAffector;
+            }));
+        assert(std::any_of(
+            effectRuntime.particles().begin(), effectRuntime.particles().end(),
+            [](const auto& particle) { return particle.projectDirection; }));
+        assert(std::any_of(
+            effectRuntime.particles().begin(), effectRuntime.particles().end(),
+            [](const auto& particle) { return !particle.projectDirection; }));
         std::vector<usm::assets::Vector3> hitStartPositions;
         for (const auto& particle : effectRuntime.particles()) {
             hitStartPositions.push_back(particle.position);
@@ -5434,8 +5447,49 @@ int main() {
             const float dz = current.z - start.z;
             hitParticleMoved |=
                 std::sqrt(dx * dx + dy * dy + dz * dz) > 95.0F;
+            const auto& previous =
+                effectRuntime.particles()[index].previousPosition;
+            assert(std::abs(previous.x - start.x) < 0.001F);
+            assert(std::abs(previous.y - start.y) < 0.001F);
+            assert(std::abs(previous.z - start.z) < 0.001F);
         }
         assert(hitParticleMoved);
+
+        const usm::assets::Vector3 billboardRight{1.0F, 0.0F, 0.0F};
+        const usm::assets::Vector3 billboardUp{0.0F, 0.0F, 1.0F};
+        const usm::assets::Vector3 billboardForward{0.0F, 1.0F, 0.0F};
+        const auto nearVector = [](const usm::assets::Vector3& actual,
+                                   const usm::assets::Vector3& expected) {
+            return std::abs(actual.x - expected.x) < 0.0001F &&
+                   std::abs(actual.y - expected.y) < 0.0001F &&
+                   std::abs(actual.z - expected.z) < 0.0001F;
+        };
+        usm::game::EffectParticleState projectedParticle;
+        projectedParticle.position = {10.0F, 0.0F, 0.0F};
+        projectedParticle.emitterDirection = billboardUp;
+        projectedParticle.directionalRotation = true;
+        projectedParticle.projectDirection = true;
+        auto axes = usm::game::effectBillboardAxes(
+            projectedParticle, billboardRight, billboardUp,
+            billboardForward);
+        assert(nearVector(axes.right, {0.0F, 0.0F, -1.0F}));
+        assert(nearVector(axes.up, {1.0F, 0.0F, 0.0F}));
+
+        projectedParticle.projectDirection = false;
+        axes = usm::game::effectBillboardAxes(
+            projectedParticle, billboardRight, billboardUp,
+            billboardForward);
+        assert(nearVector(axes.right, {0.0F, 0.0F, -1.0F}));
+        assert(nearVector(axes.up, {1.0F, 0.0F, 0.0F}));
+
+        // render's affector-type-6 branch suppresses directional alignment.
+        projectedParticle.projectDirection = true;
+        projectedParticle.hasSpinAffector = true;
+        axes = usm::game::effectBillboardAxes(
+            projectedParticle, billboardRight, billboardUp,
+            billboardForward);
+        assert(nearVector(axes.right, billboardRight));
+        assert(nearVector(axes.up, billboardUp));
         effectRuntime.update(125);
         effectRuntime.update(125);
         assert(effectRuntime.particles().empty());

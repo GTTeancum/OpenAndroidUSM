@@ -115,6 +115,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/EnemyAttackIntervalConfig.cpp
     src/game/EnemyRangeAttackConfig.cpp
     src/game/EnemySpecialActionConfig.cpp
+    src/game/EffectBillboard.cpp
     src/game/EffectPreset.cpp
     src/game/GameplayCamera.cpp
     src/game/GameplayCinematicScheduler.cpp

@@ -1916,6 +1916,20 @@ native active-room emitter construction order is recovered; passing it while
 all portable persistent emitters are active would consume the shared combat
 stream in the wrong order.
 
+Particle billboard orientation now follows
+`CFpsParticleSystemSceneNode::render` (`0x0039ff5c`) rather than treating every
+sprite as a camera-facing quad. `doParticleSystem` copies the current position
+to the particle's directional-old-position fields before affectors and motion
+(`0x0039f5e0`); render uses that frame displacement for both authored modes.
+`DirectionalRotation` without `ProjectDirection` applies Irrlicht's
+`quaternion::rotationFromTo` from the emitter direction to the displacement.
+With projection enabled, the displacement is projected onto the camera plane
+and supplies the signed camera-forward rotation from camera-up. Affector type
+6 is confirmed as Spin by `IFpsParticleSpinAffector::getType` at `0x0039e5ec`;
+its render branch takes precedence over both directional modes. This restores
+the authored orientation path shared by hit splashes, muzzle flashes, fire,
+electricity, and the red/black super-web splashes.
+
 The affector math follows the preserved implementations rather than treating
 the XML values as generic forces. `CFpsParticleGravityAffector::affect` at
 `0x0039d7d4` captures the incoming velocity and linearly reaches its target

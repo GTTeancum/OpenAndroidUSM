@@ -14,12 +14,17 @@ namespace usm::game {
 
 struct EffectParticleState {
     assets::Vector3 position;
+    assets::Vector3 previousPosition;
+    assets::Vector3 emitterDirection;
     float width{};
     float height{};
     float rotationDegrees{};
     std::uint32_t color{0xffffffffU};
     std::int32_t frameId{-1};
     bool additive{};
+    bool directionalRotation{};
+    bool projectDirection{};
+    bool hasSpinAffector{};
     std::int32_t roomId{-1};
 };
 

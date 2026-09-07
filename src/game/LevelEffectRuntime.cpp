@@ -128,6 +128,7 @@ struct LevelEffectRuntime::Particle {
     const EffectEmitterPreset* preset{};
     std::uint64_t emitterId{};
     assets::Vector3 position;
+    assets::Vector3 previousPosition;
     assets::Vector3 velocity;
     assets::Vector3 gravityStartVelocity;
     assets::Vector3 rotationPivot;
@@ -517,6 +518,13 @@ void LevelEffectRuntime::updateEmitterParticles(
         if (particle.emitterId != emitter.id) {
             continue;
         }
+        if (preset.directionalRotation) {
+            // doParticleSystem copies Pos into DirectionalOldPos before any
+            // affector or velocity integration (0x0039f5e0-0x0039f602).
+            // render then uses Pos-DirectionalOldPos for both directional
+            // billboard paths (0x003a0206, 0x003a0274).
+            particle.previousPosition = particle.position;
+        }
         const std::int64_t previousAge =
             particle.spawnedThisUpdate
                 ? -static_cast<std::int64_t>(elapsedMilliseconds)
@@ -753,6 +761,7 @@ void LevelEffectRuntime::spawnParticle(EmitterRuntimeState& emitter) noexcept {
         emitter.origin.y + preset.position.y + localOffset.y * preset.scale.y,
         emitter.origin.z + preset.position.z + localOffset.z * preset.scale.z,
     };
+    particle.previousPosition = particle.position;
 
     const std::int32_t initialRotationDifference =
         preset.initialRotationMaximumDegrees -
@@ -859,9 +868,19 @@ void LevelEffectRuntime::rebuildRenderParticles() noexcept {
             continue;
         }
         renderParticles_.push_back(
-            {particle.position, particle.width, particle.height,
-             particle.rotationDegrees, particle.color, particle.preset->frameId,
-             particle.preset->additive, particle.roomId});
+            {particle.position,
+             particle.previousPosition,
+             particle.preset->direction,
+             particle.width,
+             particle.height,
+             particle.rotationDegrees,
+             particle.color,
+             particle.preset->frameId,
+             particle.preset->additive,
+             particle.preset->directionalRotation,
+             particle.preset->projectDirection,
+             particle.preset->hasSpin,
+             particle.roomId});
     }
 }
 
