@@ -1,14 +1,25 @@
 #pragma once
 
+#include <cstdint>
+
 namespace usm::reconstructed {
 
 struct ActionButtonState {
     bool held{};
     bool pressed{};
     bool released{};
+    std::uint8_t pressedFramesRemaining{};
 
     void beginFrame() noexcept {
-        pressed = false;
+        // CKeyPad::update (0x002f9434) copies a new press as state 1 and
+        // advances the real-time state to 2. The next update copies state 2
+        // before advancing to 3. CKeyPad::wasKeyPressed (0x002f964c) accepts
+        // exactly states 1 and 2, so every physical press remains visible to
+        // gameplay for two updates rather than only the event's first frame.
+        pressed = pressedFramesRemaining != 0;
+        if (pressedFramesRemaining != 0) {
+            --pressedFramesRemaining;
+        }
         released = false;
     }
 
@@ -19,6 +30,7 @@ struct ActionButtonState {
         held = isHeld;
         pressed = isHeld;
         released = !isHeld;
+        pressedFramesRemaining = isHeld ? 1U : 0U;
     }
 };
 

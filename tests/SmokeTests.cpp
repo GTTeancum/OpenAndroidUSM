@@ -605,10 +605,11 @@ int main() {
     assert(router.state().quickTimeEvent.pressed);
 
     router.beginFrame();
-    assert(!router.state().jump.pressed);
+    assert(router.state().jump.pressed);
     assert(router.state().jump.held);
     router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, false},
                  InputContext::Gameplay);
+    assert(!router.state().jump.pressed);
     assert(router.state().jump.released);
     assert(!router.state().jump.held);
 
@@ -617,6 +618,11 @@ int main() {
                  InputContext::Gameplay);
     router.route({XperiaKeyCode::Circle, XperiaScanCode::Circle, true},
                  InputContext::Gameplay);
+    assert(router.state().punch.pressed);
+    assert(router.state().punch.held);
+    assert(router.state().web.pressed);
+    assert(router.state().web.held);
+    router.beginFrame();
     assert(router.state().punch.pressed);
     assert(router.state().punch.held);
     assert(router.state().web.pressed);

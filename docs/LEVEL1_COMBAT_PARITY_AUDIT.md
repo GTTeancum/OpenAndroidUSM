@@ -115,6 +115,18 @@ makes a premature counter available.
 
 ## Contact, trail, and audio timing
 
+- `CKeyPad::keyPressed`/`update`/`wasKeyPressed`
+  (`0x002f96e8`/`0x002f9434`/`0x002f964c`) expose a new physical press as
+  keypad states 1 and 2 on two consecutive gameplay updates; state 3 is no
+  longer considered pressed. `keyReleased`/`wasKeyReleased`
+  (`0x002f9714`/`0x002f9664`) expose release for one update. The Windows
+  input router now preserves that exact lifetime. `CLevel::Update`
+  (`0x003820bc`) calls the level's `GameEventKeyWrap::update` virtual once at
+  `0x00382242`, then calls each player object's update virtual once at
+  `0x0038237c`; consequently both keypad states reach two distinct player
+  updates rather than two input samples inside one gameplay tick. The former
+  one-update edge shortened every real controller/keyboard combo opportunity
+  relative to the original even though scripted autoplay taps still passed.
 - `Player::CheckFrame` (`0x003403fc`) converts authored frames through integer
   `(frame * 2) / 3`. `FrameFixedTimelineController::getCurrentClipFrame`
   (`0x003906c8`) rounds the 50 ms runtime frame with `time / 50 + 0.5`, so
