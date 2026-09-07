@@ -109,6 +109,17 @@ lease. The reconstruction now retains those calls and the exact
 1000 ms delay and last-attacker round-robin behavior were reconstruction-only
 and have been removed.
 
+The same application-owned stream now covers the other random consumers in
+this chronological combat slice. `Player::DoNormalSenseAction`
+(`0x0034f868`--`0x0034f87e`) samples `random(100)` and gives its first evade
+variant values 0--50 inclusive. Enemy animation-list mode 2, behavior-state
+voices, and special-action voices sample their exact vector counts at
+`0x003a8648`--`0x003a866a`, `0x003a8a60`--`0x003a8b50`, and
+`0x003a8d84`--`0x003a8da0`. Player type-0 sound ranges use the same generator
+inside `VoxSoundManager::Play2DRandom`/`Play3DRandom` at `0x003dada0` and
+`0x003dafa8`. Deterministic alternation in those paths was not native and is
+removed; core tests pin the resulting variants and generator states.
+
 `Player::OnHit` (`0x0034d790`) maps hit type 100 to state 44
 (`k_state_hurt_light`) and hit type 101 to state 45
 (`k_state_hurt_heavy`). The corresponding shipped root tracks move about
@@ -395,12 +406,12 @@ current retained gates are:
 - `first-encounter-air-web-grab-parity.usmauto` (33/33)
 - `first-encounter-melee-miss-parity.usmauto` (18/18)
 - `first-encounter-enemy-interruption-parity.usmauto` (18/18)
-- `first-encounter-enemy-offense-parity.usmauto` (31/31)
+- `first-encounter-enemy-offense-parity.usmauto` (42/42)
 - `first-encounter-web-pellet-render.usmauto` (12/12)
 - `first-encounter-far-combo-parity.usmauto` (20/20)
 - `first-encounter-manual-combat.usmauto` (19/19)
 - `first-encounter-presentation.usmauto` (10/10)
-- `player-button-combat-probe.usmauto` (30/30)
+- `player-button-combat-probe.usmauto` (34/34)
 
 These gates establish the audited source facts and catch their regressions.
 They are not a blanket claim of parity for later-level enemy types,

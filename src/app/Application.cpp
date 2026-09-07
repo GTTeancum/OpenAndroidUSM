@@ -1711,7 +1711,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         gameplaySoundStates.push_back(state.name);
     }
     result = playerSounds_.preload(playerStateConfigs_, voxSounds_,
-                                   soundCatalog_, gameplaySoundStates);
+                                   soundCatalog_, gameplaySoundStates,
+                                   &nativeRandomizer_);
     if (!result) {
         return fail(result.message());
     }
@@ -1794,7 +1795,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                         levelOne_.waypoints(),
                                         &levelOne_.buttonConfigs(),
                                         &levelOne_.playerHitEffectConfigs(),
-                                        levelOne_.playerHitEffects());
+                                        levelOne_.playerHitEffects(),
+                                        &nativeRandomizer_);
     if (!result) {
         return fail(result.message());
     }
@@ -1809,7 +1811,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         return fail(result.message());
     }
     levelDeathRuntime_.reset();
-    result = enemyRuntime_.initialize(levelOne_);
+    result = enemyRuntime_.initialize(levelOne_, &nativeRandomizer_);
     if (!result) {
         return fail(result.message());
     }

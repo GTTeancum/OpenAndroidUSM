@@ -26,6 +26,7 @@
 #include "game/LevelHintRuntime.hpp"
 #include "game/LevelHostageRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
+#include "game/NativeRandomizer.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/LevelRestoreRuntime.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
@@ -69,6 +70,7 @@ private:
     audio::XAudio2System audio_;
     audio::VoxSoundTable voxSounds_;
     audio::SoundEventCatalog soundCatalog_;
+    game::NativeRandomizer nativeRandomizer_;
     audio::PlayerStateSoundBank playerSounds_;
     audio::EnemyBehaviorSoundBank enemySounds_;
     audio::LevelMusicBank levelMusicBank_;

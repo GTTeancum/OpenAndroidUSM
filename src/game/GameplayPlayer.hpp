@@ -6,6 +6,7 @@
 #include "game/CinematicScript.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelSlideRuntime.hpp"
+#include "game/NativeRandomizer.hpp"
 #include "game/PlayerStateConfig.hpp"
 #include "game/WebGrabPointRuntime.hpp"
 #include "game/WebSwingRuntime.hpp"
@@ -191,7 +192,9 @@ public:
                                     const PlayerHitEffectConfigDatabase*
                                         hitEffects = nullptr,
                                     std::span<const PlayerHitEffectAsset>
-                                        hitEffectAssets = {});
+                                        hitEffectAssets = {},
+                                    NativeRandomizer* nativeRandomizer =
+                                        nullptr);
     void setWallWebInput(bool pressed, bool targetAlive) noexcept {
         wallWebActionPressed_ = pressed;
         wallWebTargetAlive_ = targetAlive;
@@ -581,7 +584,8 @@ private:
     std::array<const PlayerStateDefinition*, 4> senseAttackStates_{};
     const PlayerStateDefinition* senseBlinkRedState_{};
     const PlayerStateDefinition* senseBlinkBlackState_{};
-    std::uint32_t senseAvoidVariantCursor_{};
+    NativeRandomizer ownedNativeRandomizer_;
+    NativeRandomizer* nativeRandomizer_{&ownedNativeRandomizer_};
     const PlayerStateDefinition* jumpStartState_{};
     const PlayerStateDefinition* jumpFallState_{};
     const PlayerStateDefinition* shortWebJumpState_{};

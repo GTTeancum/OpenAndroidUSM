@@ -365,21 +365,35 @@ EnemyBehaviorConfigDatabase::resolveStateAnimationNames(
         return result;
     }
     for (const std::int16_t animationListId : state->animationListIds) {
-        const EnemyBehaviorAnimationList* list =
-            findAnimationList(animationListId);
-        if (list == nullptr) {
+        const auto names = resolveAnimationListNames(animationListId,
+                                                     enemyTypeId);
+        result.insert(result.end(), names.begin(), names.end());
+    }
+    return result;
+}
+
+std::vector<std::string_view>
+EnemyBehaviorConfigDatabase::resolveAnimationListNames(
+    std::int16_t animationListId, std::int16_t enemyTypeId) const {
+    std::vector<std::string_view> result;
+    if (enemyTypeId < 0 ||
+        static_cast<std::size_t>(enemyTypeId) >= kEnemyBehaviorTypeCount) {
+        return result;
+    }
+    const EnemyBehaviorAnimationList* list =
+        findAnimationList(animationListId);
+    if (list == nullptr) {
+        return result;
+    }
+    for (const std::int32_t mapId : list->animationMapIds) {
+        const EnemyBehaviorAnimationMap* map = findAnimationMap(mapId);
+        if (map == nullptr) {
             continue;
         }
-        for (const std::int32_t mapId : list->animationMapIds) {
-            const EnemyBehaviorAnimationMap* map = findAnimationMap(mapId);
-            if (map == nullptr) {
-                continue;
-            }
-            const std::string_view animationName = normalizedAnimationName(
-                map->animationNames[static_cast<std::size_t>(enemyTypeId)]);
-            if (!animationName.empty()) {
-                result.push_back(animationName);
-            }
+        const std::string_view animationName = normalizedAnimationName(
+            map->animationNames[static_cast<std::size_t>(enemyTypeId)]);
+        if (!animationName.empty()) {
+            result.push_back(animationName);
         }
     }
     return result;

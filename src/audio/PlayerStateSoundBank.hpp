@@ -5,6 +5,7 @@
 #include "audio/VoxSoundTable.hpp"
 #include "core/Result.hpp"
 #include "game/PlayerStateConfig.hpp"
+#include "game/NativeRandomizer.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -31,7 +32,8 @@ public:
     [[nodiscard]] Result preload(
         const game::PlayerStateConfigDatabase& states,
         const VoxSoundTable& voxSounds, const SoundEventCatalog& catalog,
-        std::span<const std::string_view> stateNames);
+        std::span<const std::string_view> stateNames,
+        game::NativeRandomizer* nativeRandomizer = nullptr);
     [[nodiscard]] Result dispatchStateEnter(
         std::string_view stateName, const PlayPlayerStateSound& play,
         const StopPlayerStateSound& stop = {});
@@ -60,8 +62,9 @@ private:
         const PlayPlayerStateSound& play);
 
     const game::PlayerStateConfigDatabase* states_{};
+    game::NativeRandomizer ownedNativeRandomizer_;
+    game::NativeRandomizer* nativeRandomizer_{&ownedNativeRandomizer_};
     std::map<std::int16_t, std::vector<DecodedVariant>> decodedByConfig_;
-    std::map<std::int16_t, std::size_t> nextVariantByConfig_;
     std::vector<std::int16_t> activeConfigIds_;
 };
 

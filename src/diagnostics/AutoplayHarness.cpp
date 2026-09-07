@@ -636,6 +636,15 @@ Result AutoplayHarness::parseScript(
                     "wait_enemy_melee_attack requires timeout enemy_id");
             }
             step.objectIds.push_back(objectId);
+        } else if (command == "wait_enemy_melee_inactive") {
+            step.kind = StepKind::WaitEnemyMeleeInactive;
+            std::int32_t objectId = -1;
+            if (!(tokens >> step.durationOrTimeoutMilliseconds >> objectId) ||
+                step.durationOrTimeoutMilliseconds == 0 || objectId < 0) {
+                return invalid(
+                    "wait_enemy_melee_inactive requires timeout enemy_id");
+            }
+            step.objectIds.push_back(objectId);
         } else if (command == "wait_enemy_projectile") {
             step.kind = StepKind::WaitEnemyProjectile;
             std::int32_t objectId = -1;
@@ -1684,6 +1693,24 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         } else if (timedOut()) {
             failStep(snapshot, step,
                      "enemy did not register and begin a melee attack");
+        }
+        break;
+    }
+    case StepKind::WaitEnemyMeleeInactive: {
+        const std::int32_t objectId = step.objectIds.front();
+        const auto match = std::find_if(
+            snapshot.enemies.begin(), snapshot.enemies.end(),
+            [objectId](const game::LevelEnemyState& enemy) {
+                return enemy.asset != nullptr &&
+                       enemy.asset->objectId == objectId;
+            });
+        if (match != snapshot.enemies.end() && match->visible &&
+            !match->meleeAttackActive &&
+            !match->meleeAttackRegistered) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step,
+                     "enemy melee attack did not finish and unregister");
         }
         break;
     }
@@ -4788,6 +4815,8 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::WaitEnemiesActive: return "wait_enemies_active";
     case StepKind::WaitWebGrabPoint: return "wait_web_grab_point";
     case StepKind::WaitEnemyMeleeAttack: return "wait_enemy_melee_attack";
+    case StepKind::WaitEnemyMeleeInactive:
+        return "wait_enemy_melee_inactive";
     case StepKind::WaitEnemyProjectile: return "wait_enemy_projectile";
     case StepKind::SetEnemyAi: return "set_enemy_ai";
     case StepKind::SetEnemyPhysics: return "set_enemy_physics";

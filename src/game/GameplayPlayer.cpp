@@ -414,7 +414,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
                                   const PlayerHitEffectConfigDatabase*
                                       hitEffects,
                                   std::span<const PlayerHitEffectAsset>
-                                      hitEffectAssets) {
+                                      hitEffectAssets,
+                                  NativeRandomizer* nativeRandomizer) {
     if (asset.animationBank.findClip("idle_stand") == nullptr ||
         asset.animationBank.findClip("run") == nullptr) {
         return Result::failure(
@@ -461,6 +462,9 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     stateDatabase_ = states;
     hitEffectDatabase_ = hitEffects;
     hitEffectAssets_ = hitEffectAssets;
+    nativeRandomizer_ = nativeRandomizer != nullptr
+        ? nativeRandomizer
+        : &ownedNativeRandomizer_;
     activeHitEffects_.clear();
     attackPhysicsVelocity_ = {};
     pendingHitEffectSpawnCount_ = 0;
@@ -486,7 +490,6 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     senseAttackStates_.fill(nullptr);
     senseBlinkRedState_ = nullptr;
     senseBlinkBlackState_ = nullptr;
-    senseAvoidVariantCursor_ = 0;
     jumpStartState_ = nullptr;
     jumpFallState_ = nullptr;
     shortWebJumpState_ = nullptr;
@@ -1451,8 +1454,11 @@ bool GameplayPlayer::requestSpiderSense(
             if (!evade) {
                 requested = senseAttackStates_[quadrant];
             } else {
+                // Player::DoNormalSenseAction (0x0034f868-0x0034f87e)
+                // calls random(100) once and selects the first state for
+                // values 0..50 inclusive.
                 const bool firstVariant =
-                    (senseAvoidVariantCursor_++ & 1U) == 0;
+                    nativeRandomizer_->bounded(100) <= 50;
                 if (quadrant == 2 || quadrant == 3) {
                     requested = senseAvoidStates_[firstVariant ? 0 : 1];
                 } else {

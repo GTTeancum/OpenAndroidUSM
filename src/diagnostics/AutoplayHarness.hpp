@@ -252,6 +252,7 @@ private:
         WaitEnemiesActive,
         WaitWebGrabPoint,
         WaitEnemyMeleeAttack,
+        WaitEnemyMeleeInactive,
         WaitEnemyProjectile,
         SetEnemyAi,
         SetEnemyPhysics,

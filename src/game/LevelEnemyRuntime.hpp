@@ -179,8 +179,6 @@ struct LevelEnemyState {
     // its related object separately from the ordinary AI task queue.
     bool cinematicActionActive{};
     std::int32_t cinematicActionObjectId{-1};
-    std::uint32_t hurtVariantCursor{};
-    std::uint32_t soundVariantCursor{};
     std::uint32_t rangeAttackVariantCursor{};
     std::uint32_t rangeAttackCooldownMilliseconds{};
     std::uint32_t meleeAttackCooldownMilliseconds{};
@@ -460,7 +458,9 @@ struct EnemyEffectCue {
 // remain intact so recovered scripts can manipulate state without binary hooks.
 class LevelEnemyRuntime final {
 public:
-    [[nodiscard]] Result initialize(const LevelOneBootstrap& level);
+    [[nodiscard]] Result initialize(
+        const LevelOneBootstrap& level,
+        NativeRandomizer* nativeRandomizer = nullptr);
     void advanceAnimations(
         std::uint32_t elapsedMilliseconds,
         const LevelCollision* collision = nullptr) noexcept;
@@ -619,7 +619,7 @@ public:
         return meleeEngagementCooldownMilliseconds_;
     }
     [[nodiscard]] std::int32_t nativeRandomState() const noexcept {
-        return nativeRandomizer_.state();
+        return nativeRandomizer_->state();
     }
     [[nodiscard]] std::span<const EnemyGunLineState> gunLines() const noexcept {
         return gunLines_;
@@ -813,7 +813,13 @@ private:
     std::optional<std::int32_t> shownHealthBarObjectId_;
     std::int32_t meleeEngagerObjectId_{-1};
     float meleeEngagementCooldownMilliseconds_{};
-    NativeRandomizer nativeRandomizer_;
+    // BehaviorStateFile stores these two mutable indices directly in each
+    // shared s_behavior_stateInfo (+0x10/+0x14). They are state-global, not
+    // per-enemy cursors.
+    std::vector<std::int32_t> behaviorStateListCursors_;
+    std::vector<std::int32_t> behaviorStateAnimationCursors_;
+    NativeRandomizer ownedNativeRandomizer_;
+    NativeRandomizer* nativeRandomizer_{&ownedNativeRandomizer_};
     QuickTimeActionRuntime rhinoQuickTimeAction_;
     std::int32_t rhinoQuickTimeEnemyId_{-1};
 };

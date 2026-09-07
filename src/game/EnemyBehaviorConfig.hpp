@@ -68,6 +68,11 @@ public:
         std::string_view stateName, std::int16_t enemyTypeId) const;
     [[nodiscard]] std::vector<std::string_view> resolveStateAnimationNames(
         std::string_view stateName, std::int16_t enemyTypeId) const;
+    [[nodiscard]] std::vector<std::string_view> resolveAnimationListNames(
+        std::int16_t animationListId,
+        std::int16_t enemyTypeId) const;
+    [[nodiscard]] const EnemyBehaviorAnimationList* findAnimationList(
+        std::int16_t id) const noexcept;
 
     [[nodiscard]] const std::vector<EnemyBehaviorAnimationMap>&
     animationMaps() const noexcept {
@@ -89,9 +94,6 @@ public:
 private:
     [[nodiscard]] const EnemyBehaviorAnimationMap* findAnimationMap(
         std::int32_t id) const noexcept;
-    [[nodiscard]] const EnemyBehaviorAnimationList* findAnimationList(
-        std::int16_t id) const noexcept;
-
     std::vector<EnemyBehaviorAnimationMap> animationMaps_;
     std::vector<EnemyBehaviorAnimationList> animationLists_;
     std::vector<EnemyBehaviorSoundMap> soundMaps_;

@@ -1286,6 +1286,7 @@ int main() {
         assert(catalogAudio.frameCount() > 0);
 
         usm::audio::PlayerStateSoundBank playerSounds;
+        usm::game::NativeRandomizer playerSoundRandomizer;
         std::vector<std::string_view> gameplaySoundStates;
         gameplaySoundStates.reserve(playerStateConfigs.states().size());
         for (const usm::game::PlayerStateDefinition& state :
@@ -1293,7 +1294,8 @@ int main() {
             gameplaySoundStates.push_back(state.name);
         }
         assert(playerSounds.preload(playerStateConfigs, voxSounds,
-                                    soundCatalog, gameplaySoundStates));
+                                    soundCatalog, gameplaySoundStates,
+                                    &playerSoundRandomizer));
         assert(playerSounds.decodedVariantCount() >= 20);
         std::size_t playerSoundPlayCount = 0;
         std::size_t loopingPlayerSoundCount = 0;
@@ -1317,7 +1319,10 @@ int main() {
             "k_state_idle_to_punch_right", countPlayerSound));
         assert(playerSoundPlayCount == 0);
         assert(playerSounds.dispatchEmitter(1, 0, countPlayerSound));
-        assert(playedPlayerVoxIds.back() == 60);
+        // VoxSoundManager::Play2DRandom (0x003dada0) samples the inclusive
+        // 60..61 range. The first native generator value is odd.
+        assert(playedPlayerVoxIds.back() == 61);
+        assert(playerSoundRandomizer.state() == 632802407);
         assert(playerSounds.dispatchStateFrame(
             "k_state_idle_to_punch_right", countPlayerSound));
         assert(playerSounds.dispatchStateEnter("k_state_hurt_light",
@@ -8058,10 +8063,11 @@ int main() {
         assert(attackingKnife->animationLoops);
         assert(!attackingKnife->meleeAttackRegistered);
         assert(attackingKnife->meleeAttackCooldownMilliseconds == 2000);
-        // RegisterEntityForMeleeAttack consumed the first native RNG value;
-        // unregistering consumed the second, producing a 1634 ms manager
-        // handoff before the authored 2000 ms per-enemy interval resumes.
-        enemyAttackRuntime.updateGameplay(1633, knifeVictim);
+        // Registration consumes the first native value. The two authored
+        // action sounds each consume one random(0, 1) call at their key
+        // frames, so unregister uses the fourth value and produces a
+        // 1745 ms manager handoff before the 2000 ms enemy interval.
+        enemyAttackRuntime.updateGameplay(1744, knifeVictim);
         assert(!enemyAttackRuntime.find(394)->meleeAttackActive);
         enemyAttackRuntime.updateGameplay(1, knifeVictim);
         assert(!enemyAttackRuntime.find(394)->meleeAttackActive);
@@ -8076,8 +8082,9 @@ int main() {
 
         // The bat's state-11 table exposes two equally ranked native choices.
         // With the shipped generator, the first registration consumes 7407
-        // for its lease and the tie roll is 34: jumping wins. The second tie
-        // roll is 87 after unregister/re-register, so standing wins next.
+        // for its lease and the tie roll is 34: jumping wins. Its authored
+        // action sound consumes the third value; unregister gets 1745 ms,
+        // then the second lease is 8087 and tie roll 51 selects standing.
         usm::game::LevelEnemyRuntime batAttackRuntime;
         assert(batAttackRuntime.initialize(bootstrap));
         assert(batAttackRuntime.setDiagnosticAiEnabled(394, false));
@@ -8132,7 +8139,7 @@ int main() {
         batVictim = {attackingBat->position.x + attackingBat->facing.x * 100.0F,
                      attackingBat->position.y + attackingBat->facing.y * 100.0F,
                      attackingBat->position.z};
-        batAttackRuntime.updateGameplay(1963, batVictim);
+        batAttackRuntime.updateGameplay(1744, batVictim);
         assert(!batAttackRuntime.find(395)->meleeAttackActive);
         attackingBat = batAttackRuntime.find(395);
         batVictim = {attackingBat->position.x + attackingBat->facing.x * 100.0F,
@@ -8143,7 +8150,7 @@ int main() {
         batAttackRuntime.updateGameplay(1, batVictim);
         attackingBat = batAttackRuntime.find(395);
         assert(attackingBat->activeAnimation == "idle_at1_idle");
-        assert(attackingBat->meleeRegistrationTimerMilliseconds == 9745.0F);
+        assert(attackingBat->meleeRegistrationTimerMilliseconds == 8087.0F);
         const std::uint32_t standingBatImpact =
             standingBatClip->durationMilliseconds() * 47U / 100U;
         assert(attackingBat->animationTimeMilliseconds <= standingBatImpact);
@@ -8247,7 +8254,10 @@ int main() {
         assert(damageRuntime.find(394)->health == 400.0F);
         assert(damageRuntime.find(394)->behavior ==
                usm::game::EnemyBehaviorState::Hurt);
-        assert(damageRuntime.find(394)->activeAnimation == "idle_hurt_idle");
+        // ParseAnimInfo mode 2 (0x003a8648-0x003a866a) samples the three
+        // common-hurt clips. Initial native RNG state selects index two.
+        assert(damageRuntime.find(394)->activeAnimation ==
+               "idle_hurt_right_idle");
         assert(!damageRuntime.find(394)->animationLoops);
         usm::game::LevelEnemyRuntime senseHitRuntime;
         assert(senseHitRuntime.initialize(bootstrap));
@@ -8602,7 +8612,9 @@ int main() {
         assert(tiedLieEnemy->position.z > tiedLieStartZ);
         enemySoundCues = damageRuntime.consumeSoundCues();
         assert(enemySoundCues.size() == 1);
-        assert(enemySoundCues.front().voxSoundId == 185);
+        // SetState samples the three common-hurt voices after ParseAnimInfo;
+        // the second native generator value selects sound-map index two.
+        assert(enemySoundCues.front().voxSoundId == 187);
         usm::game::LevelEnemyRuntime airborneHurtRuntime;
         assert(airborneHurtRuntime.initialize(bootstrap));
         usm::game::CinematicThread airborneHurtThread;
@@ -8685,8 +8697,8 @@ int main() {
         assert(!damageTarget->animationLoops);
         enemySoundCues = damageRuntime.consumeSoundCues();
         assert(enemySoundCues.size() == 4);
-        assert(enemySoundCues[0].voxSoundId == 186);
-        assert(enemySoundCues[1].voxSoundId == 187);
+        assert(enemySoundCues[0].voxSoundId == 185);
+        assert(enemySoundCues[1].voxSoundId == 186);
         assert(enemySoundCues[2].voxSoundId == 185);
         assert(enemySoundCues[3].voxSoundId == 188);
         usm::game::LevelCollision levelCollision;
@@ -10110,20 +10122,22 @@ int main() {
         // DoNormalSenseAction's native tables at 0x004cfd28/0x004cfd38
         // are [38,40,41,39] for close directional counters and
         // [35,34,36,37] for fixed reaction types 2..5. An airborne type-1
-        // warning instead uses the perpendicular random pair; the portable
-        // deterministic cursor preserves that 50-percent split.
+        // warning instead uses the perpendicular random pair through the
+        // process-wide native generator.
+        usm::game::NativeRandomizer senseRandomizer;
         usm::game::GameplayPlayer airSensePlayer;
         assert(airSensePlayer.initialize(
             bootstrap.player(), nullptr, &playerStateConfigs,
             {}, {}, {}, nullptr,
             &bootstrap.playerHitEffectConfigs(),
-            bootstrap.playerHitEffects()));
+            bootstrap.playerHitEffects(), &senseRandomizer));
         assert(airSensePlayer.requestJump());
         usm::game::PlayerAttackTarget airSenseTarget{
             {150.0F, 0.0F, 0.0F}, 40.0F, 1242, false, 150.0F};
         airSenseTarget.senseReactionType = 1;
         assert(airSensePlayer.requestSpiderSense(airSenseTarget));
         assert(airSensePlayer.activeStateId() == 36);
+        assert(senseRandomizer.state() == 632802407);
 
         constexpr std::array<std::uint16_t, 4> fixedSenseStates{
             35, 34, 36, 37};

@@ -802,7 +802,9 @@ std::optional<float> segmentExpandedCylinderHitFraction(
 
 } // namespace
 
-Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
+Result LevelEnemyRuntime::initialize(
+    const LevelOneBootstrap& level,
+    NativeRandomizer* nativeRandomizer) {
     states_.clear();
     pendingPlayerHits_.clear();
     pendingSoundCues_.clear();
@@ -823,9 +825,16 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
     shownHealthBarObjectId_.reset();
     meleeEngagerObjectId_ = -1;
     meleeEngagementCooldownMilliseconds_ = 0.0F;
+    nativeRandomizer_ = nativeRandomizer != nullptr
+        ? nativeRandomizer
+        : &ownedNativeRandomizer_;
     rhinoQuickTimeAction_.cancel();
     rhinoQuickTimeEnemyId_ = -1;
     level_ = &level;
+    behaviorStateListCursors_.assign(
+        level.enemyBehaviorConfigs().states().size(), 0);
+    behaviorStateAnimationCursors_.assign(
+        level.enemyBehaviorConfigs().states().size(), 0);
     states_.reserve(level.enemies().size());
     for (const LevelEnemyAsset& enemy : level.enemies()) {
         if (enemy.archetypeIndex >= level.enemyArchetypes().size()) {
@@ -3440,14 +3449,25 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
                               clip->durationMilliseconds(), eventTime)) {
             continue;
         }
+        std::vector<std::int32_t> eventSoundIds;
+        eventSoundIds.reserve(event->soundMapIds.size());
         for (const std::int16_t soundMapId : event->soundMapIds) {
             const std::int32_t voxSoundId =
                 level_->enemyBehaviorConfigs().resolveSoundMap(
                     soundMapId, enemy.asset->enemyTypeId);
             if (voxSoundId >= 0) {
-                pendingSoundCues_.push_back(
-                    {enemy.asset->objectId, voxSoundId});
+                eventSoundIds.push_back(voxSoundId);
             }
+        }
+        if (!eventSoundIds.empty()) {
+            // IBehaviorBase::SpecialAnimActionCheck
+            // (0x003a8d7c-0x003a8da0) chooses exactly one mapped sound with
+            // random(0, count), including a generator step for count one.
+            const std::size_t selected = static_cast<std::size_t>(
+                nativeRandomizer_->range(
+                    0, static_cast<std::int32_t>(eventSoundIds.size())));
+            pendingSoundCues_.push_back(
+                {enemy.asset->objectId, eventSoundIds[selected]});
         }
         if (event->actionType == 2 && enemy.meleeAttackActive) {
             // SpecialAnimActionCheck sends behavior message 0x66 here.
@@ -4031,7 +4051,7 @@ void LevelEnemyRuntime::startMeleeAttack(
                 attack->maximumAngleDegrees - targetDistance);
             if (!foundAttack || delta < selectedDelta ||
                 (delta == selectedDelta &&
-                 nativeRandomizer_.range(0, 100) <= 49)) {
+                 nativeRandomizer_->range(0, 100) <= 49)) {
                 selectedAnimation = candidate;
                 selectedDelta = delta;
                 foundAttack = true;
@@ -5857,10 +5877,13 @@ void LevelEnemyRuntime::queueStateSound(
     if (soundIds.empty()) {
         return;
     }
-    const std::size_t selected =
-        enemy.soundVariantCursor % soundIds.size();
-    enemy.soundVariantCursor = static_cast<std::uint32_t>(
-        (selected + 1) % soundIds.size());
+    // Both IBehaviorBase::SetState overloads select from the state's sound
+    // vector through random(0, count): 0x003a8a60-0x003a8a7a and
+    // 0x003a8b34-0x003a8b50. A one-element vector still consumes a native
+    // generator step.
+    const std::size_t selected = static_cast<std::size_t>(
+        nativeRandomizer_->range(
+            0, static_cast<std::int32_t>(soundIds.size())));
     pendingSoundCues_.push_back(
         {enemy.asset->objectId, soundIds[selected]});
 }
@@ -5895,17 +5918,80 @@ void LevelEnemyRuntime::selectStateAnimation(
     if (level_ == nullptr || enemy.asset == nullptr) {
         return;
     }
-    const auto animationNames =
-        level_->enemyBehaviorConfigs().resolveStateAnimationNames(
-            behaviorStateName, enemy.asset->enemyTypeId);
-    if (animationNames.empty()) {
+    const EnemyBehaviorConfigDatabase& configs =
+        level_->enemyBehaviorConfigs();
+    const EnemyBehaviorStateDefinition* state =
+        configs.findState(behaviorStateName);
+    if (state == nullptr || state->animationListIds.empty() ||
+        state->id < 0 ||
+        static_cast<std::size_t>(state->id) >=
+            behaviorStateListCursors_.size()) {
         return;
     }
-    const std::size_t selected =
-        enemy.hurtVariantCursor % animationNames.size();
-    enemy.hurtVariantCursor = static_cast<std::uint32_t>(
-        (selected + 1) % animationNames.size());
-    enemy.activeAnimation = animationNames[selected];
+    std::int32_t& listCursor =
+        behaviorStateListCursors_[static_cast<std::size_t>(state->id)];
+    std::int32_t& animationCursor =
+        behaviorStateAnimationCursors_[static_cast<std::size_t>(state->id)];
+    if (listCursor < 0 ||
+        static_cast<std::size_t>(listCursor) >=
+            state->animationListIds.size()) {
+        listCursor = 0;
+        animationCursor = 0;
+    }
+
+    std::size_t selectedListIndex = 0;
+    if (state->animationSelectionMode == 2) {
+        // IBehaviorBase::ParseStateInfo (0x003a872a-0x003a8742).
+        selectedListIndex = static_cast<std::size_t>(
+            nativeRandomizer_->range(
+                0, static_cast<std::int32_t>(
+                       state->animationListIds.size())));
+    } else if (state->animationSelectionMode == 3) {
+        // ParseStateInfo's shared outer cursor at 0x003a86f6-0x003a8726.
+        selectedListIndex = static_cast<std::size_t>(listCursor);
+    }
+
+    const std::int16_t listId =
+        state->animationListIds[selectedListIndex];
+    const EnemyBehaviorAnimationList* list =
+        configs.findAnimationList(listId);
+    const auto animationNames = configs.resolveAnimationListNames(
+        listId, enemy.asset->enemyTypeId);
+    if (list == nullptr || animationNames.empty()) {
+        return;
+    }
+
+    std::size_t selectedAnimationIndex = 0;
+    bool listCycleCompleted = false;
+    if (list->selectionMode == 1) {
+        // ParseAnimInfo queues every entry and completes the list in one
+        // call. The current first-encounter state-selection callers use
+        // this helper only for single-animation mode-1 lists; multi-task
+        // behavior states remain handled by their dedicated behavior path.
+        listCycleCompleted = true;
+    } else if (list->selectionMode == 2) {
+        // IBehaviorBase::ParseAnimInfo (0x003a8648-0x003a866a).
+        selectedAnimationIndex = static_cast<std::size_t>(
+            nativeRandomizer_->range(
+                0, static_cast<std::int32_t>(animationNames.size())));
+        animationCursor = 0;
+        listCycleCompleted = true;
+    } else if (list->selectionMode == 3) {
+        // ParseAnimInfo's inner cursor wraps before selecting the next cycle
+        // (0x003a8608-0x003a8646); only that wrap advances outer mode 3.
+        listCycleCompleted = animationCursor < 0 ||
+            static_cast<std::size_t>(animationCursor) >=
+                animationNames.size();
+        if (listCycleCompleted) {
+            animationCursor = 0;
+        }
+        selectedAnimationIndex = static_cast<std::size_t>(animationCursor++);
+    }
+    if (state->animationSelectionMode == 3 && listCycleCompleted) {
+        ++listCursor;
+    }
+
+    enemy.activeAnimation = animationNames[selectedAnimationIndex];
     enemy.animationTimeMilliseconds = 0;
     enemy.animationSpeed = 1.0F;
     enemy.animationLoops = loop;
@@ -6339,7 +6425,7 @@ bool LevelEnemyRuntime::registerMeleeEngager(
     // (0x003755fc) only ages entries while more than one is registered, so
     // this remains constant under the default one-attacker cap.
     enemy.meleeRegistrationTimerMilliseconds = static_cast<float>(
-        nativeRandomizer_.range(5000, 15000));
+        nativeRandomizer_->range(5000, 15000));
     return true;
 }
 
@@ -6361,7 +6447,7 @@ void LevelEnemyRuntime::unregisterMeleeEngager(
     // through random(baseDelay, baseDelay * 2), where the difficulty-one
     // base delay installed by 0x003744a4 is 1000 ms.
     meleeEngagementCooldownMilliseconds_ = static_cast<float>(
-        nativeRandomizer_.range(
+        nativeRandomizer_->range(
             kMeleeEngagementHandoffMinimumMilliseconds,
             kMeleeEngagementHandoffMaximumMilliseconds));
 }

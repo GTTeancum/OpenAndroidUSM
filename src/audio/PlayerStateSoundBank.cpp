@@ -9,10 +9,13 @@ namespace usm::audio {
 Result PlayerStateSoundBank::preload(
     const game::PlayerStateConfigDatabase& states,
     const VoxSoundTable& voxSounds, const SoundEventCatalog& catalog,
-    std::span<const std::string_view> stateNames) {
+    std::span<const std::string_view> stateNames,
+    game::NativeRandomizer* nativeRandomizer) {
     states_ = nullptr;
+    nativeRandomizer_ = nativeRandomizer != nullptr
+        ? nativeRandomizer
+        : &ownedNativeRandomizer_;
     decodedByConfig_.clear();
-    nextVariantByConfig_.clear();
     activeConfigIds_.clear();
     std::set<std::int16_t> configIds;
     for (const std::string_view stateName : stateNames) {
@@ -58,7 +61,6 @@ Result PlayerStateSoundBank::preload(
             variants.push_back(std::move(variant));
         }
         decodedByConfig_.emplace(configId, std::move(variants));
-        nextVariantByConfig_.emplace(configId, 0);
     }
     states_ = &states;
     return Result::success();
@@ -108,19 +110,19 @@ Result PlayerStateSoundBank::dispatchEmitter(
         config->activeEmitterIds[emitterIndex] <= 0) {
         return Result::failure("Player SoundConfig emitter is invalid");
     }
-    auto cursor = nextVariantByConfig_.find(configId);
     const auto variants = decodedByConfig_.find(configId);
-    if (cursor == nextVariantByConfig_.end() ||
-        variants == decodedByConfig_.end() || variants->second.empty()) {
+    if (variants == decodedByConfig_.end() || variants->second.empty()) {
         return Result::failure("Player SoundConfig was not predecoded");
     }
     std::size_t variantIndex{};
     if (config->playbackType == 0) {
-        // Player::UpdateSound (0x003429d4) treats the first/last Vox IDs as
-        // an inclusive random range. Cycling the decoded records preserves
-        // that authored range while keeping autoplay deterministic.
-        variantIndex = cursor->second % variants->second.size();
-        cursor->second = (variantIndex + 1) % variants->second.size();
+        // Player::UpdateSound (0x003429f4-0x00342a42) passes the first and
+        // last Vox IDs to PlayerSFX. VoxSoundManager::Play2DRandom
+        // (0x003dada0) samples that inclusive range through random(count).
+        variantIndex = variants->second.size() == 1
+            ? 0
+            : static_cast<std::size_t>(nativeRandomizer_->bounded(
+                  static_cast<std::int32_t>(variants->second.size())));
     } else if (config->playbackType == 1 &&
                emitterIndex < variants->second.size()) {
         // Type 1 pairs each emitter frame with the Vox ID at the same index.
@@ -141,10 +143,8 @@ Result PlayerStateSoundBank::dispatchConfigs(
         const game::PlayerSoundConfig* config =
             states_ == nullptr ? nullptr : states_->findSoundConfig(configId);
         auto variants = decodedByConfig_.find(configId);
-        auto cursor = nextVariantByConfig_.find(configId);
         if (config == nullptr || variants == decodedByConfig_.end() ||
-            variants->second.empty() ||
-            cursor == nextVariantByConfig_.end()) {
+            variants->second.empty()) {
             return Result::failure("Player SoundConfig was not predecoded");
         }
         const std::int16_t firstEmitter = config->activeEmitterIds.empty()
@@ -164,8 +164,14 @@ Result PlayerStateSoundBank::dispatchConfigs(
         if (config->playbackType != 0 || firstEmitter >= 1) {
             continue;
         }
-        const std::size_t variantIndex = cursor->second % variants->second.size();
-        cursor->second = (variantIndex + 1) % variants->second.size();
+        // Player::PlaySound (0x003490f8-0x0034914c) passes a range only
+        // when a type-0 config contains at least two Vox IDs. The native
+        // Play2D/3DRandom routines at 0x003dada0/0x003dafa8 then consume one
+        // global random(count) call.
+        const std::size_t variantIndex = variants->second.size() == 1
+            ? 0
+            : static_cast<std::size_t>(nativeRandomizer_->bounded(
+                  static_cast<std::int32_t>(variants->second.size())));
         Result result = dispatchVariant(configId, variantIndex, play);
         if (!result) {
             return result;

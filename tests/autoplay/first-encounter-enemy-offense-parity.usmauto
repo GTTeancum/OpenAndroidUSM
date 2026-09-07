@@ -28,32 +28,35 @@ assert_health_below 951
 assert_audio_played SFX_THUG_SWOOSH
 
 # Bat state 11 resolves its two equal +0x38 attack-distance values with the
-# shipped Irrlicht RNG. At this point in the covered encounter sequence the
-# this normal-flow command cadence observes three jumping attack-11 contacts
-# (50 points at 70 percent) before standing attack 7 (35 points at 47 percent).
+# shipped Irrlicht RNG. At this point in the covered encounter sequence,
+# this normal-flow command cadence observes standing attack 7 twice
+# (35 points at 47 percent), followed by jumping attack 11 (50 points at
+# 70 percent). Every selected branch below is pinned together with its
+# resulting damage rather than inherited from the removed alternator.
 set_enemy_ai 394 0
 set_enemy_ai 395 1 1
 teleport 13229 -6441 7 -1 0 0
 wait_enemy_melee_attack 10000 395
-wait_enemy_animation 1000 395 idle_jump_at3_idle
-wait 1050
-assert_player_state 45
-assert_health_above 899
-assert_health_below 901
-wait_enemy_animation 10000 395 idle_at1_idle
-wait_enemy_melee_attack 10000 395
-wait_enemy_animation 1000 395 idle_jump_at3_idle
-wait 1050
-assert_player_state 45
-assert_health_above 849
-assert_health_below 851
-wait_enemy_animation 10000 395 idle_at1_idle
-wait_enemy_melee_attack 10000 395
 wait_enemy_animation 1000 395 idle_at1_idle
-teleport 13700 -6441 7 -1 0 0
 wait 925
 assert_player_state 45
-assert_health_above 764
-assert_health_below 766
+assert_health_above 914
+assert_health_below 916
+wait_enemy_melee_inactive 10000 395
+teleport 13229 -6441 7 -1 0 0
+wait_enemy_melee_attack 10000 395
+wait_enemy_animation 1000 395 idle_at1_idle
+wait 925
+assert_player_state 45
+assert_health_above 879
+assert_health_below 881
+wait_enemy_melee_inactive 10000 395
+teleport 13229 -6441 7 -1 0 0
+wait_enemy_melee_attack 10000 395
+wait_enemy_animation 1000 395 idle_jump_at3_idle
+wait 1000
+assert_player_state 45
+assert_health_above 829
+assert_health_below 831
 assert_audio_played SFX_THUG_SWOOSH
 finish

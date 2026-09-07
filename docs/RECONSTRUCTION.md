@@ -523,7 +523,10 @@ Registration at `0x00375710` also consumes and retains a
 last-attacker round-robin rule had no executable counterpart and are removed.
 `irr::os::Randomizer::rand` (`0x0043ae48`) starts from `0x0f0f0f0f` and uses
 the recovered 40692/52774/3791/2147483399 Schrage recurrence; core tests pin
-its exact integer sequence and half-open wrapper ranges.
+its exact integer sequence and half-open wrapper ranges. Player combat,
+player state audio, and enemy behavior now consume one application-owned
+instance, matching the native process-global stream instead of maintaining
+independent subsystem or per-actor cursors.
 
 Each opening attack also has an action-type-2 record at 2% of its clip.
 `IBehaviorBase::SpecialAnimActionCheck` sends message `0x66` there, and
@@ -583,8 +586,14 @@ identified as its behavior sound-map list: `IBehaviorBase::SpecialAnimActionChec
 at `0x003a8c60` resolves and plays one entry when the authored animation key
 frame is crossed. Knife and bat attack records both select sound map 16, which
 resolves to Vox ID 178, `SFX_THUG_SWOOSH`. The native runtime queues these
-key-frame cues even when an attack misses, rotates hurt variants
-deterministically, and emits the corresponding death cue. Hurt and death
+key-frame cues even when an attack misses and selects exactly one cue through
+`random(0,count)` at `0x003a8d84`--`0x003a8da0`. State animation mode 2 uses
+the same bound at `IBehaviorBase::ParseAnimInfo`
+(`0x003a8648`--`0x003a866a`), and both `SetState` overloads select state
+voices through `random(0,count)` at `0x003a8a60`--`0x003a8a7a` and
+`0x003a8b34`--`0x003a8b50`. These calls consume the global generator even
+when the list has one entry; the former round-robin hurt and sound cursors
+have been removed. Hurt and death
 animations are one-shot states; D3D11 clamps them at the final authored pose
 instead of wrapping. `EnemyBehaviorSoundBank` predecodes all 32 sounds used
 by level-one enemy types 0, 1, 3, 4, 5, and 16 before gameplay. WARP captures
@@ -604,7 +613,10 @@ configuration is invoked only after the frame-7 hit is accepted, so it plays
 at the 175 ms damage event and never on a miss. Those configurations select
 Vox IDs 60/61 and 58/59. Type-1 multi-emitter configurations pair each frame
 with the Vox ID at the same index; type-0 ranges retain deterministic variant
-rotation for autoplay. `Player::CleanSound`/`StopSound` are mirrored on state
+selection from the native global stream. `PlayerSFX` delegates those ranges
+to `VoxSoundManager::Play2DRandom`/`Play3DRandom`; the exact inclusive range
+and `random(count)` call are visible at `0x003dada0` and `0x003dafa8`.
+`Player::CleanSound`/`StopSound` are mirrored on state
 transitions, including termination of the looping ultimate-wheel cue.
 `Player::OnHit` at `0x0034d790` maps the knife's hit type 100 to
 `k_state_hurt_light` and both bat attacks' hit type 101 to
