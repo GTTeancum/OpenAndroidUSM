@@ -14,7 +14,13 @@ teleport 14172 -7978 7 -0.416 -0.909 0
 move_until_cinematic 14067 -8205 7 71 10000
 wait_enemies_active 5000 394 395 397
 
+# This probe isolates player button routing; enemy-offense timing has its own
+# normal-flow gate. Freeze the full cohort before any of them can move through
+# a native melee attack and change the intended fixed targeting geometry.
+set_enemy_ai 395 0
+set_enemy_physics 395 1
 set_enemy_ai 394 0
+set_enemy_ai 397 0
 teleport 13399 -6360 7 0 -1 0
 punch
 wait 400
@@ -29,15 +35,16 @@ teleport 13148 -6335 7 0 1 0
 web_on
 wait 400
 assert_enemy_health_below 395 500
+set_enemy_physics 395 0
 
 # A Circle/B press during the ordinary jump must prefer CTargetHelper's native
 # nearest non-airborne list. Inside 200 cm, GetAirWebSpecialState selects the
 # authored 99 -> 100 -> 104 knockdown path before CanBeTiedUp is consulted.
-set_enemy_ai 397 0
 # Isolate a fresh target: enemy 395 is still tied by the preceding ground-web
 # shot, while enemy 397 is closest to this position.
-teleport 13100 -6536 7 1 0 0
+teleport 13045 -6745 7 1 0 0
 set_enemy_physics 397 1
+wait_enemies_grounded 1000 397
 jump
 # State 13's recovered aux0=2 input gate must open before Circle/B is sampled.
 # The 60 ms wait reaches the first legal native frame without rising beyond

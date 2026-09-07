@@ -37,6 +37,7 @@
 #include "game/LevelHintRuntime.hpp"
 #include "game/LevelHostageRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
+#include "game/NativeRandomizer.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/LevelRestoreRuntime.hpp"
 #include "game/EnemyRangeAttackConfig.hpp"
@@ -80,6 +81,30 @@ int main() {
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 #endif
     const auto success = usm::Result::success();
+
+    {
+        // irr::os::Randomizer::rand (0x0043ae48) and the global random()
+        // wrappers at 0x003730b0/0x003730cc. Lock the exact shipped sequence
+        // before combat scheduling is allowed to depend on it.
+        usm::game::NativeRandomizer randomizer;
+        assert(randomizer.state() == 0x0f0f0f0f);
+        constexpr std::array<std::int32_t, 6> expected{
+            632802407, 1669591634, 1237959964,
+            1548764745, 139693087, 2539051};
+        for (const std::int32_t value : expected) {
+            assert(randomizer.next() == value);
+        }
+        usm::game::NativeRandomizer bounded;
+        assert(bounded.bounded(0) == 0);
+        assert(bounded.state() == usm::game::NativeRandomizer::kInitialSeed);
+        assert(bounded.bounded(100) == 7);
+        usm::game::NativeRandomizer ranged;
+        assert(ranged.range(1000, 2000) == 1407);
+        const std::int32_t stateBeforeInvalidRanges = ranged.state();
+        assert(ranged.range(8, 8) == 8);
+        assert(ranged.range(9, 8) == 0);
+        assert(ranged.state() == stateBeforeInvalidRanges);
+    }
 
     {
         usm::game::WebLineGeometry geometry;
@@ -8033,7 +8058,10 @@ int main() {
         assert(attackingKnife->animationLoops);
         assert(!attackingKnife->meleeAttackRegistered);
         assert(attackingKnife->meleeAttackCooldownMilliseconds == 2000);
-        enemyAttackRuntime.updateGameplay(999, knifeVictim);
+        // RegisterEntityForMeleeAttack consumed the first native RNG value;
+        // unregistering consumed the second, producing a 1634 ms manager
+        // handoff before the authored 2000 ms per-enemy interval resumes.
+        enemyAttackRuntime.updateGameplay(1633, knifeVictim);
         assert(!enemyAttackRuntime.find(394)->meleeAttackActive);
         enemyAttackRuntime.updateGameplay(1, knifeVictim);
         assert(!enemyAttackRuntime.find(394)->meleeAttackActive);
@@ -8046,9 +8074,10 @@ int main() {
         assert(attackingKnife->meleeAttackRegistered);
         assert(attackingKnife->animationTimeMilliseconds == 1);
 
-        // The bat's state-11 attack table exposes two equally ranked native
-        // choices. Reproducible tie rotation must execute both real clips,
-        // including the jumping attack's 50-point event at 70 percent.
+        // The bat's state-11 table exposes two equally ranked native choices.
+        // With the shipped generator, the first registration consumes 7407
+        // for its lease and the tie roll is 34: jumping wins. The second tie
+        // roll is 87 after unregister/re-register, so standing wins next.
         usm::game::LevelEnemyRuntime batAttackRuntime;
         assert(batAttackRuntime.initialize(bootstrap));
         assert(batAttackRuntime.setDiagnosticAiEnabled(394, false));
@@ -8056,13 +8085,14 @@ int main() {
         assert(batAttackRuntime.setDiagnosticAiEnabled(395, true, true));
         const auto* attackingBat = batAttackRuntime.find(395);
         assert(attackingBat != nullptr);
-        const usm::assets::Vector3 batVictim{
+        usm::assets::Vector3 batVictim{
             attackingBat->position.x + 100.0F,
             attackingBat->position.y,
             attackingBat->position.z};
         batAttackRuntime.updateGameplay(1, batVictim);
         attackingBat = batAttackRuntime.find(395);
-        assert(attackingBat->activeAnimation == "idle_at1_idle");
+        assert(attackingBat->activeAnimation == "idle_jump_at3_idle");
+        assert(attackingBat->meleeRegistrationTimerMilliseconds == 7407.0F);
         const auto* standingBatClip =
             bootstrap.enemyArchetypes()[attackingBat->asset->archetypeIndex]
                 .animationBank.findClip("idle_at1_idle");
@@ -8070,34 +8100,59 @@ int main() {
             bootstrap.enemyArchetypes()[attackingBat->asset->archetypeIndex]
                 .animationBank.findClip("idle_jump_at3_idle");
         assert(standingBatClip != nullptr && jumpingBatClip != nullptr);
-        const std::uint32_t standingBatImpact =
-            standingBatClip->durationMilliseconds() * 47U / 100U;
-        batAttackRuntime.updateGameplay(standingBatImpact - 1U, batVictim);
-        auto batHits = batAttackRuntime.consumePlayerHits();
-        assert(batHits.size() == 1);
-        assert(batHits.front().sourceObjectId == 395);
-        assert(batHits.front().attackId == 7);
-        assert(batHits.front().damage == 35.0F);
-        assert(batHits.front().hitType == 101);
-        batAttackRuntime.updateGameplay(
-            standingBatClip->durationMilliseconds() - standingBatImpact + 1U,
-            batVictim);
-        batAttackRuntime.updateGameplay(1000, batVictim);
-        batAttackRuntime.updateGameplay(1000, batVictim);
-        batAttackRuntime.updateGameplay(1000, batVictim);
-        attackingBat = batAttackRuntime.find(395);
-        assert(attackingBat->activeAnimation == "idle_jump_at3_idle");
+        const auto advanceBatKeepingVictimNear =
+            [&](std::uint32_t milliseconds) {
+                std::vector<usm::game::EnemyPlayerHit> hits;
+                for (std::uint32_t elapsed = 0; elapsed < milliseconds;
+                     ++elapsed) {
+                    const auto* bat = batAttackRuntime.find(395);
+                    batVictim = {
+                        bat->position.x + bat->facing.x * 100.0F,
+                        bat->position.y + bat->facing.y * 100.0F,
+                        bat->position.z};
+                    batAttackRuntime.updateGameplay(1, batVictim);
+                    auto frameHits = batAttackRuntime.consumePlayerHits();
+                    hits.insert(hits.end(), frameHits.begin(),
+                                frameHits.end());
+                }
+                return hits;
+            };
         const std::uint32_t jumpingBatImpact =
             jumpingBatClip->durationMilliseconds() * 70U / 100U;
-        assert(attackingBat->animationTimeMilliseconds <= jumpingBatImpact);
-        batAttackRuntime.updateGameplay(
-            jumpingBatImpact - attackingBat->animationTimeMilliseconds,
-            batVictim);
-        batHits = batAttackRuntime.consumePlayerHits();
+        auto batHits = advanceBatKeepingVictimNear(
+            jumpingBatImpact - attackingBat->animationTimeMilliseconds);
         assert(batHits.size() == 1);
         assert(batHits.front().sourceObjectId == 395);
         assert(batHits.front().attackId == 11);
         assert(batHits.front().damage == 50.0F);
+        assert(batHits.front().hitType == 101);
+        (void)advanceBatKeepingVictimNear(
+            jumpingBatClip->durationMilliseconds() - jumpingBatImpact + 1U);
+        attackingBat = batAttackRuntime.find(395);
+        batVictim = {attackingBat->position.x + attackingBat->facing.x * 100.0F,
+                     attackingBat->position.y + attackingBat->facing.y * 100.0F,
+                     attackingBat->position.z};
+        batAttackRuntime.updateGameplay(1963, batVictim);
+        assert(!batAttackRuntime.find(395)->meleeAttackActive);
+        attackingBat = batAttackRuntime.find(395);
+        batVictim = {attackingBat->position.x + attackingBat->facing.x * 100.0F,
+                     attackingBat->position.y + attackingBat->facing.y * 100.0F,
+                     attackingBat->position.z};
+        batAttackRuntime.updateGameplay(1, batVictim);
+        batAttackRuntime.updateGameplay(1998, batVictim);
+        batAttackRuntime.updateGameplay(1, batVictim);
+        attackingBat = batAttackRuntime.find(395);
+        assert(attackingBat->activeAnimation == "idle_at1_idle");
+        assert(attackingBat->meleeRegistrationTimerMilliseconds == 9745.0F);
+        const std::uint32_t standingBatImpact =
+            standingBatClip->durationMilliseconds() * 47U / 100U;
+        assert(attackingBat->animationTimeMilliseconds <= standingBatImpact);
+        batHits = advanceBatKeepingVictimNear(
+            standingBatImpact - attackingBat->animationTimeMilliseconds);
+        assert(batHits.size() == 1);
+        assert(batHits.front().sourceObjectId == 395);
+        assert(batHits.front().attackId == 7);
+        assert(batHits.front().damage == 35.0F);
         assert(batHits.front().hitType == 101);
 
         usm::game::LevelEnemyRuntime separationRuntime;

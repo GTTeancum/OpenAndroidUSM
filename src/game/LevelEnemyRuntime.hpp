@@ -3,6 +3,7 @@
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/LevelOneBootstrap.hpp"
+#include "game/NativeRandomizer.hpp"
 #include "game/QuickTimeActionRuntime.hpp"
 #include "game/WallWebRuntime.hpp"
 
@@ -181,12 +182,6 @@ struct LevelEnemyState {
     std::uint32_t hurtVariantCursor{};
     std::uint32_t soundVariantCursor{};
     std::uint32_t rangeAttackVariantCursor{};
-    // State 11 can expose multiple equally ranked authored attack lists
-    // (the bat thug's standing and jumping strikes). The native selector
-    // resolves exact distance ties with a 50-percent random choice. Keep a
-    // deterministic parity cursor so autoplay covers both outcomes while
-    // preserving the same even distribution in live play.
-    std::uint32_t meleeAttackVariantCursor{};
     std::uint32_t rangeAttackCooldownMilliseconds{};
     std::uint32_t meleeAttackCooldownMilliseconds{};
     bool meleeAttackActive{};
@@ -197,6 +192,11 @@ struct LevelEnemyState {
     // CAIEntityManager owns a bounded list distinct from the behavior state.
     // Normal difficulty permits one registered melee attacker at a time.
     bool meleeAttackRegistered{};
+    // RegisterEntityForMeleeAttack (0x00375710) assigns every entry a native
+    // random [5000, 15000) ms lease. With the default one-attacker cap the
+    // manager does not age this value, but consuming and retaining it keeps
+    // the original global RNG call order visible to diagnostics.
+    float meleeRegistrationTimerMilliseconds{};
     // CBehaviorTiedUp states 35-37 start from a 4000 ms authored timer,
     // multiplied by the player's web-duration upgrade rate.
     std::uint32_t tiedUpRemainingMilliseconds{};
@@ -610,6 +610,17 @@ public:
     [[nodiscard]] std::span<const LevelEnemyState> states() const noexcept {
         return states_;
     }
+    // CAIEntityManager melee-arbitration diagnostics reconstructed from
+    // 0x003744a4, 0x00375560, 0x00375654, and 0x00375710.
+    [[nodiscard]] std::int32_t meleeEngagerObjectId() const noexcept {
+        return meleeEngagerObjectId_;
+    }
+    [[nodiscard]] float meleeEngagementCooldownMilliseconds() const noexcept {
+        return meleeEngagementCooldownMilliseconds_;
+    }
+    [[nodiscard]] std::int32_t nativeRandomState() const noexcept {
+        return nativeRandomizer_.state();
+    }
     [[nodiscard]] std::span<const EnemyGunLineState> gunLines() const noexcept {
         return gunLines_;
     }
@@ -662,6 +673,8 @@ public:
 
 private:
     [[nodiscard]] LevelEnemyState* findMutable(std::int32_t objectId) noexcept;
+    [[nodiscard]] bool registerMeleeEngager(LevelEnemyState& enemy) noexcept;
+    void unregisterMeleeEngager(std::int32_t objectId) noexcept;
     [[nodiscard]] float maximumAttackReach(
         const LevelEnemyState& enemy) const noexcept;
     void queueAuthoredAttackEvents(LevelEnemyState& enemy,
@@ -684,7 +697,8 @@ private:
     void throwMolotov(LevelEnemyState& enemy,
                       const assets::Vector3& playerPosition,
                       std::uint32_t authoredEventTimeMilliseconds);
-    void startMeleeAttack(LevelEnemyState& enemy);
+    void startMeleeAttack(LevelEnemyState& enemy,
+                          const assets::Vector3& playerPosition);
     void startSandmanGroundAttack(LevelEnemyState& enemy);
     void startSandmanJump(LevelEnemyState& enemy,
                           const assets::Vector3& playerPosition,
@@ -798,8 +812,8 @@ private:
     const LevelOneBootstrap* level_{};
     std::optional<std::int32_t> shownHealthBarObjectId_;
     std::int32_t meleeEngagerObjectId_{-1};
-    std::int32_t lastMeleeEngagerObjectId_{-1};
-    std::uint32_t meleeEngagementCooldownMilliseconds_{};
+    float meleeEngagementCooldownMilliseconds_{};
+    NativeRandomizer nativeRandomizer_;
     QuickTimeActionRuntime rhinoQuickTimeAction_;
     std::int32_t rhinoQuickTimeEnemyId_{-1};
 };

@@ -502,13 +502,28 @@ Enemy melee timing is not guessed. The typed
 to 45% and 75% of `idle_knife_at_idle`. Bat behavior state 11 exposes two
 equally ranked lists: attack ID 7 at 47% of `idle_at1_idle`, and attack ID 11
 at 70% of `idle_jump_at3_idle`. `CBehaviorMeleeAttack::StateEnter` at
-`0x003baef8` resolves the exact tie with a 50-percent random branch; the
-portable deterministic selector alternates the winner so both outcomes are
-covered while preserving the even mix. Those IDs resolve through
+`0x003baef8` ranks candidates by the absolute delta between target distance
+and `EnemyAttackInfo+0x38`; its tie branch at `0x003bb244`-`0x003bb28c`
+replaces the current winner only when `random(0,100) <= 49`. The portable
+runtime now performs that comparison and uses the original Irrlicht integer
+generator instead of an invented alternating selector. Those IDs resolve through
 `EnemysAttackConfigs.bin` to the authored damage, hit-box reach, angular
 sector, hit type, protection interval, and force fields. Core regressions pin
 the knife's two 25-point contacts, the bat's 35-point standing contact, and
 its 50-point jumping contact.
+
+The melee-engagement handoff is likewise native-backed. Difficulty one sets
+one melee and one ranged slot plus a 1000 ms base at
+`CAIEntityManager::ResetMaxMeleeEngagingEntities` (`0x003744a4`).
+`UnRegisterEntityForMeleeAttack` (`0x00375560`) replaces the gate with
+`random(1000,2000)`, while `CanRegisterEntityForMeleeAttack` (`0x00375654`)
+accepts the sole free slot only after that float timer is non-positive.
+Registration at `0x00375710` also consumes and retains a
+`random(5000,15000)` entry lease. The previous fixed 1000 ms handoff and
+last-attacker round-robin rule had no executable counterpart and are removed.
+`irr::os::Randomizer::rand` (`0x0043ae48`) starts from `0x0f0f0f0f` and uses
+the recovered 40692/52774/3791/2147483399 Schrage recurrence; core tests pin
+its exact integer sequence and half-open wrapper ranges.
 
 Each opening attack also has an action-type-2 record at 2% of its clip.
 `IBehaviorBase::SpecialAnimActionCheck` sends message `0x66` there, and

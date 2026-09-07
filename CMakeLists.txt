@@ -131,6 +131,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelHintRuntime.cpp
     src/game/LevelHostageRuntime.cpp
     src/game/LevelMusicRuntime.cpp
+    src/game/NativeRandomizer.cpp
     src/game/LevelObjectRuntime.cpp
     src/game/LevelRestoreRuntime.cpp
     src/game/LevelTriggerRuntime.cpp

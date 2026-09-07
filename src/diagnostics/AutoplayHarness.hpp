@@ -76,6 +76,9 @@ struct AutoplaySnapshot {
     std::span<const bool> visibleRooms;
     std::span<const game::RoomMotionState> roomMotions;
     std::span<const game::LevelEnemyState> enemies;
+    std::int32_t meleeEngagerObjectId{-1};
+    float meleeEngagementCooldownMilliseconds{};
+    std::int32_t nativeRandomState{};
     std::span<const game::EnemyMolotovState> molotovs;
     std::span<const game::EnemyBoomerangState> boomerangs;
     std::span<const game::EnemyThunderclapState> thunderclaps;

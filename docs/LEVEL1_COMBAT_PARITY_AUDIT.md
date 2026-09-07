@@ -96,8 +96,18 @@ state-11 table contains two equally ranked attacks. Native
 `CBehaviorMeleeAttack::StateEnter` resolves that exact tie with a 50-percent
 random branch: attack 7 is a 35-point standing contact at 47 percent of its
 1934 ms clip, while attack 11 is a 50-point jumping contact at 70 percent of
-its 1500 ms clip. The deterministic runtime alternates the tie winner so both
-native outcomes remain evenly represented and every autoplay run covers both.
+its 1500 ms clip. The runtime now uses the shipped Irrlicht generator and the
+native `random(0,100) <= 49` tie branch rather than alternating the winner.
+Focused core and normal-flow autoplay coverage observe both authored outcomes.
+
+The original AI manager permits one ordinary melee engager on difficulty one
+(`0x003744a4`). On unregister, `0x00375560` samples a half-open 1000--1999 ms
+global gate; `0x00375654` blocks the final free slot while that float remains
+positive; and registration at `0x00375710` consumes a 5000--14999 ms entry
+lease. The reconstruction now retains those calls and the exact
+`irr::os::Randomizer::rand` recurrence at `0x0043ae48`. The former fixed
+1000 ms delay and last-attacker round-robin behavior were reconstruction-only
+and have been removed.
 
 `Player::OnHit` (`0x0034d790`) maps hit type 100 to state 44
 (`k_state_hurt_light`) and hit type 101 to state 45

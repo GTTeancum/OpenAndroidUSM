@@ -35,8 +35,11 @@ constexpr float kWebPelletRadiusCentimeters = 30.0F;
 constexpr float kWebPelletLaunchOffsetCentimeters = 50.0F;
 constexpr float kWebPelletMaximumTravelCentimeters = 5000.0F;
 // ResetMaxMeleeEngagingEntities(1) (0x003744a4) selects one melee engager
-// for the default difficulty. Its native hand-off range is 1000 ms.
-constexpr std::uint32_t kMeleeEngagementHandoffMilliseconds = 1000;
+// and stores 1000 ms at CAIEntityManager+0xd4 for the default difficulty.
+// UnRegisterEntityForMeleeAttack (0x00375560) calls random(base, base * 2),
+// so the actual hand-off delay is the half-open interval [1000, 2000).
+constexpr std::int32_t kMeleeEngagementHandoffMinimumMilliseconds = 1000;
+constexpr std::int32_t kMeleeEngagementHandoffMaximumMilliseconds = 2000;
 // Unit::IsBlockedByWorld (0x00324670) receives -33000 / 0xffff7f18 from
 // SearchTargetByEyeHorizon (0x00343b70). Physics::processCollision treats it
 // as the ignored helper-surface mask while ordinary authored ground and wall
@@ -819,8 +822,7 @@ Result LevelEnemyRuntime::initialize(const LevelOneBootstrap& level) {
     pendingEnemySeparationEvents_.clear();
     shownHealthBarObjectId_.reset();
     meleeEngagerObjectId_ = -1;
-    lastMeleeEngagerObjectId_ = -1;
-    meleeEngagementCooldownMilliseconds_ = 0;
+    meleeEngagementCooldownMilliseconds_ = 0.0F;
     rhinoQuickTimeAction_.cancel();
     rhinoQuickTimeEnemyId_ = -1;
     level_ = &level;
@@ -1213,12 +1215,7 @@ void LevelEnemyRuntime::updateWallEnemy(
         enemy.behavior = EnemyBehaviorState::Idle;
         enemy.wallBehaviorState = 0;
         enemy.meleeAttackActive = false;
-        enemy.meleeAttackRegistered = false;
-        if (meleeEngagerObjectId_ == enemy.asset->objectId) {
-            lastMeleeEngagerObjectId_ = meleeEngagerObjectId_;
-            meleeEngagerObjectId_ = -1;
-            meleeEngagementCooldownMilliseconds_ = kMeleeEngagementHandoffMilliseconds;
-        }
+        unregisterMeleeEngager(enemy.asset->objectId);
         if (enemy.activeAnimation != "wall_idle") {
             enemy.activeAnimation = "wall_idle";
             enemy.animationTimeMilliseconds = 0;
@@ -1319,13 +1316,7 @@ void LevelEnemyRuntime::updateWallEnemy(
             }
             idle();
             enemy.wallIdleMilliseconds = 1000;
-            enemy.meleeAttackRegistered = false;
-            if (meleeEngagerObjectId_ == enemy.asset->objectId) {
-                lastMeleeEngagerObjectId_ = meleeEngagerObjectId_;
-                meleeEngagerObjectId_ = -1;
-                meleeEngagementCooldownMilliseconds_ =
-                    kMeleeEngagementHandoffMilliseconds;
-            }
+            unregisterMeleeEngager(enemy.asset->objectId);
         }
         if (enemy.wallIdleMilliseconds != 0) {
             enemy.wallIdleMilliseconds =
@@ -1335,8 +1326,7 @@ void LevelEnemyRuntime::updateWallEnemy(
         }
         if (distanceSquared <= attackRangeSquared) {
             idle();
-            if (meleeEngagerObjectId_ < 0 &&
-                meleeEngagementCooldownMilliseconds_ == 0) {
+            if (registerMeleeEngager(enemy)) {
                 // MeleeAttack::StateEnter (0x003baef8) selects directional
                 // wall attack state 12..15 (then optional 16..19 variants).
                 const auto pattern = bodyPattern(playerPosition);
@@ -1350,8 +1340,6 @@ void LevelEnemyRuntime::updateWallEnemy(
                     enemy.worldTransform[axis + 2] * localSign};
                 enemy.behavior = EnemyBehaviorState::AttackRange;
                 enemy.meleeAttackActive = true;
-                enemy.meleeAttackRegistered = true;
-                meleeEngagerObjectId_ = enemy.asset->objectId;
             }
             return;
         }
@@ -1440,10 +1428,12 @@ void LevelEnemyRuntime::updateGameplay(
     updateThunderclaps(elapsedMilliseconds, playerPosition);
     updateElectroBursts(elapsedMilliseconds);
     updateLandingAnimatedEffects(elapsedMilliseconds);
-    if (meleeEngagementCooldownMilliseconds_ > elapsedMilliseconds) {
-        meleeEngagementCooldownMilliseconds_ -= elapsedMilliseconds;
-    } else {
-        meleeEngagementCooldownMilliseconds_ = 0;
+    if (meleeEngagementCooldownMilliseconds_ > 0.0F) {
+        // CAIEntityManager::Update (0x00375090) subtracts the frame delta
+        // from the float timer; CanRegisterEntityForMeleeAttack accepts it
+        // once it is non-positive, without clamping it to zero.
+        meleeEngagementCooldownMilliseconds_ -=
+            static_cast<float>(elapsedMilliseconds);
     }
     if (meleeEngagerObjectId_ >= 0) {
         LevelEnemyState* engager = findMutable(meleeEngagerObjectId_);
@@ -1453,13 +1443,7 @@ void LevelEnemyRuntime::updateGameplay(
             engager->behavior == EnemyBehaviorState::Hurt ||
             engager->behavior == EnemyBehaviorState::TiedUp ||
             engager->behavior == EnemyBehaviorState::Dead) {
-            if (engager != nullptr) {
-                engager->meleeAttackRegistered = false;
-            }
-            lastMeleeEngagerObjectId_ = meleeEngagerObjectId_;
-            meleeEngagerObjectId_ = -1;
-            meleeEngagementCooldownMilliseconds_ =
-                kMeleeEngagementHandoffMilliseconds;
+            unregisterMeleeEngager(meleeEngagerObjectId_);
         }
     }
     for (LevelEnemyState& enemy : states_) {
@@ -1900,43 +1884,7 @@ void LevelEnemyRuntime::updateGameplay(
                 }
                 continue;
             }
-            if (meleeEngagerObjectId_ < 0 &&
-                meleeEngagementCooldownMilliseconds_ == 0) {
-                bool deferPreviousEngager =
-                    enemy.asset->objectId == lastMeleeEngagerObjectId_;
-                if (deferPreviousEngager) {
-                    deferPreviousEngager = std::any_of(
-                        states_.begin(), states_.end(),
-                        [&](const LevelEnemyState& candidate) {
-                            if (candidate.asset == nullptr ||
-                                candidate.asset->objectId ==
-                                    enemy.asset->objectId ||
-                                !candidate.visible || !candidate.aiEnabled ||
-                                !candidate.playerDetected ||
-                                candidate.health <= 0.0F ||
-                                candidate.asset->gameType.starts_with(
-                                    "Boss_") ||
-                                isGunLineEnemy(candidate) ||
-                                isMolotovEnemy(candidate)) {
-                                return false;
-                            }
-                            const float candidateX =
-                                playerPosition.x - candidate.position.x;
-                            const float candidateY =
-                                playerPosition.y - candidate.position.y;
-                            const float candidateRange =
-                                maximumAttackReach(candidate);
-                            return candidateRange > 0.0F &&
-                                   candidateX * candidateX +
-                                           candidateY * candidateY <=
-                                       candidateRange * candidateRange;
-                        });
-                }
-                if (!deferPreviousEngager) {
-                    meleeEngagerObjectId_ = enemy.asset->objectId;
-                    enemy.meleeAttackRegistered = true;
-                }
-            }
+            (void)registerMeleeEngager(enemy);
             if (meleeEngagerObjectId_ != enemy.asset->objectId) {
                 enemy.meleeAttackRegistered = false;
                 enemy.meleeAttackActive = false;
@@ -1952,7 +1900,7 @@ void LevelEnemyRuntime::updateGameplay(
             }
             if (previousBehavior != EnemyBehaviorState::AttackRange) {
                 enemy.meleeAttackCooldownMilliseconds = 0;
-                startMeleeAttack(enemy);
+                startMeleeAttack(enemy, playerPosition);
             } else if (enemy.meleeAttackActive) {
                 const EnemyArchetypeAsset& archetype =
                     level_->enemyArchetypes()[enemy.asset->archetypeIndex];
@@ -1982,11 +1930,7 @@ void LevelEnemyRuntime::updateGameplay(
                                   interval->intervalMilliseconds
                                       [enemy.asset->enemyTypeId],
                                   0.0F));
-                    enemy.meleeAttackRegistered = false;
-                    lastMeleeEngagerObjectId_ = enemy.asset->objectId;
-                    meleeEngagerObjectId_ = -1;
-                    meleeEngagementCooldownMilliseconds_ =
-                        kMeleeEngagementHandoffMilliseconds;
+                    unregisterMeleeEngager(enemy.asset->objectId);
                     continue;
                 }
             }
@@ -1994,7 +1938,7 @@ void LevelEnemyRuntime::updateGameplay(
                 if (enemy.meleeAttackCooldownMilliseconds <=
                     elapsedMilliseconds) {
                     enemy.meleeAttackCooldownMilliseconds = 0;
-                    startMeleeAttack(enemy);
+                    startMeleeAttack(enemy, playerPosition);
                 } else {
                     enemy.meleeAttackCooldownMilliseconds -=
                         elapsedMilliseconds;
@@ -2010,11 +1954,7 @@ void LevelEnemyRuntime::updateGameplay(
         const float inverseDistance = 1.0F / distance;
         if (meleeEngagerObjectId_ == enemy.asset->objectId &&
             attackRange > 0.0F && distance > attackRange * 1.5F) {
-            enemy.meleeAttackRegistered = false;
-            lastMeleeEngagerObjectId_ = enemy.asset->objectId;
-            meleeEngagerObjectId_ = -1;
-            meleeEngagementCooldownMilliseconds_ =
-                kMeleeEngagementHandoffMilliseconds;
+            unregisterMeleeEngager(enemy.asset->objectId);
         }
         const assets::Vector3 facing{toPlayerX * inverseDistance,
                                      toPlayerY * inverseDistance, 0.0F};
@@ -2638,11 +2578,7 @@ void LevelEnemyRuntime::applyCombatDamage(
     }
     if (enemy.asset != nullptr &&
         meleeEngagerObjectId_ == enemy.asset->objectId) {
-        enemy.meleeAttackRegistered = false;
-        lastMeleeEngagerObjectId_ = enemy.asset->objectId;
-        meleeEngagerObjectId_ = -1;
-        meleeEngagementCooldownMilliseconds_ =
-            kMeleeEngagementHandoffMilliseconds;
+        unregisterMeleeEngager(enemy.asset->objectId);
     }
     enemy.tiedUpRemainingMilliseconds = 0;
     const bool wasRobotPhantomConcealed =
@@ -2857,13 +2793,8 @@ bool LevelEnemyRuntime::applyWallWebEvent(const WallWebEvent& event) {
         enemy->wallWebCaptured = true;
         setFacing(*enemy, enemy->facing);
         enemy->meleeAttackActive = false;
-        enemy->meleeAttackRegistered = false;
         enemy->wallBehaviorState = 0;
-        if (meleeEngagerObjectId_ == event.targetObjectId) {
-            lastMeleeEngagerObjectId_ = meleeEngagerObjectId_;
-            meleeEngagerObjectId_ = -1;
-            meleeEngagementCooldownMilliseconds_ = kMeleeEngagementHandoffMilliseconds;
-        }
+        unregisterMeleeEngager(event.targetObjectId);
         return true;
     }
     if (!enemy->wallWebCaptured) {
@@ -3247,13 +3178,7 @@ bool LevelEnemyRuntime::setDiagnosticAiEnabled(
     enemy->behavior = enabled ? EnemyBehaviorState::Idle
                               : EnemyBehaviorState::Disabled;
     enemy->meleeAttackActive = false;
-    enemy->meleeAttackRegistered = false;
-    if (meleeEngagerObjectId_ == objectId) {
-        lastMeleeEngagerObjectId_ = objectId;
-        meleeEngagerObjectId_ = -1;
-        meleeEngagementCooldownMilliseconds_ =
-            kMeleeEngagementHandoffMilliseconds;
-    }
+    unregisterMeleeEngager(objectId);
     enemy->meleeAttackCooldownMilliseconds = 0;
     enemy->rangeAttackCooldownMilliseconds = 0;
     enemy->tiedUpRemainingMilliseconds = 0;
@@ -3385,8 +3310,7 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
     pendingEnemySeparationEvents_.clear();
     shownHealthBarObjectId_.reset();
     meleeEngagerObjectId_ = -1;
-    lastMeleeEngagerObjectId_ = -1;
-    meleeEngagementCooldownMilliseconds_ = 0;
+    meleeEngagementCooldownMilliseconds_ = 0.0F;
     rhinoQuickTimeAction_.cancel();
     rhinoQuickTimeEnemyId_ = -1;
     for (LevelEnemyState& enemy : states_) {
@@ -3396,6 +3320,7 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
         enemy.cinematicActionObjectId = -1;
         enemy.meleeAttackActive = false;
         enemy.meleeAttackRegistered = false;
+        enemy.meleeRegistrationTimerMilliseconds = 0.0F;
         enemy.tiedUpRemainingMilliseconds = 0;
         if (enemy.robotPhantomTask ==
             RobotPhantomTaskState::ConcealHidden) {
@@ -4046,7 +3971,9 @@ void LevelEnemyRuntime::startGunLineAttack(LevelEnemyState& enemy) {
     enemy.animationReversed = false;
 }
 
-void LevelEnemyRuntime::startMeleeAttack(LevelEnemyState& enemy) {
+void LevelEnemyRuntime::startMeleeAttack(
+    LevelEnemyState& enemy,
+    const assets::Vector3& playerPosition) {
     if (level_ == nullptr || enemy.asset == nullptr ||
         enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
         return;
@@ -4070,15 +3997,48 @@ void LevelEnemyRuntime::startMeleeAttack(LevelEnemyState& enemy) {
         }
         attackAnimations.push_back(fallback);
     }
-    // CBehaviorMeleeAttack::StateEnter (0x003baef8) compares each attack's
-    // authored preferred range and uses random(100) < 50 to resolve an exact
-    // tie. The two bat attacks tie, so rotating the tie winner preserves the
-    // native 50/50 mix while keeping normal-flow autoplay reproducible.
-    const std::string_view animation =
-        attackAnimations[enemy.meleeAttackVariantCursor %
-                         attackAnimations.size()];
-    enemy.meleeAttackVariantCursor = static_cast<std::uint32_t>(
-        (enemy.meleeAttackVariantCursor + 1U) % attackAnimations.size());
+    // CBehaviorMeleeAttack::StateEnter (0x003baef8; selection loop
+    // 0x003bb204-0x003bb290) compares the absolute delta between target
+    // distance and EnemyAttackInfo+0x38 for every resolved attack. A smaller
+    // delta replaces the winner; an exact tie does so only when
+    // random(0, 100) <= 49. The portable attack reader exposes that exact
+    // serialized +0x38 float as maximumAngleDegrees.
+    const float dx = playerPosition.x - enemy.position.x;
+    const float dy = playerPosition.y - enemy.position.y;
+    const float dz = playerPosition.z - enemy.position.z;
+    const float targetDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
+    std::size_t selectedAnimation = 0;
+    float selectedDelta = std::numeric_limits<float>::infinity();
+    bool foundAttack = false;
+    for (std::size_t candidate = 0; candidate < attackAnimations.size();
+         ++candidate) {
+        std::int32_t previousAttackId = -1;
+        for (const EnemyAnimationSpecialAction* event :
+             level_->enemySpecialActions().findAttackEvents(
+                 enemy.asset->enemyTypeId, attackAnimations[candidate])) {
+            if (event == nullptr || event->attackId < 0 ||
+                event->attackId == previousAttackId ||
+                event->attackId > std::numeric_limits<std::int16_t>::max()) {
+                continue;
+            }
+            previousAttackId = event->attackId;
+            const AttackDefinition* attack = level_->attackConfigs().find(
+                static_cast<std::int16_t>(event->attackId));
+            if (attack == nullptr) {
+                continue;
+            }
+            const float delta = std::abs(
+                attack->maximumAngleDegrees - targetDistance);
+            if (!foundAttack || delta < selectedDelta ||
+                (delta == selectedDelta &&
+                 nativeRandomizer_.range(0, 100) <= 49)) {
+                selectedAnimation = candidate;
+                selectedDelta = delta;
+                foundAttack = true;
+            }
+        }
+    }
+    const std::string_view animation = attackAnimations[selectedAnimation];
     if (archetype.animationBank.findClip(animation) == nullptr) {
         return;
     }
@@ -5955,6 +5915,9 @@ void LevelEnemyRuntime::selectStateAnimation(
 void LevelEnemyRuntime::enterDeadState(LevelEnemyState& enemy) {
     enemy.wallWebCaptured = false;
     cancelRhinoQuickTimeIfOwned(enemy);
+    if (enemy.asset != nullptr) {
+        unregisterMeleeEngager(enemy.asset->objectId);
+    }
     enemy.aiEnabled = false;
     enemy.behavior = EnemyBehaviorState::Dead;
     enemy.meleeAttackActive = false;
@@ -6124,7 +6087,7 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         enemy->physicsActive = false;
         enemy->behavior = EnemyBehaviorState::Disabled;
         enemy->meleeAttackActive = false;
-        enemy->meleeAttackRegistered = false;
+        unregisterMeleeEngager(objectId);
         return Result::success();
     }
     if (command.name == "KillObject") {
@@ -6137,6 +6100,7 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         enemy->physicsActive = false;
         enemy->behavior = EnemyBehaviorState::Disabled;
         enemy->meleeAttackActive = false;
+        unregisterMeleeEngager(objectId);
         enemy->meleeAttackCooldownMilliseconds = 0;
         enemy->sandmanTask = SandmanBossTaskState::None;
         enemy->sandmanJumpElapsedMilliseconds = 0;
@@ -6349,6 +6313,57 @@ LevelEnemyState* LevelEnemyRuntime::findMutable(
             return state.asset != nullptr && state.asset->objectId == objectId;
         });
     return match == states_.end() ? nullptr : &*match;
+}
+
+bool LevelEnemyRuntime::registerMeleeEngager(
+    LevelEnemyState& enemy) noexcept {
+    if (enemy.asset == nullptr) {
+        return false;
+    }
+    if (meleeEngagerObjectId_ == enemy.asset->objectId) {
+        enemy.meleeAttackRegistered = true;
+        return true;
+    }
+    // CanRegisterEntityForMeleeAttack (0x00375654): normal difficulty has a
+    // one-entry cap. With exactly one free slot, an ordinary (non-forced)
+    // registration is accepted only after the manager timer reaches <= 0.
+    if (meleeEngagerObjectId_ >= 0 ||
+        meleeEngagementCooldownMilliseconds_ > 0.0F) {
+        enemy.meleeAttackRegistered = false;
+        return false;
+    }
+    meleeEngagerObjectId_ = enemy.asset->objectId;
+    enemy.meleeAttackRegistered = true;
+    // RegisterEntityForMeleeAttack (0x00375710) consumes random(5000,15000)
+    // for the list entry. UpdateRegisterEntityForMeleeAttackTimer
+    // (0x003755fc) only ages entries while more than one is registered, so
+    // this remains constant under the default one-attacker cap.
+    enemy.meleeRegistrationTimerMilliseconds = static_cast<float>(
+        nativeRandomizer_.range(5000, 15000));
+    return true;
+}
+
+void LevelEnemyRuntime::unregisterMeleeEngager(
+    std::int32_t objectId) noexcept {
+    if (meleeEngagerObjectId_ != objectId) {
+        if (LevelEnemyState* enemy = findMutable(objectId)) {
+            enemy->meleeAttackRegistered = false;
+            enemy->meleeRegistrationTimerMilliseconds = 0.0F;
+        }
+        return;
+    }
+    if (LevelEnemyState* enemy = findMutable(objectId)) {
+        enemy->meleeAttackRegistered = false;
+        enemy->meleeRegistrationTimerMilliseconds = 0.0F;
+    }
+    meleeEngagerObjectId_ = -1;
+    // UnRegisterEntityForMeleeAttack (0x00375560) refreshes the manager gate
+    // through random(baseDelay, baseDelay * 2), where the difficulty-one
+    // base delay installed by 0x003744a4 is 1000 ms.
+    meleeEngagementCooldownMilliseconds_ = static_cast<float>(
+        nativeRandomizer_.range(
+            kMeleeEngagementHandoffMinimumMilliseconds,
+            kMeleeEngagementHandoffMaximumMilliseconds));
 }
 
 } // namespace usm::game

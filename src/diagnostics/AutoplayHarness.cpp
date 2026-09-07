@@ -146,6 +146,7 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
                  "death_confirmation_selection,exit_menu,exit_menu_state,"
                  "main_menu_requested,restore,restore_alpha,"
                  "visible_rooms,"
+                 "melee_engager,melee_gate_ms,native_random_state,"
                  "input_right,input_forward,"
                  "camera_x,camera_y,camera_z,target_x,target_y,target_z,"
                  "rhino_qte_active,rhino_qte_state,rhino_qte_state_ms,"
@@ -1844,6 +1845,14 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         }
         break;
     case StepKind::Attack: {
+        if (snapshot.tutorialVisible && !snapshot.controlsEnabled) {
+            // `attack` is a goal-directed normal-input driver. Context-clue
+            // bubbles can be raised by the route while it is active; use the
+            // same abstract shipped confirmation input as WaitControls so a
+            // modal hint cannot consume the entire combat timeout.
+            input.quickTimeEventPressed = true;
+            break;
+        }
         if (snapshot.playerStateId == 87) {
             activeAttackFarStateObserved_ = true;
         }
@@ -1867,17 +1876,21 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
             const float enemyTop = match->position.z +
                                    match->collisionHeight;
             if (!match->visible ||
-                (snapshot.playerOnWall ? !match->onWall :
-                 (playerTop < match->position.z ||
-                  enemyTop < snapshot.playerPosition.z))) {
+                (snapshot.playerOnWall && !match->onWall)) {
                 continue;
             }
             const float horizontalDistance =
                 distance2D(snapshot.playerPosition, match->position);
+            float verticalGap = 0.0F;
+            if (playerTop < match->position.z) {
+                verticalGap = match->position.z - playerTop;
+            } else if (enemyTop < snapshot.playerPosition.z) {
+                verticalGap = snapshot.playerPosition.z - enemyTop;
+            }
             const float candidateDistance = snapshot.playerOnWall
                 ? std::hypot(horizontalDistance,
                              match->position.z - snapshot.playerPosition.z)
-                : horizontalDistance;
+                : std::hypot(horizontalDistance, verticalGap);
             if (candidateDistance < targetDistance) {
                 target = &*match;
                 targetDistance = candidateDistance;
@@ -3433,7 +3446,10 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
               << snapshot.exitMenuState << ','
               << snapshot.mainMenuRequested << ','
               << snapshot.restoreActive << ',' << snapshot.restoreAlpha << ','
-              << csv(visibleRooms) << ',' << lastMotionInput_.right << ','
+              << csv(visibleRooms) << ','
+              << snapshot.meleeEngagerObjectId << ','
+              << snapshot.meleeEngagementCooldownMilliseconds << ','
+              << snapshot.nativeRandomState << ',' << lastMotionInput_.right << ','
               << lastMotionInput_.forward << ',' << snapshot.camera.position.x
               << ',' << snapshot.camera.position.y << ','
               << snapshot.camera.position.z << ',' << snapshot.camera.target.x
