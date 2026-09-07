@@ -17,9 +17,10 @@ set_enemy_ai 394 0
 set_enemy_ai 395 0
 set_enemy_ai 397 0
 
-# Actor 394 stages near (13399,-6484).  Eight metres of separation is inside
-# the native search cone but outside the ordinary 250 cm state-74 reach.
-teleport 12599 -6484 7 1 0 0
+# Actor 394 stages near (13399,-6484). This source-data Voronoi position keeps
+# it nearer than attackable scene objects 355/586/587/802/803 while remaining
+# outside the ordinary 250 cm state-74 reach.
+teleport 13000 -6200 7 0.815 -0.580 0
 punch
 assert_player_state 87
 punch_when_ready 1500

@@ -16,13 +16,14 @@ wait_enemies_active 5000 394 395 397
 set_enemy_ai 394 0
 set_enemy_ai 395 0
 set_enemy_ai 397 0
-teleport 13356 -6411 7 0 1 0
+teleport 13399 -6484 7 0 1 0
 
 # GetAirWebSpecialState reads the nearest non-airborne helper target before its
 # generic tie/drag search. At this authored encounter position an ordinary jump
 # keeps enemy 394 inside the exact 40,000 cm^2 branch threshold.
 set_enemy_physics 394 1
 jump
+wait 60
 web_on
 move_until_state 500 0 0 99
 web_off
@@ -34,7 +35,7 @@ assert_player_state 104
 wait 100
 assert_player_effect 19 1
 wait_enemy_animation 3000 394 onground_to_whirl_flying
-assert_enemy_health_near 394 300 0.01
+assert_enemy_health_near 394 400 0.01
 assert_audio_played SFX_CRITICAL_HIT_1
 assert_audio_played SFX_VERTICAL_IMPACT
 assert_health_above 0

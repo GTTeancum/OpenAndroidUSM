@@ -998,6 +998,91 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     std::to_string(effect.mesh.sceneGeometries().size()) +
                     ";textures=" +
                     std::to_string(effect.textures.size()));
+            for (std::size_t materialIndex = 0;
+                 materialIndex < effect.mesh.materials().size();
+                 ++materialIndex) {
+                const assets::ColladaMaterial& material =
+                    effect.mesh.materials()[materialIndex];
+                autoplay->recordEvent(
+                    0, "player_hit_mesh_material_asset",
+                    "effect_id=" + std::to_string(effect.definition.id) +
+                        ";material_index=" +
+                        std::to_string(materialIndex) +
+                        ";name=" + material.name +
+                        ";ambient_r=" +
+                        std::to_string(material.ambientColor[0]) +
+                        ";ambient_g=" +
+                        std::to_string(material.ambientColor[1]) +
+                        ";ambient_b=" +
+                        std::to_string(material.ambientColor[2]) +
+                        ";ambient_a=" +
+                        std::to_string(material.ambientColor[3]));
+            }
+            for (std::size_t textureIndex = 0;
+                 textureIndex < effect.textures.size(); ++textureIndex) {
+                const assets::BtexTexture& texture =
+                    effect.textures[textureIndex];
+                const assets::RgbaImage& image = texture.mipLevels().front();
+                std::uint8_t minimumAlpha = 0xff;
+                std::uint8_t maximumAlpha = 0;
+                for (std::size_t alpha = 3; alpha < image.pixels.size();
+                     alpha += 4) {
+                    minimumAlpha =
+                        std::min(minimumAlpha, image.pixels[alpha]);
+                    maximumAlpha =
+                        std::max(maximumAlpha, image.pixels[alpha]);
+                }
+                autoplay->recordEvent(
+                    0, "player_hit_mesh_texture_asset",
+                    "effect_id=" + std::to_string(effect.definition.id) +
+                        ";texture_index=" +
+                        std::to_string(textureIndex) +
+                        ";contains_alpha=" +
+                        std::to_string(texture.containsAlpha()) +
+                        ";width=" + std::to_string(image.width) +
+                        ";height=" + std::to_string(image.height) +
+                        ";minimum_alpha=" +
+                        std::to_string(minimumAlpha) +
+                        ";maximum_alpha=" +
+                        std::to_string(maximumAlpha));
+            }
+            for (std::size_t trackIndex = 0;
+                 trackIndex < effect.animation.tracks().size(); ++trackIndex) {
+                const assets::ColladaAnimationTrack& track =
+                    effect.animation.tracks()[trackIndex];
+                std::string detail =
+                    "effect_id=" + std::to_string(effect.definition.id) +
+                    ";track_index=" + std::to_string(trackIndex) +
+                    ";id=" + track.id +
+                    ";target=" + track.targetNode +
+                    ";property=" +
+                    std::to_string(static_cast<std::int32_t>(track.property)) +
+                    ";components=" +
+                    std::to_string(track.componentCount) +
+                    ";keys=" +
+                    std::to_string(track.timestampsMilliseconds.size());
+                if (!track.timestampsMilliseconds.empty()) {
+                    const std::uint32_t firstTimestamp =
+                        track.timestampsMilliseconds.front();
+                    const std::uint32_t lastTimestamp =
+                        track.timestampsMilliseconds.back();
+                    const auto first = track.sample(firstTimestamp);
+                    const auto last = track.sample(lastTimestamp);
+                    detail += ";first_ms=" + std::to_string(firstTimestamp) +
+                              ";last_ms=" + std::to_string(lastTimestamp);
+                    for (std::uint32_t component = 0;
+                         component < track.componentCount && component < 4;
+                         ++component) {
+                        detail +=
+                            ";first" + std::to_string(component) + "=" +
+                            std::to_string(first.value[component]) +
+                            ";last" + std::to_string(component) + "=" +
+                            std::to_string(last.value[component]);
+                    }
+                }
+                autoplay->recordEvent(
+                    0, "player_hit_mesh_animation_track_asset", detail);
+            }
         }
         const game::MolotovProjectileAsset& molotovProjectile =
             levelOne_.molotovProjectile();

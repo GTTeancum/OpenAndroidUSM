@@ -4777,13 +4777,20 @@ void GameplayPlayer::queueAttackFrameEvents(
             queueHitEffect(
                 effectIds[std::min(*latestCrossedEffectFrameIndex,
                                    effectIds.size() - 1)],
-                latestCrossedEffectElapsedMilliseconds);
+                latestCrossedEffectElapsedMilliseconds, 0, {}, 1.0F, true);
         } else {
             // A single-contact state treats its auxiliary effect list as a
             // simultaneous set and creates every listed effect once.
             for (const std::int16_t effectId : effectIds) {
+                // UpdateNormalEffect's two AddHitEffect call sites load r3=1
+                // at 0x00348fae and 0x00348fec. Player::AddHitEffect
+                // (0x00348f00/0x00348dc4) forwards that value as the final
+                // ThrowAnimEffect argument, so CAnimObjEffect::Init
+                // (0x00390bb8) selects material 0x1d, the native
+                // subtract-ambient renderer, for ordinary combat trails.
                 queueHitEffect(effectId,
-                               latestCrossedEffectElapsedMilliseconds);
+                               latestCrossedEffectElapsedMilliseconds, 0, {},
+                               1.0F, true);
             }
         }
     }

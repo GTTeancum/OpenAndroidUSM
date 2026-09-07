@@ -61,6 +61,10 @@ set_enemy_ai 394 0
 # 500-105-70-80-52-52-85 = 56.
 teleport 13399 -6360 7 0 -1 0
 jump
+# Enter from state 14 near the bottom of the authored jump-fall arc, when the
+# native Bip01-centered attack cylinder overlaps the grounded opening thug.
+# The recovered 25 ms jump census places that input sample at 550 ms.
+wait 500
 punch
 assert_player_state 81
 punch_attack_when_ready 1000
@@ -83,6 +87,7 @@ move_until_state 3000 0 0 0
 # contact leave 311 health; fly kick and headbutt subtract 120 each.
 teleport 13148 -6335 7 0 -1 0
 jump
+wait 500
 punch
 assert_player_state 81
 punch_attack_when_ready 1000

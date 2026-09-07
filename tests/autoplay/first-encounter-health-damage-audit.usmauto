@@ -24,9 +24,10 @@ assert_enemy_health_near 397 500 0.01
 
 # Default ground chain. Native CheckAttackTarget divides each multi-hit
 # state's total damage across its authored contact list. Collision remains
-# per contact: the high second pulse of state 78 clears this grounded thug's
-# native 40 cm half-height, so the six-button chain actually lands
-#   35 + 35 + 55 + 85 + 85 + 40 = 335.
+# per contact. Physics::testPieCollision transforms the enemy cylinder's
+# authored local {0,0,radius} center, so both state-78 pulses overlap this
+# grounded thug and the six-button chain lands
+#   35 + 35 + 55 + 85 + 85 + 80 = 375.
 teleport 13399 -6360 7 0 -1 0
 punch
 assert_player_state 74
@@ -52,36 +53,31 @@ assert_player_state 91
 # State 90 is 85 total, delivered as four 21.25 contacts.
 assert_enemy_health_near 394 290 0.01
 
-# State 91 is another 85 total. State 78 authors two 40-damage pulses, but
-# only its lower first pulse intersects this grounded target.
+# State 91 is another 85 total. State 78 authors two 40-damage contacts and
+# both intersect the correctly centered target cylinder.
 punch_when_ready 1000
 assert_enemy_health_near 394 205 0.01
 move_until_state 1000 0 0 78
 assert_player_state 78
 wait 500
-assert_enemy_health_near 394 165 0.01
+assert_enemy_health_near 394 125 0.01
 move_until_state 2000 0 0 0
 
-# The next chain removes 125 in its first three contacts and then the first
-# two 21.25 contacts of state 90 clamp the remaining 40 health to zero.
+# The next chain removes the remaining 125 in its first three contacts.
 set_enemy_ai 394 1
 wait_enemies_grounded 3000 394
 set_enemy_ai 394 0
 teleport 13399 -6360 7 0 -1 0
 punch
 wait 200
-assert_enemy_health_near 394 130 0.01
+assert_enemy_health_near 394 90 0.01
 punch_when_ready 1000
 move_until_state 1000 0 0 75
 wait 150
-assert_enemy_health_near 394 95 0.01
+assert_enemy_health_near 394 55 0.01
 punch_when_ready 1000
 move_until_state 1000 0 0 79
 wait 200
-assert_enemy_health_near 394 40 0.01
-punch_when_ready 1000
-move_until_state 1000 0 0 90
-wait 350
 assert_enemy_health_near 394 0 0.01
 assert_health_above 0
 finish

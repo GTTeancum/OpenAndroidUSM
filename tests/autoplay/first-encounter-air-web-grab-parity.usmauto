@@ -28,6 +28,7 @@ assert_enemy_health_near 394 405 0.01
 move_until_state 1500 0 0 0
 
 jump
+wait 80
 web_on
 move_until_state 500 0 0 101
 assert_player_state 101

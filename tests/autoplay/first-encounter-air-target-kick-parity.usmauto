@@ -34,6 +34,10 @@ move_until_state 1500 0 0 0
 # diagonal kick.  It owns both the source effect 26 travel trail and effect 16
 # strike trail; neither is a harness-generated visual.
 jump
+# State 13's authored input gate opens at runtime frame 2. This scenario uses
+# 10 ms fixed steps, so 80 ms of state residence makes the following input
+# sample the native 100 ms/frame-2 boundary.
+wait 80
 punch
 move_until_state 500 0 0 86
 assert_player_state 86

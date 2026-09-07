@@ -643,14 +643,19 @@ bool nativePlayerSectorIntersects(
     // Unit::CheckAttackByPos (0x00325118) supplies the animated Bip01 world
     // position as the attack center and player height/2 as its half-height.
     // Physics::testPieCollision (0x003d5434) supplies the enemy capsule's
-    // localToWorld center and shape+0x18 as the target half-height. The exact
-    // interval test is testCylinderCylinder at 0x003d0e9c.
+    // localToWorld center and shape+0x18 as the target half-height. At
+    // 0x003d5462 it transforms the shape-local vector at +0x08; the
+    // createEnemyPhysics constructor at 0x003d89be stores {0, 0, radius}
+    // there. The enemy state position is the Unit base, so the physics
+    // cylinder center is one collision radius above it. The exact interval
+    // test is testCylinderCylinder at 0x003d0e9c.
     constexpr float attackHalfHeight =
         kPlayerCollisionHeightCentimeters * 0.5F;
+    const float targetCenterZ = enemy.position.z + enemy.collisionRadius;
     if (attackCenter.z - attackHalfHeight >
-            enemy.position.z + targetHalfHeight ||
+            targetCenterZ + targetHalfHeight ||
         attackCenter.z + attackHalfHeight <
-            enemy.position.z - targetHalfHeight) {
+            targetCenterZ - targetHalfHeight) {
         return false;
     }
 

@@ -672,6 +672,13 @@ CobWeb lines. State 103 owns two simultaneous lines and delivers 280 at frame
 throw, drag-down, ground back/540 throw, punch-to-web throw, airborne target
 kick/grab, air 720 throw, and no-Web kick-down paths.
 
+State 99's serialized 100-damage sector is still collision-gated. With the
+native enemy-cylinder center and the shipped first-encounter poses, its
+animated `Bip01` origin is above the grounded target and the contact misses.
+The subsequent state 103 delivers 280, while state 104 delivers 100 and its
+buffered state-105 continuation delivers 80; the corresponding fresh-thug
+remainders are 220 and 320 rather than counting an undelivered state-99 hit.
+
 The same native function treats motions `0x6c`, `0x6d`, and `0x6f` as
 physics-ended attacks: it copies the stored velocity to the character body,
 then consumes the buffered state or normal successor as soon as
@@ -2047,10 +2054,13 @@ The three first-encounter enemies (394, 395, and 397) each serialize exactly
 (difficulty 1, attack upgrade 0), `Player::SendHitMessage` applies a 1.0
 multiplier. The ordinary ground chain authors state totals of 35, 35, 55,
 85, 85, and 80, but `Unit::CheckAttackByPos` tests every registered contact
-separately. Against the grounded type-zero thug capsule, state 78's lower
-40-damage pulse contacts and its high second pulse clears the target
-vertically. The exact delivered ledger is therefore
-`500 -> 465 -> 430 -> 375 -> 290 -> 205 -> 165 -> 130 -> 95 -> 40 -> 18.75 -> 0`.
+separately. `createEnemyPhysics` (`0x003d8980`) stores the enemy cylinder's
+local center as `{0,0,radius}` at shape offset `+0x08`; native
+`Physics::testPieCollision` loads it at `0x003d5462` and transforms it through
+`PhysicsEntity::localToWorld` (`0x003ce64c`). Against the correctly centered
+grounded type-zero thug cylinder, both state-78 40-damage pulses contact. The
+exact delivered ledger is therefore
+`500 -> 465 -> 430 -> 375 -> 290 -> 205 -> 125 -> 90 -> 55 -> 0`.
 A production-input autoplay scenario asserts every shipped starting-health
 value and this collision-complete ledger; the core runtime independently
 asserts every requested and actual delta, including the final health clamp.

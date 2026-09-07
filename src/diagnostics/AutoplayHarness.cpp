@@ -2095,7 +2095,10 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
     case StepKind::JumpAttackWhenReady:
         if (snapshot.gameplayActive && snapshot.controlsEnabled &&
             snapshot.playerJumpAttackTransitionReady) {
-            input.jumpPressed = true;
+            // This command waits for GameplayPlayer's predicate-103
+            // transition, which is the native held-button path. Emitting a
+            // fresh press as well makes Application's phase arbitration pick
+            // Pressed and correctly reject that transition.
             input.jumpHeld = true;
             completeStep(snapshot, step);
         } else if (timedOut()) {

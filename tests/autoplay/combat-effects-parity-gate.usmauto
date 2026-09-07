@@ -23,7 +23,10 @@ assert_player_effect 0 1
 capture punch-impact
 wait 175
 assert_enemy_health_below 394 500
-teleport 13399 -7400 7 0 1 0
+# Stand inside the live knife thug's native neutral-target distance while the
+# closer authored destroyable 803 remains outside it. SearchTargetByAttackRange
+# then retains the enemy for the production travelling-pellet path.
+teleport 13399 -7000 7 0 1 0
 web_on
 capture web-pellet-near
 wait 100

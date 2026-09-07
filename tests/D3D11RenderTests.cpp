@@ -446,12 +446,28 @@ int main() {
         const auto& ultimatePrepareSecondary =
             levelOne.player().animationBank
                 .clips()[ultimatePrepare->animationIds.front()];
+        // Native SwitchToNextLinkAnim returns from the current player tick at
+        // an animation-link boundary. Exercise the two authored prepare links
+        // as separate ticks instead of asking one oversized render-test update
+        // to cross both boundaries.
         ultimateEffectPlayer.update(
             {}, gameplayPose,
-            ultimatePreparePrimary.durationMilliseconds() +
-                ultimatePrepareSecondary.durationMilliseconds());
+            ultimatePreparePrimary.durationMilliseconds());
+        assert(ultimateEffectPlayer.activeStateId() == 107);
+        ultimateEffectPlayer.update(
+            {}, gameplayPose,
+            ultimatePrepareSecondary.durationMilliseconds());
         assert(ultimateEffectPlayer.activeStateId() == 108);
-        assert(ultimateEffectPlayer.hitEffects().size() == 5);
+        // Effects reaching zero in CAnimObjEffect::Update remain renderable
+        // until IsAlive reclaims them at the start of the next manager tick.
+        // The prepare effect (24), four wheel meshes (22), and pulse (23) are
+        // therefore all present at this exact boundary.
+        assert(ultimateEffectPlayer.hitEffects().size() == 6);
+        assert(std::count_if(
+                   ultimateEffectPlayer.hitEffects().begin(),
+                   ultimateEffectPlayer.hitEffects().end(),
+                   [](const auto& effect) { return effect.effectId == 24; }) ==
+               1);
         const auto* ultimateWheelClip =
             levelOne.player().animationBank.findClip(
                 ultimateEffectPlayer.activeAnimation());
@@ -493,7 +509,12 @@ int main() {
         // State 109 replaces the wheel rings with the animated inward web.
         // Verify it independently so a valid ring shader cannot mask a
         // broken effect-animation or bone-follow path.
-        ultimateEffectPlayer.update({}, gameplayPose, 1200);
+        ultimateEffectPlayer.update({}, gameplayPose, 1);
+        ultimateEffectPlayer.update({}, gameplayPose, 166);
+        for (int circle = 0; circle < 5; ++circle) {
+            ultimateEffectPlayer.update({}, gameplayPose, 201);
+        }
+        ultimateEffectPlayer.update({}, gameplayPose, 28);
         assert(ultimateEffectPlayer.activeStateId() == 109);
         ultimateEffectPlayer.update({}, gameplayPose, 100);
         assert(std::any_of(

@@ -348,6 +348,27 @@ int main() {
     (void)damageJumpHarness.update(damageJumpSnapshot);
     assert(damageJumpHarness.complete() && !damageJumpHarness.failed());
 
+    const auto heldJumpTransitionScript =
+        autoplayTestRoot / "held-jump-transition.usmauto";
+    {
+        std::ofstream stream(heldJumpTransitionScript);
+        stream << "capture_interval_ms 0\nmax_time_ms 100\n"
+                  "jump_attack_when_ready 50\nfinish\n";
+    }
+    usm::diagnostics::AutoplayHarness heldJumpTransitionHarness;
+    assert(heldJumpTransitionHarness.initialize(
+        heldJumpTransitionScript,
+        autoplayTestRoot / "held-jump-transition-output"));
+    usm::diagnostics::AutoplaySnapshot heldJumpTransitionSnapshot;
+    heldJumpTransitionSnapshot.gameplayActive = true;
+    heldJumpTransitionSnapshot.controlsEnabled = true;
+    heldJumpTransitionSnapshot.playerJumpAttackTransitionReady = true;
+    const auto heldJumpTransitionInput =
+        heldJumpTransitionHarness.update(heldJumpTransitionSnapshot);
+    assert(heldJumpTransitionInput.jumpHeld);
+    assert(!heldJumpTransitionInput.jumpPressed);
+    assert(!heldJumpTransitionInput.jumpReleased);
+
     const auto wallCombatAutoplayScript = autoplayTestRoot / "wall-combat.usmauto";
     {
         std::ofstream stream(wallCombatAutoplayScript);
@@ -1693,6 +1714,24 @@ int main() {
                    0.0001F);
             assert(material.ambientColor[3] == 1.0F);
         }
+        const auto& rightPunchTextures =
+            bootstrap.playerHitEffects()[0].textures;
+        assert(rightPunchTextures.size() == 1);
+        assert(rightPunchTextures.front().containsAlpha());
+        assert(!rightPunchTextures.front().mipLevels().empty());
+        const auto& rightPunchPixels =
+            rightPunchTextures.front().mipLevels().front().pixels;
+        std::uint8_t rightPunchMinimumAlpha = 0xff;
+        std::uint8_t rightPunchMaximumAlpha = 0;
+        for (std::size_t alpha = 3; alpha < rightPunchPixels.size();
+             alpha += 4) {
+            rightPunchMinimumAlpha =
+                std::min(rightPunchMinimumAlpha, rightPunchPixels[alpha]);
+            rightPunchMaximumAlpha =
+                std::max(rightPunchMaximumAlpha, rightPunchPixels[alpha]);
+        }
+        assert(rightPunchMinimumAlpha < rightPunchMaximumAlpha);
+        assert(rightPunchMaximumAlpha == 0xff);
         assert(bootstrap.playerHitEffectConfigs().find(-1) == nullptr);
         assert(bootstrap.playerHitEffectConfigs().find(31) == nullptr);
         for (std::size_t effectIndex = 0;
@@ -7806,6 +7845,25 @@ int main() {
                 }));
             assert(sectorHitRuntime.find(objectId)->health == 465.0F);
         }
+        usm::game::LevelEnemyRuntime capsuleCenterRuntime;
+        assert(capsuleCenterRuntime.initialize(bootstrap));
+        const auto* capsuleCenterTarget = capsuleCenterRuntime.find(394);
+        assert(capsuleCenterTarget != nullptr);
+        const usm::assets::Vector3 capsuleBoundaryAttack{
+            capsuleCenterTarget->position.x - 100.0F,
+            capsuleCenterTarget->position.y,
+            capsuleCenterTarget->position.z +
+                usm::game::kPlayerCollisionHalfHeightCentimeters +
+                capsuleCenterTarget->collisionRadius + 1.0F};
+        // testPieCollision (0x003d5434/0x003d5462) transforms the capsule's
+        // createEnemyPhysics-authored local {0,0,radius} center. This narrow
+        // overlap misses if the target is incorrectly centered on Unit base.
+        const auto capsuleBoundaryHits =
+            capsuleCenterRuntime.applyPlayerSectorMeleeHits(
+                capsuleBoundaryAttack, {1.0F, 0.0F, 0.0F}, 200.0F, 1.0F,
+                -1.0F, 100, &capsuleBoundaryAttack, 0.0F, 0.0F);
+        assert(capsuleBoundaryHits.size() == 1);
+        assert(capsuleBoundaryHits.front().objectId == 394);
         // Player::SendHitMessage reuses one AIHitTargetInfo and scales its
         // vertical force by 0.85 immediately before each dispatch.
         assert(std::abs(sectorHitRuntime.find(394)->verticalVelocity -
@@ -7860,17 +7918,17 @@ int main() {
         assert(measuredHit->actualDamage == 500.0F);
         // Default difficulty and no damage upgrade: Player::SendHitMessage
         // leaves shipped contact damage unchanged. The collision-complete
-        // autoplay gate proves that state 78's high second pulse misses the
-        // grounded 40 cm enemy capsule. This targeted ledger independently
+        // autoplay gate proves that both state 78 pulses contact the correctly
+        // centered grounded enemy cylinder. This targeted ledger independently
         // proves every resulting health delta and final clamp.
         usm::game::LevelEnemyRuntime healthAuditRuntime;
         assert(healthAuditRuntime.initialize(bootstrap));
-        const std::array<float, 11> openingChainDamage{
-            35.0F, 35.0F, 55.0F, 85.0F,
-            85.0F, 40.0F, 35.0F, 35.0F, 55.0F, 21.25F, 21.25F};
-        const std::array<float, 11> openingChainHealth{
-            465.0F, 430.0F, 375.0F, 290.0F,
-            205.0F, 165.0F, 130.0F, 95.0F, 40.0F, 18.75F, 0.0F};
+        const std::array<float, 9> openingChainDamage{
+            35.0F, 35.0F, 55.0F, 85.0F, 85.0F,
+            80.0F, 35.0F, 35.0F, 55.0F};
+        const std::array<float, 9> openingChainHealth{
+            465.0F, 430.0F, 375.0F, 290.0F, 205.0F,
+            125.0F, 90.0F, 55.0F, 0.0F};
         for (std::size_t hit = 0; hit < openingChainDamage.size(); ++hit) {
             const auto result =
                 healthAuditRuntime.applyPlayerTargetedHitDetailed(
@@ -9020,6 +9078,7 @@ int main() {
                300);
         assert(gameplayPlayer.hitEffects().front().fadeDurationMilliseconds ==
                300);
+        assert(gameplayPlayer.hitEffects().front().subtractAmbientMaterial);
         assert(!gameplayPlayer.hitEffects().front().followsPlayerBone);
         assert(gameplayPlayer.hitEffects().front().elapsedMilliseconds == 1);
         assert(gameplayPlayer.hitEffects().front()
@@ -9199,7 +9258,10 @@ int main() {
         assert(std::any_of(
             gameplayPlayer.hitEffects().begin(),
             gameplayPlayer.hitEffects().end(),
-            [](const auto& effect) { return effect.effectId == 1; }));
+            [](const auto& effect) {
+                return effect.effectId == 1 &&
+                       effect.subtractAmbientMaterial;
+            }));
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.activeStateId() == 75);
         gameplayPlayer.update({}, gameplayCameraPose, 84);
@@ -9213,7 +9275,10 @@ int main() {
         assert(std::any_of(
             gameplayPlayer.hitEffects().begin(),
             gameplayPlayer.hitEffects().end(),
-            [](const auto& effect) { return effect.effectId == 10; }));
+            [](const auto& effect) {
+                return effect.effectId == 10 &&
+                       effect.subtractAmbientMaterial;
+            }));
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.activeStateId() == 79);
         gameplayPlayer.update({}, gameplayCameraPose, 100);
@@ -9239,7 +9304,8 @@ int main() {
         assert(std::count_if(
                    gameplayPlayer.hitEffects().begin(),
                    gameplayPlayer.hitEffects().end(), [](const auto& effect) {
-                       return effect.effectId == 5;
+                       return effect.effectId == 5 &&
+                              effect.subtractAmbientMaterial;
                    }) == 1);
         assert(gameplayPlayer.punchTransitionReadyAfterImpact());
         assert(gameplayPlayer.requestPunch());

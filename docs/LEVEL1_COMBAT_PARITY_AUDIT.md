@@ -21,18 +21,19 @@ The default ground chain is:
 | 79, right kick | 1 | 55 | 55 |
 | 90, fast kick | 4 | 21.25 | 85 |
 | 91, fast kick 2 | 4 | 21.25 | 85 |
-| 78, double kick | 2 authored; 1 contacts a grounded type-0 thug | 40 | 40 delivered |
+| 78, double kick | 2 authored; both contact a grounded type-0 thug | 40 | 80 delivered |
 
-The first complete six-press chain leaves a grounded thug at 165 health. The
-next right punch, left punch, and right kick leave 40; the first two contacts
-of the following fast kick clamp that remainder to zero:
-`500 -> 465 -> 430 -> 375 -> 290 -> 205 -> 165 -> 130 -> 95 -> 40 -> 18.75 -> 0`.
+The first complete six-press chain leaves a grounded thug at 125 health. The
+next right punch, left punch, and right kick remove that remainder:
+`500 -> 465 -> 430 -> 375 -> 290 -> 205 -> 125 -> 90 -> 55 -> 0`.
 This is not a tuned exception. `Player::ResetObject` (`0x0034e258`) loads the
 185 cm player height from image address `0x0056ec94`, and
 `createEnemyPhysics` (`0x003d8980`) gives this enemy a 40 cm half-height.
-`Physics::testPieCollision` (`0x003d5434`) applies those centered vertical
-extents at each animated `Bip01` attack origin. State 78's second origin is
-high enough to miss the grounded capsule.
+`createEnemyPhysics` also stores local center `{0,0,radius}` at shape offset
+`+0x08`; `Physics::testPieCollision` (`0x003d5434`, center load at
+`0x003d5462`) transforms that point through `PhysicsEntity::localToWorld`
+(`0x003ce64c`) before applying the vertical extents at each animated `Bip01`
+attack origin. Both state-78 origins therefore overlap the grounded cylinder.
 The retained autoplay scenario
 `first-encounter-health-damage-audit.usmauto` enters the authored encounter,
 uses production input/targeting/hit dispatch, asserts all three starting
@@ -65,8 +66,8 @@ damage fields are not assumed to be delivered hits:
 | Punch, jump-release launcher, then ground drag-down (`74 -> 97`, then `63`) | 35 + 60 + 70 | 335 |
 | Punch, jump-release launcher, then airborne target kick (`74 -> 97`, then `86`) | 35 + 60 + 50 | 355 |
 | Punch, jump-release launcher, then air web grab (`74 -> 97`, then `101 -> 102`) | 35 + 60 + 0 + 0 | 405 |
-| Air knockdown into 720 web throw (`99 -> 100 -> 103`) | 100 + 280 | 120 |
-| Air knockdown into kick-down/heavy kick (`99 -> 100 -> 104 -> 105`) | 100 + 100 + 80 | 220 |
+| Air knockdown into 720 web throw (`99 -> 100 -> 103`) | state 99 misses grounded cylinder; 280 | 220 |
+| Air knockdown into kick-down/heavy kick (`99 -> 100 -> 104 -> 105`) | state 99 misses grounded cylinder; 100 + 80 | 320 |
 
 `Player::IsInWebBinding` (`0x00340f60`) and `UpdateAttackParam`
 (`0x00340fa0`) prove that binding motions do not use the generic hit-frame
@@ -82,7 +83,10 @@ State 64 is reached by native virtual movement event 0, produced by a fresh
 WASD/left-stick direction while state 60 is active. State 63 is selected only
 when the retained target is more than 160 cm above the player. States 101 and
 102 retain and render their target web line but intentionally deal zero
-damage. These are separate authored outcomes, not missing generic hit events.
+damage. State 99 serializes a 100-damage sector, but its animated `Bip01`
+origin remains above the first-encounter grounded cylinder and therefore does
+not deliver that damage; the later state-103 or state-104 contact does. These
+are separate authored outcomes, not missing generic hit events.
 
 ## Enemy offense and player hurt reactions
 
@@ -171,6 +175,13 @@ makes a premature counter available.
   complete auxiliary effect set once. The portable catch-up path now follows
   that distinction, so a slow frame cannot stack several delayed fast-kick
   trails into the same rendered frame.
+- Both ordinary-trail call sites load `r3 = 1` immediately before
+  `Player::AddHitEffect` (`0x00348fae`/`0x00348fec`, calls at
+  `0x00348fb2`/`0x00348ff0`). The `0x00348f00` wrapper preserves that value,
+  `Player::AddHitEffect` at `0x00348dc4` forwards it as the final
+  `EffectManager::ThrowAnimEffect` argument, and `CAnimObjEffect::Init`
+  (`0x00390bb8`) consequently assigns material type `0x1d`. Ordinary
+  punch/kick trails therefore use the subtract-ambient renderer, not `0x1e`.
 - `CAnimObjEffect::Init` (`0x00390bb8`) gives snapshot trails the player's
   orientation plus the authored bone position; it does not retain the bone's
   rotation. Live attachments retain the complete bone transform.
@@ -343,6 +354,18 @@ behavior-slot-8 block state, so adding a block response would be invention.
   Native material renderers `0x00397028` and `0x00397360` both install
   `GL_COMBINE_ALPHA = GL_SUBTRACT` with texture alpha as source zero and the
   material constant as source one, then use source-alpha blending.
+  A complete `glTexEnvi` caller inventory and whole-program instruction scan
+  found no write to `GL_OPERAND0_ALPHA` (`0x8598`) or
+  `GL_OPERAND1_ALPHA` (`0x8599`), so the default `GL_SRC_ALPHA` operands
+  apply. The right-punch BDAE stores ambient bytes `95 95 95 FF`; native
+  `ISceneNode::setMaterialAmbientColor` (`0x0040879c`) and the renderer's byte
+  reads confirm a constant alpha of one. This makes the literal native alpha
+  equation clamp to zero and remains a real unresolved contradiction, not
+  permission to substitute an appearance-derived blend.
+  A complete hit-effect animation census also rules out an animated ambient
+  constant: effects 0--23 and 26--28 have no animation tracks; effects
+  24/25/29/30 contain only node rotation, node scale, and morph-weight tracks,
+  with no material-color target.
   `CAnimObjEffect::Update` (`0x00390a88`) separately animates the material's
   diffuse alpha. The portable shader currently multiplies coverage by that
   animated alpha; resolve how the original fixed-function vertex/material

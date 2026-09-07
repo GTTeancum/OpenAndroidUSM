@@ -11,7 +11,10 @@ wait_gameplay 60000
 teleport 14172 -7978 7 -0.416 -0.909 0
 move_until_cinematic 14067 -8205 7 71 10000
 wait_enemies_active 5000 394 395 397
-teleport 13399 -7400 7 0 1 0
+# At y=-7400 the native neutral-nearest query correctly selects authored
+# destroyable 803. This position makes encounter enemy 394 the nearest valid
+# target while retaining a visible pellet flight.
+teleport 13399 -7000 7 0 1 0
 web_on
 capture web-pellet-flight-near
 wait 100
