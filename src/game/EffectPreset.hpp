@@ -1,14 +1,14 @@
 #pragma once
 
-#include "assets/IrrScene.hpp"
-#include "core/Result.hpp"
-
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "assets/IrrScene.hpp"
+#include "core/Result.hpp"
 
 namespace usm::game {
 
@@ -26,6 +26,29 @@ struct EffectSizeAffector {
     std::int32_t endPercent{100};
 };
 
+struct EffectAttractionAffector {
+    assets::Vector3 point;
+    float speed{};
+    bool attract{true};
+    bool affectX{true};
+    bool affectY{true};
+    bool affectZ{true};
+};
+
+enum class EffectAffectorKind : std::uint8_t {
+    FadeOut,
+    Gravity,
+    Rotate,
+    Spin,
+    Attract,
+    Size,
+};
+
+struct EffectAffectorReference {
+    EffectAffectorKind kind{};
+    std::size_t index{};
+};
+
 struct EffectEmitterPreset {
     std::string name;
     assets::Vector3 position;
@@ -37,6 +60,8 @@ struct EffectEmitterPreset {
     assets::Vector3 rotationSpeedDegreesPerSecond;
     std::int32_t systemMinimumLifetimeMilliseconds{};
     std::int32_t systemMaximumLifetimeMilliseconds{};
+    std::int32_t restartMinimumMilliseconds{-1};
+    std::int32_t restartMaximumMilliseconds{-1};
     std::int32_t startDelayMilliseconds{};
     std::int32_t minimumParticlesPerSecond{};
     std::int32_t maximumParticlesPerSecond{};
@@ -48,6 +73,9 @@ struct EffectEmitterPreset {
     std::int32_t minimumParticleLifetimeMilliseconds{};
     std::int32_t maximumParticleLifetimeMilliseconds{};
     std::int32_t speedVariationPercent{};
+    std::int32_t maximumAngleDegreesXY{};
+    std::int32_t maximumAngleDegreesYZ{};
+    std::int32_t maximumAngleDegreesXZ{};
     std::int32_t initialRotationMinimumDegrees{};
     std::int32_t initialRotationMaximumDegrees{};
     std::int32_t gravityStartPercent{};
@@ -61,8 +89,13 @@ struct EffectEmitterPreset {
     bool hasRotation{};
     bool hasSpin{};
     bool additive{};
+    bool globalParticles{};
+    bool directionalRotation{};
+    bool projectDirection{};
     std::vector<EffectColorAffector> colorAffectors;
+    std::vector<EffectAttractionAffector> attractionAffectors;
     std::vector<EffectSizeAffector> sizeAffectors;
+    std::vector<EffectAffectorReference> affectorOrder;
 };
 
 struct EffectPreset {
@@ -85,4 +118,4 @@ private:
     std::vector<EffectPreset> presets_;
 };
 
-} // namespace usm::game
+}  // namespace usm::game

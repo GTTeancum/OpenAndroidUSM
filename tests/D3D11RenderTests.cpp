@@ -771,7 +771,10 @@ int main() {
                            "gameplay-environment-baseline.bmp");
         // Let both persistent emitters reach visible color/size stages so this
         // readback covers the authored fire/smoke billboard dimensions.
-        environmentEffects.update(1000);
+        environmentEffects.update(0);
+        for (std::size_t step = 0; step < 8; ++step) {
+            environmentEffects.update(125);
+        }
         assert(!environmentEffects.particles().empty());
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
                                                    environmentEffects,
@@ -823,8 +826,10 @@ int main() {
         gameRenderer.renderFrame();
         RgbaImage bonusBaseline;
         assert(gameRenderer.readBackImage(bonusBaseline));
-        bonusEffects.update(100);
-        bonusEffects.update(100);
+        bonusEffects.update(0);
+        for (std::size_t step = 0; step < 8; ++step) {
+            bonusEffects.update(125);
+        }
         assert(!bonusEffects.particles().empty());
         assert(gameRenderer.updateLevelOneEffects(
             levelOne.effects(), bonusEffects, renderBonusRuntime));
@@ -853,7 +858,8 @@ int main() {
             100);
         assert(renderBonusRuntime.orbs().size() == 1);
         assert(bonusEffects.setPersistentEffectVisible(bonus.objectId, false));
-        bonusEffects.update(300);
+        bonusEffects.update(150);
+        bonusEffects.update(150);
         assert(gameRenderer.updateLevelOneEffects(
             levelOne.effects(), bonusEffects, renderBonusRuntime));
         gameRenderer.renderFrame();
@@ -914,7 +920,8 @@ int main() {
                     gameplayFrame.pixels[component + 2];
         }
         assert(effectChangedPixels > 2);
-        effects.update(300);
+        effects.update(150);
+        effects.update(150);
         assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),
                                                    effects, bonusRuntime));
         const auto renderAuthoredEffect =
@@ -924,6 +931,7 @@ int main() {
                 assert(effects.initialize(levelOne.effects().presets));
                 playEffect.attributes.front().value = effectType;
                 assert(effects.applyCinematicCommand(playEffect));
+                effects.update(0);
                 effects.update(elapsedMilliseconds);
                 assert(!effects.particles().empty());
                 assert(gameRenderer.updateLevelOneEffects(levelOne.effects(),

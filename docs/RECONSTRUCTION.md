@@ -1895,11 +1895,26 @@ decay, and explicit shake cancellation.
 `EffectManager::LoadEffectPresets` at `0x003925c4` from the original
 `effects.xml`, `effects.bsprite`, and shared `effects.tga` atlas. The portable
 runtime handles `CCinematicThread::PlayEffect` at `0x003712f8`, preserves each
-authored emitter's delay, lifetime, box, direction, size/color variation,
-gravity, fade, size curve, spin, pivot rotation, sprite frame, and material
-type, and exposes only renderer-neutral billboard state. The deterministic
-generator keeps test and capture results stable without importing Irrlicht
-particle objects.
+authored emitter's delay, lifetime/restart ranges, box, direction and three
+angle ranges, size/color/speed variation, gravity, fade, size curve, spin,
+attraction, pivot rotation, sprite frame, and material type, and exposes only
+renderer-neutral billboard state.
+
+`CFpsParticleBoxEmitter::deserializeAttributes`/`emitt`
+(`0x0039c678`/`0x0039ccd8`) establish the native rate clamps, half-extent
+box, strict emission interval, rounded batch cap, and per-particle random-call
+order. Effects use the recovered `irr::os::Randomizer::rand` recurrence rather
+than the former subsystem xorshift. `CFpsParticleSystemSceneNode::clone`,
+`Restart`, `SetRandomLifeTime`, and `doParticleSystem` (`0x003a0c78`,
+`0x0039fb4c`, `0x0039fae4`, `0x0039f34c`) supply the two lifetime
+selections for thrown effects, negative-delay pre-roll, first-frame behavior,
+150 ms delta rejection, finite/restarting emitter lifecycle, and strict
+particle expiry. Core regressions pin the hit splash's exact initial
+particle count and final randomizer state. The effect runtime can accept the
+application-owned generator, but live integration remains deferred until the
+native active-room emitter construction order is recovered; passing it while
+all portable persistent emitters are active would consume the shared combat
+stream in the wrong order.
 
 The affector math follows the preserved implementations rather than treating
 the XML values as generic forces. `CFpsParticleGravityAffector::affect` at
@@ -1909,13 +1924,21 @@ over the configured lifetime interval. `CFpsParticleSpinAffector::affect` at
 `CFpsParticleRotationAffector::affect` at `0x0039df08` rotates particle
 positions about its pivot using degrees per second. Emitters without a gravity
 affector retain their velocity instead of being damped toward zero.
+`CFpsParticleAttractionAffector::deserializeAttributes`/`affect`
+(`0x0039bc7c`/`0x0039bda0`) apply the authored point, speed,
+attract/repel flag, and per-axis mask. The point is translated by the thrown
+effect root in `EffectManager::InitEffect` (`0x00391d90`), then each tick
+moves particles by normalized point displacement times elapsed seconds and
+speed. This restores the 800-unit inward motion in both red and black
+super-web splashes. Affectors execute in serialized XML order; they are not
+regrouped or sorted by kind or lifetime percentage.
 
 The room loader also instantiates all 23 authored `CEffect` nodes across level
 one. Their `SysMinLifeTime = SysMaxLifeTime = -1` emitters run continuously at
 the preset particle rate, retain one-based room ownership for frustum/room
 visibility, and cover the five persistent fire/smoke presets used by the
 scene. Presets may contain several `FadeOut` color affectors. These are kept as
-separate time intervals and evaluated in chronological order, matching
+separate time intervals and evaluated in serialized order, matching
 `CFpsParticleFadeOutAffector::affect` at `0x0039d2a8`; this preserves authored
 transparent-to-opaque fade-in, color hold, and fade-out stages instead of
 collapsing them into a permanently transparent final stage.
@@ -1942,11 +1965,13 @@ targets without multiplying them by `Scale`. In particular, `big_firesomke`
 now follows its native 100-to-230-unit smoke curve instead of producing the
 incorrect 500-to-1150-unit red sheets. Core tests pin the decoded dimensions,
 and a mature WARP fire/smoke readback bounds the effect's screen coverage.
-Size affectors are also retained as an ordered list rather than collapsed into
-one emitter-wide target. `CFpsParticleSizeAffector::affect` at `0x0039e41c`
+Size affectors are also retained as an authored-order list rather than
+collapsed into one emitter-wide target.
+`CFpsParticleSizeAffector::affect` at `0x0039e41c`
 captures the size at each interval boundary and selects that affector's target
 variation once. This restores the authored 0–10% and 10–100% stages used by
-`bigfire_xp` and `fire_on_wall` smoke.
+`bigfire_xp` and `fire_on_wall` smoke, including `bigfire_xp`'s deliberate
+serialization of the 10–100% growth stage before its 0–10% initializer.
 
 ## Room visibility and terminal cinematics
 

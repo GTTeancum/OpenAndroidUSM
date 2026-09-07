@@ -5160,6 +5160,73 @@ int main() {
                nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash") !=
                nullptr);
+        const auto* blackWebSplashPreset =
+            bootstrap.effects().presets.find("super_web_splash_black");
+        assert(blackWebSplashPreset != nullptr);
+        assert(blackWebSplashPreset->emitters.size() == 1);
+        const auto& blackWebSmoke = blackWebSplashPreset->emitters.front();
+        assert(blackWebSmoke.attractionAffectors.size() == 1);
+        assert(blackWebSmoke.attractionAffectors.front().point.x == 0.0F);
+        assert(blackWebSmoke.attractionAffectors.front().point.y == 0.0F);
+        assert(blackWebSmoke.attractionAffectors.front().point.z == 0.0F);
+        assert(blackWebSmoke.attractionAffectors.front().speed == 800.0F);
+        assert(blackWebSmoke.attractionAffectors.front().attract);
+        assert(blackWebSmoke.attractionAffectors.front().affectX);
+        assert(blackWebSmoke.attractionAffectors.front().affectY);
+        assert(blackWebSmoke.attractionAffectors.front().affectZ);
+        assert(blackWebSmoke.affectorOrder.size() == 4);
+        assert(blackWebSmoke.affectorOrder[0].kind ==
+               usm::game::EffectAffectorKind::FadeOut);
+        assert(blackWebSmoke.affectorOrder[1].kind ==
+               usm::game::EffectAffectorKind::Spin);
+        assert(blackWebSmoke.affectorOrder[2].kind ==
+               usm::game::EffectAffectorKind::Attract);
+        assert(blackWebSmoke.affectorOrder[3].kind ==
+               usm::game::EffectAffectorKind::Size);
+        constexpr std::string_view attractionFixture =
+            "<effect name=\"attraction_test\"><ps><attributes>"
+            "<string name=\"Name\" value=\"pull\"/>"
+            "<vector3d name=\"Position\" value=\"0,0,0\"/>"
+            "<vector3d name=\"Scale\" value=\"1,1,1\"/>"
+            "<int name=\"SysMinLifeTime\" value=\"0\"/>"
+            "<int name=\"SysMaxLifeTime\" value=\"0\"/>"
+            "<int name=\"StartDelay\" value=\"-1001\"/>"
+            "<vector3d name=\"Box\" value=\"10,0,0\"/>"
+            "<vector3d name=\"Direction\" value=\"0,0,0\"/>"
+            "<int name=\"MinParticlesPerSecond\" value=\"1\"/>"
+            "<int name=\"MaxParticlesPerSecond\" value=\"1\"/>"
+            "<float name=\"ParticleWidth\" value=\"10\"/>"
+            "<float name=\"ParticleHeight\" value=\"10\"/>"
+            "<color name=\"MinStartColor\" value=\"ffffffff\"/>"
+            "<color name=\"MaxStartColor\" value=\"ffffffff\"/>"
+            "<int name=\"MinLifeTime\" value=\"1000\"/>"
+            "<int name=\"MaxLifeTime\" value=\"1000\"/>"
+            "<enum name=\"Affector\" value=\"Attract\"/>"
+            "<vector3d name=\"Point\" value=\"0,0,0\"/>"
+            "<float name=\"Speed\" value=\"100\"/>"
+            "<bool name=\"Attract\" value=\"true\"/>"
+            "<bool name=\"AffectX\" value=\"true\"/>"
+            "<bool name=\"AffectY\" value=\"true\"/>"
+            "<bool name=\"AffectZ\" value=\"true\"/>"
+            "<int name=\"FrameID\" value=\"0\"/>"
+            "</attributes></ps></effect>";
+        usm::game::EffectPresetDatabase attractionPresets;
+        assert(attractionPresets.load(std::span<const std::byte>(
+            reinterpret_cast<const std::byte*>(attractionFixture.data()),
+            attractionFixture.size())));
+        usm::game::LevelEffectRuntime attractionRuntime;
+        assert(attractionRuntime.initialize(attractionPresets));
+        assert(attractionRuntime.playEffect("attraction_test", {}));
+        attractionRuntime.update(0);
+        assert(attractionRuntime.particles().size() == 1);
+        const float attractionStartX =
+            attractionRuntime.particles().front().position.x;
+        assert(attractionStartX > 0.0F);
+        attractionRuntime.update(100);
+        assert(std::abs(
+                   attractionRuntime.particles().front().position.x -
+                   attractionStartX + 10.0F) <
+               0.001F);
         assert(bootstrap.effects().presets.find("bonus_green") != nullptr);
         assert(bootstrap.effects().presets.find("bonus_red") != nullptr);
         const auto* ambientFirePreset =
@@ -5182,10 +5249,19 @@ int main() {
         assert(ambientSmoke->scale.x == 5.0F);
         assert(ambientSmoke->scale.y == 5.0F);
         assert(ambientSmoke->sizeVariationPercent == 0);
+        assert(ambientSmoke->globalParticles);
+        assert(ambientSmoke->directionalRotation);
+        assert(ambientSmoke->projectDirection);
+        assert(ambientSmoke->restartMinimumMilliseconds == -1);
+        assert(ambientSmoke->restartMaximumMilliseconds == -1);
+        assert(ambientSmoke->maximumAngleDegreesXY == 0);
+        assert(ambientSmoke->maximumAngleDegreesYZ == 0);
+        assert(ambientSmoke->maximumAngleDegreesXZ == 20);
         usm::game::LevelEffectRuntime ambientScaleRuntime;
         assert(ambientScaleRuntime.initialize(bootstrap.effects().presets));
         assert(ambientScaleRuntime.playEffect("big_firesomke", {}, 1));
-        ambientScaleRuntime.update(1);
+        ambientScaleRuntime.update(0);
+        ambientScaleRuntime.update(150);
         const auto ambientSmokeParticle = std::find_if(
             ambientScaleRuntime.particles().begin(),
             ambientScaleRuntime.particles().end(),
@@ -5201,18 +5277,22 @@ int main() {
         const auto* bigFireSmoke = findEmitter(*bigFirePreset, "smoke");
         assert(bigFireSmoke != nullptr);
         assert(bigFireSmoke->sizeAffectors.size() == 2);
-        assert(bigFireSmoke->sizeAffectors[0].targetWidth == 50.0F);
-        assert(bigFireSmoke->sizeAffectors[0].variationPercent == 0);
-        assert(bigFireSmoke->sizeAffectors[0].startPercent == 0);
-        assert(bigFireSmoke->sizeAffectors[0].endPercent == 10);
-        assert(bigFireSmoke->sizeAffectors[1].targetWidth == 200.0F);
-        assert(bigFireSmoke->sizeAffectors[1].variationPercent == 50);
-        assert(bigFireSmoke->sizeAffectors[1].startPercent == 10);
-        assert(bigFireSmoke->sizeAffectors[1].endPercent == 100);
+        // The scene serializes the long growth stage before its 0-10%
+        // initializer. Native addAffector preserves that order; it does not
+        // sort stages by percentage.
+        assert(bigFireSmoke->sizeAffectors[0].targetWidth == 200.0F);
+        assert(bigFireSmoke->sizeAffectors[0].variationPercent == 50);
+        assert(bigFireSmoke->sizeAffectors[0].startPercent == 10);
+        assert(bigFireSmoke->sizeAffectors[0].endPercent == 100);
+        assert(bigFireSmoke->sizeAffectors[1].targetWidth == 50.0F);
+        assert(bigFireSmoke->sizeAffectors[1].variationPercent == 0);
+        assert(bigFireSmoke->sizeAffectors[1].startPercent == 0);
+        assert(bigFireSmoke->sizeAffectors[1].endPercent == 10);
         usm::game::LevelEffectRuntime stagedSizeRuntime;
         assert(stagedSizeRuntime.initialize(bootstrap.effects().presets));
         assert(stagedSizeRuntime.playEffect("bigfire_xp", {}, 1));
-        stagedSizeRuntime.update(1);
+        stagedSizeRuntime.update(0);
+        stagedSizeRuntime.update(150);
         const auto stagedSmokeWidth = [&stagedSizeRuntime]() {
             const auto particle = std::find_if(
                 stagedSizeRuntime.particles().begin(),
@@ -5223,15 +5303,19 @@ int main() {
         };
         stagedSizeRuntime.update(149);
         assert(std::abs(stagedSmokeWidth() - 50.0F) < 0.01F);
-        stagedSizeRuntime.update(450);
+        for (std::size_t step = 0; step < 3; ++step) {
+            stagedSizeRuntime.update(150);
+        }
         assert(stagedSmokeWidth() > 60.0F);
         assert(stagedSmokeWidth() < 140.0F);
         assert(bootstrap.effects().atlas.modules().size() == 16);
         assert(bootstrap.effects().atlas.frames().size() == 16);
         assert(bootstrap.effects().texture.image().width == 256);
         assert(bootstrap.effects().texture.image().height == 256);
+        usm::game::NativeRandomizer effectRandomizer;
         usm::game::LevelEffectRuntime effectRuntime;
-        assert(effectRuntime.initialize(bootstrap.effects().presets));
+        assert(effectRuntime.initialize(bootstrap.effects().presets,
+                                        &effectRandomizer));
         usm::game::LevelBonusRuntime bonusRuntime;
         assert(bonusRuntime.initialize(bootstrap.bonuses()));
         assert(bonusRuntime.visibleBonusCount() == 56);
@@ -5286,7 +5370,10 @@ int main() {
             bootstrap.environmentEffects().front().objectId, false));
         const auto environmentEffectCheckPoint =
             environmentEffectRuntime.saveCheckPointState();
-        environmentEffectRuntime.update(1000);
+        environmentEffectRuntime.update(0);
+        for (std::size_t step = 0; step < 8; ++step) {
+            environmentEffectRuntime.update(125);
+        }
         assert(!environmentEffectRuntime.particles().empty());
         assert(std::any_of(
             environmentEffectRuntime.particles().begin(),
@@ -5324,23 +5411,33 @@ int main() {
         // A zero-delay native emitter is renderable on the same frame it is
         // thrown; a zero-time flush must instantiate it without aging it.
         effectRuntime.update(0);
-        assert(effectRuntime.particles().size() == 2);
+        assert(effectRuntime.particles().size() == 10);
+        // Exact call-order regression for CFpsParticleBoxEmitter::emitt
+        // (0x0039ccd8): one random rate plus seven samples for each of the
+        // two `main` particles, then one random rate plus eight samples for
+        // each of the eight `main2` particles.
+        assert(effectRandomizer.state() == 66400094);
         assert(effectRuntime.particles().front().frameId == 2);
         assert(effectRuntime.particles().front().width > 0.0F);
-        std::vector<float> hitStartHeights;
+        std::vector<usm::assets::Vector3> hitStartPositions;
         for (const auto& particle : effectRuntime.particles()) {
-            hitStartHeights.push_back(particle.position.z);
+            hitStartPositions.push_back(particle.position);
         }
         effectRuntime.update(50);
-        assert(effectRuntime.particles().size() == hitStartHeights.size());
+        assert(effectRuntime.particles().size() == hitStartPositions.size());
         bool hitParticleMoved = false;
-        for (std::size_t index = 0; index < hitStartHeights.size(); ++index) {
-            hitParticleMoved |= effectRuntime.particles()[index].position.z -
-                                    hitStartHeights[index] >
-                                95.0F;
+        for (std::size_t index = 0; index < hitStartPositions.size(); ++index) {
+            const auto& current = effectRuntime.particles()[index].position;
+            const auto& start = hitStartPositions[index];
+            const float dx = current.x - start.x;
+            const float dy = current.y - start.y;
+            const float dz = current.z - start.z;
+            hitParticleMoved |=
+                std::sqrt(dx * dx + dy * dy + dz * dz) > 95.0F;
         }
         assert(hitParticleMoved);
-        effectRuntime.update(250);
+        effectRuntime.update(125);
+        effectRuntime.update(125);
         assert(effectRuntime.particles().empty());
         assert(effectRuntime.initialize(bootstrap.effects().presets));
         usm::game::CinematicCommand playExplosion;
@@ -5350,7 +5447,8 @@ int main() {
             {"vector3d", "abspos", "10.0, 20.0, 30.0"},
         };
         assert(effectRuntime.applyCinematicCommand(playExplosion));
-        effectRuntime.update(1);
+        effectRuntime.update(0);
+        effectRuntime.update(101);
         const auto firstParticleWithFrame =
             [&](std::int32_t frameId) -> const usm::game::EffectParticleState* {
             const auto match = std::find_if(
@@ -5380,7 +5478,8 @@ int main() {
         assert(effectRuntime.initialize(bootstrap.effects().presets));
         assert(effectRuntime.playEffect("explode_new", {1.0F, 2.0F, 3.0F},
                                         8));
-        effectRuntime.update(1);
+        effectRuntime.update(0);
+        effectRuntime.update(101);
         assert(!effectRuntime.particles().empty());
         assert(std::all_of(
             effectRuntime.particles().begin(), effectRuntime.particles().end(),

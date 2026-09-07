@@ -1,13 +1,14 @@
 #pragma once
 
-#include "core/Result.hpp"
-#include "game/CinematicScript.hpp"
-#include "game/EffectPreset.hpp"
-
 #include <cstdint>
 #include <span>
 #include <string_view>
 #include <vector>
+
+#include "core/Result.hpp"
+#include "game/CinematicScript.hpp"
+#include "game/EffectPreset.hpp"
+#include "game/NativeRandomizer.hpp"
 
 namespace usm::game {
 
@@ -24,8 +25,16 @@ struct EffectParticleState {
 
 struct PersistentEffectCheckPointState {
     std::int32_t sourceObjectId{-1};
-    std::int32_t delayMilliseconds{};
-    float emissionRemainder{};
+    std::uint32_t emissionAccumulatorMilliseconds{};
+    std::uint32_t activeElapsedMilliseconds{};
+    std::uint32_t restartElapsedMilliseconds{};
+    std::uint32_t startDelayElapsedMilliseconds{};
+    std::int32_t selectedSystemLifetimeMilliseconds{-1};
+    std::int32_t selectedRestartMilliseconds{-1};
+    bool firstUpdate{true};
+    bool emissionComplete{};
+    bool rotationAffectorInitialized{};
+    bool attractionAffectorInitialized{};
     bool visible{true};
 };
 
@@ -34,7 +43,6 @@ struct PersistentEffectCheckPointState {
 // portable renderer state, so their mutable values are captured explicitly.
 struct LevelEffectCheckPointState {
     std::vector<PersistentEffectCheckPointState> persistentEffects;
-    std::uint32_t randomState{};
 };
 
 // Portable one-shot effect state created by CCinematicThread::PlayEffect
@@ -46,46 +54,61 @@ public:
     LevelEffectRuntime(const LevelEffectRuntime&) = delete;
     LevelEffectRuntime& operator=(const LevelEffectRuntime&) = delete;
 
-    [[nodiscard]] Result initialize(const EffectPresetDatabase& presets);
-    [[nodiscard]] Result applyCinematicCommand(
-        const CinematicCommand& command);
+    [[nodiscard]] Result initialize(
+        const EffectPresetDatabase& presets,
+        NativeRandomizer* nativeRandomizer = nullptr);
+    [[nodiscard]] Result applyCinematicCommand(const CinematicCommand& command);
     [[nodiscard]] Result playEffect(std::string_view effectType,
                                     const assets::Vector3& origin,
                                     std::int32_t roomId = -1);
-    [[nodiscard]] Result addPersistentEffect(
-        std::string_view effectType, const assets::Vector3& origin,
-        std::int32_t roomId, bool visible = true,
-        std::int32_t sourceObjectId = -1);
-    [[nodiscard]] Result setPersistentEffectVisible(
-        std::int32_t sourceObjectId, bool visible) noexcept;
+    [[nodiscard]] Result addPersistentEffect(std::string_view effectType,
+                                             const assets::Vector3& origin,
+                                             std::int32_t roomId,
+                                             bool visible = true,
+                                             std::int32_t sourceObjectId = -1);
+    [[nodiscard]] Result setPersistentEffectVisible(std::int32_t sourceObjectId,
+                                                    bool visible) noexcept;
     [[nodiscard]] LevelEffectCheckPointState saveCheckPointState() const;
     [[nodiscard]] Result loadCheckPointState(
         const LevelEffectCheckPointState& state);
     void update(std::uint32_t elapsedMilliseconds) noexcept;
 
-    [[nodiscard]] std::span<const EffectParticleState> particles() const
-        noexcept {
+    [[nodiscard]] std::span<const EffectParticleState> particles()
+        const noexcept {
         return renderParticles_;
     }
 
 private:
+    struct EmitterRuntimeState;
     struct PendingEmitter;
     struct PersistentEmitter;
     struct Particle;
 
-    void spawnEmitter(const PendingEmitter& emitter) noexcept;
-    void spawnParticle(const EffectEmitterPreset& preset,
-                       const assets::Vector3& origin,
-                       std::int32_t roomId) noexcept;
-    [[nodiscard]] float randomUnit() noexcept;
-    [[nodiscard]] float randomRange(float minimum, float maximum) noexcept;
+    void initializeEmitter(EmitterRuntimeState& emitter,
+                           const EffectEmitterPreset& preset,
+                           const assets::Vector3& origin, std::int32_t roomId,
+                           bool restartAfterClone) noexcept;
+    void selectRandomLifetimes(EmitterRuntimeState& emitter) noexcept;
+    void restartEmitter(EmitterRuntimeState& emitter) noexcept;
+    void updateEmitter(EmitterRuntimeState& emitter,
+                       std::uint32_t elapsedMilliseconds) noexcept;
+    void updateEmitterParticles(EmitterRuntimeState& emitter,
+                                std::uint32_t elapsedMilliseconds) noexcept;
+    void spawnParticle(EmitterRuntimeState& emitter) noexcept;
+    void eraseEmitterParticles(std::uint64_t emitterId) noexcept;
+    [[nodiscard]] std::int32_t signedModulo(std::int32_t divisor) noexcept;
+    [[nodiscard]] bool emitterHasParticles(
+        std::uint64_t emitterId) const noexcept;
+    void rebuildRenderParticles() noexcept;
 
     const EffectPresetDatabase* presets_{};
     std::vector<PendingEmitter> pendingEmitters_;
     std::vector<PersistentEmitter> persistentEmitters_;
     std::vector<Particle> particles_;
     std::vector<EffectParticleState> renderParticles_;
-    std::uint32_t randomState_{0x6d2b79f5U};
+    NativeRandomizer ownedNativeRandomizer_;
+    NativeRandomizer* nativeRandomizer_{&ownedNativeRandomizer_};
+    std::uint64_t nextEmitterId_{1};
 };
 
-} // namespace usm::game
+}  // namespace usm::game

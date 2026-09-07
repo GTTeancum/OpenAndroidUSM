@@ -39,6 +39,12 @@ float floatValue(pugi::xml_node attributes, std::string_view name,
     return value ? value.attribute("value").as_float(fallback) : fallback;
 }
 
+bool booleanValue(pugi::xml_node attributes, std::string_view name,
+                  bool fallback = false) noexcept {
+    const pugi::xml_node value = namedAttribute(attributes, name);
+    return value ? value.attribute("value").as_bool(fallback) : fallback;
+}
+
 assets::Vector3 vectorValue(pugi::xml_node attributes, std::string_view name,
                             assets::Vector3 fallback = {}) noexcept {
     const pugi::xml_node value = namedAttribute(attributes, name);
@@ -67,14 +73,14 @@ std::uint32_t colorValue(pugi::xml_node value,
     }
     const std::string_view text = value.attribute("value").as_string();
     std::uint32_t parsed{};
-    const auto result = std::from_chars(text.data(), text.data() + text.size(),
-                                        parsed, 16);
+    const auto result =
+        std::from_chars(text.data(), text.data() + text.size(), parsed, 16);
     return result.ec == std::errc{} && result.ptr == text.data() + text.size()
                ? parsed
                : fallback;
 }
 
-} // namespace
+}  // namespace
 
 Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
     presets_.clear();
@@ -82,9 +88,8 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
         return Result::failure("Effect preset XML is empty");
     }
     pugi::xml_document document;
-    const pugi::xml_parse_result parsed =
-        document.load_buffer(bytes.data(), bytes.size(), pugi::parse_default,
-                             pugi::encoding_auto);
+    const pugi::xml_parse_result parsed = document.load_buffer(
+        bytes.data(), bytes.size(), pugi::parse_default, pugi::encoding_auto);
     if (!parsed) {
         return Result::failure(std::string("Could not parse effect presets: ") +
                                parsed.description());
@@ -106,22 +111,48 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
             EffectEmitterPreset emitter;
             emitter.name = stringValue(attributes, "Name");
             emitter.position = vectorValue(attributes, "Position");
-            emitter.scale = vectorValue(attributes, "Scale", {1.0F, 1.0F,
-                                                                 1.0F});
+            emitter.scale =
+                vectorValue(attributes, "Scale", {1.0F, 1.0F, 1.0F});
             emitter.box = vectorValue(attributes, "Box");
             emitter.direction = vectorValue(attributes, "Direction");
+            emitter.globalParticles =
+                booleanValue(attributes, "GlobalParticles");
+            emitter.directionalRotation =
+                booleanValue(attributes, "DirectionalRotation");
+            emitter.projectDirection =
+                booleanValue(attributes, "ProjectDirection");
             emitter.systemMinimumLifetimeMilliseconds =
-                integerValue(attributes, "SysMinLifeTime");
+                integerValue(attributes, "SysMinLifeTime", -1);
             emitter.systemMaximumLifetimeMilliseconds =
-                integerValue(attributes, "SysMaxLifeTime");
+                integerValue(attributes, "SysMaxLifeTime", -1);
+            emitter.restartMinimumMilliseconds =
+                integerValue(attributes, "RestartTimeMin", -1);
+            emitter.restartMaximumMilliseconds =
+                integerValue(attributes, "RestartTimeMax", -1);
             emitter.startDelayMilliseconds =
                 integerValue(attributes, "StartDelay");
             emitter.minimumParticlesPerSecond =
                 integerValue(attributes, "MinParticlesPerSecond");
             emitter.maximumParticlesPerSecond =
                 integerValue(attributes, "MaxParticlesPerSecond");
-            emitter.particleWidth = floatValue(attributes, "ParticleWidth");
-            emitter.particleHeight = floatValue(attributes, "ParticleHeight");
+            // CFpsParticleBoxEmitter::deserializeAttributes
+            // (0x0039c678) floors positive dimensions to unsigned integers,
+            // forces both rates to at least one, clamps MaxPPS to 200, and
+            // lowers MinPPS to the clamped maximum when necessary.
+            emitter.minimumParticlesPerSecond =
+                std::max(emitter.minimumParticlesPerSecond, 1);
+            emitter.maximumParticlesPerSecond =
+                std::clamp(emitter.maximumParticlesPerSecond, 1, 200);
+            emitter.minimumParticlesPerSecond =
+                std::min(emitter.minimumParticlesPerSecond,
+                         emitter.maximumParticlesPerSecond);
+            const float particleWidth = floatValue(attributes, "ParticleWidth");
+            const float particleHeight =
+                floatValue(attributes, "ParticleHeight");
+            emitter.particleWidth =
+                particleWidth > 0.0F ? std::floor(particleWidth) : 0.0F;
+            emitter.particleHeight =
+                particleHeight > 0.0F ? std::floor(particleHeight) : 0.0F;
             emitter.sizeVariationPercent =
                 integerValue(attributes, "SizeVariation");
             emitter.minimumStartColor =
@@ -134,6 +165,12 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                 integerValue(attributes, "MaxLifeTime");
             emitter.speedVariationPercent =
                 integerValue(attributes, "SpeedVariation");
+            emitter.maximumAngleDegreesXY =
+                integerValue(attributes, "MaxAngleDegXY");
+            emitter.maximumAngleDegreesYZ =
+                integerValue(attributes, "MaxAngleDegYZ");
+            emitter.maximumAngleDegreesXZ =
+                integerValue(attributes, "MaxAngleDegXZ");
             emitter.initialRotationMinimumDegrees =
                 integerValue(attributes, "InitialRotMin");
             emitter.initialRotationMaximumDegrees =
@@ -141,6 +178,13 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
             emitter.frameId = integerValue(attributes, "FrameID", -1);
             emitter.additive =
                 stringValue(attributes, "MaterialType") == "trans_add";
+
+            // The native emitter retains MinLifeTime and raises MaxLifeTime
+            // to it when the authored maximum is lower (0x0039c7c4-
+            // 0x0039c7e2). It does not swap the endpoints.
+            emitter.maximumParticleLifetimeMilliseconds =
+                std::max(emitter.maximumParticleLifetimeMilliseconds,
+                         emitter.minimumParticleLifetimeMilliseconds);
 
             std::string currentAffector;
             for (pugi::xml_node value : attributes.children()) {
@@ -150,8 +194,31 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                     currentAffector = value.attribute("value").as_string();
                     if (currentAffector == "FadeOut") {
                         emitter.colorAffectors.push_back({});
+                        emitter.affectorOrder.push_back(
+                            {EffectAffectorKind::FadeOut,
+                             emitter.colorAffectors.size() - 1});
                     } else if (currentAffector == "Size") {
                         emitter.sizeAffectors.push_back({});
+                        emitter.affectorOrder.push_back(
+                            {EffectAffectorKind::Size,
+                             emitter.sizeAffectors.size() - 1});
+                    } else if (currentAffector == "Attract") {
+                        emitter.attractionAffectors.push_back({});
+                        emitter.affectorOrder.push_back(
+                            {EffectAffectorKind::Attract,
+                             emitter.attractionAffectors.size() - 1});
+                    } else if (currentAffector == "Gravity") {
+                        emitter.hasGravity = true;
+                        emitter.affectorOrder.push_back(
+                            {EffectAffectorKind::Gravity, 0});
+                    } else if (currentAffector == "Rotate") {
+                        emitter.hasRotation = true;
+                        emitter.affectorOrder.push_back(
+                            {EffectAffectorKind::Rotate, 0});
+                    } else if (currentAffector == "Spin") {
+                        emitter.hasSpin = true;
+                        emitter.affectorOrder.push_back(
+                            {EffectAffectorKind::Spin, 0});
                     }
                 } else if (currentAffector == "FadeOut") {
                     if (field == "TargetColor") {
@@ -165,7 +232,6 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                             value.attribute("value").as_int(100);
                     }
                 } else if (currentAffector == "Gravity") {
-                    emitter.hasGravity = true;
                     if (field == "Gravity") {
                         emitter.gravity = vectorValue(attributes, "Gravity");
                     } else if (field == "StartTime(%)") {
@@ -176,7 +242,6 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                             value.attribute("value").as_int(100);
                     }
                 } else if (currentAffector == "Spin") {
-                    emitter.hasSpin = true;
                     if (field == "MinSpin") {
                         emitter.spinMinimumDegrees =
                             value.attribute("value").as_int();
@@ -191,13 +256,32 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                             value.attribute("value").as_int(100);
                     }
                 } else if (currentAffector == "Rotate") {
-                    emitter.hasRotation = true;
                     if (field == "PivotPoint") {
                         emitter.rotationPivot =
                             vectorValue(attributes, "PivotPoint");
                     } else if (field == "Speed") {
                         emitter.rotationSpeedDegreesPerSecond =
                             vectorValue(attributes, "Speed");
+                    }
+                } else if (currentAffector == "Attract") {
+                    EffectAttractionAffector& affector =
+                        emitter.attractionAffectors.back();
+                    if (field == "Point") {
+                        affector.point = vectorValue(attributes, "Point");
+                    } else if (field == "Speed") {
+                        affector.speed = value.attribute("value").as_float();
+                    } else if (field == "Attract") {
+                        affector.attract =
+                            value.attribute("value").as_bool(true);
+                    } else if (field == "AffectX") {
+                        affector.affectX =
+                            value.attribute("value").as_bool(true);
+                    } else if (field == "AffectY") {
+                        affector.affectY =
+                            value.attribute("value").as_bool(true);
+                    } else if (field == "AffectZ") {
+                        affector.affectZ =
+                            value.attribute("value").as_bool(true);
                     }
                 } else if (currentAffector == "Size") {
                     if (field == "TargetWidth") {
@@ -225,19 +309,6 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
                 return Result::failure(
                     "Effect emitter has invalid particle fields");
             }
-            std::stable_sort(
-                emitter.colorAffectors.begin(),
-                emitter.colorAffectors.end(),
-                [](const EffectColorAffector& first,
-                   const EffectColorAffector& second) {
-                    return first.startPercent < second.startPercent;
-                });
-            std::stable_sort(
-                emitter.sizeAffectors.begin(), emitter.sizeAffectors.end(),
-                [](const EffectSizeAffector& first,
-                   const EffectSizeAffector& second) {
-                    return first.startPercent < second.startPercent;
-                });
             preset.emitters.push_back(std::move(emitter));
         }
         if (!preset.emitters.empty()) {
@@ -252,10 +323,9 @@ Result EffectPresetDatabase::load(std::span<const std::byte> bytes) {
 const EffectPreset* EffectPresetDatabase::find(
     std::string_view name) const noexcept {
     const auto match = std::find_if(
-        presets_.begin(), presets_.end(), [name](const EffectPreset& preset) {
-            return preset.name == name;
-        });
+        presets_.begin(), presets_.end(),
+        [name](const EffectPreset& preset) { return preset.name == name; });
     return match == presets_.end() ? nullptr : &*match;
 }
 
-} // namespace usm::game
+}  // namespace usm::game

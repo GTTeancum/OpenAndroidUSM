@@ -8,8 +8,7 @@
 namespace usm::game {
 namespace {
 
-assets::Vector3 parseVector3(std::string_view text,
-                             bool& valid) noexcept {
+assets::Vector3 parseVector3(std::string_view text, bool& valid) noexcept {
     std::string storage(text);
     std::replace(storage.begin(), storage.end(), ',', ' ');
     const char* cursor = storage.c_str();
@@ -38,25 +37,13 @@ std::uint32_t interpolateColor(std::uint32_t from, std::uint32_t to,
     for (const unsigned shift : {0U, 8U, 16U, 24U}) {
         const float start = static_cast<float>(colorChannel(from, shift));
         const float end = static_cast<float>(colorChannel(to, shift));
-        result |= static_cast<std::uint32_t>(
-                      std::clamp(std::lround(start + (end - start) * progress),
-                                 0L, 255L))
+        // SColor::getInterpolated (0x0039bebc) clamps then converts with
+        // vcvt.u32.f32, which truncates rather than rounds each channel.
+        result |= static_cast<std::uint32_t>(std::clamp(
+                      start + (end - start) * progress, 0.0F, 255.0F))
                   << shift;
     }
     return result;
-}
-
-float intervalProgress(float lifeProgress, std::int32_t startPercent,
-                       std::int32_t endPercent) noexcept {
-    const float start = static_cast<float>(startPercent) / 100.0F;
-    const float end = static_cast<float>(endPercent) / 100.0F;
-    if (lifeProgress < start) {
-        return 0.0F;
-    }
-    return end <= start
-               ? 1.0F
-               : std::clamp((lifeProgress - start) / (end - start), 0.0F,
-                            1.0F);
 }
 
 void rotateAroundX(assets::Vector3& position, float degrees,
@@ -95,54 +82,77 @@ void rotateAroundZ(assets::Vector3& position, float degrees,
     position.y = y * cosine + x * sine + pivot.y;
 }
 
-} // namespace
+}  // namespace
 
-struct LevelEffectRuntime::PendingEmitter {
+struct LevelEffectRuntime::EmitterRuntimeState {
     const EffectEmitterPreset* preset{};
     assets::Vector3 origin;
-    std::int32_t delayMilliseconds{};
+    std::uint64_t id{};
+    std::uint32_t emissionAccumulatorMilliseconds{};
+    std::uint32_t activeElapsedMilliseconds{};
+    std::uint32_t restartElapsedMilliseconds{};
+    std::uint32_t startDelayElapsedMilliseconds{};
+    std::int32_t selectedSystemLifetimeMilliseconds{-1};
+    std::int32_t selectedRestartMilliseconds{-1};
     std::int32_t roomId{-1};
+    bool firstUpdate{true};
+    bool emissionComplete{};
+    bool rotationAffectorInitialized{};
+    bool attractionAffectorInitialized{};
+};
+
+struct LevelEffectRuntime::PendingEmitter {
+    EmitterRuntimeState runtime;
 };
 
 struct LevelEffectRuntime::PersistentEmitter {
-    const EffectEmitterPreset* preset{};
-    assets::Vector3 origin;
-    std::int32_t delayMilliseconds{};
-    std::int32_t roomId{-1};
+    EmitterRuntimeState runtime;
     std::int32_t sourceObjectId{-1};
-    float emissionRemainder{};
     bool visible{true};
 };
 
 struct LevelEffectRuntime::Particle {
+    struct ColorTarget {
+        std::uint32_t startColor{0xffffffffU};
+        bool initialized{};
+    };
+
     struct SizeTarget {
-        float width{};
-        float height{};
+        float startWidth{};
+        float startHeight{};
+        float deltaWidth{};
+        float deltaHeight{};
         bool initialized{};
     };
 
     const EffectEmitterPreset* preset{};
+    std::uint64_t emitterId{};
     assets::Vector3 position;
     assets::Vector3 velocity;
-    assets::Vector3 initialVelocity;
+    assets::Vector3 gravityStartVelocity;
     assets::Vector3 rotationPivot;
     std::uint32_t ageMilliseconds{};
     std::uint32_t lifetimeMilliseconds{};
-    float initialWidth{};
-    float initialHeight{};
+    float width{};
+    float height{};
+    std::vector<ColorTarget> colorTargets;
     std::vector<SizeTarget> sizeTargets;
     float rotationDegrees{};
     float spinBaseRotationDegrees{};
     float spinDeltaDegrees{};
-    std::uint32_t startColor{0xffffffffU};
+    std::uint32_t color{0xffffffffU};
+    bool gravityInitialized{};
     bool spinInitialized{};
+    bool spawnedThisUpdate{true};
+    bool visible{true};
     std::int32_t roomId{-1};
 };
 
 LevelEffectRuntime::LevelEffectRuntime() = default;
 LevelEffectRuntime::~LevelEffectRuntime() = default;
 
-Result LevelEffectRuntime::initialize(const EffectPresetDatabase& presets) {
+Result LevelEffectRuntime::initialize(const EffectPresetDatabase& presets,
+                                      NativeRandomizer* nativeRandomizer) {
     if (presets.presets().empty()) {
         return Result::failure("Effect runtime has no presets");
     }
@@ -151,7 +161,13 @@ Result LevelEffectRuntime::initialize(const EffectPresetDatabase& presets) {
     persistentEmitters_.clear();
     particles_.clear();
     renderParticles_.clear();
-    randomState_ = 0x6d2b79f5U;
+    if (nativeRandomizer == nullptr) {
+        ownedNativeRandomizer_ = NativeRandomizer{};
+        nativeRandomizer_ = &ownedNativeRandomizer_;
+    } else {
+        nativeRandomizer_ = nativeRandomizer;
+    }
+    nextEmitterId_ = 1;
     return Result::success();
 }
 
@@ -176,9 +192,9 @@ Result LevelEffectRuntime::applyCinematicCommand(
     return playEffect(type->value, origin, -1);
 }
 
-Result LevelEffectRuntime::playEffect(
-    std::string_view effectType, const assets::Vector3& origin,
-    std::int32_t roomId) {
+Result LevelEffectRuntime::playEffect(std::string_view effectType,
+                                      const assets::Vector3& origin,
+                                      std::int32_t roomId) {
     if (presets_ == nullptr) {
         return Result::failure("Effect runtime is not initialized");
     }
@@ -187,28 +203,32 @@ Result LevelEffectRuntime::playEffect(
         return Result::failure("Effect references an unknown preset");
     }
     for (const EffectEmitterPreset& emitter : preset->emitters) {
-        pendingEmitters_.push_back(
-            {&emitter, origin,
-             std::max(emitter.startDelayMilliseconds, 0), roomId});
+        PendingEmitter pending;
+        initializeEmitter(pending.runtime, emitter, origin, roomId, true);
+        pendingEmitters_.push_back(std::move(pending));
     }
     return Result::success();
 }
 
-Result LevelEffectRuntime::addPersistentEffect(
-    std::string_view effectType, const assets::Vector3& origin,
-    std::int32_t roomId, bool visible, std::int32_t sourceObjectId) {
+Result LevelEffectRuntime::addPersistentEffect(std::string_view effectType,
+                                               const assets::Vector3& origin,
+                                               std::int32_t roomId,
+                                               bool visible,
+                                               std::int32_t sourceObjectId) {
     if (presets_ == nullptr) {
         return Result::failure("Effect runtime is not initialized");
     }
     const EffectPreset* preset = presets_->find(effectType);
     if (preset == nullptr) {
-        return Result::failure("Persistent effect references an unknown preset");
+        return Result::failure(
+            "Persistent effect references an unknown preset");
     }
     for (const EffectEmitterPreset& emitter : preset->emitters) {
-        persistentEmitters_.push_back(
-            {&emitter, origin,
-             std::max(emitter.startDelayMilliseconds, 0), roomId,
-             sourceObjectId, 0.0F, visible});
+        PersistentEmitter persistent;
+        initializeEmitter(persistent.runtime, emitter, origin, roomId, false);
+        persistent.sourceObjectId = sourceObjectId;
+        persistent.visible = visible;
+        persistentEmitters_.push_back(std::move(persistent));
     }
     return Result::success();
 }
@@ -221,23 +241,32 @@ Result LevelEffectRuntime::setPersistentEffectVisible(
             continue;
         }
         emitter.visible = visible;
+        for (Particle& particle : particles_) {
+            if (particle.emitterId == emitter.runtime.id) {
+                particle.visible = visible;
+            }
+        }
         found = true;
     }
-    return found
-               ? Result::success()
-                : Result::failure("Persistent effect source was not found");
+    return found ? Result::success()
+                 : Result::failure("Persistent effect source was not found");
 }
 
-LevelEffectCheckPointState
-LevelEffectRuntime::saveCheckPointState() const {
+LevelEffectCheckPointState LevelEffectRuntime::saveCheckPointState() const {
     LevelEffectCheckPointState result;
     result.persistentEffects.reserve(persistentEmitters_.size());
     for (const PersistentEmitter& emitter : persistentEmitters_) {
+        const EmitterRuntimeState& runtime = emitter.runtime;
         result.persistentEffects.push_back(
-            {emitter.sourceObjectId, emitter.delayMilliseconds,
-             emitter.emissionRemainder, emitter.visible});
+            {emitter.sourceObjectId, runtime.emissionAccumulatorMilliseconds,
+             runtime.activeElapsedMilliseconds,
+             runtime.restartElapsedMilliseconds,
+             runtime.startDelayElapsedMilliseconds,
+             runtime.selectedSystemLifetimeMilliseconds,
+             runtime.selectedRestartMilliseconds, runtime.firstUpdate,
+             runtime.emissionComplete, runtime.rotationAffectorInitialized,
+             runtime.attractionAffectorInitialized, emitter.visible});
     }
-    result.randomState = randomState_;
     return result;
 }
 
@@ -249,304 +278,591 @@ Result LevelEffectRuntime::loadCheckPointState(
     }
     for (std::size_t index = 0; index < persistentEmitters_.size(); ++index) {
         PersistentEmitter& emitter = persistentEmitters_[index];
+        EmitterRuntimeState& runtime = emitter.runtime;
         const PersistentEffectCheckPointState& saved =
             state.persistentEffects[index];
         if (saved.sourceObjectId != emitter.sourceObjectId) {
             return Result::failure(
                 "Checkpoint effect state references a different emitter");
         }
-        emitter.delayMilliseconds = saved.delayMilliseconds;
-        emitter.emissionRemainder = saved.emissionRemainder;
+        runtime.emissionAccumulatorMilliseconds =
+            saved.emissionAccumulatorMilliseconds;
+        runtime.activeElapsedMilliseconds = saved.activeElapsedMilliseconds;
+        runtime.restartElapsedMilliseconds = saved.restartElapsedMilliseconds;
+        runtime.startDelayElapsedMilliseconds =
+            saved.startDelayElapsedMilliseconds;
+        runtime.selectedSystemLifetimeMilliseconds =
+            saved.selectedSystemLifetimeMilliseconds;
+        runtime.selectedRestartMilliseconds = saved.selectedRestartMilliseconds;
+        runtime.firstUpdate = saved.firstUpdate;
+        runtime.emissionComplete = saved.emissionComplete;
+        runtime.rotationAffectorInitialized = saved.rotationAffectorInitialized;
+        runtime.attractionAffectorInitialized =
+            saved.attractionAffectorInitialized;
         emitter.visible = saved.visible;
     }
-    randomState_ = state.randomState;
     pendingEmitters_.clear();
     particles_.clear();
     renderParticles_.clear();
     return Result::success();
 }
 
-void LevelEffectRuntime::update(
-    std::uint32_t elapsedMilliseconds) noexcept {
+void LevelEffectRuntime::update(std::uint32_t elapsedMilliseconds) noexcept {
     for (PersistentEmitter& emitter : persistentEmitters_) {
-        if (!emitter.visible) {
-            continue;
-        }
-        std::uint32_t emissionMilliseconds = elapsedMilliseconds;
-        if (emitter.delayMilliseconds > 0) {
-            if (elapsedMilliseconds <=
-                static_cast<std::uint32_t>(emitter.delayMilliseconds)) {
-                emitter.delayMilliseconds -=
-                    static_cast<std::int32_t>(elapsedMilliseconds);
-                continue;
-            }
-            emissionMilliseconds -=
-                static_cast<std::uint32_t>(emitter.delayMilliseconds);
-            emitter.delayMilliseconds = 0;
-        }
-        const float particlesPerSecond =
-            static_cast<float>(emitter.preset->minimumParticlesPerSecond +
-                               emitter.preset->maximumParticlesPerSecond) *
-            0.5F;
-        emitter.emissionRemainder +=
-            particlesPerSecond *
-            static_cast<float>(emissionMilliseconds) * 0.001F;
-        const std::int32_t particleCount = std::clamp(
-            static_cast<std::int32_t>(emitter.emissionRemainder), 0, 256);
-        emitter.emissionRemainder -= static_cast<float>(particleCount);
-        for (std::int32_t index = 0; index < particleCount; ++index) {
-            spawnParticle(*emitter.preset, emitter.origin, emitter.roomId);
+        if (emitter.visible) {
+            updateEmitter(emitter.runtime, elapsedMilliseconds);
         }
     }
 
-    for (auto iterator = pendingEmitters_.begin();
-         iterator != pendingEmitters_.end();) {
-        iterator->delayMilliseconds -=
-            static_cast<std::int32_t>(elapsedMilliseconds);
-        if (iterator->delayMilliseconds <= 0) {
-            spawnEmitter(*iterator);
-            iterator = pendingEmitters_.erase(iterator);
-        } else {
-            ++iterator;
-        }
+    for (PendingEmitter& emitter : pendingEmitters_) {
+        updateEmitter(emitter.runtime, elapsedMilliseconds);
     }
-
-    for (Particle& particle : particles_) {
-        const float delta = static_cast<float>(elapsedMilliseconds);
-        particle.ageMilliseconds = std::min(
-            particle.lifetimeMilliseconds,
-            particle.ageMilliseconds + elapsedMilliseconds);
-        particle.position.x += particle.velocity.x * delta;
-        particle.position.y += particle.velocity.y * delta;
-        particle.position.z += particle.velocity.z * delta;
-        const EffectEmitterPreset& preset = *particle.preset;
-        const float lifeProgress =
-            static_cast<float>(particle.ageMilliseconds) /
-            static_cast<float>(particle.lifetimeMilliseconds);
-        if (preset.hasGravity) {
-            // CFpsParticleGravityAffector::affect (0x0039d7d4) captures the
-            // entry velocity and linearly reaches Gravity at EndTime(%).
-            const float progress =
-                intervalProgress(lifeProgress, preset.gravityStartPercent,
-                                 preset.gravityEndPercent);
-            particle.velocity.x = particle.initialVelocity.x +
-                                  (preset.gravity.x -
-                                   particle.initialVelocity.x) *
-                                      progress;
-            particle.velocity.y = particle.initialVelocity.y +
-                                  (preset.gravity.y -
-                                   particle.initialVelocity.y) *
-                                      progress;
-            particle.velocity.z = particle.initialVelocity.z +
-                                  (preset.gravity.z -
-                                   particle.initialVelocity.z) *
-                                      progress;
-        }
-        if (preset.hasRotation) {
-            // CFpsParticleRotationAffector::affect (0x0039df08) applies the
-            // three authored angular speeds in degrees per second.
-            const float seconds = delta * 0.001F;
-            rotateAroundX(particle.position,
-                          preset.rotationSpeedDegreesPerSecond.x * seconds,
-                          particle.rotationPivot);
-            rotateAroundY(particle.position,
-                          preset.rotationSpeedDegreesPerSecond.y * seconds,
-                          particle.rotationPivot);
-            rotateAroundZ(particle.position,
-                          preset.rotationSpeedDegreesPerSecond.z * seconds,
-                          particle.rotationPivot);
-        }
-        if (preset.hasSpin) {
-            const float spinStart =
-                static_cast<float>(preset.spinStartPercent) / 100.0F;
-            if (lifeProgress >= spinStart && !particle.spinInitialized) {
-                particle.spinBaseRotationDegrees = particle.rotationDegrees;
-                particle.spinDeltaDegrees = std::floor(randomRange(
-                    static_cast<float>(preset.spinMinimumDegrees),
-                    static_cast<float>(preset.spinMaximumDegrees)));
-                particle.spinInitialized = true;
-            }
-            if (particle.spinInitialized) {
-                // CFpsParticleSpinAffector::affect (0x0039e9c4) treats the
-                // chosen spin as a total angle across the authored interval.
-                particle.rotationDegrees =
-                    particle.spinBaseRotationDegrees +
-                    particle.spinDeltaDegrees *
-                        intervalProgress(lifeProgress,
-                                         preset.spinStartPercent,
-                                         preset.spinEndPercent);
-            }
-        }
-    }
-    std::erase_if(particles_, [](const Particle& particle) {
-        return particle.ageMilliseconds >= particle.lifetimeMilliseconds;
+    std::erase_if(pendingEmitters_, [this](const PendingEmitter& emitter) {
+        return emitter.runtime.emissionComplete &&
+               !emitterHasParticles(emitter.runtime.id);
     });
 
-    renderParticles_.clear();
-    renderParticles_.reserve(particles_.size());
-    for (Particle& particle : particles_) {
-        const EffectEmitterPreset& preset = *particle.preset;
-        const float lifeProgress =
-            static_cast<float>(particle.ageMilliseconds) /
-            static_cast<float>(particle.lifetimeMilliseconds);
-        std::uint32_t color = particle.startColor;
-        for (const EffectColorAffector& affector : preset.colorAffectors) {
-            const float start =
-                static_cast<float>(affector.startPercent) / 100.0F;
-            if (lifeProgress < start) {
-                break;
-            }
-            const float end =
-                static_cast<float>(affector.endPercent) / 100.0F;
-            const float progress =
-                end <= start
-                    ? 1.0F
-                    : std::clamp((lifeProgress - start) / (end - start),
-                                 0.0F, 1.0F);
-            color = interpolateColor(color, affector.targetColor, progress);
-            if (lifeProgress < end) {
-                break;
-            }
-        }
-        float width = particle.initialWidth;
-        float height = particle.initialHeight;
-        for (std::size_t index = 0; index < preset.sizeAffectors.size();
-             ++index) {
-            const EffectSizeAffector& affector = preset.sizeAffectors[index];
-            const float sizeStart =
-                static_cast<float>(affector.startPercent) / 100.0F;
-            if (lifeProgress < sizeStart ||
-                index >= particle.sizeTargets.size()) {
-                break;
-            }
-            Particle::SizeTarget& target = particle.sizeTargets[index];
-            if (!target.initialized) {
-                float targetScale = 1.0F;
-                if (affector.variationPercent > 0) {
-                    targetScale +=
-                        std::floor(randomRange(
-                            -static_cast<float>(affector.variationPercent),
-                            static_cast<float>(affector.variationPercent))) /
-                        100.0F;
-                }
-                target.width = affector.targetWidth * targetScale;
-                target.height = affector.targetHeight * targetScale;
-                target.initialized = true;
-            }
-            const float sizeEnd =
-                static_cast<float>(affector.endPercent) / 100.0F;
-            const float sizeProgress =
-                sizeEnd <= sizeStart
-                    ? 1.0F
-                    : std::clamp((lifeProgress - sizeStart) /
-                                     (sizeEnd - sizeStart),
-                                 0.0F, 1.0F);
-            width += (target.width - width) * sizeProgress;
-            height += (target.height - height) * sizeProgress;
-            if (lifeProgress < sizeEnd) {
-                break;
-            }
-        }
-        renderParticles_.push_back(
-            {particle.position, width, height, particle.rotationDegrees,
-             color,
-             preset.frameId, preset.additive, particle.roomId});
+    rebuildRenderParticles();
+}
+
+void LevelEffectRuntime::initializeEmitter(EmitterRuntimeState& emitter,
+                                           const EffectEmitterPreset& preset,
+                                           const assets::Vector3& origin,
+                                           std::int32_t roomId,
+                                           bool restartAfterClone) noexcept {
+    emitter = {};
+    emitter.preset = &preset;
+    emitter.origin = origin;
+    emitter.id = nextEmitterId_++;
+    emitter.roomId = roomId;
+    emitter.selectedSystemLifetimeMilliseconds = -1;
+    emitter.selectedRestartMilliseconds = -1;
+
+    // CFpsParticleSystemSceneNode::clone (0x003a0c78) calls
+    // SetRandomLifeTime after copying the four authored ranges. A thrown
+    // CEffect then immediately calls child Restart through CEffect::Restart
+    // (0x0030aea0), consuming and replacing both selections a second time.
+    selectRandomLifetimes(emitter);
+    if (restartAfterClone) {
+        restartEmitter(emitter);
     }
 }
 
-void LevelEffectRuntime::spawnEmitter(
-    const PendingEmitter& emitter) noexcept {
+void LevelEffectRuntime::selectRandomLifetimes(
+    EmitterRuntimeState& emitter) noexcept {
     const EffectEmitterPreset& preset = *emitter.preset;
-    const float systemLifetimeSeconds =
-        static_cast<float>(std::max(
-            (preset.systemMinimumLifetimeMilliseconds +
-             preset.systemMaximumLifetimeMilliseconds) /
-                2,
-            50)) /
-        1000.0F;
-    const float particlesPerSecond =
-        static_cast<float>(preset.minimumParticlesPerSecond +
-                           preset.maximumParticlesPerSecond) /
-        2.0F;
-    const std::int32_t particleCount = std::clamp(
-        static_cast<std::int32_t>(
-            std::lround(particlesPerSecond * systemLifetimeSeconds)),
-        1, 128);
-    particles_.reserve(particles_.size() +
-                       static_cast<std::size_t>(particleCount));
-    for (std::int32_t index = 0; index < particleCount; ++index) {
-        spawnParticle(preset, emitter.origin, emitter.roomId);
+    const auto select = [this](std::int32_t minimum, std::int32_t maximum) {
+        return minimum == maximum ? minimum
+                                  : minimum + signedModulo(maximum - minimum);
+    };
+    // CFpsParticleSystemSceneNode::SetRandomLifeTime (0x0039fae4).
+    emitter.selectedSystemLifetimeMilliseconds =
+        select(preset.systemMinimumLifetimeMilliseconds,
+               preset.systemMaximumLifetimeMilliseconds);
+    emitter.selectedRestartMilliseconds = select(
+        preset.restartMinimumMilliseconds, preset.restartMaximumMilliseconds);
+}
+
+void LevelEffectRuntime::restartEmitter(EmitterRuntimeState& emitter) noexcept {
+    // CFpsParticleSystemSceneNode::Restart (0x0039fb4c) clears the particle
+    // array and emitter accumulator, resets the node clock, then chooses new
+    // system and restart lifetimes.
+    eraseEmitterParticles(emitter.id);
+    emitter.emissionAccumulatorMilliseconds = 0;
+    emitter.activeElapsedMilliseconds = 0;
+    emitter.restartElapsedMilliseconds = 0;
+    emitter.startDelayElapsedMilliseconds = 0;
+    emitter.firstUpdate = true;
+    emitter.emissionComplete = false;
+    emitter.rotationAffectorInitialized = false;
+    emitter.attractionAffectorInitialized = false;
+    selectRandomLifetimes(emitter);
+}
+
+void LevelEffectRuntime::updateEmitter(
+    EmitterRuntimeState& emitter, std::uint32_t elapsedMilliseconds) noexcept {
+    const EffectEmitterPreset& preset = *emitter.preset;
+    const std::uint32_t deltaMilliseconds =
+        emitter.firstUpdate ? 0U : elapsedMilliseconds;
+    emitter.firstUpdate = false;
+
+    // CFpsParticleSystemSceneNode::doParticleSystem (0x0039f34c) updates its
+    // last timestamp but rejects any frame delta above 150 ms wholesale.
+    if (deltaMilliseconds > 150U) {
+        return;
+    }
+
+    bool emitting = false;
+    if (!emitter.emissionComplete) {
+        if (static_cast<std::int64_t>(emitter.startDelayElapsedMilliseconds) <
+            static_cast<std::int64_t>(preset.startDelayMilliseconds)) {
+            emitter.startDelayElapsedMilliseconds += deltaMilliseconds;
+        } else if (preset.systemMinimumLifetimeMilliseconds == -1 ||
+                   preset.systemMaximumLifetimeMilliseconds == -1 ||
+                   emitter.activeElapsedMilliseconds <=
+                       static_cast<std::uint32_t>(
+                           emitter.selectedSystemLifetimeMilliseconds)) {
+            emitting = true;
+        } else {
+            if (preset.restartMinimumMilliseconds != -1 &&
+                preset.restartMaximumMilliseconds != -1) {
+                emitter.restartElapsedMilliseconds += deltaMilliseconds;
+                if (static_cast<std::uint32_t>(
+                        emitter.selectedRestartMilliseconds) <
+                    emitter.restartElapsedMilliseconds) {
+                    restartEmitter(emitter);
+                    return;
+                }
+            } else {
+                emitter.emissionComplete = true;
+            }
+        }
+    }
+
+    if (emitting) {
+        std::uint32_t emitterDelta = deltaMilliseconds;
+        // Negative StartDelay is a native pre-roll request. On the node's
+        // zero-delta first tick, doParticleSystem passes -StartDelay to the
+        // emitter without aging the resulting particles (0x0039f4a0).
+        if (deltaMilliseconds == 0U && preset.startDelayMilliseconds < 0) {
+            emitterDelta = static_cast<std::uint32_t>(
+                -static_cast<std::int64_t>(preset.startDelayMilliseconds));
+        }
+        emitter.emissionAccumulatorMilliseconds += emitterDelta;
+
+        std::int32_t particlesPerSecond = preset.minimumParticlesPerSecond;
+        const std::int32_t rateDifference =
+            preset.maximumParticlesPerSecond - preset.minimumParticlesPerSecond;
+        if (rateDifference != 0) {
+            particlesPerSecond += signedModulo(rateDifference);
+        }
+        const float intervalMilliseconds =
+            1000.0F / static_cast<float>(particlesPerSecond);
+        if (static_cast<float>(emitter.emissionAccumulatorMilliseconds) >
+            intervalMilliseconds) {
+            const float roundedCount =
+                static_cast<float>(emitter.emissionAccumulatorMilliseconds) /
+                    intervalMilliseconds +
+                0.5F;
+            std::uint32_t count = roundedCount > 0.0F
+                                      ? static_cast<std::uint32_t>(roundedCount)
+                                      : 0U;
+            count = std::min(count, static_cast<std::uint32_t>(
+                                        preset.maximumParticlesPerSecond * 2));
+            const std::size_t existingCount = static_cast<std::size_t>(
+                std::count_if(particles_.begin(), particles_.end(),
+                              [&emitter](const Particle& particle) {
+                                  return particle.emitterId == emitter.id;
+                              }));
+            constexpr std::size_t kNativeNodeParticleLimit = 0x3f7aU;
+            count = static_cast<std::uint32_t>(std::min<std::size_t>(
+                count, kNativeNodeParticleLimit -
+                           std::min(existingCount, kNativeNodeParticleLimit)));
+            emitter.emissionAccumulatorMilliseconds = 0;
+            for (std::uint32_t index = 0; index < count; ++index) {
+                spawnParticle(emitter);
+            }
+        }
+    }
+
+    updateEmitterParticles(emitter, deltaMilliseconds);
+    if (emitting) {
+        emitter.activeElapsedMilliseconds += deltaMilliseconds;
     }
 }
 
-void LevelEffectRuntime::spawnParticle(
-    const EffectEmitterPreset& preset, const assets::Vector3& origin,
-    std::int32_t roomId) noexcept {
+void LevelEffectRuntime::updateEmitterParticles(
+    EmitterRuntimeState& emitter, std::uint32_t elapsedMilliseconds) noexcept {
+    const EffectEmitterPreset& preset = *emitter.preset;
+    const bool rotateParticles =
+        preset.hasRotation && emitter.rotationAffectorInitialized;
+    if (preset.hasRotation) {
+        // CFpsParticleRotationAffector::affect (0x0039df08) only records the
+        // current time on its first invocation; rotation begins next tick.
+        emitter.rotationAffectorInitialized = true;
+    }
+    const bool attractParticles = !preset.attractionAffectors.empty() &&
+                                  emitter.attractionAffectorInitialized;
+    if (!preset.attractionAffectors.empty()) {
+        // CFpsParticleAttractionAffector::affect (0x0039bda0) uses a zero
+        // previous timestamp as its initialization sentinel, just like the
+        // rotation affector: its first invocation only records the clock.
+        emitter.attractionAffectorInitialized = true;
+    }
+
+    const auto intervalTime = [](std::uint32_t lifetime, std::int32_t percent) {
+        const float value =
+            static_cast<float>(lifetime) * static_cast<float>(percent) * 0.01F;
+        return value > 0.0F ? static_cast<std::uint32_t>(value) : 0U;
+    };
+    const auto isActive = [](std::int64_t previous, std::uint32_t current,
+                             std::uint32_t start, std::uint32_t end) {
+        return start <= current &&
+               (previous < static_cast<std::int64_t>(end) || current <= end);
+    };
+    const auto isEntry = [](std::int64_t previous, std::uint32_t current,
+                            std::uint32_t start) {
+        return previous < static_cast<std::int64_t>(start) || current == start;
+    };
+    const auto progress = [](std::uint32_t current, std::uint32_t start,
+                             std::uint32_t end) {
+        if (end <= start) {
+            return 1.0F;
+        }
+        return static_cast<float>(std::min(current, end) - start) /
+               static_cast<float>(end - start);
+    };
+
+    for (Particle& particle : particles_) {
+        if (particle.emitterId != emitter.id) {
+            continue;
+        }
+        const std::int64_t previousAge =
+            particle.spawnedThisUpdate
+                ? -static_cast<std::int64_t>(elapsedMilliseconds)
+                : static_cast<std::int64_t>(particle.ageMilliseconds);
+        const std::uint32_t currentAge =
+            particle.spawnedThisUpdate
+                ? 0U
+                : particle.ageMilliseconds + elapsedMilliseconds;
+
+        for (const EffectAffectorReference& reference : preset.affectorOrder) {
+            if (reference.kind == EffectAffectorKind::FadeOut) {
+                const std::size_t index = reference.index;
+                const EffectColorAffector& affector =
+                    preset.colorAffectors[index];
+                const std::uint32_t start = intervalTime(
+                    particle.lifetimeMilliseconds, affector.startPercent);
+                const std::uint32_t end = intervalTime(
+                    particle.lifetimeMilliseconds, affector.endPercent);
+                if (!isActive(previousAge, currentAge, start, end)) {
+                    continue;
+                }
+                Particle::ColorTarget& target = particle.colorTargets[index];
+                if (isEntry(previousAge, currentAge, start)) {
+                    target.startColor = particle.color;
+                    target.initialized = true;
+                }
+                if (target.initialized) {
+                    particle.color = interpolateColor(
+                        target.startColor, affector.targetColor,
+                        progress(currentAge, start, end));
+                }
+                continue;
+            }
+
+            if (reference.kind == EffectAffectorKind::Gravity) {
+                const std::uint32_t start = intervalTime(
+                    particle.lifetimeMilliseconds, preset.gravityStartPercent);
+                const std::uint32_t end = intervalTime(
+                    particle.lifetimeMilliseconds, preset.gravityEndPercent);
+                if (isActive(previousAge, currentAge, start, end)) {
+                    if (isEntry(previousAge, currentAge, start)) {
+                        particle.gravityStartVelocity = particle.velocity;
+                        particle.gravityInitialized = true;
+                    }
+                    if (particle.gravityInitialized) {
+                        const float amount = progress(currentAge, start, end);
+                        particle.velocity.x =
+                            particle.gravityStartVelocity.x +
+                            (preset.gravity.x -
+                             particle.gravityStartVelocity.x) *
+                                amount;
+                        particle.velocity.y =
+                            particle.gravityStartVelocity.y +
+                            (preset.gravity.y -
+                             particle.gravityStartVelocity.y) *
+                                amount;
+                        particle.velocity.z =
+                            particle.gravityStartVelocity.z +
+                            (preset.gravity.z -
+                             particle.gravityStartVelocity.z) *
+                                amount;
+                    }
+                }
+                continue;
+            }
+
+            if (reference.kind == EffectAffectorKind::Rotate &&
+                rotateParticles) {
+                const float seconds =
+                    static_cast<float>(elapsedMilliseconds) * 0.001F;
+                // CFpsParticleRotationAffector::affect (0x0039df08) applies YZ,
+                // XZ, then XY rotations, corresponding to X, Y, then Z axes.
+                rotateAroundX(particle.position,
+                              preset.rotationSpeedDegreesPerSecond.x * seconds,
+                              particle.rotationPivot);
+                rotateAroundY(particle.position,
+                              preset.rotationSpeedDegreesPerSecond.y * seconds,
+                              particle.rotationPivot);
+                rotateAroundZ(particle.position,
+                              preset.rotationSpeedDegreesPerSecond.z * seconds,
+                              particle.rotationPivot);
+                continue;
+            }
+
+            if (reference.kind == EffectAffectorKind::Spin) {
+                const std::uint32_t start = intervalTime(
+                    particle.lifetimeMilliseconds, preset.spinStartPercent);
+                const std::uint32_t end = intervalTime(
+                    particle.lifetimeMilliseconds, preset.spinEndPercent);
+                if (isActive(previousAge, currentAge, start, end)) {
+                    if (isEntry(previousAge, currentAge, start)) {
+                        std::int32_t chosen = preset.spinMinimumDegrees;
+                        const std::int32_t difference =
+                            preset.spinMaximumDegrees -
+                            preset.spinMinimumDegrees;
+                        if (difference > 0) {
+                            chosen += signedModulo(difference);
+                        } else if (difference < 0) {
+                            // The negative-divisor branch explicitly negates
+                            // the ARM remainder at 0x0039ea98.
+                            chosen -= signedModulo(difference);
+                        }
+                        particle.spinBaseRotationDegrees =
+                            particle.rotationDegrees;
+                        particle.spinDeltaDegrees = static_cast<float>(chosen);
+                        particle.spinInitialized = true;
+                    }
+                    if (particle.spinInitialized) {
+                        particle.rotationDegrees =
+                            particle.spinBaseRotationDegrees +
+                            particle.spinDeltaDegrees *
+                                progress(currentAge, start, end);
+                    }
+                }
+                continue;
+            }
+
+            if (reference.kind == EffectAffectorKind::Attract &&
+                attractParticles) {
+                const EffectAttractionAffector& affector =
+                    preset.attractionAffectors[reference.index];
+                // EffectManager::InitEffect (0x00391d90) translates attraction
+                // points by the thrown effect root, not by the child emitter.
+                const assets::Vector3 target{
+                    emitter.origin.x + affector.point.x,
+                    emitter.origin.y + affector.point.y,
+                    emitter.origin.z + affector.point.z,
+                };
+                float x = target.x - particle.position.x;
+                float y = target.y - particle.position.y;
+                float z = target.z - particle.position.z;
+                const float length = std::sqrt(x * x + y * y + z * z);
+                if (length > 0.0F) {
+                    const float amount =
+                        static_cast<float>(elapsedMilliseconds) * 0.001F *
+                        affector.speed * (affector.attract ? 1.0F : -1.0F) /
+                        length;
+                    if (affector.affectX) {
+                        particle.position.x += x * amount;
+                    }
+                    if (affector.affectY) {
+                        particle.position.y += y * amount;
+                    }
+                    if (affector.affectZ) {
+                        particle.position.z += z * amount;
+                    }
+                }
+                continue;
+            }
+
+            if (reference.kind == EffectAffectorKind::Size) {
+                const std::size_t index = reference.index;
+                const EffectSizeAffector& affector =
+                    preset.sizeAffectors[index];
+                const std::uint32_t start = intervalTime(
+                    particle.lifetimeMilliseconds, affector.startPercent);
+                const std::uint32_t end = intervalTime(
+                    particle.lifetimeMilliseconds, affector.endPercent);
+                if (!isActive(previousAge, currentAge, start, end)) {
+                    continue;
+                }
+                Particle::SizeTarget& target = particle.sizeTargets[index];
+                if (isEntry(previousAge, currentAge, start)) {
+                    target.startWidth = particle.width;
+                    target.startHeight = particle.height;
+                    float targetWidth = affector.targetWidth;
+                    float targetHeight = affector.targetHeight;
+                    if (affector.variationPercent > 0) {
+                        const std::int32_t variation =
+                            signedModulo(affector.variationPercent * 2) -
+                            affector.variationPercent;
+                        const float scale =
+                            1.0F + static_cast<float>(variation) * 0.01F;
+                        targetWidth *= scale;
+                        targetHeight *= scale;
+                    }
+                    target.deltaWidth = targetWidth - target.startWidth;
+                    target.deltaHeight = targetHeight - target.startHeight;
+                    target.initialized = true;
+                }
+                if (target.initialized) {
+                    const float amount = progress(currentAge, start, end);
+                    particle.width =
+                        target.startWidth + target.deltaWidth * amount;
+                    particle.height =
+                        target.startHeight + target.deltaHeight * amount;
+                }
+                continue;
+            }
+        }
+
+        particle.position.x +=
+            particle.velocity.x * static_cast<float>(elapsedMilliseconds);
+        particle.position.y +=
+            particle.velocity.y * static_cast<float>(elapsedMilliseconds);
+        particle.position.z +=
+            particle.velocity.z * static_cast<float>(elapsedMilliseconds);
+        particle.ageMilliseconds = currentAge;
+        particle.spawnedThisUpdate = false;
+    }
+
+    // The native removal check is strict EndTime < now (0x0039f674), so a
+    // particle remains renderable at its exact authored endpoint.
+    std::erase_if(particles_, [&emitter](const Particle& particle) {
+        return particle.emitterId == emitter.id &&
+               particle.lifetimeMilliseconds < particle.ageMilliseconds;
+    });
+}
+
+void LevelEffectRuntime::spawnParticle(EmitterRuntimeState& emitter) noexcept {
+    const EffectEmitterPreset& preset = *emitter.preset;
     Particle particle;
     particle.preset = &preset;
+    particle.emitterId = emitter.id;
+
+    const auto boxCoordinate = [this](float halfExtent) {
+        // The Box attribute is converted to [-Box,+Box] by
+        // CFpsParticleBoxEmitter::deserializeAttributes (0x0039c678), and
+        // emitt always consumes one rand call per component (0x0039cd9a).
+        const std::int32_t random = nativeRandomizer_->next();
+        const float span = halfExtent * 2.0F;
+        return span == 0.0F
+                   ? -halfExtent
+                   : -halfExtent + std::fmod(static_cast<float>(random), span);
+    };
+    const assets::Vector3 localOffset{boxCoordinate(preset.box.x),
+                                      boxCoordinate(preset.box.y),
+                                      boxCoordinate(preset.box.z)};
+    // doParticleSystem transforms global particle positions by the emitter
+    // node's absolute matrix (0x0039f55c). The authored node Scale therefore
+    // scales its box distribution, but never the billboard dimensions.
     particle.position = {
-        origin.x + preset.position.x +
-            randomRange(-preset.box.x * 0.5F, preset.box.x * 0.5F),
-        origin.y + preset.position.y +
-            randomRange(-preset.box.y * 0.5F, preset.box.y * 0.5F),
-        origin.z + preset.position.z +
-            randomRange(-preset.box.z * 0.5F, preset.box.z * 0.5F),
+        emitter.origin.x + preset.position.x + localOffset.x * preset.scale.x,
+        emitter.origin.y + preset.position.y + localOffset.y * preset.scale.y,
+        emitter.origin.z + preset.position.z + localOffset.z * preset.scale.z,
     };
-    const float speedScale =
-        1.0F + randomRange(-static_cast<float>(preset.speedVariationPercent),
-                           static_cast<float>(preset.speedVariationPercent)) /
-                   100.0F;
-    particle.velocity = {preset.direction.x * speedScale,
-                         preset.direction.y * speedScale,
-                         preset.direction.z * speedScale};
-    particle.initialVelocity = particle.velocity;
-    particle.rotationPivot = {
-        origin.x + preset.position.x + preset.rotationPivot.x,
-        origin.y + preset.position.y + preset.rotationPivot.y,
-        origin.z + preset.position.z + preset.rotationPivot.z,
-    };
-    particle.lifetimeMilliseconds = static_cast<std::uint32_t>(
-        std::max(1.0F,
-                 randomRange(
-                     static_cast<float>(
-                         preset.minimumParticleLifetimeMilliseconds),
-                     static_cast<float>(
-                         preset.maximumParticleLifetimeMilliseconds))));
-    const float sizeScale =
-        1.0F + randomRange(-static_cast<float>(preset.sizeVariationPercent),
-                           static_cast<float>(preset.sizeVariationPercent)) /
-                   100.0F;
-    // CFpsParticleSystemSceneNode::render (0x0039ff5c) reads the particle's
-    // width and height at SFpsParticle offsets 0x50/0x54 directly. The scene
-    // node's authored Scale affects its transform, not those billboard
-    // dimensions. Applying it here inflated big_firesomke's 100 -> 230 smoke
-    // curve into a 500 -> 1150 world-unit quad.
-    particle.initialWidth = preset.particleWidth * sizeScale;
-    particle.initialHeight = preset.particleHeight * sizeScale;
-    particle.sizeTargets.resize(preset.sizeAffectors.size());
-    particle.rotationDegrees = randomRange(
-        static_cast<float>(preset.initialRotationMinimumDegrees),
-        static_cast<float>(preset.initialRotationMaximumDegrees));
-    particle.startColor = interpolateColor(preset.minimumStartColor,
-                                           preset.maximumStartColor,
-                                           randomUnit());
-    particle.roomId = roomId;
-    particles_.push_back(particle);
-}
 
-float LevelEffectRuntime::randomUnit() noexcept {
-    randomState_ ^= randomState_ << 13U;
-    randomState_ ^= randomState_ >> 17U;
-    randomState_ ^= randomState_ << 5U;
-    return static_cast<float>(randomState_ & 0x00ffffffU) /
-           static_cast<float>(0x01000000U);
-}
-
-float LevelEffectRuntime::randomRange(float minimum, float maximum) noexcept {
-    if (maximum <= minimum) {
-        return minimum;
+    const std::int32_t initialRotationDifference =
+        preset.initialRotationMaximumDegrees -
+        preset.initialRotationMinimumDegrees;
+    std::int32_t initialRotation = preset.initialRotationMinimumDegrees;
+    if (initialRotationDifference != 0) {
+        initialRotation += signedModulo(initialRotationDifference);
     }
-    return minimum + (maximum - minimum) * randomUnit();
+
+    float sizeScale = 1.0F;
+    if (preset.sizeVariationPercent != 0) {
+        const std::int32_t variation =
+            signedModulo(preset.sizeVariationPercent * 2) -
+            preset.sizeVariationPercent;
+        sizeScale += static_cast<float>(variation) * 0.01F;
+    }
+    particle.width = preset.particleWidth * sizeScale;
+    particle.height = preset.particleHeight * sizeScale;
+
+    particle.velocity = preset.direction;
+    const auto rotateDirection = [this, &particle](std::int32_t maximumDegrees,
+                                                   auto rotate) {
+        if (maximumDegrees != 0) {
+            const std::int32_t degrees =
+                signedModulo(maximumDegrees * 2) - maximumDegrees;
+            rotate(particle.velocity, static_cast<float>(degrees), {});
+        }
+    };
+    rotateDirection(preset.maximumAngleDegreesXY, rotateAroundZ);
+    rotateDirection(preset.maximumAngleDegreesYZ, rotateAroundX);
+    rotateDirection(preset.maximumAngleDegreesXZ, rotateAroundY);
+
+    if (preset.minimumParticleLifetimeMilliseconds ==
+        preset.maximumParticleLifetimeMilliseconds) {
+        particle.lifetimeMilliseconds = static_cast<std::uint32_t>(
+            preset.minimumParticleLifetimeMilliseconds);
+    } else {
+        particle.lifetimeMilliseconds = static_cast<std::uint32_t>(
+            preset.minimumParticleLifetimeMilliseconds +
+            signedModulo(preset.maximumParticleLifetimeMilliseconds -
+                         preset.minimumParticleLifetimeMilliseconds));
+    }
+
+    // Color selection unconditionally consumes rand()%100, even for equal
+    // endpoints (0x0039cf46-0x0039cf54).
+    particle.color = interpolateColor(
+        preset.minimumStartColor, preset.maximumStartColor,
+        // min.getInterpolated(max, d) returns max at d=0 and min at d=1
+        // (0x0039bee4-0x0039bf00), hence the complement for this helper's
+        // conventional min-at-zero interpolation direction.
+        1.0F - static_cast<float>(signedModulo(100)) * 0.01F);
+
+    if (preset.speedVariationPercent != 0) {
+        // Native speed variation is positive-only, not symmetric:
+        // Direction *= 1 + rand()%SpeedVariation/100 (0x0039cf78).
+        const float speedScale =
+            1.0F +
+            static_cast<float>(signedModulo(preset.speedVariationPercent)) *
+                0.01F;
+        particle.velocity.x *= speedScale;
+        particle.velocity.y *= speedScale;
+        particle.velocity.z *= speedScale;
+    }
+
+    particle.gravityStartVelocity = particle.velocity;
+    // EffectManager::InitEffect (0x00391d90) adds the effect root position to
+    // Rotate-affector pivots. It does not add the child emitter Position.
+    particle.rotationPivot = {
+        emitter.origin.x + preset.rotationPivot.x,
+        emitter.origin.y + preset.rotationPivot.y,
+        emitter.origin.z + preset.rotationPivot.z,
+    };
+    particle.colorTargets.resize(preset.colorAffectors.size());
+    particle.sizeTargets.resize(preset.sizeAffectors.size());
+    particle.rotationDegrees = static_cast<float>(initialRotation);
+    particle.roomId = emitter.roomId;
+    particles_.push_back(std::move(particle));
 }
 
-} // namespace usm::game
+void LevelEffectRuntime::eraseEmitterParticles(
+    std::uint64_t emitterId) noexcept {
+    std::erase_if(particles_, [emitterId](const Particle& particle) {
+        return particle.emitterId == emitterId;
+    });
+}
+
+std::int32_t LevelEffectRuntime::signedModulo(std::int32_t divisor) noexcept {
+    return divisor == 0 ? 0 : nativeRandomizer_->next() % divisor;
+}
+
+bool LevelEffectRuntime::emitterHasParticles(
+    std::uint64_t emitterId) const noexcept {
+    return std::any_of(particles_.begin(), particles_.end(),
+                       [emitterId](const Particle& particle) {
+                           return particle.emitterId == emitterId;
+                       });
+}
+
+void LevelEffectRuntime::rebuildRenderParticles() noexcept {
+    renderParticles_.clear();
+    renderParticles_.reserve(particles_.size());
+    for (const Particle& particle : particles_) {
+        if (!particle.visible) {
+            continue;
+        }
+        renderParticles_.push_back(
+            {particle.position, particle.width, particle.height,
+             particle.rotationDegrees, particle.color, particle.preset->frameId,
+             particle.preset->additive, particle.roomId});
+    }
+}
+
+}  // namespace usm::game
