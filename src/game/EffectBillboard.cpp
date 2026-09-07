@@ -123,4 +123,31 @@ EffectBillboardAxes effectBillboardAxes(
     return axes;
 }
 
+EffectSpriteUvRect effectSpriteUvRect(const assets::SpriteAtlas& atlas,
+                                      std::uint32_t textureWidth,
+                                      std::uint32_t textureHeight,
+                                      std::int32_t frameId) noexcept {
+    if (frameId < 0 || textureWidth < 2 || textureHeight < 2) {
+        return {};
+    }
+    const auto frameModules =
+        atlas.modulesForFrame(static_cast<std::size_t>(frameId));
+    if (frameModules.empty() ||
+        frameModules.front().moduleIndex >= atlas.modules().size()) {
+        return {};
+    }
+    const assets::SpriteModule& module =
+        atlas.modules()[frameModules.front().moduleIndex];
+    if (module.imageIndex != 0) {
+        return {};
+    }
+    const float widthDenominator = static_cast<float>(textureWidth - 1);
+    const float heightDenominator = static_cast<float>(textureHeight - 1);
+    return {static_cast<float>(module.x) / widthDenominator,
+            static_cast<float>(module.y) / heightDenominator,
+            static_cast<float>(module.x + module.width) / widthDenominator,
+            static_cast<float>(module.y + module.height) / heightDenominator,
+            true};
+}
+
 }  // namespace usm::game

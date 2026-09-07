@@ -1910,11 +1910,11 @@ than the former subsystem xorshift. `CFpsParticleSystemSceneNode::clone`,
 selections for thrown effects, negative-delay pre-roll, first-frame behavior,
 150 ms delta rejection, finite/restarting emitter lifecycle, and strict
 particle expiry. Core regressions pin the hit splash's exact initial
-particle count and final randomizer state. The effect runtime can accept the
-application-owned generator, but live integration remains deferred until the
-native active-room emitter construction order is recovered; passing it while
-all portable persistent emitters are active would consume the shared combat
-stream in the wrong order.
+particle count and final randomizer state. Live effects use the
+application-owned generator after reconstructing active-room visibility and
+the shared serialized scene traversal; particle emission therefore consumes
+the same native stream as combat and sound selection rather than an isolated
+subsystem generator.
 
 Particle billboard orientation now follows
 `CFpsParticleSystemSceneNode::render` (`0x0039ff5c`) rather than treating every
@@ -1992,6 +1992,24 @@ different compiled registers. WARP regressions verify preset decoding,
 deterministic motion and expiry, and visible frames for all three effect types
 authored by level one: `cartoon_hit_splash_big`, `explode_new`, and
 `rock_splash`.
+
+Effect atlas lookup also follows the native particle path rather than the 2D
+sprite renderer. `EffectManager::LoadEffectPresets` at `0x003925c4` resolves
+an emitter's `FrameID` through only that frame's first module and divides its
+rectangle by `textureWidth - 1` and `textureHeight - 1` before calling
+`CFpsParticleSystemSceneNode::setUVRect` at `0x0039eba4`. That setter assigns
+the one fixed rectangle to every particle quad; 2D frame-module offsets and
+flip flags are not consulted. The D3D11 path now uses that exact mapping, and
+core tests pin all 16 shipped effect frames against the 256-by-256 atlas.
+
+Attack trails and particle splashes retain their native scene-pass order.
+`CAnimObjEffect::Init` at `0x00390bb8` adds the pooled attack-trail mesh to the
+scene manager's dedicated `HitEffects` list. `CFpsSceneManager::drawAll` at
+`0x003995dc` renders the ordinary transparent-node pass, including particle
+systems, before that list. The portable renderer therefore defers the shipped
+`MCHitEffects.bin` meshes until after particle submission instead of mixing
+them into ordinary scene geometry. Automated WARP captures cover each strike
+of the first-encounter ground combo with this compositing order.
 
 Particle width and height remain independent of the emitter scene-node scale.
 `CFpsParticleSystemSceneNode::render` at `0x0039ff5c` reads the two dimensions

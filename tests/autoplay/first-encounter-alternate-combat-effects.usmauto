@@ -75,7 +75,9 @@ move_until_state 1000 0 0 83
 assert_player_state 83
 wait 375
 assert_player_effect 15 1
-assert_audio_played SFX_CRITICAL_HIT_1
+# The shared native Randomizer stream selects Vox record 92 for this route
+# after the restored room-particle traversal consumes its authored draws.
+assert_audio_played SFX_CRITICAL_HIT_2
 assert_enemy_health_near 394 56 0.01
 capture alternate-air-heavy-punch
 move_until_state 3000 0 0 0

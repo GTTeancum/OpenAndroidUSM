@@ -3508,9 +3508,9 @@ Result D3D11Renderer::updateLevelOneEffects(
     const auto appendParticle = [&](const game::EffectParticleState& particle,
                                     std::vector<GpuVertex>& vertices,
                                     bool& valid) {
-        const auto modules = atlas.modulesForFrame(
-            static_cast<std::size_t>(particle.frameId));
-        if (particle.frameId < 0 || modules.empty()) {
+        const game::EffectSpriteUvRect uv = game::effectSpriteUvRect(
+            atlas, texture.width, texture.height, particle.frameId);
+        if (!uv.valid) {
             valid = false;
             return;
         }
@@ -3532,49 +3532,20 @@ Result D3D11Renderer::updateLevelOneEffects(
                 particle.position.z + axes.right.z * localX +
                     axes.up.z * localY};
         };
-        for (const assets::SpriteFrameModule& frameModule : modules) {
-            if (frameModule.moduleIndex >= atlas.modules().size()) {
-                valid = false;
-                continue;
-            }
-            const assets::SpriteModule& module =
-                atlas.modules()[frameModule.moduleIndex];
-            constexpr std::uint8_t horizontalFlip = 0x01;
-            constexpr std::uint8_t verticalFlip = 0x02;
-            if (module.imageIndex != 0 ||
-                (frameModule.flags & ~(horizontalFlip | verticalFlip)) != 0) {
-                valid = false;
-                continue;
-            }
-            float u0 = static_cast<float>(module.x) /
-                       static_cast<float>(texture.width);
-            float v0 = static_cast<float>(module.y) /
-                       static_cast<float>(texture.height);
-            float u1 = static_cast<float>(module.x + module.width) /
-                       static_cast<float>(texture.width);
-            float v1 = static_cast<float>(module.y + module.height) /
-                       static_cast<float>(texture.height);
-            if ((frameModule.flags & horizontalFlip) != 0) {
-                std::swap(u0, u1);
-            }
-            if ((frameModule.flags & verticalFlip) != 0) {
-                std::swap(v0, v1);
-            }
-            const float halfWidth = particle.width * 0.5F;
-            const float halfHeight = particle.height * 0.5F;
-            const std::uint32_t color = rgbaVertexColor(particle.color);
-            const GpuVertex topLeft{point(-halfWidth, halfHeight), {},
-                                    {u0, v0}, color};
-            const GpuVertex topRight{point(halfWidth, halfHeight), {},
-                                     {u1, v0}, color};
-            const GpuVertex bottomLeft{point(-halfWidth, -halfHeight), {},
-                                       {u0, v1}, color};
-            const GpuVertex bottomRight{point(halfWidth, -halfHeight), {},
-                                        {u1, v1}, color};
-            vertices.insert(vertices.end(),
-                            {topLeft, topRight, bottomLeft, topRight,
-                             bottomRight, bottomLeft});
-        }
+        const float halfWidth = particle.width * 0.5F;
+        const float halfHeight = particle.height * 0.5F;
+        const std::uint32_t color = rgbaVertexColor(particle.color);
+        const GpuVertex topLeft{point(-halfWidth, halfHeight), {},
+                                {uv.left, uv.top}, color};
+        const GpuVertex topRight{point(halfWidth, halfHeight), {},
+                                 {uv.right, uv.top}, color};
+        const GpuVertex bottomLeft{point(-halfWidth, -halfHeight), {},
+                                   {uv.left, uv.bottom}, color};
+        const GpuVertex bottomRight{point(halfWidth, -halfHeight), {},
+                                    {uv.right, uv.bottom}, color};
+        vertices.insert(vertices.end(),
+                        {topLeft, topRight, bottomLeft, topRight,
+                         bottomRight, bottomLeft});
     };
 
     bool valid = true;
@@ -6457,6 +6428,17 @@ void D3D11Renderer::renderFrame() {
             // completed opaque depth buffer just as the native scene does.
             for (const std::uint32_t renderingLayer : {0U, 7U}) {
                 for (const GpuMesh& gpuMesh : gpuMeshes_) {
+                    const std::size_t gpuMeshIndex = static_cast<std::size_t>(
+                        &gpuMesh - gpuMeshes_.data());
+                    if (gpuMeshIndex >= playerHitEffectMeshStart_ &&
+                        gpuMeshIndex < playerHitEffectMeshStart_ +
+                                           playerHitEffectMeshCount_) {
+                        // CFpsSceneManager::drawAll (0x003995dc) draws its
+                        // dedicated HitEffects list only after the complete
+                        // transparent-node pass. Defer these pooled
+                        // CAnimObjEffect meshes until after particle systems.
+                        continue;
+                    }
                     if (gpuMesh.cameraRelative != cameraRelativePass ||
                         !gpuMesh.visible || !gpuMesh.vertexBuffer ||
                         !gpuMesh.indexBuffer || gpuMesh.textures.empty()) {
@@ -6669,6 +6651,83 @@ void D3D11Renderer::renderFrame() {
             context_->Draw(effectAdditiveVertexCount_,
                            effectAlphaVertexCount_);
         }
+    }
+
+    // CAnimObjEffect::Init (0x00390bb8) places attack-trail meshes on the
+    // scene manager's dedicated HitEffects list. CFpsSceneManager::drawAll
+    // (0x003995dc) renders that list after renderTransparent, which contains
+    // CFpsParticleSystemSceneNode splashes. Keep that compositing order rather
+    // than drawing trails with ordinary scene geometry ahead of particles.
+    if (playerHitEffectMeshCount_ != 0 &&
+        playerHitEffectMeshStart_ + playerHitEffectMeshCount_ <=
+            gpuMeshes_.size()) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                    &worldViewProjection_, 0, 0);
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        const std::array<ID3D11Buffer*, 3> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get(),
+            textureTransformBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
+        context_->RSSetState(noCullRasterizerState_.Get());
+        for (std::size_t meshIndex = playerHitEffectMeshStart_;
+             meshIndex <
+             playerHitEffectMeshStart_ + playerHitEffectMeshCount_;
+             ++meshIndex) {
+            const GpuMesh& gpuMesh = gpuMeshes_[meshIndex];
+            if (!gpuMesh.visible || !gpuMesh.vertexBuffer ||
+                !gpuMesh.indexBuffer || gpuMesh.textures.empty()) {
+                continue;
+            }
+            context_->IASetVertexBuffers(
+                0, 1, gpuMesh.vertexBuffer.GetAddressOf(), &stride, &offset);
+            context_->IASetIndexBuffer(gpuMesh.indexBuffer.Get(),
+                                       DXGI_FORMAT_R16_UINT, 0);
+            for (const DrawBatch& batch : gpuMesh.drawBatches) {
+                const TextureTransformConstants textureTransform{
+                    {batch.textureTransform[0], batch.textureTransform[2],
+                     batch.textureTransform[4], 0.0F},
+                    {batch.textureTransform[1], batch.textureTransform[3],
+                     batch.textureTransform[5], 0.0F}};
+                context_->UpdateSubresource(textureTransformBuffer_.Get(), 0,
+                                            nullptr, &textureTransform, 0, 0);
+                context_->OMSetBlendState(
+                    batch.additiveBlend ? additiveBlendState_.Get()
+                                        : alphaBlendState_.Get(),
+                    nullptr, 0xffffffffU);
+                if (batch.effectAlphaTest) {
+                    const EffectAlphaTestConstants constants{
+                        DirectX::XMFLOAT4{batch.effectAlphaReference, 0.0F,
+                                         0.0F, 0.0F}};
+                    context_->UpdateSubresource(effectAlphaTestBuffer_.Get(),
+                                                0, nullptr, &constants, 0, 0);
+                    context_->PSSetConstantBuffers(
+                        0, 1, effectAlphaTestBuffer_.GetAddressOf());
+                }
+                context_->PSSetShader(
+                    batch.effectAlphaTest ? effectAlphaTestPixelShader_.Get()
+                                          : pixelShader_.Get(),
+                    nullptr, 0);
+                context_->PSSetShaderResources(
+                    0, 1,
+                    gpuMesh.textures[batch.textureIndex].GetAddressOf());
+                context_->IASetPrimitiveTopology(batch.topology);
+                context_->DrawIndexed(batch.indexCount, batch.startIndex,
+                                      batch.baseVertex);
+            }
+        }
+        const TextureTransformConstants identityTextureTransform{
+            {1.0F, 0.0F, 0.0F, 0.0F},
+            {0.0F, 1.0F, 0.0F, 0.0F}};
+        context_->UpdateSubresource(textureTransformBuffer_.Get(), 0, nullptr,
+                                    &identityTextureTransform, 0, 0);
     }
 
     if (hintVertexCount_ != 0 && hintVertexBuffer_ && hintTexture_) {

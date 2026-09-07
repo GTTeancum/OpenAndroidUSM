@@ -5373,6 +5373,32 @@ int main() {
         assert(bootstrap.effects().atlas.frames().size() == 16);
         assert(bootstrap.effects().texture.image().width == 256);
         assert(bootstrap.effects().texture.image().height == 256);
+        for (std::int32_t frameId = 0; frameId < 16; ++frameId) {
+            const auto frameModules = bootstrap.effects().atlas.modulesForFrame(
+                static_cast<std::size_t>(frameId));
+            assert(!frameModules.empty());
+            const auto& module = bootstrap.effects().atlas.modules()[
+                frameModules.front().moduleIndex];
+            const auto uv = usm::game::effectSpriteUvRect(
+                bootstrap.effects().atlas,
+                bootstrap.effects().texture.image().width,
+                bootstrap.effects().texture.image().height, frameId);
+            assert(uv.valid);
+            assert(std::abs(uv.left -
+                            static_cast<float>(module.x) / 255.0F) <
+                   0.000001F);
+            assert(std::abs(uv.top -
+                            static_cast<float>(module.y) / 255.0F) <
+                   0.000001F);
+            assert(std::abs(uv.right -
+                            static_cast<float>(module.x + module.width) /
+                                255.0F) <
+                   0.000001F);
+            assert(std::abs(uv.bottom -
+                            static_cast<float>(module.y + module.height) /
+                                255.0F) <
+                   0.000001F);
+        }
         usm::game::NativeRandomizer effectRandomizer;
         usm::game::LevelEffectRuntime effectRuntime;
         assert(effectRuntime.initialize(bootstrap.effects().presets,
