@@ -322,10 +322,24 @@ rather than incrementally adding an offset to the static matrix.
 The asset census logs both raw indexed UV bounds and all six affine matrix
 components. Core tests pin the bat identity matrix and the knife's authored
 `U=-0.498` matrix. The first-encounter presentation gate consequently renders
-the knife thug in red and both bat thugs in blue from the shipped atlas. The
-remaining queue item is deliberately narrower: determine whether any native
-spawn path additionally varies appearances among enemies of the same weapon
-archetype.
+the two knife instances and one bat instance with their distinct shipped
+atlas regions. The first encounter has no additional spawn randomizer. A
+complete reference
+census for the executable's `random`, `rand`, `lrand48`, `Rand`, and `NRand`
+entry points finds no call from `CEnemy::ProcessUserAttr`, `CEnemy::Init`, or
+material preparation. The only `CEnemy` calls to the global two-argument
+`random` routine occur in state choice, movement/attack positioning, and voice
+selection after construction. Likewise, the native texture, diffuse-color,
+ambient-color, and vertex-color mutation helpers have no enemy-construction
+caller.
+
+`CEnemy::ProcessUserAttr` (`0x00332870`) instead passes each node's serialized
+`MeshFile` directly to `IAnimatedObject` and never replaces its texture. The
+shared thug animation bank carries no texture-transform channel, so it cannot
+change the atlas choice after load. Core tests now pin objects 394/397 to the
+knife transform and object 395 to the bat transform, including the absence of
+animated UV tracks. Randomizing these three would contradict this shipped
+Android executable and Level 1 scene.
 
 ## Automated acceptance
 
@@ -378,11 +392,3 @@ enemy interruption, crowd separation, enemy offense, player hurt reactions,
 damage, trails, target splashes, web projectiles/lines, and audio now have
 source-to-runtime acceptance coverage. Opening knife and bat types have no
 behavior-slot-8 block state, so adding a block response would be invention.
-
-## Queued native parity audits
-
-- Audit whether opening thugs of the same weapon archetype have an additional
-  native appearance-selection path. The weapon-authored atlas transforms are
-  recovered; any further selection/randomization must still be proven from
-  executable calls and shipped inputs, then reproduced deterministically in
-  tests. Do not substitute a hand-authored palette or guessed random choice.

@@ -2077,6 +2077,15 @@ animated path that replaces the static matrix with the current SData matrix;
 it does not add an offset to the prepared transform. Core assertions and the
 asset census retain both the raw UV bounds and matrix values so later
 appearance work cannot regress into a guessed tint or texture choice.
+The first-room instances are fixed by scene data: objects 394 and 397 use the
+knife mesh, while 395 uses the bat mesh. A symbol-reference census of every
+native random-number implementation (`random`, `rand`, `lrand48`, particle
+`Rand`/`NRand`) finds no call from `CEnemy::ProcessUserAttr` (`0x00332870`),
+`CEnemy::Init` (`0x00332f7c`), or material setup. The native texture and color
+mutation helpers also have no enemy-construction caller, and the shared thug
+animation bank contains no texture-transform channels. Consequently these
+opening appearances are authored, deterministic weapon variants; adding a
+same-archetype random palette would not match the shipped executable.
 
 Enemy-on-player presentation is a separate native path. Opening attack rows
 6, 7, and 11 all serialize zero horizontal/vertical force and zero post-hit

@@ -6875,14 +6875,47 @@ int main() {
             });
         assert(firstKnifeEnemy != bootstrap.enemies().end());
         assert(firstKnifeEnemy->health == 500.0F);
-        for (const std::int32_t openingEnemyId : {394, 395, 397}) {
+        struct OpeningEnemyAppearance {
+            std::int32_t objectId;
+            std::string_view gameType;
+            float textureTranslationU;
+        };
+        for (const OpeningEnemyAppearance& expected : {
+                 OpeningEnemyAppearance{394, "MeleeThugEnemy_knife", -0.498F},
+                 OpeningEnemyAppearance{395, "MeleeThugEnemy_bat", 0.0F},
+                 OpeningEnemyAppearance{397, "MeleeThugEnemy_knife", -0.498F},
+             }) {
             const auto openingEnemy = std::find_if(
                 bootstrap.enemies().begin(), bootstrap.enemies().end(),
-                [openingEnemyId](const usm::game::LevelEnemyAsset& enemy) {
-                    return enemy.objectId == openingEnemyId;
+                [&expected](const usm::game::LevelEnemyAsset& enemy) {
+                    return enemy.objectId == expected.objectId;
                 });
             assert(openingEnemy != bootstrap.enemies().end());
             assert(openingEnemy->health == 500.0F);
+            assert(openingEnemy->gameType == expected.gameType);
+            const auto& archetype =
+                bootstrap.enemyArchetypes()[openingEnemy->archetypeIndex];
+            const bool expectedMaterial = std::any_of(
+                archetype.mesh.materials().begin(),
+                archetype.mesh.materials().end(),
+                [&expected](const usm::assets::ColladaMaterial& material) {
+                    return std::abs(
+                               material.diffuseTextureTransform[4] -
+                               expected.textureTranslationU) < 0.00001F &&
+                           std::abs(material.diffuseTextureTransform[5]) <
+                               0.00001F;
+                });
+            assert(expectedMaterial);
+            assert(std::none_of(
+                archetype.animationBank.tracks().begin(),
+                archetype.animationBank.tracks().end(), [](const auto& track) {
+                    return track.property ==
+                               usm::assets::ColladaAnimationProperty::
+                                   TextureOffsetU ||
+                           track.property ==
+                               usm::assets::ColladaAnimationProperty::
+                                   TextureOffsetV;
+                }));
         }
         assert(firstKnifeEnemy->aiEnabled);
         assert(firstKnifeEnemy->lineSpeedCentimetersPerMillisecond == 0.3F);
