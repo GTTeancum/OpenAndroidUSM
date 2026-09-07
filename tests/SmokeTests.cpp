@@ -9073,6 +9073,74 @@ int main() {
         inputPhasePlayer.update({}, gameplayCameraPose, 25);
         assert(inputPhasePlayer.activeStateId() == 74);
 
+        // UpdateKeyTrigger (0x0034d0a4) scans every serialized row without
+        // breaking. Later qualifying rows replace Player+0x4d8, and the row
+        // order differs between idle, jump, and attack states.
+        const auto pressed = usm::game::PlayerButtonPhase::Pressed;
+        const auto held = usm::game::PlayerButtonPhase::Held;
+        const usm::game::PlayerAttackTarget nearPriorityTarget{
+            {90.0F, 0.0F, 0.0F}, 40.0F, 8201, false, 150.0F, true};
+        const usm::game::PlayerAttackTarget farPriorityTarget{
+            {500.0F, 0.0F, 0.0F}, 40.0F, 8202, false, 150.0F, true};
+        usm::game::GameplayPlayer idlePriorityPlayer;
+        assert(idlePriorityPlayer.initialize(bootstrap.player(), nullptr,
+                                             &playerStateConfigs));
+        idlePriorityPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                     {1.0F, 0.0F, 0.0F});
+        assert(idlePriorityPlayer.preferredInputAction(
+                   pressed, pressed, pressed, nearPriorityTarget) ==
+               usm::game::PlayerInputAction::Web);
+        assert(idlePriorityPlayer.preferredInputAction(
+                   pressed, pressed, pressed, farPriorityTarget) ==
+               usm::game::PlayerInputAction::Punch);
+
+        usm::game::GameplayPlayer attackPriorityPlayer;
+        assert(attackPriorityPlayer.initialize(bootstrap.player(), nullptr,
+                                               &playerStateConfigs));
+        attackPriorityPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                       {1.0F, 0.0F, 0.0F});
+        assert(attackPriorityPlayer.requestPunch(nearPriorityTarget));
+        attackPriorityPlayer.update({}, gameplayCameraPose, 150);
+        assert(attackPriorityPlayer.preferredInputAction(
+                   held, pressed, pressed, nearPriorityTarget) ==
+               usm::game::PlayerInputAction::Web);
+
+        usm::game::GameplayPlayer jumpPriorityPlayer;
+        assert(jumpPriorityPlayer.initialize(bootstrap.player(), nullptr,
+                                             &playerStateConfigs));
+        jumpPriorityPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                     {1.0F, 0.0F, 0.0F});
+        assert(jumpPriorityPlayer.requestJump());
+        jumpPriorityPlayer.update({}, gameplayCameraPose, 100);
+        assert(jumpPriorityPlayer.preferredInputAction(
+                   pressed, pressed, pressed, nearPriorityTarget) ==
+               usm::game::PlayerInputAction::Jump);
+
+        // Sense counter states place target-search predicate 105 after their
+        // ordinary punch and web rows. Once the retained target requires a
+        // dash, that final punch row must win and queue state 87.
+        usm::game::GameplayPlayer senseFarPriorityPlayer;
+        assert(senseFarPriorityPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        senseFarPriorityPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                         {1.0F, 0.0F, 0.0F});
+        assert(senseFarPriorityPlayer.requestSpiderSense(
+            usm::game::PlayerAttackTarget{
+                {150.0F, 0.0F, 0.0F}, 40.0F, 8203, false, 150.0F,
+                true, true, false, false, std::nullopt, false, 1, true, 0}));
+        assert(senseFarPriorityPlayer.activeStateId() == 38);
+        senseFarPriorityPlayer.update({}, gameplayCameraPose, 750);
+        auto retainedFarSenseTarget = farPriorityTarget;
+        retainedFarSenseTarget.objectId = 8203;
+        senseFarPriorityPlayer.refreshTrackedAttackTarget(
+            retainedFarSenseTarget);
+        assert(senseFarPriorityPlayer.requestPunch());
+        senseFarPriorityPlayer.update(
+            {}, gameplayCameraPose,
+            senseFarPriorityPlayer.activeAnimationDurationMilliseconds() -
+                senseFarPriorityPlayer.animationTimeMilliseconds());
+        assert(senseFarPriorityPlayer.activeStateId() == 87);
+
         // Ordinary combo predicates write only Player+0x4d8. They retain the
         // original Player+0x594 target and do not re-run either target search
         // or NeedDashToTarget when that victim has been knocked out of the

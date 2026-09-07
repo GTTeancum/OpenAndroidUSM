@@ -3143,7 +3143,50 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             std::to_string(gameplayPlayer_.activeStateId()));
                 }
             }
-            if (controlsEnabled &&
+            std::optional<PlayerTargetSelection> attackTarget;
+            std::optional<game::PlayerAttackTarget> playerAttackTarget;
+            if (controlsEnabled && punchPressed && !rescuePressed) {
+                attackTarget = acquireAttackTarget(1000.0F, 1000.0F);
+                if (attackTarget.has_value()) {
+                    playerAttackTarget = attackTarget->target;
+                }
+            }
+            const std::optional<game::PlayerButtonPhase> jumpPhase =
+                !(jumpReleased || jumpPressed || jumpHeld)
+                    ? std::nullopt
+                    : std::optional<game::PlayerButtonPhase>{
+                          jumpReleased
+                              ? game::PlayerButtonPhase::Released
+                              : jumpPressed ? game::PlayerButtonPhase::Pressed
+                                            : game::PlayerButtonPhase::Held};
+            const std::optional<game::PlayerButtonPhase> punchPhase =
+                !(punchPressed || punchHeld) || rescuePressed
+                    ? std::nullopt
+                    : std::optional<game::PlayerButtonPhase>{
+                          punchPressed ? game::PlayerButtonPhase::Pressed
+                                       : game::PlayerButtonPhase::Held};
+            const std::optional<game::PlayerButtonPhase> webPhase =
+                !(webPressed || webHeld)
+                    ? std::nullopt
+                    : std::optional<game::PlayerButtonPhase>{
+                          webPressed ? game::PlayerButtonPhase::Pressed
+                                     : game::PlayerButtonPhase::Held};
+            const std::size_t simultaneousActionCount =
+                static_cast<std::size_t>(jumpPhase.has_value()) +
+                static_cast<std::size_t>(punchPhase.has_value()) +
+                static_cast<std::size_t>(webPhase.has_value());
+            const game::PlayerInputAction preferredAction =
+                simultaneousActionCount > 1
+                    ? gameplayPlayer_.preferredInputAction(
+                          jumpPhase, punchPhase, webPhase, playerAttackTarget)
+                    : game::PlayerInputAction::None;
+            const bool dispatchJump = simultaneousActionCount <= 1 ||
+                preferredAction == game::PlayerInputAction::Jump;
+            const bool dispatchPunch = simultaneousActionCount <= 1 ||
+                preferredAction == game::PlayerInputAction::Punch;
+            const bool dispatchWeb = simultaneousActionCount <= 1 ||
+                preferredAction == game::PlayerInputAction::Web;
+            if (controlsEnabled && dispatchJump &&
                 (jumpReleased || jumpPressed || jumpHeld)) {
                 const game::PlayerButtonPhase phase = jumpReleased
                     ? game::PlayerButtonPhase::Released
@@ -3165,7 +3208,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             std::string(gameplayPlayer_.activeStateName()));
                 }
             }
-            if (controlsEnabled && webPressed) {
+            if (controlsEnabled && dispatchWeb && webPressed) {
                 const bool traversalRequest = gameplayPlayer_.airborne();
                 const float gameplayAspect = autoplay
                     ? static_cast<float>(autoplay->renderWidth()) /
@@ -3319,7 +3362,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                           "web_grab_search", detail);
                 }
             }
-            if (controlsEnabled && !webPressed && webHeld &&
+            if (controlsEnabled && dispatchWeb && !webPressed && webHeld &&
                 gameplayPlayer_.webHeldAttackTransitionReady()) {
                 const std::int32_t retainedWebTargetId =
                     gameplayPlayer_.trackedAttackTargetObjectId();
@@ -3353,15 +3396,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             if (controlsEnabled && webReleased) {
                 (void)gameplayPlayer_.releaseWeb();
             }
-            std::optional<PlayerTargetSelection> attackTarget;
-            std::optional<game::PlayerAttackTarget> playerAttackTarget;
-            if (controlsEnabled && punchPressed && !rescuePressed) {
-                attackTarget = acquireAttackTarget(1000.0F, 1000.0F);
-                if (attackTarget.has_value()) {
-                    playerAttackTarget = attackTarget->target;
-                }
-            }
-            if (controlsEnabled && (punchPressed || punchHeld) &&
+            if (controlsEnabled && dispatchPunch &&
+                (punchPressed || punchHeld) &&
                 !rescuePressed) {
                 const bool accepted = gameplayPlayer_.requestPunch(
                     punchPressed ? playerAttackTarget : std::nullopt,

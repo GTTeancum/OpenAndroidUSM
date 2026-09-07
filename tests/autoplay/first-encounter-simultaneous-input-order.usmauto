@@ -1,0 +1,36 @@
+# Exercise the production input router with multiple face buttons in one
+# fixed frame. Player::UpdateKeyTrigger (0x0034d0a4) scans the current
+# state's serialized transition rows and retains the last qualifying row.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+
+# Jump state 13 orders Punch, target-special Punch, Web, then Jump. The final
+# simultaneous row must therefore enter the authored second-jump state 30.
+teleport 13399 -6360 7 0 -1 0
+jump
+wait 100
+press_buttons jump punch web
+assert_player_state 30
+move_until_state 3000 0 0 0
+
+# Attack state 74 orders held/released Jump, Punch, then normal/black Web.
+# A same-frame Punch+Web edge must queue state 92, not combo state 75.
+punch
+wait 150
+press_buttons punch web
+move_until_state 1000 0 0 92
+assert_player_state 92
+assert_health_above 0
+finish

@@ -804,6 +804,29 @@ Result AutoplayHarness::parseScript(
             }
         } else if (command == "punch") {
             step.kind = StepKind::Punch;
+        } else if (command == "press_buttons") {
+            step.kind = StepKind::PressButtons;
+            std::string button;
+            while (tokens >> button) {
+                if (button == "jump") {
+                    step.objectIds.push_back(8);
+                } else if (button == "punch") {
+                    step.objectIds.push_back(6);
+                } else if (button == "web") {
+                    step.objectIds.push_back(5);
+                } else {
+                    return invalid(
+                        "press_buttons accepts jump, punch, and web");
+                }
+            }
+            std::ranges::sort(step.objectIds);
+            step.objectIds.erase(
+                std::unique(step.objectIds.begin(), step.objectIds.end()),
+                step.objectIds.end());
+            if (step.objectIds.size() < 2) {
+                return invalid(
+                    "press_buttons requires at least two distinct buttons");
+            }
         } else if (command == "punch_when_ready") {
             step.kind = StepKind::PunchWhenReady;
             if (!(tokens >> step.durationOrTimeoutMilliseconds) ||
@@ -1261,6 +1284,7 @@ AutoplayFrameInput AutoplayHarness::update(
         // tutorials instead of recording the frame after dismissal.
         const bool immediate = step.kind == StepKind::Jump ||
                                step.kind == StepKind::Punch ||
+                               step.kind == StepKind::PressButtons ||
                                step.kind == StepKind::SpiderSense ||
                                step.kind == StepKind::SuperAttack ||
                                step.kind == StepKind::WebOn ||
@@ -2035,6 +2059,17 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         break;
     case StepKind::Punch:
         input.punchPressed = true;
+        completeStep(snapshot, step);
+        break;
+    case StepKind::PressButtons:
+        input.jumpPressed =
+            std::ranges::find(step.objectIds, 8) != step.objectIds.end();
+        input.jumpHeld = input.jumpPressed;
+        input.punchPressed =
+            std::ranges::find(step.objectIds, 6) != step.objectIds.end();
+        input.webPressed =
+            std::ranges::find(step.objectIds, 5) != step.objectIds.end();
+        input.webHeld = input.webPressed;
         completeStep(snapshot, step);
         break;
     case StepKind::PunchWhenReady:
@@ -4617,6 +4652,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::CollectComic: return "collect_comic";
     case StepKind::Jump: return "jump";
     case StepKind::Punch: return "punch";
+    case StepKind::PressButtons: return "press_buttons";
     case StepKind::PunchWhenReady: return "punch_when_ready";
     case StepKind::PunchAttackWhenReady: return "punch_attack_when_ready";
     case StepKind::JumpAttackWhenReady: return "jump_attack_when_ready";

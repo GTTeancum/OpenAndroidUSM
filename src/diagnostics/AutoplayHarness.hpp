@@ -264,6 +264,7 @@ private:
         CollectComic,
         Jump,
         Punch,
+        PressButtons,
         PunchWhenReady,
         PunchAttackWhenReady,
         JumpAttackWhenReady,

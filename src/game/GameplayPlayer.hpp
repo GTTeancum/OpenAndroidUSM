@@ -34,6 +34,13 @@ enum class PlayerButtonPhase {
     Released,
 };
 
+enum class PlayerInputAction {
+    None,
+    Jump,
+    Punch,
+    Web,
+};
+
 struct PlayerMeleeImpact {
     std::uint16_t stateId{};
     std::string_view stateName;
@@ -211,6 +218,16 @@ public:
     [[nodiscard]] bool requestUltimate() noexcept;
     [[nodiscard]] bool requestSpiderSense(
         const PlayerAttackTarget& attacker) noexcept;
+    // Player::UpdateKeyTrigger (0x0034d0a4) scans the current state's
+    // serialized transition rows and lets later qualifying rows replace the
+    // pending state. Use this before dispatching simultaneous face buttons;
+    // a single global button order cannot reproduce the authored tables.
+    [[nodiscard]] PlayerInputAction preferredInputAction(
+        const std::optional<PlayerButtonPhase>& jump,
+        const std::optional<PlayerButtonPhase>& punch,
+        const std::optional<PlayerButtonPhase>& web,
+        const std::optional<PlayerAttackTarget>& punchTarget =
+            std::nullopt) const noexcept;
     void setWebGrabViewContext(
         const CameraPose& camera, float aspectRatio,
         std::span<const bool> roomVisibility) noexcept {
@@ -486,8 +503,10 @@ private:
     void queueSpecialAttackEffects(std::uint32_t previousMilliseconds,
                                    std::uint32_t currentMilliseconds) noexcept;
     [[nodiscard]] const PlayerStateDefinition*
-    punchTransition(PlayerButtonPhase phase =
-                        PlayerButtonPhase::Pressed) const noexcept;
+    punchTransition(
+        PlayerButtonPhase phase = PlayerButtonPhase::Pressed,
+        const std::optional<PlayerAttackTarget>& target =
+            std::nullopt) const noexcept;
     [[nodiscard]] const PlayerStateDefinition*
     webTransition(PlayerButtonPhase phase =
                       PlayerButtonPhase::Pressed) const noexcept;

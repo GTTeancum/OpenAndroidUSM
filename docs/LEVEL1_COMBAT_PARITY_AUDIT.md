@@ -134,6 +134,17 @@ makes a premature counter available.
   begins on the third update. Jump-start's state-level frame-2 input gate is
   now applied to punch, web, and second-jump requests as well as class-four
   attacks. The former path accepted all four actions too early.
+- `Player::UpdateKeyTrigger` (`0x0034d0a4`) walks the complete serialized
+  transition array and never stops at its first match. Each qualifying row
+  replaces `Player+0x4d8`, so the final matching row wins. This is not a
+  fixed face-button priority: idle state 0 selects Web over a simultaneous
+  near Punch and Jump, but its later predicate-105 far-Punch row overrides
+  Web; jump state 13 puts second Jump after Punch and Web; attack state 74
+  puts Web after held Jump and Punch. The application now arbitrates a
+  simultaneous input snapshot against that current authored row order before
+  dispatch, and same-button transition lookup likewise retains the final
+  match. State-38--41 counter continuations therefore recover their trailing
+  far-Punch transition to state 87 instead of always taking state 74.
 - `Player::UpdateAttacks` (`0x00351204`) returns immediately after
   `SetNextStateId` at `0x00353352`, and also after
   `SwitchToNextLinkAnim`. A combo state or recovery clip entered on the
@@ -286,7 +297,8 @@ current retained gates are:
 - `OpenAndroidUSM.CoreTests.exe`
 - `OpenAndroidUSM.RenderTests.exe`
 - `first-encounter-health-damage-audit.usmauto` (53/53)
-- `first-encounter-full-combo-effects.usmauto` (50/50)
+- `first-encounter-full-combo-effects.usmauto` (47/47)
+- `first-encounter-simultaneous-input-order.usmauto` (20/20)
 - `first-encounter-alternate-combat-effects.usmauto` (80/80)
 - `combat-effects-parity-gate.usmauto` (43/43)
 - `first-encounter-normal-progression.usmauto` (14/14)
@@ -327,3 +339,12 @@ behavior-slot-8 block state, so adding a block response would be invention.
   selection/randomization path and its asset/material inputs from the native
   executable and data, then reproduce that distribution deterministically in
   tests. Do not substitute a hand-authored palette or guessed random choice.
+- Finish the hit-effect alpha-combiner audit before changing its presentation.
+  Native material renderers `0x00397028` and `0x00397360` both install
+  `GL_COMBINE_ALPHA = GL_SUBTRACT` with texture alpha as source zero and the
+  material constant as source one, then use source-alpha blending.
+  `CAnimObjEffect::Update` (`0x00390a88`) separately animates the material's
+  diffuse alpha. The portable shader currently multiplies coverage by that
+  animated alpha; resolve how the original fixed-function vertex/material
+  path combines those two values and pin it with pixels rather than replacing
+  it from appearance alone.

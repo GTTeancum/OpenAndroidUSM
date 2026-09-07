@@ -841,7 +841,7 @@ bool GameplayPlayer::requestPunch(
             lastActionRejectionReason_ = "attack_window_closed";
             return false;
         }
-        requested = punchTransition(phase);
+        requested = punchTransition(phase, selectedTarget);
     } else if (beganAirborne) {
         if (phase != PlayerButtonPhase::Pressed ||
             !locomotionInputWindowOpen()) {
@@ -1491,6 +1491,110 @@ bool GameplayPlayer::requestSpiderSense(
         return false;
     }
     return true;
+}
+
+PlayerInputAction GameplayPlayer::preferredInputAction(
+    const std::optional<PlayerButtonPhase>& jump,
+    const std::optional<PlayerButtonPhase>& punch,
+    const std::optional<PlayerButtonPhase>& web,
+    const std::optional<PlayerAttackTarget>& punchTarget) const noexcept {
+    const PlayerStateDefinition* state = activeAttackState_ != nullptr
+        ? activeAttackState_
+        : activeLocomotionState_;
+    if (state == nullptr && stateDatabase_ != nullptr &&
+        !stateDatabase_->states().empty() &&
+        stateDatabase_->states().front().id == 0) {
+        // The portable grounded idle keeps no locomotion pointer, while the
+        // native Player+0x4a8 still addresses state zero's transition table.
+        state = &stateDatabase_->states().front();
+    }
+    if (state == nullptr || state->transitionFields[0].empty()) {
+        return PlayerInputAction::None;
+    }
+    if ((activeAttackState_ != nullptr && !attackInputWindowOpen()) ||
+        (activeAttackState_ == nullptr && !locomotionInputWindowOpen())) {
+        return PlayerInputAction::None;
+    }
+
+    const std::optional<PlayerAttackTarget>& selectedPunchTarget =
+        activeAttackState_ != nullptr ? activeAttackTarget_ : punchTarget;
+    const bool farPunch = selectedPunchTarget.has_value() &&
+        initialPunchState_ != nullptr && farPunchState_ != nullptr &&
+        attackStateForTarget(*initialPunchState_, selectedPunchTarget) ==
+            farPunchState_;
+    const auto phaseForButton = [&](std::int16_t button)
+        -> const std::optional<PlayerButtonPhase>* {
+        if (button == kJumpButton) {
+            return &jump;
+        }
+        if (button == kPunchButton) {
+            return &punch;
+        }
+        if (button == kWebButton) {
+            return &web;
+        }
+        return nullptr;
+    };
+    const auto actionForButton = [](std::int16_t button) {
+        return button == kJumpButton
+            ? PlayerInputAction::Jump
+            : button == kPunchButton
+                  ? PlayerInputAction::Punch
+                  : button == kWebButton ? PlayerInputAction::Web
+                                         : PlayerInputAction::None;
+    };
+
+    PlayerInputAction selected = PlayerInputAction::None;
+    const std::size_t count = std::min(
+        {state->transitionFields[0].size(),
+         state->transitionFields[1].size(),
+         state->transitionFields[2].size()});
+    for (std::size_t index = 0; index < count; ++index) {
+        const std::int16_t button = state->transitionFields[0][index];
+        const std::optional<PlayerButtonPhase>* phase =
+            phaseForButton(button);
+        if (phase == nullptr || !phase->has_value()) {
+            continue;
+        }
+        const std::int16_t predicate = state->transitionFields[1][index];
+        const bool pressed = **phase == PlayerButtonPhase::Pressed;
+        bool accepted =
+            (predicate == kPressedTransition ||
+             predicate == kNormalSuitPressedTransition) &&
+            pressed;
+        accepted = accepted ||
+            (predicate == kReleasedTransition &&
+             **phase == PlayerButtonPhase::Released) ||
+            (predicate == kHeldTransition &&
+             **phase == PlayerButtonPhase::Held);
+        if (predicate >= 1 && predicate <= 4) {
+            // VisualKeyPressed exposes the four direction events beside the
+            // held face button. Their exact quadrant chooses a target state,
+            // but every row belongs to the same face-button action.
+            accepted = pressed;
+        } else if (predicate == 105) {
+            accepted = pressed && farPunch;
+        } else if (predicate == 109) {
+            accepted = pressed && selectedPunchTarget.has_value() &&
+                selectedPunchTarget->airborne;
+        } else if (predicate == 106 || predicate == 110 ||
+                   predicate == 111) {
+            // These target-special predicates occur only in tables whose
+            // competing rows use the same face button. Preserve that button
+            // in arbitration; requestJump/requestWeb performs the complete
+            // native target-capability test before accepting the state.
+            accepted = pressed;
+        } else if (predicate == 151) {
+            // The chronological level-one runtime is the normal red suit.
+            accepted = false;
+        }
+        if (accepted) {
+            // UpdateKeyTrigger never breaks after a match. The final
+            // qualifying serialized row owns Player+0x4d8.
+            selected = actionForButton(button);
+        }
+    }
+    return selected;
 }
 
 std::vector<WebGrabCandidateDiagnostics>
@@ -4938,7 +5042,8 @@ void GameplayPlayer::queueSpecialAttackEffects(
 }
 
 const PlayerStateDefinition* GameplayPlayer::punchTransition(
-    PlayerButtonPhase phase) const noexcept {
+    PlayerButtonPhase phase,
+    const std::optional<PlayerAttackTarget>& target) const noexcept {
     if (phase == PlayerButtonPhase::Held) {
         constexpr std::array<std::int16_t, 1> held{kHeldTransition};
         return transitionForButton(kPunchButton, held);
@@ -4946,9 +5051,20 @@ const PlayerStateDefinition* GameplayPlayer::punchTransition(
     if (phase == PlayerButtonPhase::Released) {
         return nullptr;
     }
-    constexpr std::array<std::int16_t, 2> predicates{
-        kPressedTransition, kNormalSuitPressedTransition};
-    return transitionForButton(kPunchButton, predicates);
+    std::array<std::int16_t, 4> predicates{
+        kPressedTransition, kNormalSuitPressedTransition, -1, -1};
+    std::size_t count = 2;
+    if (target.has_value() && target->airborne) {
+        predicates[count++] = 109;
+    }
+    if (target.has_value() && initialPunchState_ != nullptr &&
+        farPunchState_ != nullptr &&
+        attackStateForTarget(*initialPunchState_, target) == farPunchState_) {
+        predicates[count++] = 105;
+    }
+    return transitionForButton(
+        kPunchButton,
+        std::span<const std::int16_t>(predicates.data(), count));
 }
 
 const PlayerStateDefinition* GameplayPlayer::webTransition(
@@ -4972,6 +5088,7 @@ const PlayerStateDefinition* GameplayPlayer::transitionForButton(
         std::min({activeAttackState_->transitionFields[0].size(),
                   activeAttackState_->transitionFields[1].size(),
                   activeAttackState_->transitionFields[2].size()});
+    const PlayerStateDefinition* selected = nullptr;
     for (std::size_t index = 0; index < transitionCount; ++index) {
         const std::int16_t button =
             activeAttackState_->transitionFields[0][index];
@@ -4989,10 +5106,13 @@ const PlayerStateDefinition* GameplayPlayer::transitionForButton(
         const PlayerStateDefinition& state =
             stateDatabase_->states()[static_cast<std::size_t>(target)];
         if (state.id == static_cast<std::uint16_t>(target)) {
-            return &state;
+            selected = &state;
         }
     }
-    return nullptr;
+    // Player::UpdateKeyTrigger (0x0034d0a4) scans through the complete
+    // transition array. Every qualifying row writes Player+0x4d8, so the
+    // last match wins rather than the first.
+    return selected;
 }
 
 bool GameplayPlayer::attackInputWindowOpen() const noexcept {
