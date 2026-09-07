@@ -45,17 +45,25 @@ public:
     [[nodiscard]] const assets::Vector3& travelDirection() const noexcept {
         return travelDirection_;
     }
+    [[nodiscard]] bool exitAngleReached() const noexcept {
+        return exitAngleReached_;
+    }
 
 private:
-    void refreshPose() noexcept;
+    [[nodiscard]] float finishTimeMilliseconds() const noexcept;
+    void refreshDesiredPose(assets::Vector3& desiredPosition) noexcept;
 
     const LevelWebGrabPointAsset* point_{};
     assets::Vector3 position_;
     assets::Vector3 velocityCentimetersPerSecond_;
     assets::Vector3 ropeDirection_{0.0F, 0.0F, -1.0F};
     assets::Vector3 travelDirection_{1.0F, 0.0F, 0.0F};
+    assets::Vector3 planeNormal_{0.0F, 1.0F, 0.0F};
+    assets::Vector3 horizontalOffset_;
     float angleRadians_{};
-    float angularVelocityRadiansPerSecond_{};
+    float targetAngleRadians_{};
+    float catchUpTimeMilliseconds_{};
+    bool exitAngleReached_{};
 };
 
 } // namespace usm::game

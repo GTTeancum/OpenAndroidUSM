@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -17,9 +18,10 @@ constexpr std::uint32_t kAnimationSize = 0x24;
 constexpr std::uint32_t kSourceSize = 0x0c;
 constexpr std::uint32_t kSamplerCountOffset = 0x0c;
 constexpr std::uint32_t kSamplerArrayOffset = 0x10;
-constexpr std::uint32_t kSamplerSize = 0x0c;
+constexpr std::uint32_t kSamplerSize = 0x14;
 constexpr std::uint32_t kSamplerInputSourceIndexOffset = 0x04;
 constexpr std::uint32_t kSamplerOutputSourceIndexOffset = 0x08;
+constexpr std::uint32_t kChannelSize = 0x10;
 constexpr std::uint32_t kTimestampSourceType = 4;
 constexpr std::uint32_t kFloatingPointSourceType = 6;
 constexpr std::uint32_t kAnimationClipCountOffset = 0x1c;
@@ -90,6 +92,12 @@ ColladaAnimationProperty propertyFromChannel(
         return ColladaAnimationProperty::Rotation;
     case 9:
         return ColladaAnimationProperty::RotationAngle;
+    case 10:
+        return ColladaAnimationProperty::Scale;
+    case 0x101:
+        return ColladaAnimationProperty::TextureOffsetU;
+    case 0x102:
+        return ColladaAnimationProperty::TextureOffsetV;
     default:
         break;
     }
@@ -102,53 +110,39 @@ ColladaAnimationProperty propertyFromChannel(
     return ColladaAnimationProperty::Unknown;
 }
 
-Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
-                  ColladaAnimationTrack& output) {
-    const auto idOffset = view.integer<std::uint32_t>(animationOffset);
-    const auto sourceCount = view.integer<std::uint32_t>(animationOffset + 4);
-    const auto sourcesOffset = view.integer<std::uint32_t>(animationOffset + 8);
-    const auto samplerCount =
-        view.integer<std::uint32_t>(animationOffset + kSamplerCountOffset);
-    const auto samplersOffset =
-        view.integer<std::uint32_t>(animationOffset + kSamplerArrayOffset);
-    const auto channelCount = view.integer<std::uint32_t>(animationOffset + 20);
-    const auto channelsOffset = view.integer<std::uint32_t>(animationOffset + 24);
-    if (!idOffset || !sourceCount || !sourcesOffset || !samplerCount ||
-        !samplersOffset || !channelCount || !channelsOffset ||
-        *sourceCount < 2 || *samplerCount != 1 || *channelCount == 0 ||
-        !view.contains(*sourcesOffset,
-                       static_cast<std::uint64_t>(*sourceCount) * kSourceSize) ||
-        !view.contains(*samplersOffset, kSamplerSize)) {
-        return Result::failure("BDAE animation record is invalid");
-    }
-    const auto id = view.string(*idOffset);
-    const auto targetOffset = view.integer<std::uint32_t>(*channelsOffset + 4);
-    const auto channelType = view.integer<std::uint32_t>(*channelsOffset + 8);
-    if (!id || !targetOffset || !channelType) {
-        return Result::failure("BDAE animation names are invalid");
+Result parseTrackChannel(const BinaryView& view, std::string_view id,
+                         std::uint32_t sourceCount,
+                         std::uint32_t sourcesOffset,
+                         std::uint32_t samplerOffset,
+                         std::uint32_t channelOffset,
+                         ColladaAnimationTrack& output) {
+    const auto targetOffset = view.integer<std::uint32_t>(channelOffset + 4);
+    const auto channelType = view.integer<std::uint32_t>(channelOffset + 8);
+    if (!targetOffset || !channelType) {
+        return Result::failure("BDAE animation channel is truncated");
     }
     const auto target = view.string(*targetOffset);
     if (!target) {
         return Result::failure("BDAE animation target is invalid");
     }
-
     const auto timeSourceIndex = view.integer<std::uint32_t>(
-        *samplersOffset + kSamplerInputSourceIndexOffset);
+        samplerOffset + kSamplerInputSourceIndexOffset);
     const auto valueSourceIndex = view.integer<std::uint32_t>(
-        *samplersOffset + kSamplerOutputSourceIndexOffset);
+        samplerOffset + kSamplerOutputSourceIndexOffset);
     if (!timeSourceIndex || !valueSourceIndex ||
-        *timeSourceIndex >= *sourceCount || *valueSourceIndex >= *sourceCount) {
+        *timeSourceIndex >= sourceCount || *valueSourceIndex >= sourceCount) {
         return Result::failure("BDAE animation sampler is invalid");
     }
     const std::uint32_t timeSource =
-        *sourcesOffset + *timeSourceIndex * kSourceSize;
+        sourcesOffset + *timeSourceIndex * kSourceSize;
     const std::uint32_t valueSource =
-        *sourcesOffset + *valueSourceIndex * kSourceSize;
+        sourcesOffset + *valueSourceIndex * kSourceSize;
     const ColladaAnimationProperty property =
-        propertyFromChannel(*channelType, *id);
+        propertyFromChannel(*channelType, id);
     std::uint32_t componentCount = 0;
     switch (property) {
     case ColladaAnimationProperty::Translation:
+    case ColladaAnimationProperty::Scale:
         componentCount = 3;
         break;
     case ColladaAnimationProperty::TranslationX:
@@ -160,6 +154,8 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         componentCount = 4;
         break;
     case ColladaAnimationProperty::RotationAngle:
+    case ColladaAnimationProperty::TextureOffsetU:
+    case ColladaAnimationProperty::TextureOffsetV:
         componentCount = 1;
         break;
     default:
@@ -217,7 +213,7 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         }
     }
 
-    output.id = *id;
+    output.id = id;
     output.targetNode = *target;
     output.property = property;
     output.componentCount = componentCount;
@@ -241,11 +237,62 @@ Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
         const auto value = view.floating(*valuesOffset + index * 4);
         if (!value || !std::isfinite(*value)) {
             return Result::failure(
-                "BDAE animation values are invalid for " + *id +
+                "BDAE animation values are invalid for " + std::string(id) +
                 " at scalar " + std::to_string(index));
         }
         output.values.push_back(*value);
     }
+    return Result::success();
+}
+
+Result parseTrack(const BinaryView& view, std::uint32_t animationOffset,
+                  std::vector<ColladaAnimationTrack>& output) {
+    const auto idOffset = view.integer<std::uint32_t>(animationOffset);
+    const auto sourceCount = view.integer<std::uint32_t>(animationOffset + 4);
+    const auto sourcesOffset = view.integer<std::uint32_t>(animationOffset + 8);
+    const auto samplerCount =
+        view.integer<std::uint32_t>(animationOffset + kSamplerCountOffset);
+    const auto samplersOffset =
+        view.integer<std::uint32_t>(animationOffset + kSamplerArrayOffset);
+    const auto channelCount = view.integer<std::uint32_t>(animationOffset + 20);
+    const auto channelsOffset =
+        view.integer<std::uint32_t>(animationOffset + 24);
+    if (!idOffset || !sourceCount || !sourcesOffset || !samplerCount ||
+        !samplersOffset || !channelCount || !channelsOffset ||
+        *sourceCount < 2 || *samplerCount == 0 || *channelCount == 0 ||
+        (*samplerCount != 1 && *samplerCount != *channelCount) ||
+        !view.contains(*sourcesOffset,
+                       static_cast<std::uint64_t>(*sourceCount) * kSourceSize) ||
+        !view.contains(*samplersOffset,
+                       static_cast<std::uint64_t>(*samplerCount) *
+                           kSamplerSize) ||
+        !view.contains(*channelsOffset,
+                       static_cast<std::uint64_t>(*channelCount) *
+                           kChannelSize)) {
+        return Result::failure("BDAE animation record is invalid");
+    }
+    const auto id = view.string(*idOffset);
+    if (!id || id->empty()) {
+        return Result::failure("BDAE animation name is invalid");
+    }
+    std::vector<ColladaAnimationTrack> parsed;
+    parsed.reserve(*channelCount);
+    for (std::uint32_t channelIndex = 0; channelIndex < *channelCount;
+         ++channelIndex) {
+        const std::uint32_t samplerIndex =
+            *samplerCount == 1 ? 0 : channelIndex;
+        ColladaAnimationTrack channel;
+        Result result = parseTrackChannel(
+            view, *id, *sourceCount, *sourcesOffset,
+            *samplersOffset + samplerIndex * kSamplerSize,
+            *channelsOffset + channelIndex * kChannelSize, channel);
+        if (!result) {
+            return result;
+        }
+        parsed.push_back(std::move(channel));
+    }
+    output.insert(output.end(), std::make_move_iterator(parsed.begin()),
+                  std::make_move_iterator(parsed.end()));
     return Result::success();
 }
 
@@ -426,13 +473,11 @@ Result ColladaAnimationFile::load(std::span<const std::byte> bytes) {
     }
     tracks_.reserve(*count);
     for (std::uint32_t index = 0; index < *count; ++index) {
-        ColladaAnimationTrack track;
-        result = parseTrack(view, *array + index * kAnimationSize, track);
+        result = parseTrack(view, *array + index * kAnimationSize, tracks_);
         if (!result) {
             tracks_.clear();
             return result;
         }
-        tracks_.push_back(std::move(track));
     }
     result = parseAnimationClips(view, *rootOffset, clips_);
     if (!result) {

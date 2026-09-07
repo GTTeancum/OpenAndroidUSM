@@ -1,0 +1,21 @@
+# Leave all three first-encounter enemies under production AI long enough to
+# converge on an idle player. Their authored 40 cm cylinders must remain
+# mutually separated and only one may occupy the melee-engager role.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+teleport 13399 -7000 7 0 1 0
+wait 10000
+assert_enemy_distance_above 394 395 80
+assert_enemy_distance_above 394 397 80
+assert_enemy_distance_above 395 397 80
+assert_health_above 0
+finish

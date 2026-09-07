@@ -23,7 +23,7 @@ struct TriggerEvent {
 };
 
 // Native runtime for CTrigger::Update (0x0036ac74). It evaluates the player's
-// recovered 50 x 50 x 140 cm collision box against authored AABB/OBB volumes.
+// recovered 50 x 50 x 185 cm collision box against authored AABB/OBB volumes.
 class LevelTriggerRuntime final {
 public:
     void bind(std::span<const LevelTriggerAsset> triggers);

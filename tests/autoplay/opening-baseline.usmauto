@@ -2,11 +2,30 @@
 # gameplay, hold for one second, and capture the resulting state.
 fixed_step_ms 50
 sample_interval_ms 50
-capture_interval_ms 5000
+capture_interval_ms 0
 max_time_ms 70000
 render_size 1280 720
 
 wait_gameplay 60000
+assert_audio_played SFX_CUTSCENE_LV3_SPIDY_ARRIVES
+assert_audio_played SFX_FLIP
+assert_audio_played SFX_KICK_IMPACT_1
+assert_audio_played SFX_KICK_IMPACT_2
+assert_audio_played SFX_LAND
+assert_audio_played SFX_POLICE_ARRIVING
+assert_audio_played SFX_PUNCH_IMPACT_1
+assert_audio_played SFX_THUG_BAT_HURT_1
+assert_audio_played SFX_THUG_KNIFE_HURT_1
+assert_audio_played SFX_VERTICAL_IMPACT
+assert_audio_played SFX_WALL_CLIMB_START
+assert_audio_played SFX_WEB_SWING_START
+assert_audio_played SFX_WEB_THROW_1
+assert_audio_played SFX_WOMAN_HOSTAGE_HELP
+assert_audio_played VFX_PROLOGUE_COP_01
+assert_audio_played VFX_PROLOGUE_GIRL_01
+assert_audio_played VFX_PROLOGUE_SPIDY_01
+assert_audio_played VFX_PROLOGUE_SPIDY_02
+assert_audio_played VFX_PROLOGUE_SPIDY_03
 capture gameplay-start
 wait 1000
 assert_health_above 0

@@ -5,7 +5,9 @@
 #include "game/LevelOneBootstrap.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <span>
+#include <vector>
 
 namespace usm::game {
 
@@ -29,15 +31,22 @@ struct SlideExit {
 class LevelSlideRuntime final {
 public:
     void bind(std::span<const LevelSlideAsset> slides,
-              std::span<const LevelWayPointAsset> waypoints) noexcept;
+              std::span<const LevelWayPointAsset> waypoints);
+    [[nodiscard]] Result applyCinematicCommand(
+        const CinematicCommand& command);
     [[nodiscard]] SlideCatch findCatch(
-        const assets::Vector3& playerPosition) const noexcept;
+        const assets::Vector3& playerPosition,
+        bool playerIsDownFalling = true,
+        bool allowTerminalCatch = false) const noexcept;
     [[nodiscard]] Result start(const SlideCatch& caught,
                                float speedCentimetersPerSecond) noexcept;
     [[nodiscard]] Result start(std::int32_t slideId,
                                float speedCentimetersPerSecond) noexcept;
     void update(std::uint32_t elapsedMilliseconds) noexcept;
     [[nodiscard]] SlideExit finish() noexcept;
+    [[nodiscard]] SlideExit jumpFinish(
+        std::uint32_t cooldownMilliseconds) noexcept;
+    void advanceCooldown(std::uint32_t elapsedMilliseconds) noexcept;
 
     [[nodiscard]] bool active() const noexcept { return active_; }
     [[nodiscard]] const assets::Vector3& position() const noexcept {
@@ -49,8 +58,12 @@ public:
     [[nodiscard]] const LevelSlideAsset* slide() const noexcept {
         return activeSlide_;
     }
+    [[nodiscard]] std::optional<bool> enabled(
+        std::int32_t objectId) const noexcept;
 
 private:
+    [[nodiscard]] bool enabled(
+        const LevelSlideAsset* slide) const noexcept;
     [[nodiscard]] const LevelWayPointAsset* waypoint(
         std::int32_t id) const noexcept;
     [[nodiscard]] Result enterSegment(std::size_t index,
@@ -58,7 +71,10 @@ private:
 
     std::span<const LevelSlideAsset> slides_;
     std::span<const LevelWayPointAsset> waypoints_;
+    std::vector<bool> enabled_;
     const LevelSlideAsset* activeSlide_{};
+    const LevelSlideAsset* cooldownSlide_{};
+    std::uint32_t cooldownRemainingMilliseconds_{};
     bool active_{};
     std::size_t segmentIndex_{};
     float distanceAlongSegment_{};

@@ -3,7 +3,7 @@
 # raw wall-relative forward input then climbs for one second.
 fixed_step_ms 25
 sample_interval_ms 25
-capture_interval_ms 250
+capture_interval_ms 0
 max_time_ms 57000
 start_time_ms 53033
 render_size 640 360

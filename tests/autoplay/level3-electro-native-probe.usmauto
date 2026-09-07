@@ -1,0 +1,24 @@
+# Process-local probe for the type-7 Electro runtime actor. CBoss::InitAiTask
+# (0x0032b66c) supplies the six-task queue; CSummonObjManage::Launch
+# (0x003670dc) supplies the deterministic three-object Thunderclap ring.
+# The player is moved after launch so this diagnostic observes the projectile
+# lifecycle without three coincident 50-damage contacts ending the run.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 45000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 1000
+wait_controls 25000
+teleport 24806.750000 14697.748047 -9.322998 -1 0 0
+set_enemy_ai 31094 1 1
+wait_enemy_animation 1000 31094 attack_fall
+wait_enemy_projectile 1500 31094
+teleport 23806.750000 15897.748047 -9.322998 0 -1 0
+wait 4500
+damage_enemy 31094 100000
+wait_enemy_animation 2500 31094 attack_fall
+assert_health_above 0
+finish

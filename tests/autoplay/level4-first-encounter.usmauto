@@ -1,0 +1,46 @@
+# Continue from Level 4's shipped opening through the first live encounter and
+# its authored death-watcher/door-opening handoff.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 150000
+render_size 640 360
+
+wait_cinematic_started 1000 30801
+wait_controls 50000
+wait_enemies_active 5000 30645 30648 30649 30772
+
+attack 90000 220 30645 30648 30649 30772
+assert_health_above 0
+wait_cinematic_started 5000 30771
+wait_controls 10000
+assert_camera_area 30429
+assert_audio_played SFX_DOOR_OPEN
+
+# Door cinematic 30771 repositions Spider-Man at the north end of Room 1.
+# Crossing the ordinary north volume must invoke its authored room transport.
+move_until_cinematic 56382 40820 12 40881 15000
+wait_transport_state 1000 0
+assert_audio_played SFX_SPIDER_LOGO_IN
+wait 450
+capture level4-transport-closing
+wait_transport_state 1000 1
+capture level4-transport-covered
+wait_transport_state 1000 2
+assert_camera_area 30565
+assert_audio_played SFX_SPIDER_LOGO_OUT
+wait 450
+capture level4-transport-opening
+wait_transport_state 1500 -1
+# The arrival volume immediately chains 10 -> 11, Electro's authored
+# before-boss DAE cinematic, so controls intentionally remain disabled.
+wait_cinematic_started 1000 11
+wait_controls 30000
+assert_camera_area 30565
+wait_enemies_active 5000 30709
+capture level4-electro-fight-start
+attack 90000 220 30709
+wait_cinematic_started 5000 40924
+wait_level_end 60000
+assert_health_above 0
+finish

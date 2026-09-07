@@ -1,0 +1,30 @@
+# Selects No in the native death confirmation. CLevel::DoConfirmation
+# (0x003836f8) pushes GS_ExitMenu mode 3; its 50 ms state machine at
+# 0x002c0150 clears the failed gameplay stack and requests GS_MainMenu through
+# HandleGoToMainMenuWhenFail (0x002bfcb8). No host input is generated.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_death_confirmation 5000
+menu_down
+assert_death_confirmation_selection 1
+menu_select
+wait_exit_menu 1000
+wait_main_menu_requested 2000
+assert_death_screen_inactive
+assert_death_confirmation_inactive
+finish

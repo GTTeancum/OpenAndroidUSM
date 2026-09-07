@@ -1,0 +1,47 @@
+# Exercise authored trigger volumes through the real room-visibility and
+# cinematic runtimes. Deliberate captures are added only after a route segment
+# is stable; this first pass is trace-only to avoid accumulating screenshots.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 300000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 5000
+cross_trigger 76 71 5000
+wait_enemies_active 5000 394 395 397
+wait_controls 10000
+cross_trigger 40026 40027 5000
+wait_controls 10000
+cross_trigger 971 972 5000
+wait_controls 10000
+cross_trigger 973 974 5000
+wait_controls 15000
+cross_trigger 1114 1115 5000
+wait_controls 10000
+cross_trigger 1117 1198 5000
+wait_controls 10000
+cross_trigger 1163 969 5000
+wait_controls 10000
+cross_trigger 40039 40040 5000
+wait_controls 10000
+cross_trigger 1149 1150 5000
+wait_controls 10000
+cross_trigger 10337 10338 5000
+wait_controls 10000
+cross_trigger 1147 1148 5000
+wait_controls 10000
+cross_trigger 1187 535 5000
+wait_controls 10000
+cross_trigger 20029 20004 5000
+wait_controls 20000
+cross_trigger 30004 30002 5000
+wait_controls 10000
+cross_trigger 40004 40005 5000
+wait_controls 10000
+cross_trigger 1174 1175 5000
+wait_controls 60000
+cross_trigger 1252 1253 5000
+wait_controls 30000
+finish

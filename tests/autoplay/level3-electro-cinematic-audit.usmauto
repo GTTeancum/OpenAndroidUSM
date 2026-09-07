@@ -1,0 +1,22 @@
+# Process-local replay of the authored 30408 Electro cinematic at its camera
+# and action boundaries. These timestamps come directly from
+# levelnew_03_30408_cinematic.cff.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 30000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait 250
+capture electro-message
+wait 2300
+capture electro-scream
+wait 1450
+capture electro-lightning
+wait 3150
+capture electro-wide
+wait 2200
+finish

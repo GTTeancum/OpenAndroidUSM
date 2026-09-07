@@ -1,0 +1,48 @@
+# Normal-flow enemy-offense gate for all attack variants authored by the
+# first three thugs. No damage or animation is injected: each hit is emitted
+# by the production AI, animation key, attack volume, and player hurt path.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 85000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+
+# Knife attack 6 has two live contacts at 45 and 75 percent. At 25 damage
+# apiece, one complete authored attack must take 1000 -> 950 health.
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_ai 394 1 1
+teleport 13456 -6311 7 -1 0 0
+wait_enemy_melee_attack 10000 394
+wait 800
+assert_player_state 44
+wait 500
+assert_health_above 949
+assert_health_below 951
+assert_audio_played SFX_THUG_SWOOSH
+
+# Bat state 11 first resolves the standing attack: attack 7, one 35-point
+# contact at 47 percent. The second equally ranked native outcome is the
+# jumping attack: attack 11, one 50-point contact at 70 percent.
+set_enemy_ai 394 0
+set_enemy_ai 395 1 1
+teleport 13229 -6441 7 -1 0 0
+wait_enemy_melee_attack 10000 395
+wait 950
+assert_player_state 45
+assert_health_above 914
+assert_health_below 916
+wait_enemy_animation 10000 395 idle_jump_at3_idle
+wait 1100
+assert_player_state 45
+assert_health_above 864
+assert_health_below 866
+assert_enemy_melee_attack_active 395 1
+assert_audio_played SFX_THUG_SWOOSH
+finish

@@ -1,0 +1,40 @@
+# Direct regression for Player::SendHitMessage/AddCombo/UpdateComboState and
+# CLevel::DoConfirmation. CheckPoint 755 is saved before the encounter, so its
+# serialized Player+0x580 is zero. Combat then earns a live score; Retry must
+# restore the checkpoint world while writing that live score back afterward.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 120000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 9033.422 -5652.256 366.227 1 0 0
+wait 100
+assert_last_checkpoint 755
+
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+teleport 13399 -6360 7 0 -1 0
+attack 20000 135 394
+wait 2100
+assert_combo_score_at_least 500
+
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_death_confirmation 5000
+menu_select
+wait_controls 5000
+assert_last_checkpoint 755
+assert_near 9033.422 -5652.256 366.227 5
+assert_combo_score_at_least 500
+finish

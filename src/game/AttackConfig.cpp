@@ -126,12 +126,16 @@ Result AttackConfigDatabase::load(std::span<const std::byte> bytes) {
         AttackDefinition attack;
         std::string exportedName;
         std::int32_t ignoredInteger{};
+        std::int32_t interruptibleDuringExecution{};
         float ignoredFloat{};
         if (!reader.readS16(attack.id) || !reader.readString(exportedName) ||
             !reader.readS32(ignoredInteger) ||
-            !reader.readS32(ignoredInteger) ||
+            !reader.readS32(attack.hitType) ||
             !reader.readF32(ignoredFloat) || !skipS32(reader, 3) ||
-            !reader.readF32(attack.damage) || !skipF32(reader, 3)) {
+            !reader.readF32(attack.damage) ||
+            !reader.readF32(attack.hitProtectionMilliseconds) ||
+            !reader.readF32(attack.horizontalForce) ||
+            !reader.readF32(attack.verticalForce)) {
             attacks_.clear();
             return Result::failure("Enemy attack config is truncated");
         }
@@ -144,11 +148,19 @@ Result AttackConfigDatabase::load(std::span<const std::byte> bytes) {
         }
         if (!reader.readF32(attack.minimumAngleDegrees) ||
             !reader.readF32(attack.maximumAngleDegrees) ||
-            !skipS32(reader, 9) || !reader.readF32(ignoredFloat) ||
-            !skipS32(reader, 2)) {
+            !reader.readS32(ignoredInteger) ||
+            !reader.readS32(interruptibleDuringExecution) ||
+            !skipS32(reader, 5) ||
+            !reader.readS32(attack.senseReactionType) ||
+            !skipS32(reader, 1) ||
+            !reader.readF32(attack.senseSlowMotionDenominator) ||
+            !reader.readS32(attack.forceSenseActionId) ||
+            !reader.readS32(attack.sensePhotoTargetId)) {
             attacks_.clear();
             return Result::failure("Enemy attack metadata is truncated");
         }
+        attack.interruptibleDuringExecution =
+            interruptibleDuringExecution > 0;
         std::string ignoredString;
         if (!reader.readString(ignoredString) ||
             !reader.readString(ignoredString) || !skipS32(reader, 1) ||

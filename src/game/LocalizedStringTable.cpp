@@ -47,6 +47,7 @@ std::vector<std::string> parseKeys(std::span<const std::byte> bytes) {
 Result LocalizedStringTable::load(std::span<const std::byte> mapBytes,
                                   std::span<const std::byte> dataBytes) {
     strings_.clear();
+    orderedStrings_.clear();
     if (dataBytes.size() < 4) {
         return Result::failure("Localized string data has no header");
     }
@@ -60,6 +61,7 @@ Result LocalizedStringTable::load(std::span<const std::byte> mapBytes,
     }
     const std::size_t payloadOffset = 4U + count * 4U;
     strings_.reserve(count);
+    orderedStrings_.reserve(count);
     for (std::uint32_t index = 0; index < count; ++index) {
         const std::uint32_t relativeOffset =
             readU32(dataBytes, 4U + index * 4U);
@@ -91,6 +93,7 @@ Result LocalizedStringTable::load(std::span<const std::byte> mapBytes,
             strings_.clear();
             return Result::failure("Localized string is not terminated");
         }
+        orderedStrings_.push_back(value);
         strings_.emplace(keys[index], std::move(value));
     }
     return Result::success();
@@ -103,7 +106,8 @@ const std::u16string* LocalizedStringTable::find(
 }
 
 Result LevelTextCatalog::load(const std::filesystem::path& gameDataRoot,
-                              std::string_view language) {
+                              std::string_view language,
+                              std::string_view levelTable) {
     filesystem::GbmpArchive strings;
     Result result = strings.open(gameDataRoot / "xlsStrings.pack");
     if (!result) {
@@ -123,14 +127,20 @@ Result LevelTextCatalog::load(const std::filesystem::path& gameDataRoot,
                                    dataBytes);
         return tableResult ? table.load(mapBytes, dataBytes) : tableResult;
     };
-    result = loadTable("levelnew_01", level_);
+    result = loadTable(levelTable, level_);
     if (!result) {
-        return Result::failure("Could not load level-one strings: " +
+        return Result::failure("Could not load " + std::string(levelTable) +
+                               " strings: " +
                                result.message());
     }
     result = loadTable("Tutorial", tutorial_);
+    if (!result) {
+        return Result::failure("Could not load tutorial strings: " +
+                               result.message());
+    }
+    result = loadTable("Main", main_);
     return result ? result
-                  : Result::failure("Could not load tutorial strings: " +
+                  : Result::failure("Could not load main strings: " +
                                     result.message());
 }
 

@@ -38,6 +38,7 @@ struct GameplayInputState {
     ActionButtonState upgrade;
     ActionButtonState upgradeProceed;
     ActionButtonState pause;
+    ActionButtonState menuSelected;
 
     void beginFrame() noexcept {
         web.beginFrame();
@@ -53,6 +54,7 @@ struct GameplayInputState {
         upgrade.beginFrame();
         upgradeProceed.beginFrame();
         pause.beginFrame();
+        menuSelected.beginFrame();
     }
 };
 

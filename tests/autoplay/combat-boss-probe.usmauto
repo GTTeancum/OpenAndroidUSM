@@ -1,0 +1,49 @@
+# Enter Room 13 in authored player-flow order, wait through the Collada
+# presentation and successor 1256, then defeat the enabled Sandman actor.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 260000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+cross_trigger 1252 1253 5000
+wait_controls 60000
+# Successor 1256 places Spider-Man inside trigger 1174. Its while-inside
+# cinematic 1175 enables Sandman and shows the boss health bar naturally.
+wait_enemies_active 5000 1199
+# Start about 825 cm east of Sandman's authored position.  The previous
+# coordinate was already inside the two actors' combined collision radii, so
+# this nominal "far attack" probe could only begin with a standing punch.
+teleport -17050 10534 -281 -1 0 0
+attack 120000 900 1199
+assert_audio_played M_BOSS_SANDMAN
+assert_audio_played SFX_SANDMAN_PUNCH
+assert_audio_stopped M_BOSS_SANDMAN
+wait_cinematic_started 10000 1238
+wait 5000
+capture level-ending-early
+wait 10000
+capture level-ending-middle
+wait 13000
+capture level-ending-rhino
+wait 9000
+capture level-ending-final
+assert_audio_played VFX_LV1_02_SPIDY_01
+assert_audio_played SFX_CAR_FIRE_LOOP
+assert_audio_stopped SFX_CAR_FIRE_LOOP
+assert_audio_played VFX_LV1_02_SPIDY_02
+assert_audio_played SFX_SPIDER_SENSE_IN
+assert_audio_play_count SFX_LAND 2
+assert_audio_played VFX_LV1_02_SPIDY_03
+assert_audio_played SFX_JUMP_SWOOSH_2
+assert_audio_played SFX_SANDMAN_DIES
+assert_audio_played SFX_VENOM_HITS_GROUND
+assert_audio_played SFX_CAR_IMPACT
+assert_audio_played SFX_RHINO_CAR_THROW
+assert_audio_played SFX_RHINO_LAUGH
+assert_audio_play_count SFX_RHINO_FS_1 3
+assert_audio_played SFX_RHINO_FS_2
+assert_health_above 0
+finish

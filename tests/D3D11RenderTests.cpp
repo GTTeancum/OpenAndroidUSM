@@ -1,4 +1,5 @@
 #include "renderer/d3d11/D3D11Renderer.hpp"
+#include "assets/ColladaSkinning.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "game/GameplayPlayer.hpp"
@@ -11,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -65,6 +67,49 @@ int main() {
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 #endif
     using namespace usm::assets;
+
+    // CAnimObjEffect::Init snapshots only the bone position while retaining
+    // the player's facing. A live attachment inherits the bone rotation too.
+    const std::array<float, 16> effectPlayerWorld{
+        0.0F, 1.0F, 0.0F, 0.0F,
+        -1.0F, 0.0F, 0.0F, 0.0F,
+        0.0F, 0.0F, 1.0F, 0.0F,
+        10.0F, 20.0F, 30.0F, 1.0F};
+    const std::array<float, 16> effectBoneTransform{
+        -1.0F, 0.0F, 0.0F, 0.0F,
+        0.0F, -1.0F, 0.0F, 0.0F,
+        0.0F, 0.0F, 1.0F, 0.0F,
+        5.0F, 6.0F, 7.0F, 1.0F};
+    const auto snapshotEffectTransform =
+        usm::renderer::resolvePlayerHitEffectWorldTransform(
+            effectPlayerWorld, effectBoneTransform, false);
+    const auto attachedEffectTransform =
+        usm::renderer::resolvePlayerHitEffectWorldTransform(
+            effectPlayerWorld, effectBoneTransform, true);
+    const auto driftingAttachedEffectTransform =
+        usm::renderer::resolvePlayerHitEffectWorldTransform(
+            effectPlayerWorld, effectBoneTransform, true,
+            {30.0F, -20.0F, 10.0F});
+    assert(snapshotEffectTransform[0] == effectPlayerWorld[0]);
+    assert(snapshotEffectTransform[1] == effectPlayerWorld[1]);
+    assert(snapshotEffectTransform[4] == effectPlayerWorld[4]);
+    assert(snapshotEffectTransform[5] == effectPlayerWorld[5]);
+    assert(snapshotEffectTransform[12] == 4.0F);
+    assert(snapshotEffectTransform[13] == 25.0F);
+    assert(snapshotEffectTransform[14] == 37.0F);
+    assert(attachedEffectTransform[0] != snapshotEffectTransform[0] ||
+           attachedEffectTransform[1] != snapshotEffectTransform[1]);
+    assert(attachedEffectTransform[12] == snapshotEffectTransform[12]);
+    assert(attachedEffectTransform[13] == snapshotEffectTransform[13]);
+    assert(attachedEffectTransform[14] == snapshotEffectTransform[14]);
+    // CAnimObjEffect::Update changes the parented scene node's relative
+    // position, so the live bone basis rotates this numeric velocity offset.
+    assert(driftingAttachedEffectTransform[12] ==
+           attachedEffectTransform[12] - 20.0F);
+    assert(driftingAttachedEffectTransform[13] ==
+           attachedEffectTransform[13] - 30.0F);
+    assert(driftingAttachedEffectTransform[14] ==
+           attachedEffectTransform[14] + 10.0F);
 
     ColladaGeometry triangle;
     triangle.bounds = {{-1.0F, -1.0F, 0.0F}, {1.0F, 1.0F, 0.0F}};
@@ -131,8 +176,21 @@ int main() {
         assert(playerStates.load(dataRoot));
         captureIfRequested(levelOne.hud().interfaceTexture.image(),
                            "interface-atlas.bmp");
+        captureIfRequested(levelOne.hud().tutorialTexture.image(),
+                           "tutorial-atlas.bmp");
         captureIfRequested(levelOne.effects().texture.image(),
                            "effects-atlas.bmp");
+        for (std::size_t effectId = 22; effectId <= 25; ++effectId) {
+            const auto& effect = levelOne.playerHitEffects()[effectId];
+            for (std::size_t textureIndex = 0;
+                 textureIndex < effect.textures.size(); ++textureIndex) {
+                captureIfRequested(
+                    effect.textures[textureIndex].mipLevels().front(),
+                    "combat-effect-" + std::to_string(effectId) +
+                        "-texture-" + std::to_string(textureIndex) +
+                        ".bmp");
+            }
+        }
         for (std::size_t textureIndex = 0;
              textureIndex < levelOne.introSky().textures.size();
              ++textureIndex) {
@@ -157,6 +215,19 @@ int main() {
                     .front(),
                 "spider-texture-" + std::to_string(textureIndex) + ".bmp");
         }
+        const auto carActor = std::find_if(
+            levelOne.introActors().begin(), levelOne.introActors().end(),
+            [](const usm::game::CinematicActorAsset& actor) {
+                return actor.objectId == 1262;
+            });
+        assert(carActor != levelOne.introActors().end());
+        for (std::size_t textureIndex = 0;
+             textureIndex < carActor->textures.size(); ++textureIndex) {
+            captureIfRequested(
+                carActor->textures[textureIndex].mipLevels().front(),
+                "police-car-texture-" + std::to_string(textureIndex) +
+                    ".bmp");
+        }
 
         usm::renderer::D3D11Renderer gameRenderer;
         const bool capturing =
@@ -170,6 +241,52 @@ int main() {
             std::cerr << uploadLevelResult.message() << '\n';
             return 1;
         }
+        usm::game::CinematicUiFrame deathBlackFrame;
+        deathBlackFrame.blackOverlayAlpha = 1.0F;
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), deathBlackFrame));
+        usm::game::DeathConfirmationFrame deathConfirmation;
+        deathConfirmation.visible = true;
+        deathConfirmation.selection = 0;
+        deathConfirmation.title = u"Confirmation";
+        deathConfirmation.message = u"Rhino has escaped. Retry?";
+        deathConfirmation.yes = u"YES";
+        deathConfirmation.no = u"NO";
+        assert(gameRenderer.updateDeathConfirmation(levelOne.hud(),
+                                                    deathConfirmation));
+        gameRenderer.renderFrame();
+        RgbaImage confirmationFrame;
+        assert(gameRenderer.readBackImage(confirmationFrame));
+        captureIfRequested(confirmationFrame,
+                           "gameplay-death-confirmation.bmp");
+        std::size_t confirmationColoredPixels = 0;
+        for (std::size_t component = 0;
+             component < confirmationFrame.pixels.size(); component += 4) {
+            confirmationColoredPixels +=
+                confirmationFrame.pixels[component] > 12 ||
+                confirmationFrame.pixels[component + 1] > 12 ||
+                confirmationFrame.pixels[component + 2] > 12;
+        }
+        assert(confirmationColoredPixels > 1000);
+        usm::game::DeathConfirmationFrame exitLoading;
+        exitLoading.loadingVisible = true;
+        exitLoading.loadingLabel = *levelOne.textCatalog().main().at(0x13);
+        exitLoading.loadingSuffix = *levelOne.textCatalog().main().at(0x26a);
+        assert(gameRenderer.updateDeathConfirmation(levelOne.hud(),
+                                                    exitLoading));
+        gameRenderer.renderFrame();
+        RgbaImage exitLoadingFrame;
+        assert(gameRenderer.readBackImage(exitLoadingFrame));
+        std::size_t loadingColoredPixels = 0;
+        for (std::size_t component = 0;
+             component < exitLoadingFrame.pixels.size(); component += 4) {
+            loadingColoredPixels +=
+                exitLoadingFrame.pixels[component] > 12 ||
+                exitLoadingFrame.pixels[component + 1] > 12 ||
+                exitLoadingFrame.pixels[component + 2] > 12;
+        }
+        assert(loadingColoredPixels > 10);
+        assert(gameRenderer.updateDeathConfirmation(levelOne.hud(), {}));
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), {}));
         usm::game::LevelObjectRuntime levelObjects;
         assert(levelObjects.initialize(levelOne));
         usm::game::GameplayCamera gameplayCamera;
@@ -230,6 +347,23 @@ int main() {
         captureIfRequested(actorFrame, "intro-20000.bmp");
         assert(actorFrame.pixels.size() == rendered.pixels.size());
 
+        RgbaImage policeCarFrame;
+        for (const std::uint32_t timestampMilliseconds :
+             {35300U, 37000U, 39000U, 41000U, 41800U, 45000U, 47000U,
+              48000U, 50000U, 53033U}) {
+            assert(gameRenderer.setCamera(
+                levelOne.introCamera().sample(timestampMilliseconds)));
+            assert(gameRenderer.updateLevelOneActors(
+                levelOne, timestampMilliseconds));
+            gameRenderer.renderFrame();
+            assert(gameRenderer.readBackImage(policeCarFrame));
+            captureIfRequested(
+                policeCarFrame,
+                "intro-" + std::to_string(timestampMilliseconds) +
+                    "-police-car.bmp");
+            assert(policeCarFrame.pixels.size() == rendered.pixels.size());
+        }
+
         const auto* idleClip =
             levelOne.player().animationBank.findClip("idle_stand");
         assert(idleClip != nullptr);
@@ -251,6 +385,203 @@ int main() {
         assert(gameRenderer.readBackImage(gameplayFrame));
         captureIfRequested(gameplayFrame, "gameplay-start.bmp");
         assert(gameplayFrame.pixels.size() == rendered.pixels.size());
+
+        // Player::UpdateNormalEffect (0x00348f24) emits the authored BDAE
+        // trail on the same frame as the attack hit. Render the identical
+        // player pose before and after enabling the trail so this regression
+        // cannot pass from animation movement alone.
+        usm::game::GameplayPlayer hitEffectPlayer;
+        assert(hitEffectPlayer.initialize(
+            levelOne.player(), nullptr, &playerStates, {}, {}, {}, nullptr,
+            &levelOne.playerHitEffectConfigs()));
+        assert(hitEffectPlayer.requestPunch());
+        hitEffectPlayer.update({}, gameplayPose, 174);
+        assert(hitEffectPlayer.hitEffects().empty());
+        hitEffectPlayer.update({}, gameplayPose, 1);
+        assert(hitEffectPlayer.hitEffects().size() == 1);
+        const auto* hitTrailPunchClip = levelOne.player().animationBank.findClip(
+            hitEffectPlayer.activeAnimation());
+        assert(hitTrailPunchClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *hitTrailPunchClip,
+            hitEffectPlayer.animationTimeMilliseconds(),
+            hitEffectPlayer.worldTransform()));
+        gameRenderer.renderFrame();
+        RgbaImage punchWithoutTrail;
+        assert(gameRenderer.readBackImage(punchWithoutTrail));
+        assert(gameRenderer.updatePlayerHitEffects(levelOne,
+                                                   hitEffectPlayer));
+        gameRenderer.renderFrame();
+        RgbaImage punchWithTrail;
+        assert(gameRenderer.readBackImage(punchWithTrail));
+        captureIfRequested(punchWithTrail, "gameplay-punch-hit-trail.bmp");
+        std::size_t hitTrailChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < punchWithTrail.pixels.size(); component += 4) {
+            hitTrailChangedPixels +=
+                punchWithoutTrail.pixels[component] !=
+                    punchWithTrail.pixels[component] ||
+                punchWithoutTrail.pixels[component + 1] !=
+                    punchWithTrail.pixels[component + 1] ||
+                punchWithoutTrail.pixels[component + 2] !=
+                    punchWithTrail.pixels[component + 2];
+        }
+        assert(hitTrailChangedPixels > 5);
+
+        usm::game::GameplayPlayer noHitEffectsPlayer;
+        assert(noHitEffectsPlayer.initialize(levelOne.player()));
+
+        usm::game::GameplayPlayer ultimateEffectPlayer;
+        assert(ultimateEffectPlayer.initialize(
+            levelOne.player(), nullptr, &playerStates, {}, {}, {}, nullptr,
+            &levelOne.playerHitEffectConfigs(),
+            levelOne.playerHitEffects()));
+        assert(ultimateEffectPlayer.requestUltimate());
+        const auto* ultimatePrepare =
+            playerStates.findState("k_state_ultimate_prepare");
+        assert(ultimatePrepare != nullptr);
+        const auto& ultimatePreparePrimary =
+            levelOne.player().animationBank
+                .clips()[ultimatePrepare->primaryAnimationId];
+        const auto& ultimatePrepareSecondary =
+            levelOne.player().animationBank
+                .clips()[ultimatePrepare->animationIds.front()];
+        ultimateEffectPlayer.update(
+            {}, gameplayPose,
+            ultimatePreparePrimary.durationMilliseconds() +
+                ultimatePrepareSecondary.durationMilliseconds());
+        assert(ultimateEffectPlayer.activeStateId() == 108);
+        assert(ultimateEffectPlayer.hitEffects().size() == 5);
+        const auto* ultimateWheelClip =
+            levelOne.player().animationBank.findClip(
+                ultimateEffectPlayer.activeAnimation());
+        assert(ultimateWheelClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *ultimateWheelClip,
+            ultimateEffectPlayer.animationTimeMilliseconds(),
+            ultimateEffectPlayer.worldTransform()));
+        assert(gameRenderer.updatePlayerHitEffects(levelOne,
+                                                   noHitEffectsPlayer));
+        gameRenderer.renderFrame();
+        RgbaImage ultimateWithoutEffects;
+        assert(gameRenderer.readBackImage(ultimateWithoutEffects));
+        const usm::Result ultimateEffectsResult =
+            gameRenderer.updatePlayerHitEffects(levelOne,
+                                                 ultimateEffectPlayer);
+        if (!ultimateEffectsResult) {
+            std::cerr << ultimateEffectsResult.message() << '\n';
+        }
+        assert(ultimateEffectsResult);
+        gameRenderer.renderFrame();
+        RgbaImage ultimateWithEffects;
+        assert(gameRenderer.readBackImage(ultimateWithEffects));
+        captureIfRequested(ultimateWithEffects,
+                           "gameplay-ultimate-wheel-effects.bmp");
+        std::size_t ultimateEffectChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < ultimateWithEffects.pixels.size(); component += 4) {
+            ultimateEffectChangedPixels +=
+                ultimateWithoutEffects.pixels[component] !=
+                    ultimateWithEffects.pixels[component] ||
+                ultimateWithoutEffects.pixels[component + 1] !=
+                    ultimateWithEffects.pixels[component + 1] ||
+                ultimateWithoutEffects.pixels[component + 2] !=
+                    ultimateWithEffects.pixels[component + 2];
+        }
+        assert(ultimateEffectChangedPixels > 5);
+
+        // State 109 replaces the wheel rings with the animated inward web.
+        // Verify it independently so a valid ring shader cannot mask a
+        // broken effect-animation or bone-follow path.
+        ultimateEffectPlayer.update({}, gameplayPose, 1200);
+        assert(ultimateEffectPlayer.activeStateId() == 109);
+        ultimateEffectPlayer.update({}, gameplayPose, 100);
+        assert(std::any_of(
+            ultimateEffectPlayer.hitEffects().begin(),
+            ultimateEffectPlayer.hitEffects().end(),
+            [](const auto& effect) { return effect.effectId == 25; }));
+        const auto* ultimateInClip =
+            levelOne.player().animationBank.findClip(
+                ultimateEffectPlayer.activeAnimation());
+        assert(ultimateInClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *ultimateInClip,
+            ultimateEffectPlayer.animationTimeMilliseconds(),
+            ultimateEffectPlayer.worldTransform()));
+        assert(gameRenderer.updatePlayerHitEffects(levelOne,
+                                                   noHitEffectsPlayer));
+        gameRenderer.renderFrame();
+        RgbaImage ultimateInWithoutEffect;
+        assert(gameRenderer.readBackImage(ultimateInWithoutEffect));
+        assert(gameRenderer.updatePlayerHitEffects(levelOne,
+                                                   ultimateEffectPlayer));
+        gameRenderer.renderFrame();
+        RgbaImage ultimateInWithEffect;
+        assert(gameRenderer.readBackImage(ultimateInWithEffect));
+        captureIfRequested(ultimateInWithEffect,
+                           "gameplay-ultimate-in-effect.bmp");
+        std::size_t ultimateInChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < ultimateInWithEffect.pixels.size(); component += 4) {
+            ultimateInChangedPixels +=
+                ultimateInWithoutEffect.pixels[component] !=
+                    ultimateInWithEffect.pixels[component] ||
+                ultimateInWithoutEffect.pixels[component + 1] !=
+                    ultimateInWithEffect.pixels[component + 1] ||
+                ultimateInWithoutEffect.pixels[component + 2] !=
+                    ultimateInWithEffect.pixels[component + 2];
+        }
+        assert(ultimateInChangedPixels > 5);
+
+        assert(gameRenderer.updatePlayerHitEffects(levelOne,
+                                                   noHitEffectsPlayer));
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelOne, *idleClip, 0, levelOne.player().worldTransform));
+
+        usm::game::TransportFrame coveredTransport;
+        coveredTransport.state = usm::game::TransportState::Covered;
+        coveredTransport.elapsedMilliseconds = 950.0F;
+        assert(gameRenderer.updateTransport(levelOne.hud(),
+                                            coveredTransport));
+        gameRenderer.renderFrame();
+        RgbaImage coveredTransportFrame;
+        assert(gameRenderer.readBackImage(coveredTransportFrame));
+        captureIfRequested(coveredTransportFrame,
+                           "gameplay-transport-covered.bmp");
+        for (std::size_t component = 0;
+             component < coveredTransportFrame.pixels.size();
+             component += 4) {
+            assert(coveredTransportFrame.pixels[component] < 4);
+            assert(coveredTransportFrame.pixels[component + 1] < 4);
+            assert(coveredTransportFrame.pixels[component + 2] < 4);
+        }
+
+        usm::game::TransportFrame closingTransport;
+        closingTransport.state = usm::game::TransportState::Closing;
+        closingTransport.elapsedMilliseconds = 600.0F;
+        closingTransport.scale = 8.0F;
+        assert(gameRenderer.updateTransport(levelOne.hud(),
+                                            closingTransport));
+        gameRenderer.renderFrame();
+        RgbaImage closingTransportFrame;
+        assert(gameRenderer.readBackImage(closingTransportFrame));
+        captureIfRequested(closingTransportFrame,
+                           "gameplay-transport-closing.bmp");
+        std::size_t transportBlackPixels = 0;
+        std::size_t transportVisiblePixels = 0;
+        for (std::size_t component = 0;
+             component < closingTransportFrame.pixels.size();
+             component += 4) {
+            const bool black =
+                closingTransportFrame.pixels[component] < 8 &&
+                closingTransportFrame.pixels[component + 1] < 8 &&
+                closingTransportFrame.pixels[component + 2] < 8;
+            transportBlackPixels += black;
+            transportVisiblePixels += !black;
+        }
+        assert(transportBlackPixels > 100);
+        assert(transportVisiblePixels > 100);
+        assert(gameRenderer.updateTransport(levelOne.hud(), {}));
 
         usm::game::GameplayPlayer hurtPlayer;
         assert(hurtPlayer.initialize(levelOne.player(), nullptr,
@@ -481,9 +812,12 @@ int main() {
                     bonusBaseline.pixels[component + 2];
         }
         assert(bonusStationaryChangedPixels > 2);
+        // Keep the deterministic orb near the collection point so this
+        // renderer check remains in view under CGameCamera::ResetCamera's
+        // recovered 30.236501-degree FOV (0x002f2c70).
         renderBonusRuntime.update(
             {bonus.position.x, bonus.position.y, bonus.position.z - 100.0F},
-            250);
+            100);
         assert(renderBonusRuntime.orbs().size() == 1);
         assert(bonusEffects.setPersistentEffectVisible(bonus.objectId, false));
         bonusEffects.update(300);
@@ -702,6 +1036,12 @@ int main() {
                                                           0));
         assert(gameRenderer.setCamera(
             gameplayCamera.sample(levelOne.player().position)));
+        assert(gameRenderer.updatePlayerHud(
+            levelOne.hud(), 0.65F, 0.85F, 1.0F, nullptr, 0, false, nullptr,
+            false));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayHudHiddenFrame;
+        assert(gameRenderer.readBackImage(gameplayHudHiddenFrame));
         assert(gameRenderer.updatePlayerHud(levelOne.hud(), 0.65F, 0.85F,
                                             1.0F));
         gameRenderer.renderFrame();
@@ -713,13 +1053,44 @@ int main() {
              component < gameplayHudFrame.pixels.size(); component += 4) {
             hudChangedPixels +=
                 gameplayHudFrame.pixels[component] !=
-                    gameplayFrame.pixels[component] ||
+                    gameplayHudHiddenFrame.pixels[component] ||
                 gameplayHudFrame.pixels[component + 1] !=
-                    gameplayFrame.pixels[component + 1] ||
+                    gameplayHudHiddenFrame.pixels[component + 1] ||
                 gameplayHudFrame.pixels[component + 2] !=
-                    gameplayFrame.pixels[component + 2];
+                    gameplayHudHiddenFrame.pixels[component + 2];
         }
         assert(hudChangedPixels > 100);
+        assert(gameRenderer.updatePlayerHud(
+            levelOne.hud(), 0.65F, 0.85F, 1.0F, nullptr, 0, false, nullptr,
+            false));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayHudHiddenAgainFrame;
+        assert(gameRenderer.readBackImage(gameplayHudHiddenAgainFrame));
+        assert(gameplayHudHiddenAgainFrame.pixels ==
+               gameplayHudHiddenFrame.pixels);
+        assert(gameRenderer.updatePlayerHud(levelOne.hud(), 0.65F, 0.85F,
+                                            1.0F));
+        gameRenderer.renderFrame();
+        RgbaImage gameplayHudRestoredFrame;
+        assert(gameRenderer.readBackImage(gameplayHudRestoredFrame));
+        assert(gameplayHudRestoredFrame.pixels == gameplayHudFrame.pixels);
+        assert(gameRenderer.updatePlayerHud(
+            levelOne.hud(), 0.65F, 0.85F, 1.0F, nullptr, 0, false, nullptr,
+            true, true, 0.5F));
+        gameRenderer.renderFrame();
+        RgbaImage bossProgressHudFrame;
+        assert(gameRenderer.readBackImage(bossProgressHudFrame));
+        captureIfRequested(bossProgressHudFrame,
+                           "gameplay-boss-progress-hud.bmp");
+        assert(countChangedPixels(gameplayHudFrame, bossProgressHudFrame) >
+               20);
+        assert(gameRenderer.updatePlayerHud(levelOne.hud(), 0.65F, 0.85F,
+                                            1.0F));
+        gameRenderer.renderFrame();
+        RgbaImage bossProgressHiddenAgainFrame;
+        assert(gameRenderer.readBackImage(bossProgressHiddenAgainFrame));
+        assert(bossProgressHiddenAgainFrame.pixels ==
+               gameplayHudFrame.pixels);
         usm::game::LevelHintRuntime hintRuntime;
         assert(hintRuntime.initialize(levelOne.hints()));
         assert(gameRenderer.updateLevelOneHints(hintRuntime));
@@ -766,6 +1137,7 @@ int main() {
         usm::game::LevelEnemyRuntime healthBarEnemies;
         assert(healthBarEnemies.initialize(levelOne));
         usm::game::CinematicThread showHealthThread;
+        showHealthThread.type = 1;
         showHealthThread.objectId = levelOne.player().objectId;
         usm::game::CinematicCommand showHealthCommand;
         showHealthCommand.name = "ShowHealth";
@@ -806,12 +1178,14 @@ int main() {
         }
         assert(enemyHealthChangedPixels > 100);
         usm::game::CinematicUiFrame tutorialUi;
-        tutorialUi.text = u"Press [A] to jump";
+        tutorialUi.text = u"Press [X] for a NORMAL ATTACK!";
         tutorialUi.textVisible = true;
+        tutorialUi.tutorialPanelVisible = true;
+        tutorialUi.tutorialButton = -1;
         tutorialUi.letterboxVisible = true;
         tutorialUi.quickTimeEventVisible = true;
         tutorialUi.quickTimeEventProgress = 0.5F;
-        assert(gameRenderer.updateCinematicUi(tutorialUi));
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), tutorialUi));
         gameRenderer.renderFrame();
         RgbaImage tutorialUiFrame;
         assert(gameRenderer.readBackImage(tutorialUiFrame));
@@ -828,9 +1202,140 @@ int main() {
                     gameplayHudFrame.pixels[component + 2];
         }
         assert(tutorialUiChangedPixels > 100);
+        std::size_t xboxXGlyphPixels = 0;
+        for (std::uint32_t y = tutorialUiFrame.height * 2U / 3U;
+             y < tutorialUiFrame.height; ++y) {
+            for (std::uint32_t x = tutorialUiFrame.width * 2U / 5U;
+                 x < tutorialUiFrame.width * 3U / 5U; ++x) {
+                const std::size_t component =
+                    (static_cast<std::size_t>(y) * tutorialUiFrame.width +
+                     x) * 4U;
+                const std::uint8_t red = tutorialUiFrame.pixels[component];
+                const std::uint8_t green =
+                    tutorialUiFrame.pixels[component + 1U];
+                const std::uint8_t blue =
+                    tutorialUiFrame.pixels[component + 2U];
+                xboxXGlyphPixels += red < 80U && green > 70U &&
+                                    blue > 100U;
+            }
+        }
+        assert(xboxXGlyphPixels > 5U);
+        tutorialUi.text =
+            u"When SPIDER-SENSE appears, press [LB] to counter!";
+        tutorialUi.quickTimeEventVisible = false;
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), tutorialUi));
+        gameRenderer.renderFrame();
+        RgbaImage tutorialLbUiFrame;
+        assert(gameRenderer.readBackImage(tutorialLbUiFrame));
+        captureIfRequested(tutorialLbUiFrame,
+                           "gameplay-tutorial-lb-ui.bmp");
+        std::size_t tutorialLbChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < tutorialLbUiFrame.pixels.size(); component += 4) {
+            tutorialLbChangedPixels +=
+                tutorialLbUiFrame.pixels[component] !=
+                    gameplayHudFrame.pixels[component] ||
+                tutorialLbUiFrame.pixels[component + 1] !=
+                    gameplayHudFrame.pixels[component + 1] ||
+                tutorialLbUiFrame.pixels[component + 2] !=
+                    gameplayHudFrame.pixels[component + 2];
+        }
+        assert(tutorialLbChangedPixels > 100);
+        usm::game::CinematicUiRuntime collectibleUi;
+        collectibleUi.bind(levelOne.textCatalog());
+        assert(collectibleUi.showComicCover(7));
+        const auto renderInformationNotice = [&](const char* filename) {
+            assert(gameRenderer.updateCinematicUi(
+                levelOne.hud(), collectibleUi.frame()));
+            gameRenderer.renderFrame();
+            RgbaImage notice;
+            assert(gameRenderer.readBackImage(notice));
+            captureIfRequested(notice, filename);
+            return notice;
+        };
+        const RgbaImage firstInformationNotice = renderInformationNotice(
+            "gameplay-artwork-first-information-panel.bmp");
+        // The original no-portrait panel uses the same shipped frame/font
+        // as tutorials. Assert pixel identity for equal text and frame size,
+        // not just that some subtitle pixels appeared.
+        auto equivalentTutorial = collectibleUi.frame();
+        equivalentTutorial.informationPanel =
+            usm::game::InformationPanel::None;
+        equivalentTutorial.tutorialPanelVisible = true;
+        assert(gameRenderer.updateCinematicUi(
+            levelOne.hud(), equivalentTutorial));
+        gameRenderer.renderFrame();
+        RgbaImage equivalentTutorialImage;
+        assert(gameRenderer.readBackImage(equivalentTutorialImage));
+        assert(firstInformationNotice.pixels ==
+               equivalentTutorialImage.pixels);
+        assert(collectibleUi.showComicCover(8));
+        const RgbaImage repeatInformationNotice = renderInformationNotice(
+            "gameplay-artwork-repeat-information-panel.bmp");
+        assert(firstInformationNotice.pixels != repeatInformationNotice.pixels);
+        equivalentTutorial = collectibleUi.frame();
+        equivalentTutorial.informationPanel =
+            usm::game::InformationPanel::None;
+        equivalentTutorial.tutorialPanelVisible = true;
+        assert(gameRenderer.updateCinematicUi(
+            levelOne.hud(), equivalentTutorial));
+        gameRenderer.renderFrame();
+        assert(gameRenderer.readBackImage(equivalentTutorialImage));
+        assert(repeatInformationNotice.pixels ==
+               equivalentTutorialImage.pixels);
+        const std::u16string* copMessage =
+            levelOne.textCatalog().findLevelString(
+                "STR_PROLOGUE_CINEMATIC_COP_03");
+        assert(copMessage != nullptr);
+        usm::game::CinematicUiFrame messageUi;
+        messageUi.text = *copMessage;
+        messageUi.textVisible = true;
+        messageUi.messagePanelVisible = true;
+        messageUi.messageFace = 4;
+        messageUi.messageDurationMilliseconds = 6200;
+        messageUi.messageElapsedMilliseconds = 1800;
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), messageUi));
+        gameRenderer.renderFrame();
+        RgbaImage cinematicMessageFrame;
+        assert(gameRenderer.readBackImage(cinematicMessageFrame));
+        captureIfRequested(cinematicMessageFrame,
+                           "gameplay-cinematic-message-page-1.bmp");
+        std::size_t messageChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < cinematicMessageFrame.pixels.size();
+             component += 4) {
+            messageChangedPixels +=
+                cinematicMessageFrame.pixels[component] !=
+                    gameplayHudFrame.pixels[component] ||
+                cinematicMessageFrame.pixels[component + 1] !=
+                    gameplayHudFrame.pixels[component + 1] ||
+                cinematicMessageFrame.pixels[component + 2] !=
+                    gameplayHudFrame.pixels[component + 2];
+        }
+        assert(messageChangedPixels > 100);
+        messageUi.messageElapsedMilliseconds = 6100;
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), messageUi));
+        gameRenderer.renderFrame();
+        RgbaImage cinematicMessageLastPage;
+        assert(gameRenderer.readBackImage(cinematicMessageLastPage));
+        captureIfRequested(cinematicMessageLastPage,
+                           "gameplay-cinematic-message-last-page.bmp");
+        std::size_t pageChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < cinematicMessageLastPage.pixels.size();
+             component += 4) {
+            pageChangedPixels +=
+                cinematicMessageLastPage.pixels[component] !=
+                    cinematicMessageFrame.pixels[component] ||
+                cinematicMessageLastPage.pixels[component + 1] !=
+                    cinematicMessageFrame.pixels[component + 1] ||
+                cinematicMessageLastPage.pixels[component + 2] !=
+                    cinematicMessageFrame.pixels[component + 2];
+        }
+        assert(pageChangedPixels > 100);
         usm::game::CinematicUiFrame restoreFadeUi;
         restoreFadeUi.blackOverlayAlpha = 1.0F;
-        assert(gameRenderer.updateCinematicUi(restoreFadeUi));
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), restoreFadeUi));
         gameRenderer.renderFrame();
         RgbaImage restoreFadeFrame;
         assert(gameRenderer.readBackImage(restoreFadeFrame));
@@ -842,7 +1347,7 @@ int main() {
         assert(restoreFadeFrame.pixels[restoreCenter] < 3);
         assert(restoreFadeFrame.pixels[restoreCenter + 1] < 3);
         assert(restoreFadeFrame.pixels[restoreCenter + 2] < 3);
-        assert(gameRenderer.updateCinematicUi({}));
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), {}));
         assert(gameRenderer.updateLevelOnePlayer(
             levelOne, *idleClip, idleClip->durationMilliseconds() / 2,
             levelOne.player().worldTransform));
@@ -946,7 +1451,13 @@ int main() {
                 playerWebLineFrame.pixels[component + 2] !=
                     playerJumpFrame.pixels[component + 2];
         }
-        assert(webLineChangedPixels > 2);
+        // The old guessed LINELIST changed only a handful of pixels and let
+        // an effectively absent strand pass.  At the normal 256x256 test
+        // resolution the native 20 cm textured ribbon covers more than 30
+        // pixels (the optional 1280x720 capture path covers over 500).
+        const std::size_t minimumWebLinePixels =
+            captureWidth >= 1000U ? 500U : 30U;
+        assert(webLineChangedPixels > minimumWebLinePixels);
         assert(gameRenderer.updateWebLine(false));
 
         assert(gameplayPlayer.requestPunch());
@@ -1118,12 +1629,49 @@ int main() {
             levelOne.enemyArchetypes()[chasingEnemy->asset->archetypeIndex]
                 .animationBank.findClip(chasingEnemy->activeAnimation);
         assert(hurtClip != nullptr);
-        enemies.advanceAnimations(hurtClip->durationMilliseconds() / 2U);
+        enemies.advanceAnimations(hurtClip->durationMilliseconds() / 2U,
+                                  &levelCollision);
         assert(gameRenderer.updateLevelOneEnemies(levelOne, enemies));
         gameRenderer.renderFrame();
         RgbaImage hurtFrame;
         assert(gameRenderer.readBackImage(hurtFrame));
         captureIfRequested(hurtFrame, "gameplay-enemy-hurt.bmp");
+
+        assert(enemies.applyPlayerTargetedHitDetailed(
+            394, 35.0F, 109, &enemyHitOrigin));
+        assert(enemies.find(394)->hurtStateId == 69);
+        for (std::uint32_t elapsed = 0;
+             elapsed < 5000 && enemies.find(394)->hurtStateId == 69;
+             elapsed += 25) {
+            enemies.updateGameplay(25, chaseTarget, &levelCollision);
+        }
+        assert(enemies.find(394)->hurtStateId == 70);
+        assert(enemies.landingAnimatedEffects().size() == 2);
+        const usm::Result kickdownEnemyRender =
+            gameRenderer.updateLevelOneEnemies(levelOne, enemies);
+        if (!kickdownEnemyRender) {
+            std::cerr << kickdownEnemyRender.message() << '\n';
+        }
+        assert(kickdownEnemyRender);
+        assert(gameRenderer.updateEnemyElectroEffects(levelOne, enemies));
+        gameRenderer.renderFrame();
+        RgbaImage kickdownLandingFrame;
+        assert(gameRenderer.readBackImage(kickdownLandingFrame));
+        captureIfRequested(kickdownLandingFrame,
+                           "gameplay-enemy-kickdown-landing.bmp");
+        std::size_t kickdownLandingChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < kickdownLandingFrame.pixels.size();
+             component += 4) {
+            kickdownLandingChangedPixels +=
+                kickdownLandingFrame.pixels[component] !=
+                    hurtFrame.pixels[component] ||
+                kickdownLandingFrame.pixels[component + 1] !=
+                    hurtFrame.pixels[component + 1] ||
+                kickdownLandingFrame.pixels[component + 2] !=
+                    hurtFrame.pixels[component + 2];
+        }
+        assert(kickdownLandingChangedPixels > 20);
 
         assert(enemies.applyPlayerMeleeHit(
             enemyHitOrigin, {1.0F, 0.0F, 0.0F}, 200.0F, 1000.0F));
@@ -1197,6 +1745,629 @@ int main() {
         RgbaImage finalRoomFrame;
         assert(gameRenderer.readBackImage(finalRoomFrame));
         captureIfRequested(finalRoomFrame, "gameplay-room13-overview.bmp");
+
+        usm::game::LevelOneBootstrap levelTwo;
+        const usm::Result levelTwoLoad = levelTwo.load(dataRoot, 2);
+        if (!levelTwoLoad) {
+            std::cerr << levelTwoLoad.message() << '\n';
+            return 1;
+        }
+        assert(levelTwo.levelNumber() == 2);
+        assert(levelTwo.rooms().size() == 10);
+        assert(gameRenderer.uploadLevelOneScene(levelTwo));
+        usm::game::LevelObjectRuntime levelTwoObjects;
+        assert(levelTwoObjects.initialize(levelTwo));
+        assert(gameRenderer.updateLevelOneObjects(levelTwo, levelTwoObjects));
+        usm::game::LevelEnemyRuntime levelTwoEnemies;
+        assert(levelTwoEnemies.initialize(levelTwo));
+        assert(gameRenderer.updateLevelOneEnemies(levelTwo, levelTwoEnemies));
+        assert(gameRenderer.updateEnemyMolotovs(levelTwo, {}));
+        usm::game::EnemyMolotovState levelTwoMolotov;
+        levelTwoMolotov.sourceObjectId = 642;
+        levelTwoMolotov.roomId = 1;
+        levelTwoMolotov.position = levelTwo.player().position;
+        levelTwoMolotov.position.z += 150.0F;
+        levelTwoMolotov.facing = {1.0F, 0.0F, 0.0F};
+        levelTwoMolotov.damage = 50.0F;
+        levelTwoMolotov.phaseElapsedMilliseconds = 400;
+        levelTwoMolotov.phase = usm::game::EnemyMolotovPhase::Flying;
+        levelTwoMolotov.active = true;
+        const std::array<usm::game::EnemyMolotovState, 1>
+            levelTwoMolotovs{levelTwoMolotov};
+        assert(gameRenderer.updateEnemyMolotovs(levelTwo,
+                                                levelTwoMolotovs));
+        assert(gameRenderer.updateLevelOneActors(levelTwo, 0));
+        const auto* levelTwoIdleClip =
+            levelTwo.player().animationBank.findClip("idle_stand");
+        assert(levelTwoIdleClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelTwo, *levelTwoIdleClip, 0,
+            levelTwo.player().worldTransform));
+        usm::game::GameplayCamera levelTwoCamera;
+        assert(levelTwoCamera.bind(levelTwo.cameraAreas(),
+                                   levelTwo.player().initialCameraAreaId));
+        gameRenderer.setCameraAreaRoomVisibility(
+            levelTwoCamera.mustInvisibleRooms(),
+            levelTwoCamera.mustVisibleRooms());
+        std::array<bool, 16> levelTwoCinematicRooms{};
+        gameRenderer.setCinematicVisibleRooms(levelTwoCinematicRooms);
+        assert(gameRenderer.setCamera(
+            levelTwoCamera.sample(levelTwo.player().position)));
+        gameRenderer.renderFrame();
+        RgbaImage levelTwoOpeningFrame;
+        assert(gameRenderer.readBackImage(levelTwoOpeningFrame));
+        captureIfRequested(levelTwoOpeningFrame, "level2-opening.bmp");
+        std::size_t levelTwoNonBlackPixels = 0;
+        std::size_t levelTwoColorfulPixels = 0;
+        for (std::size_t component = 0;
+             component < levelTwoOpeningFrame.pixels.size();
+             component += 4) {
+            const auto red = levelTwoOpeningFrame.pixels[component];
+            const auto green = levelTwoOpeningFrame.pixels[component + 1];
+            const auto blue = levelTwoOpeningFrame.pixels[component + 2];
+            levelTwoNonBlackPixels += red > 8 || green > 8 || blue > 8;
+            levelTwoColorfulPixels +=
+                std::max({red, green, blue}) -
+                    std::min({red, green, blue}) >
+                12;
+        }
+        assert(levelTwoNonBlackPixels >
+               levelTwoOpeningFrame.pixels.size() / 16);
+        assert(levelTwoColorfulPixels > 1000);
+
+        usm::game::LevelOneBootstrap levelThree;
+        const usm::Result levelThreeLoad = levelThree.load(dataRoot, 3);
+        if (!levelThreeLoad) {
+            std::cerr << levelThreeLoad.message() << '\n';
+            return 1;
+        }
+        assert(levelThree.levelNumber() == 3);
+        assert(levelThree.rooms().size() == 10);
+        assert(gameRenderer.uploadLevelOneScene(levelThree));
+        usm::game::LevelObjectRuntime levelThreeObjects;
+        assert(levelThreeObjects.initialize(levelThree));
+        assert(gameRenderer.updateLevelOneObjects(levelThree,
+                                                  levelThreeObjects));
+        usm::game::LevelEnemyRuntime levelThreeEnemies;
+        assert(levelThreeEnemies.initialize(levelThree));
+        assert(gameRenderer.updateLevelOneEnemies(levelThree,
+                                                  levelThreeEnemies));
+        assert(gameRenderer.updateEnemyElectroEffects(levelThree,
+                                                       levelThreeEnemies));
+        assert(gameRenderer.updateLevelOneActors(levelThree, 0));
+        const auto* levelThreeIdleClip =
+            levelThree.player().animationBank.findClip("idle_stand");
+        assert(levelThreeIdleClip != nullptr);
+        assert(gameRenderer.updateLevelOnePlayer(
+            levelThree, *levelThreeIdleClip, 0,
+            levelThree.player().worldTransform));
+        usm::game::GameplayCamera levelThreeCamera;
+        assert(levelThreeCamera.bind(levelThree.cameraAreas(),
+                                     levelThree.player().initialCameraAreaId));
+        gameRenderer.setCameraAreaRoomVisibility(
+            levelThreeCamera.mustInvisibleRooms(),
+            levelThreeCamera.mustVisibleRooms());
+        std::array<bool, 16> levelThreeCinematicRooms{};
+        gameRenderer.setCinematicVisibleRooms(levelThreeCinematicRooms);
+        assert(gameRenderer.setCamera(
+            levelThreeCamera.sample(levelThree.player().position)));
+        gameRenderer.renderFrame();
+        RgbaImage levelThreeOpeningFrame;
+        assert(gameRenderer.readBackImage(levelThreeOpeningFrame));
+        captureIfRequested(levelThreeOpeningFrame, "level3-opening.bmp");
+        std::size_t levelThreeNonBlackPixels = 0;
+        std::size_t levelThreeColorfulPixels = 0;
+        for (std::size_t component = 0;
+             component < levelThreeOpeningFrame.pixels.size();
+             component += 4) {
+            const auto red = levelThreeOpeningFrame.pixels[component];
+            const auto green = levelThreeOpeningFrame.pixels[component + 1];
+            const auto blue = levelThreeOpeningFrame.pixels[component + 2];
+            levelThreeNonBlackPixels += red > 8 || green > 8 || blue > 8;
+            levelThreeColorfulPixels +=
+                std::max({red, green, blue}) -
+                    std::min({red, green, blue}) >
+                12;
+        }
+        assert(levelThreeNonBlackPixels >
+               levelThreeOpeningFrame.pixels.size() / 16);
+        assert(levelThreeColorfulPixels > 1000);
+
+        // Native CSummonObject/CElectricPost rendering uses the exact shipped
+        // Electro meshes and material type 0x0d. Render them through WARP and
+        // require additive brightening so opaque black lightning planes cannot
+        // return unnoticed.
+        assert(levelThreeEnemies.setDiagnosticAiEnabled(31094, true));
+        const auto* renderedElectro = levelThreeEnemies.find(31094);
+        assert(renderedElectro != nullptr);
+        usm::assets::Vector3 electroVictim = renderedElectro->position;
+        levelThreeEnemies.updateGameplay(1, electroVictim, nullptr);
+        levelThreeEnemies.updateGameplay(416, electroVictim, nullptr);
+        levelThreeEnemies.updateGameplay(1, electroVictim, nullptr);
+        assert(levelThreeEnemies.thunderclaps().size() == 3);
+        const auto thunderclapPosition =
+            levelThreeEnemies.thunderclaps().front().position;
+        gameRenderer.setCameraAreaRoomVisibility({}, {});
+        const usm::game::CameraPose thunderclapCamera{
+            {thunderclapPosition.x, thunderclapPosition.y - 900.0F,
+             thunderclapPosition.z + 350.0F},
+            {thunderclapPosition.x, thunderclapPosition.y,
+             thunderclapPosition.z + 300.0F},
+            {0.0F, 0.0F, 1.0F}, 60.0F, 1.0F, 5000.0F};
+        assert(gameRenderer.setCamera(thunderclapCamera));
+        usm::game::LevelEnemyRuntime emptyLevelThreeEnemies;
+        assert(emptyLevelThreeEnemies.initialize(levelThree));
+        assert(gameRenderer.updateEnemyElectroEffects(
+            levelThree, emptyLevelThreeEnemies));
+        gameRenderer.renderFrame();
+        RgbaImage thunderclapHiddenFrame;
+        assert(gameRenderer.readBackImage(thunderclapHiddenFrame));
+        assert(gameRenderer.updateEnemyElectroEffects(levelThree,
+                                                       levelThreeEnemies));
+        gameRenderer.renderFrame();
+        RgbaImage thunderclapVisibleFrame;
+        assert(gameRenderer.readBackImage(thunderclapVisibleFrame));
+        captureIfRequested(thunderclapVisibleFrame,
+                           "level3-thunderclap-additive.bmp");
+        std::size_t thunderclapBrightenedPixels = 0;
+        std::size_t thunderclapDarkenedPixels = 0;
+        for (std::size_t component = 0;
+             component < thunderclapVisibleFrame.pixels.size();
+             component += 4) {
+            const int hidden =
+                thunderclapHiddenFrame.pixels[component] +
+                thunderclapHiddenFrame.pixels[component + 1] +
+                thunderclapHiddenFrame.pixels[component + 2];
+            const int visible =
+                thunderclapVisibleFrame.pixels[component] +
+                thunderclapVisibleFrame.pixels[component + 1] +
+                thunderclapVisibleFrame.pixels[component + 2];
+            thunderclapBrightenedPixels += visible > hidden + 6;
+            thunderclapDarkenedPixels += visible + 6 < hidden;
+        }
+        assert(thunderclapBrightenedPixels > 20);
+        assert(thunderclapDarkenedPixels == 0);
+
+        bool electroBurstRendered = false;
+        std::size_t electroBurstBrightenedPixels = 0;
+        std::size_t electroBurstDarkenedPixels = 0;
+        for (std::uint32_t elapsed = 0;
+             elapsed < 30000 &&
+             levelThreeEnemies.find(31094)->electroTask !=
+                 usm::game::ElectroBossTaskState::Rotate;
+             elapsed += 25) {
+            levelThreeEnemies.updateGameplay(25, electroVictim, nullptr);
+            if (!electroBurstRendered &&
+                !levelThreeEnemies.electroBursts().empty()) {
+                const auto burstPosition =
+                    levelThreeEnemies.electroBursts().front().position;
+                const usm::game::CameraPose burstCamera{
+                    {burstPosition.x, burstPosition.y - 1200.0F,
+                     burstPosition.z + 300.0F},
+                    burstPosition, {0.0F, 0.0F, 1.0F}, 60.0F, 1.0F,
+                    6000.0F};
+                assert(gameRenderer.setCamera(burstCamera));
+                assert(gameRenderer.updateEnemyElectroEffects(
+                    levelThree, emptyLevelThreeEnemies));
+                gameRenderer.renderFrame();
+                RgbaImage burstHiddenFrame;
+                assert(gameRenderer.readBackImage(burstHiddenFrame));
+                assert(gameRenderer.updateEnemyElectroEffects(
+                    levelThree, levelThreeEnemies));
+                gameRenderer.renderFrame();
+                RgbaImage burstVisibleFrame;
+                assert(gameRenderer.readBackImage(burstVisibleFrame));
+                captureIfRequested(burstVisibleFrame,
+                                   "level3-electro-weak-burst-additive.bmp");
+                for (std::size_t component = 0;
+                     component < burstVisibleFrame.pixels.size();
+                     component += 4) {
+                    const int hidden =
+                        burstHiddenFrame.pixels[component] +
+                        burstHiddenFrame.pixels[component + 1] +
+                        burstHiddenFrame.pixels[component + 2];
+                    const int visible =
+                        burstVisibleFrame.pixels[component] +
+                        burstVisibleFrame.pixels[component + 1] +
+                        burstVisibleFrame.pixels[component + 2];
+                    electroBurstBrightenedPixels += visible > hidden + 6;
+                    electroBurstDarkenedPixels += visible + 6 < hidden;
+                }
+                electroBurstRendered = true;
+            }
+            (void)levelThreeEnemies.consumePlayerHits();
+            (void)levelThreeEnemies.consumeProjectileEvents();
+            (void)levelThreeEnemies.consumeEffectCues();
+        }
+        assert(electroBurstRendered);
+        assert(electroBurstBrightenedPixels > 20);
+        assert(electroBurstDarkenedPixels == 0);
+        assert(levelThreeEnemies.find(31094)->electroTask ==
+               usm::game::ElectroBossTaskState::Rotate);
+        assert(levelThreeEnemies.electricPosts().size() == 3);
+        const auto postCenter = levelThreeEnemies.electricPosts()[0].position;
+        const usm::game::CameraPose electricPostCamera{
+            {postCenter.x, postCenter.y - 1200.0F, postCenter.z + 500.0F},
+            {postCenter.x, postCenter.y, postCenter.z + 200.0F},
+            {0.0F, 0.0F, 1.0F}, 60.0F, 1.0F, 6000.0F};
+        assert(gameRenderer.setCamera(electricPostCamera));
+        assert(gameRenderer.updateEnemyElectroEffects(
+            levelThree, emptyLevelThreeEnemies));
+        gameRenderer.renderFrame();
+        RgbaImage electricPostsHiddenFrame;
+        assert(gameRenderer.readBackImage(electricPostsHiddenFrame));
+        assert(gameRenderer.updateEnemyElectroEffects(levelThree,
+                                                       levelThreeEnemies));
+        gameRenderer.renderFrame();
+        RgbaImage electricPostsVisibleFrame;
+        assert(gameRenderer.readBackImage(electricPostsVisibleFrame));
+        captureIfRequested(electricPostsVisibleFrame,
+                           "level3-electric-posts-additive.bmp");
+        std::size_t electricPostBrightenedPixels = 0;
+        std::size_t electricPostDarkenedPixels = 0;
+        for (std::size_t component = 0;
+             component < electricPostsVisibleFrame.pixels.size();
+             component += 4) {
+            const int hidden =
+                electricPostsHiddenFrame.pixels[component] +
+                electricPostsHiddenFrame.pixels[component + 1] +
+                electricPostsHiddenFrame.pixels[component + 2];
+            const int visible =
+                electricPostsVisibleFrame.pixels[component] +
+                electricPostsVisibleFrame.pixels[component + 1] +
+                electricPostsVisibleFrame.pixels[component + 2];
+            electricPostBrightenedPixels += visible > hidden + 6;
+            electricPostDarkenedPixels += visible + 6 < hidden;
+        }
+        assert(electricPostBrightenedPixels > 20);
+        assert(electricPostDarkenedPixels == 0);
+
+        // CCinematicThread::ActiveRoom (0x00371d54) opens the CRoom+0x90
+        // movement gate; CRoom::Move (0x0036d8c0) changes the complete room
+        // scene-node transform. Exercise the shipped Level 7 Room22 mesh
+        // through WARP before and after that exact command path.
+        usm::game::LevelOneBootstrap levelSeven;
+        const usm::Result levelSevenLoad = levelSeven.load(dataRoot, 7);
+        if (!levelSevenLoad) {
+            std::cerr << levelSevenLoad.message() << '\n';
+            return 1;
+        }
+        assert(gameRenderer.uploadLevelOneScene(levelSeven));
+
+        // CLevel::LoadNextObject's Train branch must materialize the shipped
+        // train.bdae scene node before its commands can affect a real object.
+        // Compare the same WARP frame with Level 7 Train3 visible/hidden so
+        // this cannot regress to a telemetry-only train state.
+        usm::game::LevelObjectRuntime levelSevenObjects;
+        assert(levelSevenObjects.initialize(levelSeven));
+        const auto* renderedTrain = levelSevenObjects.find(60564);
+        assert(renderedTrain != nullptr && renderedTrain->asset != nullptr);
+        assert(renderedTrain->asset->kind ==
+               usm::game::LevelObjectKind::Train);
+        std::array<bool, 16> levelSevenVisibleRooms{};
+        levelSevenVisibleRooms[6] = true;
+        gameRenderer.setCinematicVisibleRooms(levelSevenVisibleRooms);
+        const usm::game::CameraPose trainCameraPose{
+            {renderedTrain->position.x + 2200.0F,
+             renderedTrain->position.y,
+             renderedTrain->position.z + 700.0F},
+            {renderedTrain->position.x, renderedTrain->position.y,
+             renderedTrain->position.z + 100.0F},
+            {0.0F, 0.0F, 1.0F}, 60.0F, 10.0F, 6000.0F};
+        assert(gameRenderer.updateLevelOneObjects(levelSeven,
+                                                  levelSevenObjects));
+        assert(gameRenderer.setCamera(trainCameraPose));
+        gameRenderer.renderFrame();
+        RgbaImage trainVisibleFrame;
+        assert(gameRenderer.readBackImage(trainVisibleFrame));
+
+        const auto trainBossRush = std::find_if(
+            levelSeven.cinematics().begin(), levelSeven.cinematics().end(),
+            [](const auto& cinematic) {
+                return cinematic.objectId == 61175;
+            });
+        assert(trainBossRush != levelSeven.cinematics().end());
+        const auto movingTrainThread = std::find_if(
+            trainBossRush->script.threads().begin(),
+            trainBossRush->script.threads().end(), [](const auto& thread) {
+                return thread.objectId == 60564;
+            });
+        assert(movingTrainThread != trainBossRush->script.threads().end());
+        usm::game::LevelObjectRuntime movingTrainObjects;
+        assert(movingTrainObjects.initialize(levelSeven));
+        for (const std::string_view commandName :
+             {std::string_view{"CutTrain"},
+              std::string_view{"FollowWayPoint"},
+              std::string_view{"EnableAI"}}) {
+            const auto command = std::find_if(
+                movingTrainThread->commands.begin(),
+                movingTrainThread->commands.end(),
+                [commandName](const auto& candidate) {
+                    return candidate.name == commandName;
+                });
+            assert(command != movingTrainThread->commands.end());
+            assert(movingTrainObjects.applyCinematicCommand(
+                levelSeven, *movingTrainThread, *command));
+        }
+        movingTrainObjects.advanceAnimations(500);
+        const auto* advancedTrain = movingTrainObjects.find(60564);
+        assert(advancedTrain != nullptr);
+        assert(std::hypot(advancedTrain->position.x -
+                              renderedTrain->position.x,
+                          advancedTrain->position.y -
+                              renderedTrain->position.y,
+                          advancedTrain->position.z -
+                              renderedTrain->position.z) > 490.0F);
+        assert(gameRenderer.updateLevelOneObjects(levelSeven,
+                                                  movingTrainObjects));
+        gameRenderer.renderFrame();
+        RgbaImage trainAdvancedFrame;
+        assert(gameRenderer.readBackImage(trainAdvancedFrame));
+        std::size_t trainMotionChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < trainVisibleFrame.pixels.size(); component += 4) {
+            trainMotionChangedPixels +=
+                trainVisibleFrame.pixels[component] !=
+                    trainAdvancedFrame.pixels[component] ||
+                trainVisibleFrame.pixels[component + 1] !=
+                    trainAdvancedFrame.pixels[component + 1] ||
+                trainVisibleFrame.pixels[component + 2] !=
+                    trainAdvancedFrame.pixels[component + 2];
+        }
+        assert(trainMotionChangedPixels > 100);
+
+        usm::game::CinematicThread trainThread;
+        trainThread.objectId = 60564;
+        usm::game::CinematicCommand hideTrain;
+        hideTrain.name = "SetVisible";
+        hideTrain.attributes.push_back({"bool", "Visible", "false"});
+        assert(levelSevenObjects.applyCinematicCommand(
+            levelSeven, trainThread, hideTrain));
+        assert(gameRenderer.updateLevelOneObjects(levelSeven,
+                                                  levelSevenObjects));
+        gameRenderer.renderFrame();
+        RgbaImage trainHiddenFrame;
+        assert(gameRenderer.readBackImage(trainHiddenFrame));
+        std::size_t trainChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < trainVisibleFrame.pixels.size(); component += 4) {
+            trainChangedPixels +=
+                trainVisibleFrame.pixels[component] !=
+                    trainHiddenFrame.pixels[component] ||
+                trainVisibleFrame.pixels[component + 1] !=
+                    trainHiddenFrame.pixels[component + 1] ||
+                trainVisibleFrame.pixels[component + 2] !=
+                    trainHiddenFrame.pixels[component + 2];
+        }
+        assert(trainChangedPixels > 100);
+
+        const auto movingRoom = std::find_if(
+            levelSeven.rooms().begin(), levelSeven.rooms().end(),
+            [](const auto& room) { return room.objectId == 61204; });
+        assert(movingRoom != levelSeven.rooms().end());
+        usm::assets::Vector3 movingRoomMinimum{
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max()};
+        usm::assets::Vector3 movingRoomMaximum{
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::lowest()};
+        for (const auto& geometry :
+             movingRoom->geometry.sceneGeometries()) {
+            movingRoomMinimum.x =
+                std::min(movingRoomMinimum.x, geometry.bounds.minimum.x);
+            movingRoomMinimum.y =
+                std::min(movingRoomMinimum.y, geometry.bounds.minimum.y);
+            movingRoomMinimum.z =
+                std::min(movingRoomMinimum.z, geometry.bounds.minimum.z);
+            movingRoomMaximum.x =
+                std::max(movingRoomMaximum.x, geometry.bounds.maximum.x);
+            movingRoomMaximum.y =
+                std::max(movingRoomMaximum.y, geometry.bounds.maximum.y);
+            movingRoomMaximum.z =
+                std::max(movingRoomMaximum.z, geometry.bounds.maximum.z);
+        }
+        const usm::assets::Vector3 movingRoomCenter{
+            (movingRoomMinimum.x + movingRoomMaximum.x) * 0.5F,
+            (movingRoomMinimum.y + movingRoomMaximum.y) * 0.5F,
+            (movingRoomMinimum.z + movingRoomMaximum.z) * 0.5F};
+        const float movingRoomExtent = std::max(
+            {movingRoomMaximum.x - movingRoomMinimum.x,
+             movingRoomMaximum.y - movingRoomMinimum.y,
+             movingRoomMaximum.z - movingRoomMinimum.z});
+        assert(std::isfinite(movingRoomExtent) && movingRoomExtent > 0.0F);
+        const float movingRoomCameraDistance =
+            std::max(1000.0F, movingRoomExtent * 0.8F);
+        const usm::game::CameraPose movingRoomCameraPose{
+            {movingRoomCenter.x,
+             movingRoomCenter.y - movingRoomCameraDistance,
+             movingRoomCenter.z + movingRoomExtent * 0.15F},
+            movingRoomCenter,
+            {0.0F, 0.0F, 1.0F}, 60.0F,
+            std::max(1.0F, movingRoomExtent * 0.001F),
+            movingRoomCameraDistance * 8.0F};
+        usm::game::LevelTriggerRuntime levelSevenTriggers;
+        levelSevenTriggers.bind(levelSeven.triggers());
+        usm::game::GameplayCamera levelSevenCamera;
+        assert(levelSevenCamera.bind(
+            levelSeven.cameraAreas(),
+            levelSeven.player().initialCameraAreaId));
+        usm::game::LevelCinematicRuntime levelSevenCinematics;
+        levelSevenCinematics.bind(levelSevenTriggers, levelSevenCamera,
+                                  levelSeven.waypoints(),
+                                  levelSeven.rooms());
+        assert(gameRenderer.updateLevelRooms(levelSeven,
+                                             levelSevenCinematics));
+        assert(gameRenderer.setCamera(movingRoomCameraPose));
+        gameRenderer.renderFrame();
+        RgbaImage movingRoomInitialFrame;
+        assert(gameRenderer.readBackImage(movingRoomInitialFrame));
+
+        const auto bossRush = std::find_if(
+            levelSeven.cinematics().begin(), levelSeven.cinematics().end(),
+            [](const auto& cinematic) {
+                return cinematic.objectId == 61175;
+            });
+        assert(bossRush != levelSeven.cinematics().end());
+        const usm::game::CinematicThread* activeRoomThread = nullptr;
+        const usm::game::CinematicCommand* activeRoomCommand = nullptr;
+        for (const auto& thread : bossRush->script.threads()) {
+            for (const auto& command : thread.commands) {
+                const auto* geometry =
+                    command.findAttribute("^ID^Geometry");
+                if (command.name == "ActiveRoom" && geometry != nullptr &&
+                    geometry->value == "61204") {
+                    activeRoomThread = &thread;
+                    activeRoomCommand = &command;
+                    break;
+                }
+            }
+            if (activeRoomCommand != nullptr) {
+                break;
+            }
+        }
+        assert(activeRoomThread != nullptr && activeRoomCommand != nullptr);
+        assert(levelSevenCinematics.applyCommand(*activeRoomThread,
+                                                 *activeRoomCommand));
+        levelSevenCinematics.advanceRoomMotion(1000);
+        assert(std::abs(
+                   levelSevenCinematics.findRoomMotion(61204)->position.y) >
+               1000.0F);
+        assert(gameRenderer.updateLevelRooms(levelSeven,
+                                             levelSevenCinematics));
+        assert(gameRenderer.setCamera(movingRoomCameraPose));
+        gameRenderer.renderFrame();
+        RgbaImage movingRoomAdvancedFrame;
+        assert(gameRenderer.readBackImage(movingRoomAdvancedFrame));
+        std::size_t movingRoomChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < movingRoomAdvancedFrame.pixels.size();
+             component += 4) {
+            movingRoomChangedPixels +=
+                movingRoomAdvancedFrame.pixels[component] !=
+                    movingRoomInitialFrame.pixels[component] ||
+                movingRoomAdvancedFrame.pixels[component + 1] !=
+                    movingRoomInitialFrame.pixels[component + 1] ||
+                movingRoomAdvancedFrame.pixels[component + 2] !=
+                    movingRoomInitialFrame.pixels[component + 2];
+        }
+        assert(movingRoomChangedPixels > 100);
+
+        // Both CBoomerang constructors (0x0035b3fc/0x0035b604) load
+        // phantom_unit_weapons.bdae. At 0x0035b568/0x0035b728, r1 is the
+        // native string `weapons` at 0x004e538a, r2=true and r3=0. Exercise
+        // that exact packaged mesh/clip through WARP so the recovered
+        // projectile cannot regress into a logic-only placeholder.
+        usm::game::LevelOneBootstrap levelEight;
+        const usm::Result levelEightLoad = levelEight.load(dataRoot, 8);
+        if (!levelEightLoad) {
+            std::cerr << levelEightLoad.message() << '\n';
+            return 1;
+        }
+        assert(levelEight.levelNumber() == 8);
+        assert(gameRenderer.uploadLevelOneScene(levelEight));
+        usm::game::LevelEnemyRuntime levelEightEnemies;
+        assert(levelEightEnemies.initialize(levelEight));
+        assert(gameRenderer.updateLevelOneEnemies(levelEight,
+                                                  levelEightEnemies));
+        assert(gameRenderer.updateLevelOneActors(levelEight, 0));
+        assert(gameRenderer.updateEnemyBoomerangs(levelEight, {}));
+
+        const auto& boomerangAsset = levelEight.boomerangProjectile();
+        const auto* boomerangAnimation =
+            boomerangAsset.animationBank.findClip("weapons");
+        assert(boomerangAnimation != nullptr);
+        std::vector<usm::assets::ColladaGeometry> boomerangGeometry;
+        assert(usm::assets::evaluateColladaPose(
+            boomerangAsset.mesh, boomerangAsset.animationBank,
+            boomerangAnimation->startMilliseconds, boomerangGeometry));
+        usm::assets::Vector3 boomerangMinimum{
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max(),
+            std::numeric_limits<float>::max()};
+        usm::assets::Vector3 boomerangMaximum{
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::lowest(),
+            std::numeric_limits<float>::lowest()};
+        for (const auto& geometry : boomerangGeometry) {
+            for (const auto& vertex : geometry.vertices) {
+                boomerangMinimum.x =
+                    std::min(boomerangMinimum.x, vertex.position.x);
+                boomerangMinimum.y =
+                    std::min(boomerangMinimum.y, vertex.position.y);
+                boomerangMinimum.z =
+                    std::min(boomerangMinimum.z, vertex.position.z);
+                boomerangMaximum.x =
+                    std::max(boomerangMaximum.x, vertex.position.x);
+                boomerangMaximum.y =
+                    std::max(boomerangMaximum.y, vertex.position.y);
+                boomerangMaximum.z =
+                    std::max(boomerangMaximum.z, vertex.position.z);
+            }
+        }
+        const usm::assets::Vector3 boomerangCenter{
+            (boomerangMinimum.x + boomerangMaximum.x) * 0.5F,
+            (boomerangMinimum.y + boomerangMaximum.y) * 0.5F,
+            (boomerangMinimum.z + boomerangMaximum.z) * 0.5F};
+        const float boomerangExtent = std::max(
+            {boomerangMaximum.x - boomerangMinimum.x,
+             boomerangMaximum.y - boomerangMinimum.y,
+             boomerangMaximum.z - boomerangMinimum.z});
+        assert(std::isfinite(boomerangExtent) && boomerangExtent > 0.0F);
+
+        std::array<bool, 16> levelEightCinematicRooms{};
+        gameRenderer.setCinematicVisibleRooms(levelEightCinematicRooms);
+        gameRenderer.setCameraAreaRoomVisibility({}, {});
+        const float boomerangCameraDistance =
+            boomerangExtent * 1.5F;
+        const float boomerangNearPlane =
+            std::max(boomerangExtent * 0.01F, 0.001F);
+        const usm::game::CameraPose boomerangCamera{
+            {0.0F, -boomerangCameraDistance, 0.0F},
+            {0.0F, 0.0F, 0.0F},
+            {0.0F, 0.0F, 1.0F}, 60.0F, boomerangNearPlane,
+            std::max(boomerangCameraDistance * 5.0F,
+                     boomerangNearPlane + 1.0F)};
+        assert(gameRenderer.setCamera(boomerangCamera));
+        gameRenderer.renderFrame();
+        RgbaImage boomerangHiddenFrame;
+        assert(gameRenderer.readBackImage(boomerangHiddenFrame));
+
+        usm::game::EnemyBoomerangState renderedBoomerang;
+        renderedBoomerang.sourceObjectId = 40524;
+        renderedBoomerang.roomId = 7;
+        // Facing -Y yields the identity local basis in the portable renderer;
+        // offset the authored mesh center to put the exact asset on camera.
+        renderedBoomerang.position = {-boomerangCenter.x,
+                                      -boomerangCenter.y,
+                                      -boomerangCenter.z};
+        renderedBoomerang.facing = {0.0F, -1.0F, 0.0F};
+        renderedBoomerang.damage = 40.0F;
+        renderedBoomerang.phaseElapsedMilliseconds = 100;
+        renderedBoomerang.phase =
+            usm::game::EnemyBoomerangPhase::Outbound;
+        renderedBoomerang.active = true;
+        assert(gameRenderer.updateEnemyBoomerangs(
+            levelEight, {&renderedBoomerang, 1}));
+        gameRenderer.renderFrame();
+        RgbaImage boomerangVisibleFrame;
+        assert(gameRenderer.readBackImage(boomerangVisibleFrame));
+        captureIfRequested(boomerangVisibleFrame,
+                           "level8-robot-phantom-boomerang.bmp");
+        std::size_t boomerangChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < boomerangVisibleFrame.pixels.size();
+             component += 4) {
+            boomerangChangedPixels +=
+                boomerangVisibleFrame.pixels[component] !=
+                    boomerangHiddenFrame.pixels[component] ||
+                boomerangVisibleFrame.pixels[component + 1] !=
+                    boomerangHiddenFrame.pixels[component + 1] ||
+                boomerangVisibleFrame.pixels[component + 2] !=
+                    boomerangHiddenFrame.pixels[component + 2];
+        }
+        assert(boomerangChangedPixels > 20);
     }
     return 0;
 }

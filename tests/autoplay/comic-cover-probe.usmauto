@@ -1,0 +1,22 @@
+# Exercises native CComicCover::Update collection twice: expanded mesh AABB,
+# visibility removal, VoxSound record 0, authored profile index, first-session
+# five-second notice, and subsequent three-second notice.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 60000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 5632.700 -5888.769 4.802 1 0 0
+collect_comic 2000 40011
+assert_comic_collected 40011
+assert_audio_played SFX_SPECIAL_COLLECT
+capture first-comic-cover-notice
+teleport 11184.358 -3979.116 107.591 1 0 0
+collect_comic 2000 40023
+assert_comic_collected 40023
+capture repeat-comic-cover-notice
+wait 100
+finish

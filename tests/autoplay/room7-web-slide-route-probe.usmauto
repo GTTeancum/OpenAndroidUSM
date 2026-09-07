@@ -1,0 +1,66 @@
+# Focused continuation from Slide 1038's terminal WayPoint 430 through the
+# next rooftop cohort, WebGrabPoints 441/443, and Slide 1039.  The teleport is
+# diagnostic setup only; post-crash-route-probe carries the finalized segment
+# in uninterrupted player flow.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 120000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+teleport 4214 8558 2454 -1 0 0
+wait_enemies_grounded 5000 618 10342 10343
+capture room7-rooftop-encounter-ready
+attack 70000 180 618 10342 10343
+capture room7-rooftop-encounter-complete
+move_until_state 3000 0 0 0
+
+# The landing roof ends at x=2939; the adjacent 2612 cm roof begins there
+# one storey higher.  Use an ordinary jump before approaching point 441.
+move_to 3050 8450 2454 100 6000
+jump
+move_to 2600 8450 2612 200 6000
+move_until_state 3000 0 0 0
+move_to 2250 7800 2612 100 4000
+capture room7-web441-takeoff
+jump
+wait 100
+web_on
+move_until_state 2500 0 0 18
+capture room7-web441-swing
+move_until_state 3000 0 0 19
+capture room7-web441-release
+
+# Point 441's automatic exit crosses the first gap.  Once motion 19 returns
+# to ordinary airborne state 15, point 443 is the next facing-valid grab.
+move_until_state 2500 0 0 15
+web_on
+move_until_state 2500 0 0 18
+capture room7-web443-swing
+move_until_state 3000 0 0 19
+capture room7-web443-release
+
+# Point 443 is authored with WayPoint 445, so motion 28 feeds Slide 1039
+# without player-authored coordinates or a diagnostic teleport.
+move_until_state 5000 0 0 23
+capture room7-second-slide-catch
+move_until_state 2000 0 0 22
+assert_audio_played SFX_SLIDING
+wait 2250
+# Forced motion 28 hands its approximately 1219 cm/s arrival speed to
+# CSlider, so this uninterrupted chain advances farther than the standalone
+# 700 cm/s slide fixture after the same interval.
+assert_near -5790 6699 1960 200
+capture room7-second-slide-moving
+# Native obbox::test_obb applies a world-space broad phase before volume 554's
+# oriented containment test.  The slide stays outside that gate and reaches
+# waypoint 446, directly above the adjoining roof.
+move_until_state 5000 0 0 15
+capture room7-second-slide-exit
+move_until_state 2000 0 0 16
+move_until_state 1000 0 0 0
+capture room7-second-slide-landing
+assert_health_above 0
+finish

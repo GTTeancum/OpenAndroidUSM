@@ -131,10 +131,16 @@ EnemyAttackIntervalConfigDatabase::findForWeaponType(
     }
     const auto mapIndex = static_cast<std::int32_t>(
         std::distance(kRangeWeaponTypes.begin(), map));
+    return findByWeaponTypeMapIndex(mapIndex);
+}
+
+const EnemyAttackIntervalDefinition*
+EnemyAttackIntervalConfigDatabase::findByWeaponTypeMapIndex(
+    std::int32_t weaponTypeMapIndex) const noexcept {
     const auto definition = std::find_if(
         definitions_.begin(), definitions_.end(),
-        [mapIndex](const EnemyAttackIntervalDefinition& candidate) {
-            return candidate.weaponTypeMapIndex == mapIndex;
+        [weaponTypeMapIndex](const EnemyAttackIntervalDefinition& candidate) {
+            return candidate.weaponTypeMapIndex == weaponTypeMapIndex;
         });
     return definition == definitions_.end() ? nullptr : &*definition;
 }

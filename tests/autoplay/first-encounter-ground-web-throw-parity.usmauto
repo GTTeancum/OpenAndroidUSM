@@ -1,0 +1,53 @@
+# Source-authored held-shot -> bind -> backward throw -> 540 throw branch.
+# Enemy decisions are frozen only after normal encounter activation; combat
+# input, retained targeting, animation timing, damage, web lines, and reaction
+# dispatch all remain on the production application path.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_physics 394 1
+teleport 13399 -6360 7 0 -1 0
+
+web_on
+move_until_state 500 0 0 58
+web_held_attack_when_ready 1000
+move_until_state 1000 0 0 60
+assert_enemy_health_near 394 480 0.01
+
+# A new B/Circle press in state 60 selects state 65 instead of the no-input
+# zero-damage state-62 recovery.
+web_attack_when_ready 1000
+move_until_state 1000 0 0 65
+assert_player_state 65
+assert_enemy_health_near 394 480 0.01
+
+# State 65's 100 damage is delivered at authored frame 21 (700 ms), not at
+# entry. Buffer another web press during its native frame 3..13 window.
+web_attack_when_ready 1000
+assert_enemy_health_near 394 480 0.01
+wait 560
+assert_enemy_health_near 394 380 0.01
+move_until_state 1000 0 0 66
+assert_player_state 66
+assert_enemy_health_near 394 380 0.01
+
+# State 66 is a non-damaging bind link. State 67 applies 220 only when its
+# 634 ms primary 540-degree throw clip completes.
+move_until_state 1000 0 0 67
+assert_player_state 67
+assert_enemy_health_near 394 380 0.01
+wait 650
+assert_enemy_health_near 394 160 0.01
+assert_health_above 0
+finish

@@ -22,6 +22,21 @@ struct EffectParticleState {
     std::int32_t roomId{-1};
 };
 
+struct PersistentEffectCheckPointState {
+    std::int32_t sourceObjectId{-1};
+    std::int32_t delayMilliseconds{};
+    float emissionRemainder{};
+    bool visible{true};
+};
+
+// ResetLevel clears live emitters and particles before CLevel::Load restores
+// saved object visibility (0x003832d0, 0x00388450). Persistent emitters are
+// portable renderer state, so their mutable values are captured explicitly.
+struct LevelEffectCheckPointState {
+    std::vector<PersistentEffectCheckPointState> persistentEffects;
+    std::uint32_t randomState{};
+};
+
 // Portable one-shot effect state created by CCinematicThread::PlayEffect
 // (0x003712f8). It exposes renderer-neutral billboard particles only.
 class LevelEffectRuntime final {
@@ -43,6 +58,9 @@ public:
         std::int32_t sourceObjectId = -1);
     [[nodiscard]] Result setPersistentEffectVisible(
         std::int32_t sourceObjectId, bool visible) noexcept;
+    [[nodiscard]] LevelEffectCheckPointState saveCheckPointState() const;
+    [[nodiscard]] Result loadCheckPointState(
+        const LevelEffectCheckPointState& state);
     void update(std::uint32_t elapsedMilliseconds) noexcept;
 
     [[nodiscard]] std::span<const EffectParticleState> particles() const

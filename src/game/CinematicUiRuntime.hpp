@@ -9,9 +9,22 @@
 
 namespace usm::game {
 
+enum class InformationPanel : std::uint8_t {
+    None,
+    Expanded,
+    Compact,
+};
+
 struct CinematicUiFrame {
     std::u16string text;
     bool textVisible{};
+    bool tutorialPanelVisible{};
+    std::int32_t tutorialButton{-1};
+    InformationPanel informationPanel{InformationPanel::None};
+    bool messagePanelVisible{};
+    std::int32_t messageFace{-1};
+    std::int32_t messageElapsedMilliseconds{};
+    std::int32_t messageDurationMilliseconds{};
     bool letterboxVisible{};
     bool dimBackground{};
     bool quickTimeEventVisible{};
@@ -25,6 +38,10 @@ class CinematicUiRuntime final {
 public:
     void bind(const LevelTextCatalog& strings) noexcept;
     [[nodiscard]] Result applyCommand(const CinematicCommand& command);
+    [[nodiscard]] Result showComicCover(std::int32_t comicIndex);
+    void setColladaMovieUi(bool active) noexcept {
+        letterboxVisible_ = active;
+    }
     void update(std::uint32_t elapsedMilliseconds,
                 bool dismissPressed) noexcept;
     [[nodiscard]] CinematicUiFrame frame(bool quickTimeEventVisible = false,
@@ -34,8 +51,17 @@ public:
     [[nodiscard]] bool tutorialVisible() const noexcept {
         return tutorialVisible_;
     }
+    [[nodiscard]] bool modalTutorialVisible() const noexcept {
+        // CTutorial::AddInfo (0x0038dea0) stores Timer < 1 as the modal flag.
+        // CLevel::Update (0x003820bc) returns before world/player/physics
+        // simulation while that tutorial remains visible.
+        return tutorialVisible_ && tutorialRemainingMilliseconds_ < 1;
+    }
     [[nodiscard]] bool messageVisible() const noexcept {
         return messageVisible_;
+    }
+    [[nodiscard]] bool letterboxVisible() const noexcept {
+        return letterboxVisible_;
     }
 
 private:
@@ -43,11 +69,17 @@ private:
     std::u16string tutorialText_;
     std::u16string messageText_;
     std::int32_t tutorialRemainingMilliseconds_{};
+    std::int32_t tutorialButton_{-1};
     std::int32_t messageRemainingMilliseconds_{};
+    std::int32_t messageDurationMilliseconds_{};
+    std::int32_t messageFace_{-1};
     bool tutorialVisible_{};
     bool messageVisible_{};
+    bool messagePanelVisible_{};
+    InformationPanel informationPanel_{InformationPanel::None};
     bool tutorialDimBackground_{};
     bool letterboxVisible_{};
+    bool comicCoverTipShown_{};
 };
 
 } // namespace usm::game

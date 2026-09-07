@@ -1,0 +1,53 @@
+# Prove that one player-style X/Square press and one B/Circle press enter the
+# production input path and reduce live first-encounter enemy health. Unlike
+# the goal-directed `attack` step, these commands do not steer, retry, or
+# repeatedly inject input on later combo windows.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+
+set_enemy_ai 394 0
+teleport 13399 -6360 7 0 -1 0
+punch
+wait 400
+assert_enemy_health_below 394 500
+
+# Face away from the cluster so the native no-stick path falls back to the
+# nearest enemy (395) instead of preferring the farther actor most centered
+# in the look cone. Keep its PhysicsEntity active: motion 123 now travels
+# through the real CBullet collision path instead of dispatching an instant
+# targeted hit.
+teleport 13148 -6335 7 0 1 0
+web_on
+wait 400
+assert_enemy_health_below 395 500
+
+# A Circle/B press during the ordinary jump must prefer CTargetHelper's native
+# nearest non-airborne list. Inside 200 cm, GetAirWebSpecialState selects the
+# authored 99 -> 100 -> 104 knockdown path before CanBeTiedUp is consulted.
+set_enemy_ai 397 0
+# Isolate a fresh target: enemy 395 is still tied by the preceding ground-web
+# shot, while enemy 397 is closest to this position.
+teleport 13100 -6536 7 1 0 0
+set_enemy_physics 397 1
+jump
+web_on
+move_until_state 250 0 0 99
+web_off
+move_until_state 1000 0 0 100
+move_until_state 1500 0 0 104
+wait 100
+assert_player_effect 19 1
+wait_enemy_animation 3000 397 onground_to_whirl_flying
+assert_enemy_health_near 397 300 0.01
+assert_audio_played SFX_VERTICAL_IMPACT
+assert_health_above 0
+finish

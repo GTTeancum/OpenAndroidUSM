@@ -1,0 +1,34 @@
+# Prove the uninterrupted player-controlled path from the opening spawn,
+# through the first three-enemy fight, into the authored truck/Sandman crash.
+# Unlike the focused combat probe, this does not teleport between targets or
+# directly start the post-fight cinematic.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 180000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 60000
+move_to 14067 -8205 7 100 25000
+wait_enemies_active 10000 394 395 397
+
+# Approach and defeat the complete live cohort through ordinary movement and
+# button-driven attacks.  The attack driver only supplies controller-style
+# movement/punch input; all targeting, animation, contact, and damage remain
+# runtime behavior.
+attack 90000 200 394 395 397
+assert_health_above 0
+
+# Cinematic 1162 is the concurrent authored death watcher.  It must start
+# 1170 naturally, which chains into crash cinematic 1212 without a harness
+# command naming either cinematic.
+wait_cinematic_started 5000 1170
+wait_cinematic_started 15000 1212
+wait_controls 15000
+assert_camera_area 304
+assert_audio_played SFX_TRUCK_ARRIVES
+assert_audio_played SFX_TRUCK_ENDS
+assert_audio_played SFX_TRUCK_HIT
+assert_health_above 0
+finish

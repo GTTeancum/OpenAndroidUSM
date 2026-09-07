@@ -1,0 +1,21 @@
+# Street cohort in Room 4. Isolated from other rooms so health and AI timing
+# failures remain attributable to these four authored enemies.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 170000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport -254 -550 2 0 -1 0
+attack 20000 150 416
+teleport -121 1100 2 0 1 0
+attack 20000 150 418
+teleport -279 750 2 0 1 0
+attack 20000 150 419
+# Actor 417 is deliberately authored behind the east building collision at
+# x=589.734. It is not referenced by a death watcher or encounter gate and is
+# not part of the reachable street cohort.
+assert_health_above 0
+finish

@@ -1,0 +1,65 @@
+# Deterministic production-input gate for the normal-suit six-button ground
+# combo. Enemy decisions are frozen after the authored first-encounter
+# activation so their attacks cannot make combo windows flaky.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+# Leave exactly the first five states' native 295 damage. State 91 therefore
+# defeats the retained victim immediately before the ordinary state-78 combo
+# transition. Player::UpdateKeyTrigger (0x0034d0a4) does not run a new target
+# search for that transition; state 78's sector contacts may hit another actor.
+damage_enemy 394 205
+teleport 13399 -6360 7 0 -1 0
+
+punch
+assert_player_state 74
+punch_when_ready 1000
+move_until_state 1000 0 0 75
+assert_player_state 75
+assert_player_effect 0 1
+capture combo-right-punch
+punch_when_ready 1000
+move_until_state 1000 0 0 79
+assert_player_state 79
+assert_player_effect 1 1
+capture combo-left-punch
+punch_when_ready 1000
+move_until_state 1000 0 0 90
+assert_player_state 90
+assert_player_effect 10 1
+capture combo-right-kick
+punch_when_ready 1000
+move_until_state 1000 0 0 91
+assert_player_state 91
+# The authored 200 ms lifetime leaves the final state-90 FX_LL trail alive
+# at this transition; the preceding trails have already expired.
+assert_player_effect 5 1
+capture combo-fast-kick
+punch_when_ready 1000
+move_until_state 1000 0 0 78
+assert_player_state 78
+# The retained state-91 trail is still alive when state 78 begins.
+assert_player_effect 5 1
+capture combo-double-kick-entry
+wait 300
+assert_player_effect 12 1
+capture combo-double-kick-first-impact
+wait 200
+assert_player_effect 13 1
+capture combo-double-kick-second-impact
+move_until_state 1500 0 0 0
+wait 2100
+assert_combo_score_at_least 1
+assert_health_above 0
+finish

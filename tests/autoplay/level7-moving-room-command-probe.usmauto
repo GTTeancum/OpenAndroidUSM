@@ -1,0 +1,15 @@
+# Process-local proof of the shipped moving-room command path. Cinematic
+# 61175 issues ActiveRoom at timestamp zero for Geometry IDs 61205, 61204,
+# 60039, 60030 and 60009. CRoom::Move (0x0036d8c0) then advances the four
+# rooms that carry authored waypoint links; rooms.csv records the exact state.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 45000
+render_size 640 360
+
+wait_gameplay 30000
+start_cinematic 61175
+wait 500
+assert_object_near 60564 70196.9 40256.4 -180.7 2
+finish

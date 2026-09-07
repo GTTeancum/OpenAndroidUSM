@@ -13,9 +13,19 @@
   the initial Windows backend; reconstructed gameplay code must not depend on
   D3D types.
 - Prefer deterministic, non-interactive tests and headless analysis scripts.
+- Do not invoke the built OpenAndroidUSM executable with `--help`; it has no
+  help switch. Verify supported command-line arguments from source and invoke
+  only arguments that are implemented there.
+- Work through the game chronologically in normal player-flow order. Finish
+  the current playable sequence and its blocking reconstruction issues before
+  moving to later areas or levels; only investigate later code when it is a
+  required dependency for the current sequence.
+- Resolve game behavior by reverse engineering the original executable and
+  shipped data. Do not invent, approximate, tune by feel, or independently
+  design an answer when native behavior is unresolved; obtain direct code or
+  data evidence first, record its address/source, and implement that result.
 - Record original addresses for reconstructed functions until an automated
   source map supersedes them.
 - The current stopping milestone is verified first-level gameplay with no
   known graphical or audio issues. At that point, stop changing the project
   and request user review without marking the durable goal complete.
-

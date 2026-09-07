@@ -1,0 +1,17 @@
+# Deterministic, bounded audit for the final police-car dialogue. Explicit
+# frames cover the car/building composition, following camera beat, and the
+# native two-line message page transition without interval screenshots.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 50000
+start_time_ms 41800
+render_size 1280 720
+
+wait 1800
+capture police-car-dialogue
+wait 1000
+capture police-car-followup
+wait 3000
+capture police-car-dialogue-last-page
+finish

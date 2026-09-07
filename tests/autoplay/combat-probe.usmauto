@@ -2,19 +2,40 @@
 # the encounter cinematic and its concurrent death-condition monitor together.
 fixed_step_ms 50
 sample_interval_ms 50
-capture_interval_ms 2500
-max_time_ms 110000
+capture_interval_ms 0
+max_time_ms 140000
 start_time_ms 53033
 render_size 1280 720
 
 wait_gameplay 60000
-teleport 13266 -5940 10 0 1 0
+# Cross the authored oriented trigger, then wait until cinematic 71 has moved
+# all three enemies into the plaza and enabled their AI/physics. Attacking the
+# reset staging coordinates exercises disabled actors, not the encounter.
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
 capture first-encounter-start
-attack 12000 135 394
-teleport 12598 -6000 10 0 -1 0
-attack 12000 135 395
-teleport 12444 -6380 24 0 -1 0
-attack 12000 135 397
+teleport 13399 -6360 7 0 -1 0
+attack 20000 135 394
+teleport 13148 -6335 7 0 -1 0
+attack 20000 135 395
+teleport 13046 -6620 7 0 -1 0
+attack 20000 135 397
 capture first-encounter-cleared
+wait_cinematic_started 15000 1212
+wait_controls 15000
+capture sandman-crash-resolved
+assert_audio_played SFX_TRUCK_ARRIVES
+assert_audio_played SFX_TRUCK_ENDS
+assert_audio_played SFX_TRUCK_HIT
+assert_audio_played SFX_SANDMAN_HURT_1
+assert_audio_played SFX_GREEN_GOBLIN_JUMP
+# Use the real post-crash jump route. The previous cross_trigger driver
+# teleported into this elevated volume and could not detect a player-facing
+# collision or traversal regression at the first progression gate.
+jump
+move_until_cinematic 13152 -6396 408 20038 5000
+wait_cinematic_started 5000 20038
+capture jump-arrow-hidden
 assert_health_above 0
 finish

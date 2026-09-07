@@ -13,10 +13,20 @@ Result EnemyBehaviorSoundBank::preload(
     std::span<const std::int16_t> enemyTypeIds) {
     decodedByVoxId_.clear();
     std::set<std::int32_t> voxSoundIds;
-    constexpr std::string_view stateNames[]{
-        "ENEMY_BEHAVIOR_HURT_STATE_COMMON", "ENEMY_BEHAVIOR_DEAD_STATE"};
+    // CBehaviorHurt state 0x45 queues VoxSound 0x4b directly when an air
+    // kickdown reaches the ground (native 0x003b8e5c). It does not pass
+    // through a BehaviorConfigs state or animation sound map, so include that
+    // source-authored cue explicitly in the predecoded combat bank.
+    voxSoundIds.insert(0x4b);
     for (const std::int16_t enemyTypeId : enemyTypeIds) {
-        for (const std::string_view stateName : stateNames) {
+        for (const game::EnemyBehaviorStateDefinition& state :
+             behaviorConfigs.states()) {
+            const std::string_view stateName = state.name;
+            if (!stateName.starts_with("ENEMY_BEHAVIOR_HURT_STATE_") &&
+                stateName != "ENEMY_BEHAVIOR_DEAD_STATE" &&
+                stateName != "ENEMY_BEHAVIOR_DEAD_STATE_ON_WALL") {
+                continue;
+            }
             const auto stateIds = behaviorConfigs.resolveStateSoundIds(
                 stateName, enemyTypeId);
             voxSoundIds.insert(stateIds.begin(), stateIds.end());

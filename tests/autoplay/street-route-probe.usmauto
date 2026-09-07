@@ -1,0 +1,16 @@
+# Reach the first encounter from the authored player spawn using only normal
+# gameplay motion. This catches collision-shell side errors that the focused
+# combat probes intentionally bypass with setup teleports.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 90000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+move_to 14067 -8205 7 100 25000
+wait_enemies_active 10000 394 395 397
+capture street-route-reached
+assert_health_above 0
+finish

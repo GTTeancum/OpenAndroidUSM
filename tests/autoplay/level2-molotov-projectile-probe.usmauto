@@ -1,0 +1,19 @@
+# Deterministic process-local probe for the recovered weapon-type-5 path.
+# Enemy 642 is the authored upper-bank molotov thug. The harness must observe
+# its real runtime projectile; host OS input is never generated.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 15000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 5000
+wait_controls 5000
+teleport -20193.537109 9811.349609 962.339172 -1 0 0
+wait_enemies_active 3000 642
+wait_enemy_projectile 5000 642
+wait 2500
+assert_health_below 1000
+assert_health_above 0
+finish

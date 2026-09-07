@@ -1,0 +1,33 @@
+# Exercises both authored Room-7 CSlider paths through GameplayPlayer rather
+# than calling LevelSlideRuntime directly. Both routes verify their terminal
+# exits; Slide1039 also guards the native restore-volume broad phase that keeps
+# volume 554 from interrupting the authored rope.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 85000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+
+# Slide 1038: WayPoint 429 -> 430.
+teleport 8700.163 11155.479 3502.942 -0.866 -0.501 0
+jump
+move_until_state 3000 0 0 23
+move_until_state 2000 0 0 22
+assert_audio_played SFX_SLIDING
+move_until_state 10000 0 0 15
+assert_near 4214.271 8558.059 2488.073 125
+
+# Slide 1039: WayPoint 445 -> 446.
+teleport -2894.430 6830.233 2520.220 -0.999 -0.045 0
+jump
+move_until_state 3000 0 0 23
+move_until_state 2000 0 0 22
+wait 1500
+assert_near -3941.393 6783.574 2320.841 125
+move_until_state 10000 0 0 15
+assert_near -8099.410 6598.260 1529.000 150
+assert_health_above 0
+finish

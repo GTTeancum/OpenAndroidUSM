@@ -152,7 +152,13 @@ bool containsPlayer(const CameraArea& area, const Vector3& player) noexcept {
         return false;
     }
     const Vector3 projected = projectOnControlPlane(area, player);
-    if (distance(player, projected) > area.height + 1e-3F) {
+    // CCameraArea::ProcessAttr (0x002f4aa4) squares the authored height before
+    // CCameraArea::IsPlayerIn (0x002f3d70) compares it with the squared
+    // distance to the control plane. Some shipped areas deliberately author a
+    // negative height, including Level 1 area 339, so comparing the raw value
+    // made those areas impossible to enter.
+    if (lengthSquared(subtract(player, projected)) >
+        area.height * area.height) {
         return false;
     }
     return pointInTriangle(projected, area.controlPoints[0].position,
@@ -385,8 +391,10 @@ CameraPose GameplayCamera::sample(
     pose.target = target;
     pose.position = subtract(target, scale(direction, cameraDistance));
     pose.up = {0.0F, 0.0F, 1.0F};
-    pose.verticalFieldOfViewDegrees = 45.0F;
-    pose.nearPlane = 1.0F;
+    // CGameCamera::ResetCamera (0x002f2c70) supplies the non-DAE camera's
+    // projection values. The authored CameraArea changes only its far offset.
+    pose.verticalFieldOfViewDegrees = 30.236501F;
+    pose.nearPlane = 100.0F;
     pose.farPlane = 10000.0F + currentArea_->farPlaneOffset;
     if (transitionProgress_ < 1.0F) {
         const float progress = transitionProgress_;

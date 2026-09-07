@@ -1,0 +1,223 @@
+# Follow Level 7 chronologically from its shipped player transform to Room 5.
+# This route uses ordinary movement, combat, wall traversal, WebGrabPoints
+# 181/183/196/201, and Slide 198; it performs no teleports or direct health
+# manipulation.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 240000
+render_size 640 360
+
+wait_gameplay 30000
+capture level7-opening-combat
+
+# Clear the two symbiotes active beside Spider-Man at gameplay handoff.
+attack 30000 250 60654
+attack 30000 250 60655
+capture level7-opening-combat-cleared
+
+# Cross the first collapsed street with the authored WebGrabPoint 181.
+move_to_3d 18750 584 5 150 10000
+jump 0 1
+move_input 250 0 1
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 3000 0 0 18
+capture level7-opening-web-grab
+move_until_state 5000 0 1 19
+move_to_3d 21450 584 10 300 10000
+capture level7-opening-gap-crossed
+
+# Cinematic 138 watches these three deaths and removes SpiderWebWall 136.
+wait 1000
+attack 30000 250 128
+attack 30000 250 129
+attack 30000 250 131
+wait 1000
+assert_object_hidden 136
+capture level7-first-gate-cleared
+
+# Traverse the opened route to authored CheckPoint 27.
+move_to_3d 22300 950 0 160 10000
+jump 0 1
+move_to_3d 22750 1150 5 60 15000
+assert_last_checkpoint 27
+capture level7-first-checkpoint
+
+# A double jump clears the authored foreground slab so WebGrabPoint 183 is
+# visible; swing across the second collapsed section into the next encounter.
+move_to_3d 23950 1600 -80 100 10000
+jump 0 1
+move_input 250 0 1
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 3000 0 0 18
+capture level7-second-web-grab
+move_until_state 5000 0.3 1 19
+move_input 1000 0.4 1
+move_until_state 5000 0 0 0
+capture level7-second-gap-steered-landing
+
+# Cinematic 141 binds object threads to 130/133/293. Their deaths reveal
+# reinforcements 301/302/303; defeating that wave removes SpiderWebWall 139.
+attack 30000 250 130
+attack 30000 250 133
+attack 30000 250 293
+attack 30000 250 301
+attack 30000 250 302
+attack 30000 250 303
+wait 1000
+assert_object_hidden 139
+capture level7-second-gate-cleared
+
+# Approach Room 4's climbable facade after the second web gate, acquire the
+# wall state, and climb through the low authored enemy band.
+move_until_wall 22550 4300 0 12000
+move_until_state 2000 0 0 1
+assert_last_checkpoint 310
+capture level7-room4-wall-start
+move_input 2200 0 1
+capture level7-room4-wall-low-band
+move_until_state 3000 0 0 1
+# Two simultaneous wall attackers can interrupt each other's button-mash
+# capture. Clear the nearer lower guard with ordinary wall melee, then use
+# the wall-web takedown once the remaining target is isolated.
+attack 30000 230 60658
+move_until_state 3000 0 0 1
+web_on
+move_until_state 1000 0 0 73
+wait 2500
+move_until_state 5000 0 0 1
+assert_enemy_health_below 60658 1
+assert_enemy_health_below 127 1
+assert_health_above 0
+capture level7-room4-wall-low-band-clear
+move_until_state 3000 0 0 1
+# Traps 55 and 296 leave a deliberately narrow vertical seam at x=22951.
+# Move into it before ascending so the route tests avoidance instead of
+# absorbing repeated hazard hits.
+move_input 900 0.955 0
+capture level7-room4-trap-seam
+wait_area_damage_state 5000 296 active
+wait_area_damage_state 15000 296 waiting
+jump 0 1
+move_until_state 4000 0 0 1
+capture level7-room4-upper-wall-reacquired
+
+# Close the remaining distance to the first upper-band enemy while staying
+# in the seam between traps 55 and 296.
+wait_area_damage_state 5000 296 waiting
+jump 0 1
+move_until_state 4000 0 0 1
+move_input 300 0 1
+move_until_state 2000 0 0 1
+web_on
+move_until_state 1000 0 0 73
+wait 2500
+assert_enemy_health_below 144 1
+move_until_state 5000 0 0 1
+capture level7-room4-first-upper-enemy-clear
+
+# Rise above trap 296, traverse below trap 307, and clear the two enemies on
+# the right side of the facade with the native overlapping wall attack.
+move_input 900 0 1
+move_input 1800 1 0
+move_until_state 2000 0 0 1
+attack 30000 230 145
+move_until_state 3000 0 0 1
+assert_enemy_health_below 145 1
+assert_enemy_health_below 61229 1
+capture level7-room4-right-wall-enemies-clear
+
+# Return below traps 307/309 to the clear left column, then use the shipped
+# wall-web button-mash takedown against the two enemies anchored there.
+climb_to 22550 4031 1775 70 12000
+web_on
+move_until_state 1000 0 0 73
+wait 2500
+assert_enemy_health_below 61230 1
+move_until_state 5000 0 0 1
+climb_to 22550 4031 2200 70 10000
+web_on
+move_until_state 1000 0 0 73
+wait 2500
+assert_enemy_health_below 60657 1
+move_until_state 5000 0 0 1
+capture level7-room4-upper-enemy-band-clear
+assert_health_above 0
+
+# Follow the continuous wall_01 -> wall_02 surface into Room 15 and require
+# the shipped edge_wall02 state-7 roof transfer.
+climb_to 22550 4031 2910 80 12000
+capture level7-room4-top-wall
+move_until_state 5000 0 1 7
+move_until_state 5000 0 1 0
+capture level7-room15-roof-arrival
+assert_health_above 0
+attack 60000 240 148
+capture level7-room15-first-enemy-clear
+assert_health_above 0
+
+# Stay west of Object108's shipped x=22964 wall while routing around the
+# central rooftop block, then clear the hostage guards west of AreaDamage 91.
+web_on
+wait 1500
+move_to 22880 4800 3042 80 8000
+wait_area_damage_state 15000 142 waiting
+move_to 22880 5900 3042 80 10000
+move_to 22500 6100 3042 100 8000
+attack 60000 240 150
+web_on
+wait 1500
+move_to 22600 6550 3042 100 8000
+attack 60000 240 151
+rescue_hostage 15000 60348
+capture level7-room15-hostage-rescued
+assert_health_above 0
+# Cross below the central damage pool before moving to its east side.
+move_to 22900 6150 3042 100 8000
+move_to 24320 6150 3042 100 10000
+move_to 24320 6650 3042 100 8000
+attack 60000 240 152
+move_to 24880 6402 3042 100 10000
+assert_last_checkpoint 269
+capture level7-room15-east-roof-clear
+
+# jump_wall4 is the authored vault boundary at the east parapet. Ground
+# motion stops at it while airborne collision ignores flag 0x10, so a normal
+# double jump crosses into WebGrabPoint 196's radius.
+move_to 24940 6600 3042 80 5000
+jump 0 1
+move_input 250 0 1
+jump 0 1
+move_input 500 0 1
+web_on
+move_until_state 2500 0 0 18
+capture level7-room16-first-web-grab
+
+# WebGrabPoint 196 releases toward Slide 198. Steer at the shipped entry
+# waypoint and require the native slider state rather than treating the rope
+# as scenery.
+move_until_state 4500 -0.30 1 19
+move_to 28432 6707 0 100 4000
+move_until_state 1500 0 0 22
+capture level7-room16-slide-caught
+move_to_3d 32500 6250 2560 700 12000
+capture level7-room16-slide-late
+
+# Jump from the moving slide, inherit its authored velocity, acquire
+# WebGrabPoint 201, and steer the release to the safe Room 5 floor. The target
+# avoids the shipped instant-kill tentacle AreaDamage 224.
+jump
+move_to_3d 34000 6100 2470 650 6000
+web_on
+move_until_state 2500 0 0 18
+capture level7-room16-second-web-grab
+move_until_state 4500 0 1 19
+move_to_until_state 36200 6300 23 0 5000
+move_to 36953 6622 23 120 6000
+assert_last_checkpoint 156
+capture level7-room5-arrival
+finish

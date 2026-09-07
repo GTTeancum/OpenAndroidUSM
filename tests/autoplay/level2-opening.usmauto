@@ -1,0 +1,13 @@
+# Load Level 2 directly at its authored Spider-Man spawn and camera area.
+# This is a renderer/runtime gate, not a substitute for later route gameplay.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 5000
+start_time_ms 0
+render_size 1280 720
+
+wait_gameplay 1000
+capture level2-opening
+assert_health_above 0
+finish

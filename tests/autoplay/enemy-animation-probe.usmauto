@@ -1,14 +1,17 @@
-# Short, non-aliasing room-two animation probe. The 200 ms capture cadence is
+# Short, non-aliasing room-four animation probe. It places the camera beside
+# the exact enemies being measured, so the captures prove visible pose changes
+# as well as the per-tick animation telemetry. The 200 ms capture cadence is
 # intentionally not a divisor of the authored 2.5-second idle loops.
 fixed_step_ms 50
 sample_interval_ms 50
-capture_interval_ms 200
+capture_interval_ms 0
 max_time_ms 55000
 start_time_ms 53033
 render_size 1280 720
 
 wait_gameplay 1000
-teleport 7575 -6305 1042 0 1 0
+teleport -650 -700 16 1 0 0
+wait 500
 capture enemy-animation-start
 wait 1000
 capture enemy-animation-end

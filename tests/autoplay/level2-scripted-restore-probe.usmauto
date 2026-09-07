@@ -1,0 +1,20 @@
+# Cinematic 20053's authored Restore command is CCinematicThread::OnRestore:
+# it writes -1.0f to the active player's Unit+0x64 health field. This proves
+# the command reaches Player::CheckDeath/state 0x80 and the normal native
+# death-confirmation path without host input.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 10000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 1000
+start_cinematic 20053
+wait_cinematic_started 1000 20053
+wait_death_screen 5000
+wait_death_confirmation 5000
+assert_health_below 0
+assert_death_screen_active
+assert_death_confirmation_active
+finish

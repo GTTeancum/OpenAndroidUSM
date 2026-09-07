@@ -1,0 +1,41 @@
+# Dies before activating any checkpoint and selects GS_Confirmation's Yes
+# entry. CLevel::RestartAtCheckPoint falls through to CLevel::RestartLevel
+# (0x00382b10): authored level state reloads, the initial camera is restored,
+# and Level 1 queues the player node's linked cinematic 1265 (not wrapper
+# 1264). The harness remains process-local and sends no host input.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 140000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+assert_last_checkpoint -1
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_death_confirmation 5000
+assert_health_below 1
+menu_select
+
+wait_intro 1000
+assert_death_screen_inactive
+assert_death_confirmation_inactive
+assert_last_checkpoint -1
+assert_camera_area 283
+assert_near 14701.212 -9696.749 9.597 5
+assert_health_above 999
+assert_audio_stopped M_LOSE
+
+wait_controls 60000
+assert_camera_area 283
+assert_near 14701.212 -9696.749 9.597 5
+assert_health_above 999
+finish

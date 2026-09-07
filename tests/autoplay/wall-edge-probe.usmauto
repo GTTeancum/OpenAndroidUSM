@@ -3,18 +3,28 @@
 # assuming that the end of any regular wall is a valid ledge.
 fixed_step_ms 25
 sample_interval_ms 25
-capture_interval_ms 500
-max_time_ms 75000
+capture_interval_ms 0
+max_time_ms 100000
 start_time_ms 53033
 render_size 640 360
 
 wait_gameplay 5000
 teleport 4700 4000 145 1 0 0
 move_until_wall 5000 4000 145 2000
-move_input 6000 0 1
+# Follow the clear channel around authored fire volume 836, then return to
+# the tutorial's part of the facade above it. Heavy fire hits knock downward.
+climb_to 4726 3800 250 25 6000
+climb_to 4726 3800 750 25 6000
+climb_to 4726 4750 750 25 6000
+climb_to 4726 4750 1430 25 6000
+climb_to 4726 3957 1430 25 6000
+move_input_until_cinematic 18000 0 1 1148
+capture jump-wall-tutorial
+wait_controls 5000
 jump
 move_until_state 3000 0 0 1
 move_input 1000 0 1
+move_until_state 2000 0 0 1
 jump
 move_until_state 3000 0 0 1
 move_until_state 3000 0 1 7

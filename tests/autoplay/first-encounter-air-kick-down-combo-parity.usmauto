@@ -1,0 +1,50 @@
+# Source-authored launcher-to-air-bind kick-down continuation. This takes the
+# no-Web state-100 -> 104 path and presses Square/X inside state 104's native
+# input window to reach the state-105 heavy-kick finisher.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_physics 394 1
+teleport 13356 -6411 7 0 1 0
+
+jump
+web_on
+move_until_state 500 0 0 99
+web_off
+move_until_state 1000 0 0 100
+assert_enemy_health_near 394 400 0.01
+
+# With no second Web request, state 100 naturally advances to the retained-
+# target kick-down. UpdateNormalEffect emits effect 19 on its authored frame;
+# UpdateAttackParam repeats the state-104 sector until the descending Bip01
+# cylinder reaches the target and delivers 100.
+move_until_state 1500 0 0 104
+assert_player_state 104
+# Buffer Square/X while state 104's source-authored input window is open;
+# native UpdateAttacks consumes it when the descending attack reaches ground.
+punch_attack_when_ready 1000
+assert_player_effect 19 1
+wait 200
+assert_enemy_health_near 394 300 0.01
+
+# State 104's serialized Square/X link is available from 400 to 600 ms. The
+# resulting state-105 frame-11 contact delivers 80 and effect 20.
+move_until_state 2000 0 0 105
+assert_player_state 105
+wait 400
+assert_enemy_health_near 394 220 0.01
+assert_player_effect 20 1
+assert_audio_played SFX_CRITICAL_HIT_2
+assert_health_above 0
+finish

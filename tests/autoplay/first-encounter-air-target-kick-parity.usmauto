@@ -1,0 +1,51 @@
+# Source-authored airborne Square/X target-special.  Jump states route a punch
+# against an airborne target through predicate 109 to state 86 rather than the
+# ordinary state-81 aerial punch chain.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_physics 394 1
+
+# Remove only the two competing helper targets so production acquisition must
+# select the launched knife thug.  The tested victim retains authored health.
+damage_enemy 395 100000
+damage_enemy 397 100000
+teleport 13399 -6360 7 0 -1 0
+
+punch
+jump_release_attack_when_ready 1000
+move_until_state 1000 0 0 97
+wait 350
+assert_enemy_health_near 394 405 0.01
+move_until_state 1500 0 0 0
+
+# A fresh jump plus Square/X sees the airborne target and enters the 50-damage
+# diagonal kick.  It owns both the source effect 26 travel trail and effect 16
+# strike trail; neither is a harness-generated visual.
+jump
+punch
+move_until_state 500 0 0 86
+assert_player_state 86
+assert_player_effect 26 1
+wait 80
+assert_player_effect 16 1
+assert_enemy_health_near 394 355 0.01
+assert_audio_played SFX_AIR_DIAGONAL_KICK
+assert_audio_played SFX_KICK_IMPACT_1
+# Accepted contact latches the state exactly once even while the dash and
+# whirlwind trail continue through their authored follow-through.
+wait 500
+assert_enemy_health_near 394 355 0.01
+assert_health_above 0
+finish

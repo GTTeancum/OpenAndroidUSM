@@ -1,0 +1,229 @@
+# Follow Level 5 from its shipped opening without diagnostic teleports. This
+# route is intentionally expanded in authored player-flow order.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 500000
+render_size 640 360
+
+wait_cinematic_started 1000 12
+wait_controls 30000
+assert_camera_area 20098
+capture level5-gameplay-start
+
+# Cross Room 1's first connected camera volume toward wall_02, climb its
+# authored vertical camera stack, and exit onto the roof beside Slide 40669.
+move_to 14500 2700 1225 180 12000
+assert_camera_area 40059
+move_until_wall 14500 3500 1225 5000
+move_until_state 7000 0 1 7
+move_until_state 5000 0 0 0
+assert_camera_area 20120
+capture level5-first-roof
+
+# The enabled opening slide links WayPoints 40667 -> 40668 and lands in the
+# next roof's Room 3 collision. Catch it through the ordinary airborne path.
+# Clear obj_collision203, the small solid rope mount, and release the stick
+# once the ordinary jump is inside the rope's native catch corridor.
+move_to 15375 4115 3174 20 7000
+jump -1 1
+move_input 50 -1 1
+move_until_state 3000 0 0 23
+move_until_state 2000 0 0 22
+move_until_state 7000 0 0 15
+assert_near 17091 3812 2482 250
+capture level5-first-slide-landing
+assert_health_above 0
+
+# Cinematic 20329 exposes the first authored rooftop pair as the player lands.
+# Defeat them using the production movement, targeting, combo, animation, and
+# damage paths; no enemy health is changed by a diagnostic command here.
+wait_enemies_active 5000 40970 40825
+wait_enemies_grounded 10000 40970 40825
+attack 90000 240 40970 40825
+assert_health_above 0
+
+# Cinematic 24 is the pair's native destroyed-object watcher. It exposes the
+# second three-enemy cohort, whose own watcher closes and removes WebWall
+# 20327 only after all three are defeated.
+wait_enemies_active 5000 20376 40969 40827
+wait_enemies_grounded 10000 20376 40969 40827
+attack 120000 240 20376 40969 40827
+wait 1000
+assert_object_hidden 20327
+
+# The closing wall script reveals the third cohort beyond it. Continue with
+# ordinary button-driven combat so this route covers both symbiote rigs and
+# the complete authored Room 3 encounter chain.
+wait_enemies_active 5000 40979 40831 40980
+wait_enemies_grounded 10000 40979 40831 40980
+attack 120000 240 40979 40831 40980
+assert_health_above 0
+capture level5-room3-combat-clear
+
+# Enter the narrow north walkway through its shipped WayPoint 1 before
+# following WayPoint 2. A direct diagonal cuts across Object189's tall
+# parapet at the junction instead of using the authored opening.
+move_to 20366 5006 2310 150 12000
+move_to 20355 6533 2305 180 15000
+
+# Follow Room 3's connected camera volumes north across the long roof. The
+# two ambient symbiotes at the far checkpoint are ordinary authored actors,
+# so keep them in the same production combat coverage.
+wait_enemies_active 5000 20337 40833
+wait_enemies_grounded 10000 20337 40833
+attack 90000 240 20337 40833
+move_to 19903 7428 2294 220 10000
+assert_last_checkpoint 40701
+# Object06 encloses this roof and jump_wall03_PIVOT is authored with the
+# JumpWall physics flag: it blocks ground motion but the native jump path
+# deliberately ignores it. The landing beyond it is intentionally absent;
+# WebGrabPoints 20173, 40637, and 20177 form the shipped three-anchor route
+# through CameraAreas 40195 and 40639 to Room 6.
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 2000 0 0 18
+move_until_state 3000 0 1 19
+move_until_state 2500 0 1 15
+web_on
+move_until_state 2000 0 0 18
+move_until_state 3000 0 1 19
+move_until_state 2500 0 1 15
+web_on
+move_until_state 2000 0 0 18
+move_until_state 3000 0 1 19
+move_until_state 4000 0 1 0
+move_to 21589 12712 2310 240 20000
+assert_camera_area 40090
+capture level5-room6-approach
+
+# Trigger 4 exposes the shipped Room 6 cohort and Cinematic 5 binds the boss
+# meter to the 800-health zombie. Clear all five through ordinary combat;
+# Cinematic 40941 watches their destroyed states and unlocks Slide 40662.
+wait_enemies_active 5000 40841 40842 40843 40844 40845
+wait_enemies_grounded 10000 40841 40842 40843 40844 40845
+attack 180000 240 40841 40842 40843 40844 40845
+assert_health_above 0
+wait 1000
+capture level5-room6-combat-clear
+
+# Enter the newly enabled slide through its authored 40663 -> 40664 path.
+move_to 22382 13620 2344 60 12000
+move_until_state 3000 0 1 23
+move_until_state 3000 0 0 22
+move_until_state 6000 0 0 15
+move_until_state 3000 0 0 0
+assert_near 24000 13665 1350 350
+capture level5-room7-slide-landing
+
+# Trigger 20404, crossed by the slide, opens WebWall 20365 and exposes the
+# four Room 7 symbiotes. Their destroyed watcher 20366 closes and removes the
+# wall after the ordinary fight.
+wait_enemies_active 5000 20378 40834 40972 40973
+wait_enemies_grounded 10000 20378 40834 40972 40973
+# The straight line from the slide landing to the symbiotes crosses the
+# obj_collision161 obstruction and then walks off an unsupported edge. Nav07
+# instead narrows west through triangles 23/27, jumps to 40, and then jumps the
+# second short gap to triangles 46/47 on the enemy roof. Follow those authored
+# surfaces before handing control to combat pursuit.
+move_to 23750 14000 1234 100 7000
+move_to 23600 14300 1234 150 5000
+jump
+wait 250
+jump
+move_to 23400 15250 1234 120 8000
+move_until_state 3000 0 0 0
+jump
+wait 250
+jump
+move_to 23650 15950 1234 180 6000
+move_until_state 3000 0 0 0
+attack 180000 240 20378 40834 40972 40973
+assert_health_above 0
+wait 1000
+assert_object_hidden 20365
+capture level5-room7-combat-clear
+
+# The Room 7 shell ends at y=16688 and the Room 8 west wall ends at y=16567.
+# Approach their north end on the enemy roof, then use the ordinary two-stage
+# jump around both faces and onto Room 8's overlapping floor. This also crosses
+# checkpoint 20322 before following its linked WayPoint 66.
+move_to 25850 16620 1234 100 10000
+jump
+wait 250
+jump
+move_to 26080 16720 1480 100 3000
+move_to 26200 16450 1225 180 5000
+move_until_state 3000 0 0 0
+assert_last_checkpoint 20322
+move_until_cinematic 26441 16113 1223 57 8000
+capture level5-room8-cityhall-cinematic
+wait_controls 60000
+assert_near 26632 16225 1223 200
+capture level5-room8-entry
+
+# Cinematic 58 leaves Spider-Man below the authored wall08 climb face. Attach,
+# traverse east to edge_wall08's x=27391..27763 ledge, then climb to its top.
+move_until_wall 26632 16800 1223 5000
+capture level5-room8-wall-attach
+move_input 2300 1 0
+move_input 500 0 1
+jump
+move_until_state 3000 0 0 1
+move_until_state 10000 0 1 7
+capture level5-room8-wall-edge
+move_until_state 3000 0 0 0
+capture level5-room8-first-roof
+
+# Object1540's first roof panel ends at y=17470,z=4089; the combat roof starts
+# ten units farther north at z=4373. Cross that authored step with a jump, then
+# clear the five-enemy cohort watched by Cinematic 40974. Its completion reveals
+# the shipped objective arrow beside CheckPoint 40922.
+move_to 28000 17350 4089 100 8000
+jump
+move_to 28000 17650 4373 140 5000
+move_until_state 3000 0 0 0
+wait_enemies_active 5000 20354 40957 40958 40984 40985
+wait_enemies_grounded 10000 20354 40957 40958 40984 40985
+attack 240000 240 20354 40957 40958 40984 40985
+assert_health_above 0
+wait 1000
+capture level5-room8-rooftop-combat-clear
+move_to 29186 18173 4373 140 10000
+assert_last_checkpoint 40922
+capture level5-room8-checkpoint
+
+# The roof ends at x=29416. WebGrabPoint 40698 is 1.49k units east of the
+# checkpoint (inside its authored 1.6k visible range) and is the only shipped
+# traversal object spanning the gap to Object20's final roof. Jump clear of
+# the parapet, acquire the point, and ride the ordinary swing/release states.
+move_to 29320 18100 4373 80 4000
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 2000 0 0 18
+capture level5-room8-web-grab
+move_until_state 4000 0 1 19
+move_until_state 6000 0 1 0
+wait_cinematic_started 3000 60
+capture level5-room8-on-roof-cinematic
+wait_controls 60000
+assert_near 33492 17203 3270 200
+capture level5-room8-final-roof
+
+# Cinematic 62 puts SecurityRobot 40846 and Spider-Man on the final roof.
+# Cinematic 40976 watches this 1,600-health robot and exposes the two 1,000-
+# health reinforcements only after it is genuinely destroyed.
+wait_enemies_active 5000 40846
+wait_enemies_grounded 5000 40846
+attack 180000 240 40846
+assert_health_above 0
+wait_enemies_active 5000 40977 40978
+wait_enemies_grounded 10000 40977 40978
+capture level5-room8-reinforcements
+attack 180000 240 40977 40978
+assert_health_above 0
+wait_level_end 60000
+capture level5-ending
+finish

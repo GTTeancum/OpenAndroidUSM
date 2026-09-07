@@ -1,0 +1,17 @@
+# Hold the authored Electro camera on both sides of the SetVisible beam
+# commands. This separates sky/rooftop geometry from the five animated beam
+# objects without host input or renderer-specific debug overrides.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 18000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait 3300
+capture level3-before-beams
+wait 700
+capture level3-with-beams
+finish

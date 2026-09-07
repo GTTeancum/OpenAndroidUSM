@@ -1,13 +1,13 @@
 #include "game/LevelDamageRuntime.hpp"
 
+#include "game/PlayerPhysicsConstants.hpp"
+
 #include <algorithm>
 #include <cmath>
 
 namespace usm::game {
 namespace {
 
-constexpr float kPlayerRadius = 50.0F;
-constexpr float kPlayerHalfHeight = 70.0F;
 constexpr std::uint32_t kNativeReactionMilliseconds = 1000;
 
 assets::Vector3 inverseRotate(assets::Vector3 value,
@@ -84,14 +84,17 @@ bool LevelDamageRuntime::containsPlayer(
     const assets::Vector3& player) noexcept {
     assets::Vector3 relative{player.x - asset.position.x,
                              player.y - asset.position.y,
-                             player.z + kPlayerHalfHeight -
+                             player.z +
+                                 kPlayerCollisionHalfHeightCentimeters -
                                  asset.position.z};
     relative = inverseRotate(relative, asset.rotation);
     const assets::Vector3 half{
-        std::abs(asset.sizes.x * asset.scale.x) * 0.5F + kPlayerRadius,
-        std::abs(asset.sizes.y * asset.scale.y) * 0.5F + kPlayerRadius,
+        std::abs(asset.sizes.x * asset.scale.x) * 0.5F +
+            kPlayerCollisionRadiusCentimeters,
+        std::abs(asset.sizes.y * asset.scale.y) * 0.5F +
+            kPlayerCollisionRadiusCentimeters,
         std::abs(asset.sizes.z * asset.scale.z) * 0.5F +
-            kPlayerHalfHeight};
+            kPlayerCollisionHalfHeightCentimeters};
     return std::abs(relative.x) <= half.x &&
            std::abs(relative.y) <= half.y &&
            std::abs(relative.z) <= half.z;

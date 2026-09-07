@@ -31,7 +31,8 @@ public:
     [[nodiscard]] Result playNamed3D(std::string_view eventName,
                                     const PcmAudio& audio,
                                     const SpatialSoundSource& source,
-                                    bool loop = false);
+                                    bool loop = false,
+                                    float volume = 1.0F);
     [[nodiscard]] Result stopNamed(
         std::string_view eventName,
         std::uint32_t fadeMilliseconds = 0) noexcept;

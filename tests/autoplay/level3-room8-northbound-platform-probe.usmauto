@@ -1,0 +1,111 @@
+# Focused traversal development for the post-encounter Room 8 course. The
+# teleport starts on the authored encounter roof; all following movement uses
+# the production player input path and will be folded into the chronological
+# no-teleport acceptance route once proven.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 90000
+start_time_ms 0
+render_size 640 360
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+teleport 18833 -9768 1336 0 1 0
+
+# Re-enter the four-row landing field from the Room 8 fight roof.
+jump 0 1
+move_to 18696 -9452 1355 80 2500
+move_until_state 4000 0 0 0
+jump 0 1
+move_to 18697 -9149 1355 80 2200
+move_until_state 4000 0 0 0
+jump 0 1
+move_to 18696 -8848 1355 80 2200
+move_until_state 4000 0 0 0
+jump 0 1
+move_to 18697 -8547 1355 80 2200
+move_until_state 4000 0 0 0
+capture level3-room8-northbound-field-complete
+
+# Board mover 30855 at its south endpoint and let production rider carry take
+# Spider-Man to the north endpoint before handing off to mover 30863.
+wait_object_near 12000 30855 18687 -8245 1336 45
+jump 0 1
+move_to 18687 -8245 1340 70 2500
+move_until_state 4000 0 0 0
+wait_object_near 12000 30855 18689 -7416 1329 45
+capture level3-room8-first-mover-north
+wait_object_near 12000 30863 18684 -7135 1344 45
+jump 0 1
+move_to 18684 -7135 1350 70 2500
+move_until_state 4000 0 0 0
+wait_object_near 12000 30863 18684 -6417 1344 45
+capture level3-room8-second-mover-north
+
+# The mover releases onto the central equipment roof. Cross that authored
+# support to the two east/west movers which bridge the northbound gaps.
+jump 0 1
+move_to 18685 -6000 1336 100 3000
+move_until_state 4000 0 0 0
+move_to 18685 -5350 1336 100 4000
+wait_object_near 12000 30864 18804 -5054 1316 50
+jump 0 1
+move_to 18700 -5054 1322 90 2800
+move_until_state 4000 0 0 0
+capture level3-room8-third-mover
+# Synchronize on 30865's east park, then use the authored airborne web-jump
+# so the handoff does not depend on 30864's current x phase.
+wait_object_near 12000 30865 18805 -4502 1316 50
+jump 0 1
+move_until_state 2000 0 1 14
+jump 0 1
+move_to 18800 -4500 1322 80 3000
+move_until_state 4000 0 0 0
+capture level3-room8-fourth-mover
+
+# Finish on the first stationary pair beyond the moving spans.
+jump 0 1
+move_to 18627 -3932 1355 90 3500
+move_until_state 4000 0 0 0
+capture level3-room8-north-grid-entry
+
+# Follow the paired static grid, then take its damage-free east spur 30868.
+jump 0 1
+move_to 18628 -3629 1355 80 2200
+move_until_state 4000 0 0 0
+jump 0 1
+move_to 18630 -3326 1355 80 2200
+move_until_state 4000 0 0 0
+jump 1 1
+move_to 19134 -3036 1355 90 2600
+move_until_state 4000 0 0 0
+capture level3-room8-safe-spur
+
+# A normal takeoff plus the authored airborne web-jump spans the final gap to
+# Room 9's lower landing and crosses Trigger 31108 / CheckPoint 31088.
+jump 0 1
+move_until_state 2000 0 1 14
+jump 0 1
+move_to 19336 -2043 1400 110 4000
+move_until_state 5000 0 0 0
+wait 200
+assert_last_checkpoint 31088
+capture level3-room9-lower-arrival
+
+# Climb Room 9's authored wall01 face to edge_wall01, exit onto Object92,
+# and enter the upper checkpoint before the three-way slide choice.
+move_to 19260 -2050 1401 60 2000
+move_until_wall 19260 -1800 1401 5000
+capture level3-room9-wall-attach
+climb_to 19260 -1866 2850 80 12000
+climb_to 19850 -1866 2850 80 8000
+move_until_state 5000 0 1 7
+move_until_state 4000 0 0 0
+move_to 19300 -1515 3190 100 4000
+wait 200
+assert_last_checkpoint 31202
+capture level3-room9-upper-arrival
+assert_health_above 0
+finish

@@ -1,0 +1,18 @@
+# Rooms 7 and 8 regular cohorts. The upper Room 8 guard is included after the
+# lower platform group so vertical overlap cannot confuse attack targeting.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 200000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 3550 8100 2454 0 1 0
+attack 60000 150 618 10342 10343
+teleport 5550 6050 3145 0 1 0
+attack 70000 150 421 538 1156
+teleport 5528 6700 4300 0 1 0
+attack 30000 150 10370
+assert_health_above 0
+finish

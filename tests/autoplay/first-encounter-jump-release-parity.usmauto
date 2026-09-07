@@ -1,0 +1,56 @@
+# The shipped input graph gives A/Cross release (predicate 102) and hold
+# (predicate 103) different branches during the opening punch. This pins the
+# release-only state 97 path through production input dispatch.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+teleport 13399 -6360 7 0 -1 0
+
+punch
+assert_player_state 74
+jump_release_attack_when_ready 1000
+move_until_state 1000 0 0 97
+assert_player_state 97
+wait 350
+assert_player_effect 7 1
+assert_enemy_health_near 394 405 0.01
+assert_audio_played SFX_CRITICAL_HIT_1
+
+# Predicate 110 is a separate fresh A/Cross press while the retained victim
+# is airborne and bindable. It advances state 97 to the 80-damage state-106
+# target-special kick with its own effect 21.
+jump
+move_until_state 2000 0 0 106
+assert_player_state 106
+wait 650
+assert_player_effect 21 1
+assert_enemy_health_near 394 325 0.01
+
+# Holding A/Cross later in the same normal-suit chain selects state 80 from
+# state 79. This is a separate uppercut with its own authored 75 damage and
+# 1000 cm/s vertical launch.
+teleport 13148 -6335 7 0 -1 0
+punch
+punch_attack_when_ready 1000
+move_until_state 1000 0 0 75
+punch_attack_when_ready 1000
+move_until_state 1000 0 0 79
+jump_attack_when_ready 1000
+move_until_state 1000 0 0 80
+assert_player_state 80
+wait 350
+assert_player_effect 3 1
+assert_enemy_health_near 395 300 0.01
+assert_health_above 0
+finish

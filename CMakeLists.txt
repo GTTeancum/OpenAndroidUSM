@@ -89,6 +89,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/audio/SpatialSound.cpp
     src/audio/VoxSoundTable.cpp
     src/assets/BresFile.cpp
+    src/assets/AnimationDisplacement.cpp
     src/assets/BtexTexture.cpp
     src/assets/DdsAtcTexture.cpp
     src/assets/ColladaAnimation.cpp
@@ -96,14 +97,19 @@ add_library(OpenAndroidUSM.Core STATIC
     src/assets/ColladaSkinning.cpp
     src/assets/IrrScene.cpp
     src/assets/SpriteAtlas.cpp
+    src/assets/TgaTexture.cpp
     src/filesystem/GbmpArchive.cpp
     src/game/CinematicScript.cpp
     src/game/AttackConfig.cpp
     src/game/ButtonConfig.cpp
+    src/game/QuickTimeActionConfig.cpp
+    src/game/QuickTimeActionRuntime.cpp
     src/game/CinematicPlayer.cpp
     src/game/CinematicCamera.cpp
     src/game/CinematicCameraTrack.cpp
     src/game/CinematicUiRuntime.cpp
+    src/game/DeathConfirmationRuntime.cpp
+    src/game/ExitMenuRuntime.cpp
     src/game/EnemyBehaviorConfig.cpp
     src/game/EnemyAttributeConfig.cpp
     src/game/EnemyAttackIntervalConfig.cpp
@@ -114,13 +120,16 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/GameplayCinematicScheduler.cpp
     src/game/GameplayPlayer.cpp
     src/game/LevelCollision.cpp
+    src/game/LevelCheckPointRuntime.cpp
     src/game/LevelCinematicRuntime.cpp
     src/game/LevelBonusRuntime.cpp
     src/game/LevelDamageRuntime.cpp
+    src/game/LevelDeathRuntime.cpp
     src/game/LevelEnemyRuntime.cpp
     src/game/LevelEffectRuntime.cpp
     src/game/LevelDropRuntime.cpp
     src/game/LevelHintRuntime.cpp
+    src/game/LevelHostageRuntime.cpp
     src/game/LevelMusicRuntime.cpp
     src/game/LevelObjectRuntime.cpp
     src/game/LevelRestoreRuntime.cpp
@@ -130,9 +139,12 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LocalizedStringTable.cpp
     src/game/LevelSlideRuntime.cpp
     src/game/PlayerHudHealthState.cpp
+    src/game/PlayerHitEffectConfig.cpp
     src/game/PlayerStateConfig.cpp
     src/game/QuickTimeEventRuntime.cpp
+    src/game/WallWebRuntime.cpp
     src/game/WebGrabPointRuntime.cpp
+    src/game/WebLineGeometry.cpp
     src/game/WebSwingRuntime.cpp
     src/diagnostics/AutoplayHarness.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
@@ -167,6 +179,8 @@ target_link_libraries(OpenAndroidUSM.D3D11 PRIVATE
     dxguid
     d3dcompiler
     gdi32
+    ole32
+    windowscodecs
 )
 if(MSVC)
     target_compile_options(OpenAndroidUSM.D3D11 PRIVATE /W4 /permissive- /EHsc /utf-8)
@@ -205,6 +219,12 @@ if(MSVC)
     target_compile_options(OpenAndroidUSM PRIVATE /W4 /permissive- /EHsc /utf-8)
 endif()
 
+add_custom_command(TARGET OpenAndroidUSM POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/xboxButtons.png"
+        "$<TARGET_FILE_DIR:OpenAndroidUSM>/xboxButtons.png"
+)
+
 include(CTest)
 if(BUILD_TESTING AND USM_BUILD_TESTS)
     add_executable(OpenAndroidUSM.CoreTests
@@ -216,6 +236,11 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     target_compile_definitions(OpenAndroidUSM.CoreTests PRIVATE
         USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman"
     )
+    if(MSVC)
+        target_compile_options(OpenAndroidUSM.CoreTests PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(OpenAndroidUSM.CoreTests PRIVATE -UNDEBUG)
+    endif()
     add_test(NAME OpenAndroidUSM.CoreTests COMMAND OpenAndroidUSM.CoreTests)
 
     add_executable(OpenAndroidUSM.RenderTests
@@ -234,5 +259,29 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
         dxgi
         d3dcompiler
     )
+    if(MSVC)
+        target_compile_options(OpenAndroidUSM.RenderTests PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(OpenAndroidUSM.RenderTests PRIVATE -UNDEBUG)
+    endif()
+    add_custom_command(TARGET OpenAndroidUSM.RenderTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/xboxButtons.png"
+            "$<TARGET_FILE_DIR:OpenAndroidUSM.RenderTests>/xboxButtons.png"
+    )
     add_test(NAME OpenAndroidUSM.RenderTests COMMAND OpenAndroidUSM.RenderTests)
+
+    find_program(USM_POWERSHELL_EXECUTABLE NAMES pwsh powershell)
+    if(USM_POWERSHELL_EXECUTABLE)
+        add_test(NAME OpenAndroidUSM.AutoplaySuiteRunnerTests
+            COMMAND "${USM_POWERSHELL_EXECUTABLE}" -NoProfile -ExecutionPolicy Bypass
+                -File "${CMAKE_SOURCE_DIR}/tests/AutoplaySuiteRunnerTests.ps1"
+        )
+        set_tests_properties(OpenAndroidUSM.AutoplaySuiteRunnerTests PROPERTIES TIMEOUT 30)
+        add_test(NAME OpenAndroidUSM.AutoplayComparisonTests
+            COMMAND "${USM_POWERSHELL_EXECUTABLE}" -NoProfile -ExecutionPolicy Bypass
+                -File "${CMAKE_SOURCE_DIR}/tests/AutoplayComparisonTests.ps1"
+        )
+        set_tests_properties(OpenAndroidUSM.AutoplayComparisonTests PROPERTIES TIMEOUT 30)
+    endif()
 endif()

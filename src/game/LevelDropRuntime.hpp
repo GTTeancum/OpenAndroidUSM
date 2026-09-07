@@ -59,6 +59,7 @@ public:
         return states_;
     }
     [[nodiscard]] std::vector<LevelDropEvent> consumeEvents();
+    void resetTransientForCheckPointLoad() noexcept { events_.clear(); }
 
 private:
     struct AreaState {

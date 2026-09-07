@@ -35,19 +35,10 @@ Matrix4 multiply(const Matrix4& left, const Matrix4& right) noexcept {
     return result;
 }
 
-Matrix4 localMatrix(const Vector3& position, Quaternion rotation,
+Matrix4 localMatrix(const Vector3& position, const Quaternion& rotation,
                     const Vector3& scale) noexcept {
-    const float length = std::sqrt(
-        rotation.x * rotation.x + rotation.y * rotation.y +
-        rotation.z * rotation.z + rotation.w * rotation.w);
-    if (length > std::numeric_limits<float>::epsilon()) {
-        rotation.x /= length;
-        rotation.y /= length;
-        rotation.z /= length;
-        rotation.w /= length;
-    } else {
-        rotation = {};
-    }
+    // ISceneNode::setRotation (0x00408978) stores the quaternion verbatim;
+    // quaternion::getMatrix_transposed (0x00305f48) uses its raw components.
     const float xx = rotation.x * rotation.x;
     const float yy = rotation.y * rotation.y;
     const float zz = rotation.z * rotation.z;
@@ -176,6 +167,7 @@ Result buildWorldMatrices(const ColladaMeshFile& mesh,
          ++nodeIndex) {
         const ColladaSceneNode& node = mesh.sceneNodes()[nodeIndex];
         Vector3 position = node.position;
+        Vector3 scale = node.scale;
         Quaternion rotation = node.rotation;
         if (const ColladaAnimationTrack* translation = findTrack(
                 animation, node.id, ColladaAnimationProperty::Translation)) {
@@ -209,7 +201,13 @@ Result buildWorldMatrices(const ColladaMeshFile& mesh,
             rotation = withAnimatedAngle(
                 rotation, angleTrack->sample(timestampMilliseconds).value[0]);
         }
-        const Matrix4 local = localMatrix(position, rotation, node.scale);
+        if (const ColladaAnimationTrack* scaleTrack = findTrack(
+                animation, node.id, ColladaAnimationProperty::Scale)) {
+            const ColladaAnimationSample sample =
+                scaleTrack->sample(timestampMilliseconds);
+            scale = {sample.value[0], sample.value[1], sample.value[2]};
+        }
+        const Matrix4 local = localMatrix(position, rotation, scale);
         if (node.parentIndex < 0) {
             worldMatrices.push_back(local);
         } else if (static_cast<std::size_t>(node.parentIndex) <
@@ -345,6 +343,37 @@ Result evaluateColladaPose(
         }
         updateBounds(geometry);
     }
+    return Result::success();
+}
+
+Result evaluateColladaSceneNodeTransform(
+    const ColladaMeshFile& mesh, const ColladaAnimationFile& animation,
+    std::uint32_t timestampMilliseconds, std::string_view nodeName,
+    std::array<float, 16>& output) {
+    std::vector<Matrix4> worldMatrices;
+    Result result = buildWorldMatrices(mesh, animation, timestampMilliseconds,
+                                       worldMatrices);
+    if (!result) {
+        output = {};
+        return result;
+    }
+    const auto node = std::find_if(
+        mesh.sceneNodes().begin(), mesh.sceneNodes().end(),
+        [nodeName](const ColladaSceneNode& candidate) {
+            return candidate.name == nodeName;
+        });
+    if (node == mesh.sceneNodes().end()) {
+        output = {};
+        return Result::failure("BDAE scene node was not found: " +
+                               std::string(nodeName));
+    }
+    const std::size_t nodeIndex = static_cast<std::size_t>(
+        node - mesh.sceneNodes().begin());
+    if (nodeIndex >= worldMatrices.size()) {
+        output = {};
+        return Result::failure("BDAE scene node transform is missing");
+    }
+    output = worldMatrices[nodeIndex].value;
     return Result::success();
 }
 

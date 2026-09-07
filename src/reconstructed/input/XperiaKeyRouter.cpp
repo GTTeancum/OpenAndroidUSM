@@ -19,6 +19,8 @@ void XperiaKeyRouter::route(const XperiaKeyEvent& event,
         if (gameplay) {
             state_.jump.set(event.pressed);
             state_.quickTimeEvent.set(event.pressed);
+        } else if (context == InputContext::Menu) {
+            state_.menuSelected.set(event.pressed);
         } else if (context == InputContext::UpgradeMenu) {
             state_.upgrade.set(event.pressed);
             state_.upgradeProceed.set(event.pressed);
@@ -40,12 +42,12 @@ void XperiaKeyRouter::route(const XperiaKeyEvent& event,
         }
         break;
     case XperiaKeyCode::DpadUp:
-        if (gameplay) {
+        if (gameplay || context == InputContext::Menu) {
             state_.moveUp.set(event.pressed);
         }
         break;
     case XperiaKeyCode::DpadDown:
-        if (gameplay) {
+        if (gameplay || context == InputContext::Menu) {
             state_.moveDown.set(event.pressed);
         }
         break;

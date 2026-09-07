@@ -1,0 +1,17 @@
+# Reconstructs the complete first-level CDestroyableObject path: authored
+# melee acquisition, impact sound, directional break animation, collision
+# handoff, terminal broken pose, and deterministic event logging.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 14320 -8545 10 1 0 0
+attack_object 12000 250 278
+assert_object_destroyed 278
+assert_audio_played SFX_STREET_LAMP_IMPACT
+assert_health_above 0
+finish

@@ -1,0 +1,18 @@
+# Native-render validation for the dense Room 8 electric-platform field.
+# The process-local teleport occurs only after the authored opening releases
+# controls; the suite runner removes the BMP after each run.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 35000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+teleport 19000 -5000 1349.714722 0 -1 0
+wait 500
+capture level3-electric-rooftop
+assert_health_above 0
+finish

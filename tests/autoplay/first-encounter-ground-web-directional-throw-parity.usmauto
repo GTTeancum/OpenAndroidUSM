@@ -1,0 +1,40 @@
+# Source-authored held shot -> bind -> direction-plus-target throw branch.
+# Native GameEventKeyWrap maps a new WASD/left-stick direction to virtual
+# button 0; state 60 maps button-0 predicate 101 to state 64.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_physics 394 1
+teleport 13399 -6360 7 0 -1 0
+
+web_on
+move_until_state 500 0 0 58
+web_held_attack_when_ready 1000
+move_until_state 1000 0 0 60
+assert_enemy_health_near 394 480 0.01
+
+# A fresh right-stick/WASD direction is event 0 Pressed, rotates Spider-Man
+# camera-relatively, and selects the otherwise unreachable state 64.
+move_until_state 1000 1 0 64
+assert_player_state 64
+assert_enemy_health_near 394 480 0.01
+
+# Motion 129 delivers its 150 damage only when the 634 ms primary throw clip
+# finishes. State 64 has no ordinary impact-frame/effect list.
+wait 500
+assert_enemy_health_near 394 480 0.01
+wait 150
+assert_enemy_health_near 394 330 0.01
+assert_health_above 0
+finish

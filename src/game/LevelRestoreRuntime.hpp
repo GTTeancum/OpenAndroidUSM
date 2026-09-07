@@ -3,6 +3,7 @@
 #include "game/LevelOneBootstrap.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -21,12 +22,18 @@ public:
     [[nodiscard]] Result bind(
         std::span<const LevelRestoreTriggerAsset> triggers,
         std::span<const LevelRestorePointAsset> restorePoints);
+    [[nodiscard]] Result applyCinematicCommand(
+        const CinematicThread& thread, const CinematicCommand& command);
     void update(const assets::Vector3& playerPosition,
-                std::uint32_t elapsedMilliseconds) noexcept;
+                std::uint32_t elapsedMilliseconds,
+                bool updatesEnabled = true,
+                bool playerCanEnable = true) noexcept;
 
     [[nodiscard]] std::vector<LevelRestoreEvent> consumeEvents();
     [[nodiscard]] float blackOverlayAlpha() const noexcept { return alpha_; }
     [[nodiscard]] bool active() const noexcept { return active_ != nullptr; }
+    [[nodiscard]] std::optional<bool> enabled(
+        std::int32_t objectId) const noexcept;
 
 private:
     static bool containsPlayer(const LevelRestoreTriggerAsset& trigger,
@@ -34,6 +41,7 @@ private:
 
     std::span<const LevelRestoreTriggerAsset> triggers_;
     std::span<const LevelRestorePointAsset> restorePoints_;
+    std::vector<bool> enabled_;
     const LevelRestoreTriggerAsset* active_{};
     std::uint32_t elapsedMilliseconds_{};
     float alpha_{};

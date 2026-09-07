@@ -1,0 +1,25 @@
+# Process-local proof of Rhino's recovered phase-one task/QTE path. Damage is
+# applied through the diagnostic harness, but the 67% clamp, task queue,
+# synchronized clips, eight-tap/4000 ms button config, and result branch are
+# production LevelEnemyRuntime/QuickTimeActionRuntime code recovered from the
+# shipped ARM routines and QTE_ACTIONS.bin/BCONFIG.bin.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 25000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 1000
+wait_controls 1000
+teleport 5256.273438 61090.000000 968.338501 0 1 0
+set_enemy_ai 20055 1 1
+damage_enemy 20055 100000
+wait_enemy_animation 12000 20055 idle_to_grab_ready
+wait_enemy_animation 3000 20055 idle_to_grab
+wait_enemy_animation 5000 20055 struggleing
+wait_enemy_animation 3000 20055 struggle_to_hurt_to_idle
+wait_enemy_animation 5000 20055 idle_charge_run
+assert_health_below 1000
+assert_health_above 0
+finish

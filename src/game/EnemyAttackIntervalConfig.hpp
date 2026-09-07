@@ -34,6 +34,8 @@ public:
 
     [[nodiscard]] const EnemyAttackIntervalDefinition* findForWeaponType(
         std::int32_t weaponType) const noexcept;
+    [[nodiscard]] const EnemyAttackIntervalDefinition* findByWeaponTypeMapIndex(
+        std::int32_t weaponTypeMapIndex) const noexcept;
     [[nodiscard]] const std::vector<EnemyAttackIntervalDefinition>& definitions()
         const noexcept {
         return definitions_;

@@ -1,0 +1,36 @@
+# Exercises the authored Cinematic_Gameover asset independently of player
+# death. Direct ARM RE traces cinematic 1267 to GS_ExitMenu::HandleGoToGameEnd
+# (0x002bfdfc), its GS_Loading+0x114 flag, and CLevel+0x254; it is not the
+# CLevel player-death path.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 125000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+wait_controls 5000
+start_cinematic 1267
+wait_cinematic_started 1000 1267
+wait 1000
+capture campaign-end-opening
+wait 9000
+capture campaign-end-girl
+wait 10000
+capture campaign-end-dialogue
+wait 14500
+capture campaign-end-camera-shot
+wait 12000
+capture campaign-end-late-dialogue
+wait 8500
+capture campaign-end-final
+assert_audio_played VFX_END_SPIDY_01
+assert_audio_played SFX_CAMERA_SHOT
+assert_audio_played VFX_END_SPIDY_02
+assert_audio_played SFX_JUMP_SWOOSH_4
+assert_audio_play_count SFX_WEB_THROW_1 2
+assert_audio_play_count SFX_CUTSCENE_LV3_SPIDY_ARRIVES 2
+assert_audio_played VFX_END_GIRL_01
+assert_audio_played VFX_END_GIRL_02
+finish

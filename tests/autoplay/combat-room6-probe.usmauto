@@ -1,0 +1,21 @@
+# Elevated Room 6 cohort, including the authored type-5 heavy enemy.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 240000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 11850 9690 3479 1 0 0
+attack 25000 160 481
+teleport 12290 8656 3479 1 0 0
+attack 25000 160 482
+teleport 9610 11136 3479 0 1 0
+attack 25000 160 483
+teleport 12173 9269 3479 1 0 0
+attack 30000 160 10344
+teleport 7900 6927 3579 -1 0 0
+attack 50000 180 1139
+assert_health_above 0
+finish

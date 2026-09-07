@@ -31,11 +31,13 @@ constexpr std::uint32_t kVisualSceneArrayOffset = 0x70;
 constexpr std::uint32_t kVisualSceneSize = 0x10;
 constexpr std::uint32_t kSceneNodeSize = 0x50;
 constexpr std::uint32_t kSceneInstanceSize = 0x08;
+constexpr std::uint32_t kControllerInstanceType = 2;
 constexpr std::uint32_t kGeometryInstanceType = 3;
 constexpr std::uint32_t kControllerCountOffset = 0x54;
 constexpr std::uint32_t kControllerArrayOffset = 0x58;
 constexpr std::uint32_t kControllerSize = 0x0c;
 constexpr std::uint32_t kSkinControllerType = 0;
+constexpr std::uint32_t kMorphControllerType = 1;
 
 class BinaryView final {
 public:
@@ -105,7 +107,9 @@ std::optional<AxisAlignedBounds> readBounds(const BinaryView& view,
 }
 
 struct AffineTransform {
-    // Row-major 3x3 linear transform. Points use linear * point + translation.
+    // Row-major 3x3 storage matching Irrlicht CMatrix4. The original
+    // transformVect (0x002c2924) treats points as row vectors:
+    // point * linear + translation.
     std::array<float, 9> linear{1.0F, 0.0F, 0.0F,
                                 0.0F, 1.0F, 0.0F,
                                 0.0F, 0.0F, 1.0F};
@@ -115,9 +119,9 @@ struct AffineTransform {
 Vector3 multiply(const std::array<float, 9>& matrix,
                  const Vector3& value) noexcept {
     return {
-        matrix[0] * value.x + matrix[1] * value.y + matrix[2] * value.z,
-        matrix[3] * value.x + matrix[4] * value.y + matrix[5] * value.z,
-        matrix[6] * value.x + matrix[7] * value.y + matrix[8] * value.z,
+        matrix[0] * value.x + matrix[3] * value.y + matrix[6] * value.z,
+        matrix[1] * value.x + matrix[4] * value.y + matrix[7] * value.z,
+        matrix[2] * value.x + matrix[5] * value.y + matrix[8] * value.z,
     };
 }
 
@@ -139,7 +143,9 @@ std::array<float, 9> multiply(const std::array<float, 9>& left,
 AffineTransform combine(const AffineTransform& parent,
                         const AffineTransform& local) noexcept {
     return {
-        multiply(parent.linear, local.linear),
+        // ISceneNode::updateAbsolutePosition calls parent.mult34(local), and
+        // mult34 (0x002bac54) emits local * parent for this row-vector layout.
+        multiply(local.linear, parent.linear),
         [&] {
             const Vector3 translated = multiply(parent.linear, local.translation);
             return Vector3{translated.x + parent.translation.x,
@@ -166,14 +172,13 @@ std::optional<AffineTransform> readNodeTransform(const BinaryView& view,
         return std::nullopt;
     }
 
-    const float length = std::sqrt(*x * *x + *y * *y + *z * *z + *w * *w);
-    if (length <= std::numeric_limits<float>::epsilon()) {
-        return std::nullopt;
-    }
-    const float qx = *x / length;
-    const float qy = *y / length;
-    const float qz = *z / length;
-    const float qw = *w / length;
+    // The shipped path copies SNode::Rotation unchanged in
+    // ISceneNode::setRotation (0x00408978). The raw components then enter
+    // quaternion::getMatrix_transposed (0x00305f48); it does not normalize.
+    const float qx = *x;
+    const float qy = *y;
+    const float qz = *z;
+    const float qw = *w;
     const float xx = qx * qx;
     const float yy = qy * qy;
     const float zz = qz * qz;
@@ -185,15 +190,18 @@ std::optional<AffineTransform> readNodeTransform(const BinaryView& view,
     const float wz = qw * qz;
 
     AffineTransform result;
+    // quaternion::getMatrix_transposed (0x00305f48) emits these rows, then
+    // ISceneNode::getRelativeTransformation (0x004083c4) scales each complete
+    // row by the matching local-axis scale.
     result.linear = {
         (1.0F - 2.0F * (yy + zz)) * scale->x,
-        (2.0F * (xy - wz)) * scale->y,
-        (2.0F * (xz + wy)) * scale->z,
-        (2.0F * (xy + wz)) * scale->x,
+        (2.0F * (xy - wz)) * scale->x,
+        (2.0F * (xz + wy)) * scale->x,
+        (2.0F * (xy + wz)) * scale->y,
         (1.0F - 2.0F * (xx + zz)) * scale->y,
-        (2.0F * (yz - wx)) * scale->z,
-        (2.0F * (xz - wy)) * scale->x,
-        (2.0F * (yz + wx)) * scale->y,
+        (2.0F * (yz - wx)) * scale->y,
+        (2.0F * (xz - wy)) * scale->z,
+        (2.0F * (yz + wx)) * scale->z,
         (1.0F - 2.0F * (xx + yy)) * scale->z,
     };
     result.translation = *position;
@@ -299,6 +307,40 @@ std::optional<std::uint32_t> componentOffset(const BinaryView& view,
         componentOffsets + static_cast<std::uint32_t>(componentIndex) * 4);
 }
 
+std::optional<std::uint32_t> effectTextureImageIndex(
+    const BinaryView& view, std::uint32_t effectOffset,
+    std::uint32_t textureEntryOffset, std::uint32_t imageCount) {
+    // CResFileManager::postLoadProcess (0x00425d88) resolves each serialized
+    // texture entry through two effect-local index tables before it reaches
+    // the SCollada image library. Keep those indices immutable here.
+    const auto mapIndex = view.integer<std::uint32_t>(textureEntryOffset);
+    const auto mapCount = view.integer<std::uint32_t>(effectOffset + 0x4c);
+    const auto mapArray = view.integer<std::uint32_t>(effectOffset + 0x50);
+    const auto imageReferenceCount =
+        view.integer<std::uint32_t>(effectOffset + 0x54);
+    const auto imageReferenceArray =
+        view.integer<std::uint32_t>(effectOffset + 0x58);
+    if (!mapIndex || !mapCount || !mapArray || !imageReferenceCount ||
+        !imageReferenceArray || *mapIndex >= *mapCount ||
+        !view.contains(*mapArray,
+                       static_cast<std::uint64_t>(*mapCount) * 4) ||
+        !view.contains(*imageReferenceArray,
+                       static_cast<std::uint64_t>(*imageReferenceCount) * 4)) {
+        return std::nullopt;
+    }
+    const auto imageReferenceIndex =
+        view.integer<std::uint32_t>(*mapArray + *mapIndex * 4);
+    if (!imageReferenceIndex ||
+        *imageReferenceIndex >= *imageReferenceCount) {
+        return std::nullopt;
+    }
+    const auto imageIndex = view.integer<std::uint32_t>(
+        *imageReferenceArray + *imageReferenceIndex * 4);
+    return imageIndex && *imageIndex < imageCount
+               ? std::optional(*imageIndex)
+               : std::nullopt;
+}
+
 Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
                      ColladaGeometry& output) {
     const auto idOffset = view.integer<std::uint32_t>(geometryOffset);
@@ -347,6 +389,7 @@ Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
     std::int8_t positionComponent = -1;
     std::int8_t normalComponent = -1;
     std::int8_t textureComponent = -1;
+    std::int8_t secondaryTextureComponent = -1;
     std::int8_t colorComponent = -1;
     for (std::uint32_t index = 0; index < *bufferCount; ++index) {
         const std::uint32_t bufferOffset =
@@ -377,6 +420,8 @@ Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
                 *view.integer<std::uint8_t>(bufferOffset + 13));
             textureComponent = static_cast<std::int8_t>(
                 *view.integer<std::uint8_t>(bufferOffset + 16));
+            secondaryTextureComponent = static_cast<std::int8_t>(
+                *view.integer<std::uint8_t>(bufferOffset + 19));
             colorComponent = static_cast<std::int8_t>(
                 *view.integer<std::uint8_t>(bufferOffset + 22));
         }
@@ -386,6 +431,9 @@ Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
         buffer.materialName = *material;
         buffer.firstVertex = *firstVertex;
         buffer.lastVertex = *lastVertex;
+        buffer.usesSecondaryTextureCoordinates =
+            static_cast<std::int8_t>(
+                *view.integer<std::uint8_t>(bufferOffset + 19)) != -1;
         buffer.bounds = *bufferBounds;
         buffer.indices.reserve(*indexCount);
         for (std::uint32_t indexPosition = 0; indexPosition < *indexCount;
@@ -406,6 +454,8 @@ Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
         view, *componentOffsets, *componentCount, normalComponent);
     const auto textureOffset = componentOffset(
         view, *componentOffsets, *componentCount, textureComponent);
+    const auto secondaryTextureOffset = componentOffset(
+        view, *componentOffsets, *componentCount, secondaryTextureComponent);
     const auto colorOffset = componentOffset(
         view, *componentOffsets, *componentCount, colorComponent);
     if (!positionOffset) {
@@ -437,6 +487,17 @@ Result parseGeometry(const BinaryView& view, std::uint32_t geometryOffset,
                 return Result::failure("BDAE texture-coordinate stream is truncated");
             }
             vertex.textureCoordinate = {*u, *v};
+        }
+        if (secondaryTextureOffset) {
+            const auto u =
+                view.floating(vertexOffset + *secondaryTextureOffset);
+            const auto v =
+                view.floating(vertexOffset + *secondaryTextureOffset + 4);
+            if (!u || !v) {
+                return Result::failure(
+                    "BDAE secondary texture-coordinate stream is truncated");
+            }
+            vertex.secondaryTextureCoordinate = {*u, *v};
         }
         if (colorOffset) {
             const auto color =
@@ -534,11 +595,22 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
 
         const auto secondaryTextureMode =
             view.integer<std::uint32_t>(entry + 0x30);
-        if (!secondaryTextureMode) {
+        const auto additiveBlend =
+            view.integer<std::uint32_t>(entry + 0x1c);
+        const auto backFaceCulling =
+            view.integer<std::uint32_t>(entry + 0x38);
+        const auto frontFaceCulling =
+            view.integer<std::uint32_t>(entry + 0x3c);
+        if (!secondaryTextureMode || !additiveBlend || !backFaceCulling ||
+            !frontFaceCulling) {
             return Result::failure("BDAE material mode is truncated");
         }
         ColladaMaterial material{*id, *name, *effectId, std::nullopt,
-                                 std::nullopt, *secondaryTextureMode};
+                                 std::nullopt, std::nullopt,
+                                 *secondaryTextureMode,
+                                 *additiveBlend != 0,
+                                 *backFaceCulling != 0,
+                                 *frontFaceCulling != 0, false};
         const auto imageIndexFromReference =
             [imageCount, imageArray](std::uint32_t pointer)
             -> std::optional<std::uint32_t> {
@@ -565,6 +637,26 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
         material.diffuseImageIndex = imageIndexFromReference(*primaryImage);
         material.secondaryImageIndex = imageIndexFromReference(*secondaryImage);
         const std::uint32_t effect = *effectArray + *effectIndex * kEffectSize;
+        const auto ambientUsesTextures =
+            view.integer<std::uint8_t>(effect + 0x08);
+        const auto ambientPayload =
+            view.integer<std::uint32_t>(effect + 0x0c);
+        if (!ambientUsesTextures || !ambientPayload) {
+            return Result::failure("BDAE material ambient fields are truncated");
+        }
+        if (*ambientUsesTextures == 0 && *ambientPayload != 0) {
+            for (std::size_t component = 0;
+                 component < material.ambientColor.size(); ++component) {
+                const auto value = view.integer<std::uint8_t>(
+                    *ambientPayload + static_cast<std::uint32_t>(component));
+                if (!value) {
+                    return Result::failure(
+                        "BDAE material ambient color is truncated");
+                }
+                material.ambientColor[component] =
+                    static_cast<float>(*value) / 255.0F;
+            }
+        }
         const auto diffuseUsesTextures =
             view.integer<std::uint8_t>(effect + 0x10);
         const auto diffusePayload =
@@ -630,6 +722,54 @@ Result parseMaterialLibrary(const BinaryView& view, std::uint32_t rootOffset,
                 material.diffuseImageIndex = *imageIndex;
             }
         }
+        // CMaterial::prepareMaterial (0x0041c750) treats the effect channel at
+        // +0x38/+0x3c as a lightmap only when its referenced image name
+        // contains "lightmap". Merely having a TEXCOORD1 component does not
+        // select the lightmap renderer; many ordinary level meshes carry
+        // unrelated secondary coordinates.
+        const auto lightmapUsesTextures =
+            view.integer<std::uint8_t>(effect + 0x38);
+        const auto lightmapPayload =
+            view.integer<std::uint32_t>(effect + 0x3c);
+        if (lightmapUsesTextures && *lightmapUsesTextures == 1 &&
+            lightmapPayload && *lightmapPayload != 0) {
+            const auto textureCount =
+                view.integer<std::uint32_t>(*lightmapPayload);
+            const auto textureArray =
+                view.integer<std::uint32_t>(*lightmapPayload + 4);
+            if (textureCount && textureArray && *textureCount != 0 &&
+                view.contains(*textureArray,
+                              static_cast<std::uint64_t>(*textureCount) *
+                                  0x1c)) {
+                for (std::uint32_t layer = 0; layer < *textureCount; ++layer) {
+                    const auto imageIndex = effectTextureImageIndex(
+                        view, effect, *textureArray + layer * 0x1c,
+                        imageCount);
+                    if (imageIndex &&
+                        images[*imageIndex].sourcePath.find("lightmap") !=
+                            std::string::npos) {
+                        material.lightmapImageIndex = *imageIndex;
+                        break;
+                    }
+                }
+            }
+        }
+        const auto effectOpacity = view.floating(effect + 0x40);
+        if (!lightmapUsesTextures || !effectOpacity) {
+            return Result::failure(
+                "BDAE material transparency fields are truncated");
+        }
+        // CMaterial::prepareMaterial (0x0041c750) selects native renderer
+        // index 0x0e, TRANSPARENT_ALPHA_CHANNEL, for a single-layer material
+        // when the effect's transparent-texture channel is present, the
+        // secondary mode requests alpha, or the effect opacity is not one.
+        // A channel already classified as a named lightmap is handled by the
+        // two-layer lightmap renderer instead.
+        material.transparentAlphaChannel =
+            !material.secondaryImageIndex &&
+            ((!material.lightmapImageIndex && *lightmapUsesTextures == 1) ||
+             material.secondaryTextureMode == 1 ||
+             *effectOpacity != 1.0F);
         output.push_back(std::move(material));
     }
     return Result::success();
@@ -639,6 +779,8 @@ Result parseSceneNodes(
     const BinaryView& view, std::uint32_t nodeArray, std::uint32_t nodeCount,
     const AffineTransform& parentTransform,
     const std::unordered_map<std::string, std::uint32_t>& geometryIndices,
+    const std::unordered_map<std::string, std::uint32_t>&
+        controllerGeometryIndices,
     const std::vector<ColladaGeometry>& geometries,
     std::vector<ColladaGeometry>& output,
     std::vector<ColladaSceneNode>& sceneNodes, std::int32_t parentIndex,
@@ -685,6 +827,8 @@ Result parseSceneNodes(
 
         const std::int32_t currentNodeIndex =
             static_cast<std::int32_t>(sceneNodes.size());
+        const AffineTransform worldTransform =
+            combine(parentTransform, *localTransform);
         sceneNodes.push_back({*id,
                               *name,
                               *scopeId,
@@ -692,10 +836,9 @@ Result parseSceneNodes(
                               *position,
                               {*rotationX, *rotationY, *rotationZ, *rotationW},
                               *scale,
+                              worldTransform.linear,
+                              worldTransform.translation,
                               {}});
-
-        const AffineTransform worldTransform =
-            combine(parentTransform, *localTransform);
         for (std::uint32_t instanceIndex = 0;
              instanceIndex < *instanceCount; ++instanceIndex) {
             const std::uint32_t instanceOffset =
@@ -705,7 +848,8 @@ Result parseSceneNodes(
             if (!type || !payload) {
                 return Result::failure("BDAE scene instance is truncated");
             }
-            if (*type != kGeometryInstanceType) {
+            if (*type != kGeometryInstanceType &&
+                *type != kControllerInstanceType) {
                 continue;
             }
             const auto externalFile = view.integer<std::uint32_t>(*payload);
@@ -724,8 +868,12 @@ Result parseSceneNodes(
                 geometryUrl->front() != '#') {
                 return Result::failure("BDAE geometry instance URL is invalid");
             }
-            const auto geometry = geometryIndices.find(geometryUrl->substr(1));
-            if (geometry == geometryIndices.end() ||
+            const auto& instanceIndices =
+                *type == kGeometryInstanceType ? geometryIndices
+                                               : controllerGeometryIndices;
+            const auto geometry =
+                instanceIndices.find(geometryUrl->substr(1));
+            if (geometry == instanceIndices.end() ||
                 geometry->second >= geometries.size()) {
                 // Some animation-only resources retain scene instances for a
                 // geometry library stripped into another BDAE. They do not
@@ -743,7 +891,8 @@ Result parseSceneNodes(
         if (*childCount != 0) {
             Result result = parseSceneNodes(
                 view, *childArray, *childCount, worldTransform,
-                geometryIndices, geometries, output, sceneNodes,
+                geometryIndices, controllerGeometryIndices, geometries,
+                output, sceneNodes,
                 currentNodeIndex, depth + 1);
             if (!result) {
                 return result;
@@ -755,6 +904,8 @@ Result parseSceneNodes(
 
 Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
                          const std::vector<ColladaGeometry>& geometries,
+                         const std::vector<ColladaSkin>& skins,
+                         const std::vector<ColladaMorph>& morphs,
                          std::vector<ColladaGeometry>& output,
                          std::vector<ColladaSceneNode>& sceneNodes) {
     const auto sceneCount =
@@ -778,6 +929,25 @@ Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
     for (std::uint32_t index = 0; index < geometries.size(); ++index) {
         geometryIndices.emplace(geometries[index].id, index);
     }
+    std::unordered_map<std::string, std::uint32_t>
+        controllerGeometryIndices;
+    controllerGeometryIndices.reserve(skins.size() + morphs.size());
+    const auto addControllerGeometry =
+        [&geometryIndices, &controllerGeometryIndices](
+            const std::string& controllerId,
+            const std::string& geometryId) {
+            const auto geometry = geometryIndices.find(geometryId);
+            if (geometry != geometryIndices.end()) {
+                controllerGeometryIndices.emplace(controllerId,
+                                                  geometry->second);
+            }
+        };
+    for (const ColladaSkin& skin : skins) {
+        addControllerGeometry(skin.controllerId, skin.geometryId);
+    }
+    for (const ColladaMorph& morph : morphs) {
+        addControllerGeometry(morph.controllerId, morph.sourceGeometryId);
+    }
     const AffineTransform identity;
     for (std::uint32_t sceneIndex = 0; sceneIndex < *sceneCount; ++sceneIndex) {
         const std::uint32_t sceneOffset =
@@ -789,7 +959,7 @@ Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
         }
         Result result = parseSceneNodes(
             view, *nodeArray, *nodeCount, identity, geometryIndices,
-            geometries, output, sceneNodes, -1, 0);
+            controllerGeometryIndices, geometries, output, sceneNodes, -1, 0);
         if (!result) {
             output.clear();
             return result;
@@ -797,6 +967,82 @@ Result parseVisualScenes(const BinaryView& view, std::uint32_t rootOffset,
     }
     if (output.empty()) {
         output = geometries;
+    }
+    return Result::success();
+}
+
+Result parseMorphControllers(const BinaryView& view,
+                             std::uint32_t rootOffset,
+                             std::uint32_t geometryCount,
+                             std::vector<ColladaMorph>& output) {
+    const auto controllerCount =
+        view.integer<std::uint32_t>(rootOffset + kControllerCountOffset);
+    const auto controllerArray =
+        view.integer<std::uint32_t>(rootOffset + kControllerArrayOffset);
+    if (!controllerCount || !controllerArray ||
+        (*controllerCount != 0 &&
+         !view.contains(*controllerArray,
+                        static_cast<std::uint64_t>(*controllerCount) *
+                            kControllerSize))) {
+        return Result::failure("BDAE controller library is invalid");
+    }
+    for (std::uint32_t controllerIndex = 0;
+         controllerIndex < *controllerCount; ++controllerIndex) {
+        const std::uint32_t controllerOffset =
+            *controllerArray + controllerIndex * kControllerSize;
+        const auto type = view.integer<std::uint32_t>(controllerOffset);
+        const auto idOffset =
+            view.integer<std::uint32_t>(controllerOffset + 4);
+        const auto morphOffset =
+            view.integer<std::uint32_t>(controllerOffset + 8);
+        if (!type || !idOffset || !morphOffset) {
+            return Result::failure("BDAE controller record is truncated");
+        }
+        if (*type != kMorphControllerType) {
+            continue;
+        }
+        const auto controllerId = view.string(*idOffset);
+        const auto sourceUrlOffset =
+            view.integer<std::uint32_t>(*morphOffset);
+        const auto targetCount =
+            view.integer<std::uint32_t>(*morphOffset + 0x10);
+        const auto targetIndices =
+            view.integer<std::uint32_t>(*morphOffset + 0x14);
+        const auto weightCount =
+            view.integer<std::uint32_t>(*morphOffset + 0x18);
+        const auto weights =
+            view.integer<std::uint32_t>(*morphOffset + 0x1c);
+        if (!controllerId || !sourceUrlOffset || !targetCount ||
+            !targetIndices || !weightCount || !weights ||
+            *targetCount != *weightCount ||
+            (*targetCount != 0 &&
+             (!view.contains(*targetIndices,
+                             static_cast<std::uint64_t>(*targetCount) * 4) ||
+              !view.contains(*weights,
+                             static_cast<std::uint64_t>(*weightCount) * 4)))) {
+            return Result::failure("BDAE morph payload is invalid");
+        }
+        const auto sourceUrl = view.string(*sourceUrlOffset);
+        if (!sourceUrl || sourceUrl->empty() || sourceUrl->front() != '#') {
+            return Result::failure("BDAE morph source URL is invalid");
+        }
+        ColladaMorph morph;
+        morph.controllerId = *controllerId;
+        morph.sourceGeometryId = sourceUrl->substr(1);
+        morph.targetGeometryIndices.reserve(*targetCount);
+        morph.weights.reserve(*weightCount);
+        for (std::uint32_t target = 0; target < *targetCount; ++target) {
+            const auto geometryIndex =
+                view.integer<std::uint32_t>(*targetIndices + target * 4);
+            const auto weight = view.floating(*weights + target * 4);
+            if (!geometryIndex || *geometryIndex >= geometryCount || !weight ||
+                !std::isfinite(*weight)) {
+                return Result::failure("BDAE morph target is invalid");
+            }
+            morph.targetGeometryIndices.push_back(*geometryIndex);
+            morph.weights.push_back(*weight);
+        }
+        output.push_back(std::move(morph));
     }
     return Result::success();
 }
@@ -964,6 +1210,7 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
     geometries_.clear();
     sceneGeometries_.clear();
     skins_.clear();
+    morphs_.clear();
     sceneNodes_.clear();
     Result result = resource_.load(bytes);
     if (!result) {
@@ -1006,15 +1253,21 @@ Result ColladaMeshFile::load(std::span<const std::byte> bytes) {
         }
         geometries_.push_back(std::move(geometry));
     }
-    result = parseVisualScenes(view, *rootOffset, geometries_,
-                               sceneGeometries_, sceneNodes_);
-    if (!result) {
-        sceneGeometries_.clear();
-        return result;
-    }
     result = parseSkinControllers(view, *rootOffset, skins_);
     if (!result) {
         skins_.clear();
+        return result;
+    }
+    result = parseMorphControllers(view, *rootOffset, *geometryCount,
+                                   morphs_);
+    if (!result) {
+        morphs_.clear();
+        return result;
+    }
+    result = parseVisualScenes(view, *rootOffset, geometries_, skins_, morphs_,
+                               sceneGeometries_, sceneNodes_);
+    if (!result) {
+        sceneGeometries_.clear();
         return result;
     }
     return Result::success();

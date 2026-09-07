@@ -28,6 +28,8 @@ public:
     void bind(std::span<const LevelTriggerSoundAsset> triggers);
     [[nodiscard]] std::vector<TriggerSoundEvent> update(
         const assets::Vector3& playerPosition);
+    [[nodiscard]] std::vector<TriggerSoundEvent>
+    checkPointLoadEvents() const;
 
 private:
     struct State {

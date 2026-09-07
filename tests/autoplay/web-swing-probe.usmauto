@@ -1,0 +1,27 @@
+# Enters the real player traversal graph at authored WebGrabPoint 377 and
+# verifies throw (17), hang (18), controlled swing, release (19), rope/audio
+# state, and return to airborne locomotion without synthetic OS input.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 62000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 5000 -6120 10 -0.97 0.23 0
+jump
+wait 150
+web_on
+move_until_state 2000 0 0 18
+assert_player_web_line 1 1 -1
+capture web-swing-native-ribbon
+assert_audio_played SFX_WEB_THROW_1
+assert_audio_played SFX_WEB_SWING_START
+move_input 500 0 1
+web_off
+move_until_state 1000 0 0 19
+assert_audio_played SFX_WEB_SWING_END
+wait 500
+assert_health_above 0
+finish

@@ -1,0 +1,20 @@
+# Process-local proof that the shipped Level 2 basic-thread commands route
+# into the direct CCinematicThread/CBoss reconstructions. Cinematic 20017
+# issues Throwing for Rhino 20019 and object 1177. Cinematic 20020 stops that
+# action and starts the native CProgressBar chase from waypoints 20071/20080.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 10000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 1000
+start_cinematic 20017
+wait_cinematic_started 1000 20017
+wait 3700
+start_cinematic 20020
+wait_cinematic_started 1000 20020
+wait 1800
+capture level2-progress-command
+finish

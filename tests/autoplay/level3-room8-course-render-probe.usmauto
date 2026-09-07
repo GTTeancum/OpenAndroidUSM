@@ -1,0 +1,27 @@
+# Focused native-render survey of the authored Room 8 platform course. These
+# process-local teleports are diagnostic viewpoints only; the chronological
+# acceptance route traverses the same course through production player input.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 30000
+start_time_ms 0
+render_size 960 540
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+teleport 18690 -7600 1650 0 1 -0.25
+wait 200
+capture level3-room8-moving-spans
+teleport 19700 -6450 1650 1 0 -0.2
+wait 200
+capture level3-room8-east-grid
+teleport 19000 -5000 1650 0 1 -0.2
+wait 200
+capture level3-room8-middle-grid
+teleport 19000 -3500 1650 0 1 -0.15
+wait 200
+capture level3-room8-north-grid
+assert_health_above 0
+finish

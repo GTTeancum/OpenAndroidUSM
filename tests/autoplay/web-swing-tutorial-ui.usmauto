@@ -1,0 +1,14 @@
+# Focused regression for the authored Timer-less Room 2 web-swing tutorial.
+# Native IAttributes supplies Timer=0, making it modal until acknowledged.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 65000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+cross_trigger 1114 1115 5000
+capture web-swing-tutorial
+wait_controls 5000
+finish

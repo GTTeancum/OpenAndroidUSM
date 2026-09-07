@@ -1,0 +1,149 @@
+# Follow Level 6 from its shipped player transform through the authored
+# interior, rooftop, bridge, and Venom sequences. Expanded chronologically as
+# each room-owned route is verified.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 500000
+render_size 1280 720
+
+capture level6-gameplay-start
+
+# Spider-Man starts on Room 2's upper floor beside the three symbiotes watched
+# by Cinematic 125. Defeat them through ordinary combat so its IfEnemyDead
+# chain starts the shipped researcher/stone Cinematic 123 and successor 124.
+wait_enemies_active 5000 88 40594 40597
+wait_enemies_grounded 5000 88 40594 40597
+attack 150000 240 88 40594 40597
+assert_health_above 0
+wait_cinematic_started 5000 123
+capture level6-researcher-cinematic
+wait_controls 60000
+capture level6-post-researcher
+
+# Cinematic 124 leaves Spider-Man at the top of Object72's curved stair/ramp.
+# Follow its authored nav bands down from z=1959 to the z=1332 second floor,
+# then clear the four symbiotes watched by Cinematic 41426.
+move_to 33950 23850 1828 140 6000
+move_to 34025 24400 1667 140 6000
+move_to 33750 24875 1497 140 6000
+move_to 33250 25250 1332 180 6000
+wait_enemies_active 5000 41321 41322 41323 41324
+wait_enemies_grounded 5000 41321 41322 41323 41324
+attack 180000 240 41321 41322 41323 41324
+assert_health_above 0
+wait_cinematic_started 5000 41428
+capture level6-floor-break-qte
+
+# The default process-local QTE driver presses the abstract shipped action;
+# success follows 41464 -> 87 and lands both actors on the ground floor.
+wait_controls 30000
+assert_near 32717 24090 262 220
+assert_gameplay_ui
+wait_enemies_active 5000 89
+wait_enemies_grounded 5000 89
+capture level6-ground-floor
+attack 90000 240 89
+assert_health_above 0
+
+# Object 89's destroyed watcher reveals the final two interior symbiotes.
+# Their watcher closes/removes SpiderWebWall 84 and enables Trigger 40622.
+wait_enemies_active 5000 41204 41205
+wait_enemies_grounded 10000 41204 41205
+attack 120000 240 41204 41205
+assert_health_above 0
+wait 2000
+assert_object_hidden 84
+capture level6-interior-clear
+
+# Enter the newly enabled doorway transport and require every native logo
+# transition before Cinematic 40621 places Spider-Man in Room 1.
+move_until_cinematic 32183 24349 260 40621 10000
+wait_transport_state 1000 0
+wait_transport_state 1000 1
+wait_transport_state 1000 2
+wait_transport_state 1500 -1
+assert_camera_area 40941
+assert_near 27397 7280 1303 200
+assert_gameplay_ui
+capture level6-room1-arrival
+
+# Room 1's three standard thugs and big thug are already authored active.
+# Clear them with ordinary attacks, then use the real obj_collision207
+# crossing along WayPoints 3 -> 4 into Room 3.
+wait_enemies_active 5000 41304 41305 41306 41307
+wait_enemies_grounded 5000 41304 41305 41306 41307
+attack 180000 240 41304 41305 41306 41307
+assert_health_above 0
+capture level6-room1-combat-clear
+move_to 28387 8079 1324 110 12000
+move_to 28522 9684 1333 140 12000
+capture level6-room3-arrival
+
+# Room 3's western roof edge is a solid wall until jump_wall_01. Cross its
+# authored jump-only section onto Object22 beside WayPoint 6, then follow
+# the rising walkway toward WayPoint 7 and Slide 41133 in Room 4.
+move_to 28270 10380 1333 15 10000
+jump
+move_to 27915 10520 1320 35 8000
+move_until_state 2000 0 0 0
+assert_near 27915 10520 1320 100
+move_to 27257 11009 1493 110 8000
+assert_near 27257 11009 1493 160
+capture level6-room3-rising-walkway
+move_to 27320 11720 1641 50 12000
+rescue_hostage 15000 41144
+assert_hostage_freed 41144
+# Object22's final roof is 272 cm above the hostage ledge at y=11827.
+# Jump the authored vertical face rather than walking through it.
+jump
+move_to 27320 12075 1913 50 6000
+move_until_state 2000 0 0 0
+assert_near 27320 12075 1913 100
+capture level6-room4-slide-approach
+
+# Jump through jump_wall_02 to catch Slide 41133's shipped 41131 -> 41132
+# cable. Its landing enters Trigger 111 and reveals Room 4's first cohort.
+move_to 27365 12205 1913 12 4000
+jump
+move_to 27379 12245 1960 15 1000
+move_until_state 3000 0 0 23
+move_until_state 3000 0 0 22
+move_until_state 7000 0 0 15
+move_until_state 3000 0 0 0
+assert_near 28571 13642 1225 220
+wait_cinematic_started 5000 112
+capture level6-room4-slide-landing
+# Approach wall01 from the real slide landing. The six authored OnWall
+# enemies must remain wall actors while the player climbs toward Object17.
+move_until_wall 28571 14300 1295 7000
+move_until_state 2000 0 0 1
+move_input 1300 0 1
+wait 600
+capture level6-room4-wall-combat
+# Disable only the prompt auto-responder after reaching the wall normally.
+# One press must decay, then timeout must release the living enemy.
+set_auto_qte 0
+move_until_state 2000 0 0 1
+web_on
+move_until_state 1000 0 0 73
+wait 1000
+qte_tap
+wait 600
+capture wall-web-decayed-progress
+wait 2600
+move_until_state 2000 0 0 1
+wait_enemies_active 1000 41357
+assert_enemy_health_below 41357 801
+assert_audio_stopped SFX_ZOMBIE_BOUND
+capture wall-web-failed-enemy-alive
+# A later successful attempt must still detach that same actor.
+set_auto_qte 1
+web_on
+move_until_state 1000 0 0 73
+wait 2500
+assert_enemy_health_below 41357 1
+assert_audio_played SFX_ZOMBIE_BOUND_FALL
+capture wall-web-retry-success
+assert_health_above 0
+finish

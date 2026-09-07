@@ -1,0 +1,11 @@
+# Fast bootstrap-only census. This emits static trigger, enemy, object,
+# camera, collision, cinematic, and player-state telemetry without producing
+# screenshots or waiting through the opening sequence.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 500
+render_size 320 180
+
+wait 50
+finish

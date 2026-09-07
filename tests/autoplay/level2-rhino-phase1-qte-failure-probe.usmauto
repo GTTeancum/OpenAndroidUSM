@@ -1,0 +1,25 @@
+# Process-local proof of Rhino's recovered phase-one QTE failure branch.
+# Suppressing the harness's normal automatic QTE taps must select shipped
+# action 8: Rhino hold_to_throw, Spider-Man grab_to_knockbackflying, and the
+# authored 100-damage hit at frame 50 before the task queue continues to dash.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 30000
+start_time_ms 0
+render_size 640 360
+auto_qte 0
+
+wait_gameplay 1000
+wait_controls 1000
+teleport 5256.273438 61090.000000 968.338501 0 1 0
+set_enemy_ai 20055 1 1
+damage_enemy 20055 100000
+wait_enemy_animation 12000 20055 idle_to_grab_ready
+wait_enemy_animation 3000 20055 idle_to_grab
+wait_enemy_animation 5000 20055 struggleing
+wait_enemy_animation 6000 20055 hold_to_throw
+wait_enemy_animation 5000 20055 idle_charge_run
+assert_health_below 800
+assert_health_above 0
+finish

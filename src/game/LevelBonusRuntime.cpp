@@ -26,15 +26,6 @@ float distanceSquared(const assets::Vector3& first,
 
 } // namespace
 
-struct LevelBonusRuntime::BonusState {
-    const LevelBonusAsset* asset{};
-    assets::Vector3 startTangent;
-    assets::Vector3 endTangent;
-    float progress{};
-    bool visible{};
-    bool orbActive{};
-};
-
 LevelBonusRuntime::LevelBonusRuntime() = default;
 LevelBonusRuntime::~LevelBonusRuntime() = default;
 
@@ -44,6 +35,7 @@ Result LevelBonusRuntime::initialize(std::span<const LevelBonusAsset> assets,
         return Result::failure("Level bonus difficulty is invalid");
     }
     states_.clear();
+    spawnedAssets_.clear();
     states_.reserve(assets.size());
     for (const LevelBonusAsset& asset : assets) {
         if (asset.objectId < 0 || asset.roomId < 1) {
@@ -62,8 +54,32 @@ Result LevelBonusRuntime::initialize(std::span<const LevelBonusAsset> assets,
     skillPointPopupMilliseconds_ = 0;
     skillPointTotalRemainingMilliseconds_ = 0;
     skillPointPopup_ = {};
-    return states_.empty() ? Result::failure("Level has no bonus objects")
-                           : Result::success();
+    nextSpawnedObjectId_ = -200000;
+    // CLevel permits levels without Bonus nodes (notably Levels 9 and 10).
+    // An empty manager is a valid inert runtime, not a bootstrap failure.
+    return Result::success();
+}
+
+void LevelBonusRuntime::spawnOrbs(LevelBonusType type,
+                                  const assets::Vector3& position,
+                                  std::int32_t roomId,
+                                  std::int32_t count) noexcept {
+    for (std::int32_t index = 0; index < std::max(0, count); ++index) {
+        LevelBonusAsset asset;
+        asset.objectId = nextSpawnedObjectId_--;
+        asset.type = type;
+        asset.roomId = roomId;
+        asset.position = position;
+        asset.visible = false;
+        spawnedAssets_.push_back(std::move(asset));
+        LevelBonusState state;
+        state.asset = &spawnedAssets_.back();
+        state.startTangent = randomTangent(3000.0F, 2000.0F, 30, 60);
+        state.endTangent = randomTangent(-4000.0F, -3000.0F, 120, 240);
+        state.visible = false;
+        state.orbActive = true;
+        states_.push_back(state);
+    }
 }
 
 void LevelBonusRuntime::update(const assets::Vector3& playerPosition,
@@ -96,7 +112,7 @@ void LevelBonusRuntime::update(const assets::Vector3& playerPosition,
     }
     const assets::Vector3 target{playerPosition.x, playerPosition.y,
                                  playerPosition.z + kPlayerTargetHeight};
-    for (BonusState& state : states_) {
+    for (LevelBonusState& state : states_) {
         if (state.visible &&
             distanceSquared(state.asset->position, target) <
                 kCollectionRadiusSquared) {
@@ -169,7 +185,51 @@ std::vector<LevelBonusGrant> LevelBonusRuntime::consumeGrants() {
 std::size_t LevelBonusRuntime::visibleBonusCount() const noexcept {
     return static_cast<std::size_t>(std::count_if(
         states_.begin(), states_.end(),
-        [](const BonusState& state) { return state.visible; }));
+        [](const LevelBonusState& state) { return state.visible; }));
+}
+
+LevelBonusCheckPointState
+LevelBonusRuntime::saveCheckPointState() const {
+    return {states_,
+            difficulty_,
+            randomState_,
+            pendingSkillPointAmount_,
+            pendingSkillPointMilliseconds_,
+            skillPointPopupMilliseconds_,
+            skillPointTotalRemainingMilliseconds_,
+            skillPointPopup_};
+}
+
+Result LevelBonusRuntime::loadCheckPointState(
+    const LevelBonusCheckPointState& state) {
+    if (state.bonuses.empty() != states_.empty()) {
+        return Result::failure(
+            "Checkpoint bonus state does not match the loaded level");
+    }
+    const std::size_t sharedCount =
+        std::min(state.bonuses.size(), states_.size());
+    for (std::size_t index = 0; index < sharedCount; ++index) {
+        if (state.bonuses[index].asset == nullptr ||
+            states_[index].asset == nullptr ||
+            state.bonuses[index].asset->objectId !=
+                states_[index].asset->objectId) {
+            return Result::failure(
+                "Checkpoint bonus state references a different asset");
+        }
+    }
+    states_ = state.bonuses;
+    difficulty_ = state.difficulty;
+    randomState_ = state.randomState;
+    pendingSkillPointAmount_ = state.pendingSkillPointAmount;
+    pendingSkillPointMilliseconds_ = state.pendingSkillPointMilliseconds;
+    skillPointPopupMilliseconds_ = state.skillPointPopupMilliseconds;
+    skillPointTotalRemainingMilliseconds_ =
+        state.skillPointTotalRemainingMilliseconds;
+    skillPointPopup_ = state.skillPointPopup;
+    renderOrbs_.clear();
+    collectedBonusIds_.clear();
+    grants_.clear();
+    return Result::success();
 }
 
 std::uint32_t LevelBonusRuntime::randomBounded(

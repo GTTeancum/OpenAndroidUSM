@@ -1,0 +1,27 @@
+# Live first-encounter coverage for DoNormalSenseAction's right quadrant.
+# With Spider-Man facing -X and actor 394 approaching from +Y, the native
+# dot/cross quadrant test at 0x0034f630 selects state 41 and effect 9.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+teleport 13399 -6650 7 -1 0 0
+wait_enemy_melee_attack 10000 394
+spider_sense
+assert_player_state 41
+assert_slow_motion 3
+wait 550
+assert_enemy_health_near 394 200 0.01
+assert_player_effect 9 1
+assert_slow_motion 1
+assert_health_above 999
+finish

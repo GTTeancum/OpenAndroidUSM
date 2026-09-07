@@ -145,4 +145,12 @@ const VoxSoundRecord* VoxSoundTable::find(
     return match == records_.end() ? nullptr : &*match;
 }
 
+const VoxSoundRecord* VoxSoundTable::find(std::uint16_t id) const noexcept {
+    const auto match = std::find_if(
+        records_.begin(), records_.end(), [id](const VoxSoundRecord& record) {
+            return record.id == id;
+        });
+    return match == records_.end() ? nullptr : &*match;
+}
+
 } // namespace usm::audio

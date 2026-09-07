@@ -1,0 +1,41 @@
+# Native-window coverage for Player::CheckBlinkStrike (0x00342550). The
+# knife clip is 1667 ms long and its first damage action is authored at 45%,
+# so CEnemy::IsNearAttackKeyFrame (0x00334dd0) accepts Spider-Sense from
+# roughly 550 through 799 animation ms. The live melee registration occurs
+# at the action-type-2 marker near 33 ms; waiting 500 ms enters that window.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+
+teleport 13399 -6650 7 0 1 0
+wait_enemy_melee_attack 10000 394
+wait 500
+spider_sense
+assert_player_state 42
+assert_slow_motion 3
+assert_player_effect 25 1
+
+# State 42/motion 0x1fd emits effect 24 at frame 16, hits for 200 at frame
+# 18 using raw hit type 0x1fd, then emits super_web_splash plus VoxSound
+# 0x54 at frame 20. Slow-motion divides the gameplay clock by three.
+wait 1600
+assert_player_effect 24 1
+assert_audio_stopped SFX_SUPER_WEB_ATTACK
+assert_enemy_health_near 394 300 0.01
+assert_enemy_health_near 395 300 0.01
+assert_enemy_health_near 397 300 0.01
+assert_audio_played SFX_CRITICAL_HIT_1
+assert_audio_played SFX_SUPER_WEB_FINAL_ATTACK
+assert_slow_motion 1
+wait 250
+finish

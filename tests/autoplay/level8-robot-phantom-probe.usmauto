@@ -1,0 +1,29 @@
+# Process-local proof of Robot Phantom's native CBoss phase-zero queue.
+# _GLOBAL__I_CBoss (0x00329cd4) emits task IDs 3,24,5,24; the corresponding
+# behavior IDs are melee 0x12f, conceal 0x141, and range 0x134. Cinematic
+# 40526 is the authored SetVisible/ShowHealth gate for object 40524.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 50000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 1000
+wait_controls 20000
+teleport -60089.582031 856.445557 -4993.477539 1 0 0
+start_cinematic 40526
+set_enemy_ai 40524 1 1
+wait_enemy_animation 2000 40524 rush_attack_ready
+wait_enemy_animation 1500 40524 rush_attack1
+wait_enemy_animation 1500 40524 rush_attack2
+wait_enemy_animation 2500 40524 conceal_ready
+wait_enemy_animation 2000 40524 conceal_attack
+wait_enemy_animation 2500 40524 throw_ready
+wait_enemy_animation 1500 40524 throw
+wait_enemy_projectile 1500 40524
+wait_enemy_animation 1500 40524 throw_wait
+wait_enemy_animation 6000 40524 throw_wait_to_idle
+wait_enemy_animation 2000 40524 conceal_ready
+assert_health_above 0
+finish

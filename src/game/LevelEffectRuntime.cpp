@@ -225,7 +225,45 @@ Result LevelEffectRuntime::setPersistentEffectVisible(
     }
     return found
                ? Result::success()
-               : Result::failure("Persistent effect source was not found");
+                : Result::failure("Persistent effect source was not found");
+}
+
+LevelEffectCheckPointState
+LevelEffectRuntime::saveCheckPointState() const {
+    LevelEffectCheckPointState result;
+    result.persistentEffects.reserve(persistentEmitters_.size());
+    for (const PersistentEmitter& emitter : persistentEmitters_) {
+        result.persistentEffects.push_back(
+            {emitter.sourceObjectId, emitter.delayMilliseconds,
+             emitter.emissionRemainder, emitter.visible});
+    }
+    result.randomState = randomState_;
+    return result;
+}
+
+Result LevelEffectRuntime::loadCheckPointState(
+    const LevelEffectCheckPointState& state) {
+    if (state.persistentEffects.size() != persistentEmitters_.size()) {
+        return Result::failure(
+            "Checkpoint effect state does not match the loaded level");
+    }
+    for (std::size_t index = 0; index < persistentEmitters_.size(); ++index) {
+        PersistentEmitter& emitter = persistentEmitters_[index];
+        const PersistentEffectCheckPointState& saved =
+            state.persistentEffects[index];
+        if (saved.sourceObjectId != emitter.sourceObjectId) {
+            return Result::failure(
+                "Checkpoint effect state references a different emitter");
+        }
+        emitter.delayMilliseconds = saved.delayMilliseconds;
+        emitter.emissionRemainder = saved.emissionRemainder;
+        emitter.visible = saved.visible;
+    }
+    randomState_ = state.randomState;
+    pendingEmitters_.clear();
+    particles_.clear();
+    renderParticles_.clear();
+    return Result::success();
 }
 
 void LevelEffectRuntime::update(

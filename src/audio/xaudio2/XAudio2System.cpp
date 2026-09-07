@@ -123,13 +123,13 @@ Result XAudio2System::playNamed(std::string_view eventName,
 Result XAudio2System::playNamed3D(std::string_view eventName,
                                  const PcmAudio& audio,
                                  const SpatialSoundSource& source,
-                                 bool loop) {
+                                 bool loop, float volume) {
     const SpatialSoundMix mix =
         calculateSpatialSoundMix(listenerPosition_, listenerRight_, source);
     if (mix.culled) {
         return Result::success();
     }
-    Result result = playNamed(eventName, audio, loop);
+    Result result = playNamed(eventName, audio, loop, volume);
     if (!result) {
         return result;
     }

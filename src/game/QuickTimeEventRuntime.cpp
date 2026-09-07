@@ -27,15 +27,18 @@ void QuickTimeEventRuntime::bind(
     const ButtonConfigDatabase& configs) noexcept {
     configs_ = &configs;
     configId_ = -1;
+    sourceCinematicId_ = -1;
     successCinematicId_ = -1;
     failureCinematicId_ = -1;
     elapsedMilliseconds_ = 0;
     durationMilliseconds_ = 0;
     cinematicRequest_.reset();
+    buttonProgress_.reset();
     active_ = false;
 }
 
-Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command) {
+Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command,
+                                          std::int32_t sourceCinematicId) {
     if (command.name != "StartQTE") {
         return Result::success();
     }
@@ -58,12 +61,14 @@ Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command) {
     }
 
     configId_ = configId;
+    sourceCinematicId_ = sourceCinematicId;
     successCinematicId_ = successId;
     failureCinematicId_ = failureId;
     elapsedMilliseconds_ = 0;
     durationMilliseconds_ = static_cast<std::uint32_t>(
         std::lround(definition->durationMilliseconds));
     cinematicRequest_.reset();
+    buttonProgress_.reset();
     active_ = true;
     return Result::success();
 }
@@ -73,9 +78,14 @@ void QuickTimeEventRuntime::update(std::uint32_t elapsedMilliseconds,
     if (!active_ || cinematicRequest_.has_value()) {
         return;
     }
-    elapsedMilliseconds_ = std::min(
-        durationMilliseconds_, elapsedMilliseconds_ + elapsedMilliseconds);
-    if (actionPressed) {
+    elapsedMilliseconds_ = static_cast<std::uint32_t>(std::min<std::uint64_t>(
+        durationMilliseconds_, static_cast<std::uint64_t>(elapsedMilliseconds_) +
+                                   elapsedMilliseconds));
+    const auto* definition = configs_ == nullptr ? nullptr : configs_->find(configId_);
+    const bool succeeded = definition != nullptr && buttonProgress_.update(
+        elapsedMilliseconds, actionPressed, definition->requiredActionCount,
+        definition->interactionType == 3);
+    if (succeeded) {
         cinematicRequest_ = successCinematicId_;
         active_ = false;
     } else if (elapsedMilliseconds_ >= durationMilliseconds_) {

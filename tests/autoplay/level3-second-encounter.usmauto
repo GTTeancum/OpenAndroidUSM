@@ -1,0 +1,35 @@
+# Continue the shipped Level 3 graph through the room-2 reveal trigger and the
+# room-4 four-enemy barrier encounter. All volume entry is process-local and
+# uses the exact CFF trigger IDs/transforms recorded in trigger-assets.csv.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 180000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+wait_enemies_active 5000 30314 31305 31306
+wait_enemies_grounded 5000 30314 31305 31306
+attack 60000 160 30314 31305 31306
+wait 1500
+assert_object_animation 30405 close
+assert_object_hidden 30405
+
+cross_trigger 31291 31292 5000
+wait_enemies_active 5000 30328 31307 31308
+cross_trigger 30412 30413 5000
+wait_cinematic_started 5000 30414
+wait_enemies_active 5000 30331 30332 30336 40701
+wait_enemies_grounded 5000 30331 30332 30336 40701
+# Trigger 30412 spans the upper bridge as well as the lower combat floor.
+# Stage on enemy 30331's authored floor elevation before testing melee.
+teleport -4300 -4114 1389 1 0 0
+attack 90000 170 30331 30332 30336 40701
+wait 1500
+assert_object_animation 30411 close
+assert_object_hidden 30411
+assert_health_above 0
+finish

@@ -1,0 +1,37 @@
+# Exhausts health through authored Room 1 TriggerRestore volume 539 and
+# verifies Player::CheckDeath -> state 0x80 -> CLevel::CBlackScreen. Direct
+# ARM RE proves this path opens GS_Confirmation; it must not start cinematic
+# 1267, which belongs to GS_ExitMenu's separate campaign-end reload.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_death_screen 5000
+wait_death_confirmation 5000
+assert_death_confirmation_active
+assert_death_confirmation_selection 0
+capture death-confirmation-yes
+menu_down
+assert_death_confirmation_selection 1
+capture death-confirmation-no
+menu_up
+assert_death_confirmation_selection 0
+assert_health_below 1
+assert_death_screen_active
+assert_death_alpha_above 0.99
+assert_cinematic_not_started 1267
+assert_audio_played M_LOSE
+finish

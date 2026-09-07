@@ -24,6 +24,10 @@ public:
                 std::uint32_t elapsedMilliseconds) noexcept;
 
     [[nodiscard]] std::vector<LevelDamageEvent> consumeEvents();
+    void resetTransientForCheckPointLoad() noexcept {
+        events_.clear();
+        cooldownRemainingMilliseconds_ = 0;
+    }
     [[nodiscard]] std::uint32_t cooldownRemainingMilliseconds() const
         noexcept {
         return cooldownRemainingMilliseconds_;

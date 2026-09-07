@@ -1,0 +1,22 @@
+# Enters and leaves both authored CTriggerSound volumes. Both use
+# SFX_FIRE_TRAP, so minimum play/stop counts prove both independent voices
+# traversed their native start/500-ms-fade-stop path.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 57000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 12746.187 -5284.022 889.949 1 0 0
+wait 100
+teleport 12746.187 -5284.022 5000 1 0 0
+wait 100
+teleport 4779.568 4094.688 997.886 1 0 0
+wait 100
+teleport 4779.568 4094.688 5000 1 0 0
+wait 100
+assert_audio_play_count SFX_FIRE_TRAP 2
+assert_audio_stop_count SFX_FIRE_TRAP 2
+finish

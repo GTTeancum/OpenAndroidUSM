@@ -1,0 +1,54 @@
+# Source-authored grounded B/Circle selection against a target launched more
+# than 160 cm above Spider-Man.  Player::GetAirWebSpecialState selects state
+# 63, whose motion-127 attach event is non-damaging and whose 70 damage is
+# delivered only when the 534 ms web_drag primary clip finishes.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_physics 394 1
+teleport 13399 -6360 7 0 -1 0
+
+# The opening 35-damage punch retains thug 394.  Releasing A/Cross in the
+# authored cancel window enters state 97 and launches it for another 60.
+punch
+jump_release_attack_when_ready 1000
+move_until_state 1000 0 0 97
+wait 350
+assert_enemy_health_near 394 405 0.01
+assert_player_effect 7 1
+assert_audio_played SFX_CRITICAL_HIT_1
+
+# Wait for Spider-Man to recover while the launched victim is still above the
+# native 160 cm split, then issue a fresh grounded web press.
+move_until_state 1500 0 0 0
+web_on
+move_until_state 500 0 0 63
+assert_player_state 63
+assert_enemy_health_near 394 405 0.01
+assert_player_web_line 1 1 394
+assert_audio_played SFX_HORIZONTAL_SWING
+
+# Motion 127 attaches at 200 ms without damage.  The retained target receives
+# all 70 only when the 534 ms primary clip completes.
+wait 300
+assert_enemy_health_near 394 405 0.01
+wait 260
+assert_enemy_health_near 394 335 0.01
+# The native CobWeb remains owned during drag_enemy_to_idle and is released
+# only when state 63 itself exits, not at the damage event.
+assert_player_web_line 1 1 394
+move_until_state 1500 0 0 0
+assert_player_web_line 0 0 -1
+assert_health_above 0
+finish

@@ -1,0 +1,29 @@
+# Both authored first-room melee attacks are interruptible during execution.
+# Strike the knife thug after its attack begins but before the first 45%
+# contact event: the hit must cancel the attack and enter hurt behavior.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+set_enemy_ai 394 1 1
+teleport 13399 -6360 7 0 -1 0
+
+wait_enemy_melee_attack 10000 394
+assert_enemy_melee_attack_active 394 1
+punch
+wait 220
+assert_enemy_health_near 394 465 0.01
+assert_enemy_melee_attack_active 394 0
+assert_enemy_behavior 394 hurt
+assert_audio_played SFX_PUNCH_IMPACT_1
+assert_health_above 0
+finish

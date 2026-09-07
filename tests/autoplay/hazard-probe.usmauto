@@ -1,0 +1,24 @@
+# Covers the two authored environmental damage paths through the real
+# application loop: a type-0 EffectDamage hurt reaction and an activated,
+# delayed, smoking Room-8 chair that falls into the player once.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+# EffectDamage compares its OBB against the center of the 185-unit player.
+teleport 12643.770 -5114.238 748.571 1 0 0
+wait 100
+assert_health_above 969
+assert_health_below 971
+# DropArea 495 owns chair 834. Stand under its authored X/Y at the area's
+# floor height and wait for the runtime's hit flag rather than a guessed time.
+teleport 4794.356 3908.068 2268.137 1 0 0
+wait_drop_hit 5000 834
+assert_audio_played SFX_BATTERY_CELL_EXPLOSION
+assert_health_above 869
+assert_health_below 871
+finish

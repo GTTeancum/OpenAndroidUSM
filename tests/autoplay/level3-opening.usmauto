@@ -1,0 +1,19 @@
+# Run the shipped Level 3 arrival cinematic through its authored handoff,
+# capture the electric beam while the Electro presentation exposes it, and
+# capture the first gameplay frame. This is a bootstrap/presentation gate,
+# not a claim that the complete Electro level is playable.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 25000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait 3900
+capture level3-electro-beam
+wait_controls 12000
+capture level3-opening
+assert_health_above 0
+finish

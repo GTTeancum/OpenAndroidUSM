@@ -1,0 +1,64 @@
+# Progress the authored Level 3 encounter graph through room 7. Earlier gates
+# cover production melee; this focused monitor test uses process-local damage
+# to advance exact IfEnemyDead chains without generating host input.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 120000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+wait_enemies_active 5000 30314 31305 31306
+damage_enemy 30314 100000
+damage_enemy 31305 100000
+damage_enemy 31306 100000
+wait 1000
+assert_object_hidden 30405
+
+cross_trigger 31291 31292 5000
+cross_trigger 30412 30413 5000
+wait_cinematic_started 5000 30414
+wait_enemies_active 5000 30331 30332 30336 40701
+damage_enemy 30331 100000
+damage_enemy 30332 100000
+damage_enemy 30336 100000
+damage_enemy 40701 100000
+wait 1000
+assert_object_hidden 30411
+
+cross_trigger 40192 40193 5000
+wait_cinematic_started 5000 40199
+cross_trigger 40488 40489 5000
+wait_enemies_active 5000 40024 31309 31310 40279
+damage_enemy 40024 100000
+damage_enemy 31309 100000
+damage_enemy 31310 100000
+damage_enemy 40279 100000
+wait 1000
+assert_object_hidden 40191
+
+cross_trigger 40181 40183 5000
+wait_cinematic_started 5000 40557
+wait_enemies_active 5000 30341 30342 30343 30344
+damage_enemy 30341 100000
+damage_enemy 30342 100000
+damage_enemy 30343 100000
+damage_enemy 30344 100000
+wait_cinematic_started 5000 40559
+wait_enemies_active 5000 40550 40552 31312 31313
+damage_enemy 40550 100000
+damage_enemy 40552 100000
+damage_enemy 31312 100000
+damage_enemy 31313 100000
+wait_cinematic_started 5000 40647
+wait_enemies_active 5000 40648
+damage_enemy 40648 100000
+wait 1000
+assert_object_animation 40639 close
+assert_object_hidden 40639
+assert_object_hidden 31337
+assert_health_above 0
+finish

@@ -1,0 +1,18 @@
+# Enters an authored TriggerRestore volume and verifies the native 1280 ms
+# fade-to-black, restore-point relocation, 512 ms opaque hold, and return of
+# player controls while keeping the later post-death screen separate from
+# traversal and restore-volume behavior.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 65000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+assert_near 5607.006 -6449.024 5.012 15
+assert_health_above 799
+assert_health_below 801
+finish

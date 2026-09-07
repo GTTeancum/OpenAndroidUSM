@@ -13,6 +13,7 @@ Result PlayerStateSoundBank::preload(
     states_ = nullptr;
     decodedByConfig_.clear();
     nextVariantByConfig_.clear();
+    activeConfigIds_.clear();
     std::set<std::int16_t> configIds;
     for (const std::string_view stateName : stateNames) {
         const game::PlayerStateDefinition* state = states.findState(stateName);
@@ -42,6 +43,8 @@ Result PlayerStateSoundBank::preload(
             const VoxSoundRecord& record =
                 voxSounds.records()[static_cast<std::size_t>(voxId)];
             DecodedVariant variant;
+            variant.voxSoundId = voxId;
+            variant.eventName = record.eventName;
             Result result = catalog.decode(record.eventName, variant.audio);
             if (!result) {
                 return Result::failure("Could not decode player sound " +
@@ -62,9 +65,18 @@ Result PlayerStateSoundBank::preload(
 }
 
 Result PlayerStateSoundBank::dispatchStateEnter(
-    std::string_view stateName, const PlayPlayerStateSound& play) {
+    std::string_view stateName, const PlayPlayerStateSound& play,
+    const StopPlayerStateSound& stop) {
     if (states_ == nullptr) {
         return Result::failure("Player state sound bank is not loaded");
+    }
+    if (stop) {
+        Result cleanResult = cleanActive(stop);
+        if (!cleanResult) {
+            return cleanResult;
+        }
+    } else {
+        activeConfigIds_.clear();
     }
     const game::PlayerStateDefinition* state = states_->findState(stateName);
     return state == nullptr
@@ -83,6 +95,42 @@ Result PlayerStateSoundBank::dispatchStateFrame(
                : dispatchConfigs(state->frameSoundConfigIds, play);
 }
 
+Result PlayerStateSoundBank::dispatchEmitter(
+    std::int16_t configId, std::size_t emitterIndex,
+    const PlayPlayerStateSound& play) {
+    if (states_ == nullptr) {
+        return Result::failure("Player state sound bank is not loaded");
+    }
+    const game::PlayerSoundConfig* config =
+        states_->findSoundConfig(configId);
+    if (config == nullptr ||
+        emitterIndex >= config->activeEmitterIds.size() ||
+        config->activeEmitterIds[emitterIndex] <= 0) {
+        return Result::failure("Player SoundConfig emitter is invalid");
+    }
+    auto cursor = nextVariantByConfig_.find(configId);
+    const auto variants = decodedByConfig_.find(configId);
+    if (cursor == nextVariantByConfig_.end() ||
+        variants == decodedByConfig_.end() || variants->second.empty()) {
+        return Result::failure("Player SoundConfig was not predecoded");
+    }
+    std::size_t variantIndex{};
+    if (config->playbackType == 0) {
+        // Player::UpdateSound (0x003429d4) treats the first/last Vox IDs as
+        // an inclusive random range. Cycling the decoded records preserves
+        // that authored range while keeping autoplay deterministic.
+        variantIndex = cursor->second % variants->second.size();
+        cursor->second = (variantIndex + 1) % variants->second.size();
+    } else if (config->playbackType == 1 &&
+               emitterIndex < variants->second.size()) {
+        // Type 1 pairs each emitter frame with the Vox ID at the same index.
+        variantIndex = emitterIndex;
+    } else {
+        return Result::failure("Player SoundConfig emitter mapping is invalid");
+    }
+    return dispatchVariant(configId, variantIndex, play);
+}
+
 Result PlayerStateSoundBank::dispatchConfigs(
     std::span<const std::int16_t> configIds,
     const PlayPlayerStateSound& play) {
@@ -90,21 +138,85 @@ Result PlayerStateSoundBank::dispatchConfigs(
         return Result::failure("Player sound callback is missing");
     }
     for (const std::int16_t configId : configIds) {
+        const game::PlayerSoundConfig* config =
+            states_ == nullptr ? nullptr : states_->findSoundConfig(configId);
         auto variants = decodedByConfig_.find(configId);
         auto cursor = nextVariantByConfig_.find(configId);
-        if (variants == decodedByConfig_.end() || variants->second.empty() ||
+        if (config == nullptr || variants == decodedByConfig_.end() ||
+            variants->second.empty() ||
             cursor == nextVariantByConfig_.end()) {
             return Result::failure("Player SoundConfig was not predecoded");
         }
+        const std::int16_t firstEmitter = config->activeEmitterIds.empty()
+                                              ? -1
+                                              : config->activeEmitterIds.front();
+        const bool retainedByNative = config->playbackType == 1 ||
+                                      config->selectionMode != 1 ||
+                                      firstEmitter >= 0;
+        if (retainedByNative &&
+            std::find(activeConfigIds_.begin(), activeConfigIds_.end(),
+                      configId) == activeConfigIds_.end()) {
+            activeConfigIds_.push_back(configId);
+        }
+        // Player::PlaySound (0x0034905c) plays only type-0 configs whose
+        // first emitter is -1/0 immediately. Positive emitter frames and
+        // type-1 per-frame lists are consumed by Player::UpdateSound.
+        if (config->playbackType != 0 || firstEmitter >= 1) {
+            continue;
+        }
         const std::size_t variantIndex = cursor->second % variants->second.size();
         cursor->second = (variantIndex + 1) % variants->second.size();
-        const DecodedVariant& variant = variants->second[variantIndex];
-        Result result = play(variant.audio, variant.looping);
+        Result result = dispatchVariant(configId, variantIndex, play);
         if (!result) {
             return result;
         }
     }
     return Result::success();
+}
+
+Result PlayerStateSoundBank::cleanActive(
+    const StopPlayerStateSound& stop) {
+    if (!stop) {
+        activeConfigIds_.clear();
+        return Result::success();
+    }
+    for (const std::int16_t configId : activeConfigIds_) {
+        const game::PlayerSoundConfig* config =
+            states_ == nullptr ? nullptr : states_->findSoundConfig(configId);
+        const auto variants = decodedByConfig_.find(configId);
+        if (config == nullptr || variants == decodedByConfig_.end()) {
+            return Result::failure("Player SoundConfig was not predecoded");
+        }
+        // Player::StopSound (0x00341e10) leaves selection-mode 1 one-shots
+        // alone; every other retained config stops each Vox entry.
+        if (config->selectionMode == 1) {
+            continue;
+        }
+        for (const DecodedVariant& variant : variants->second) {
+            Result result = stop(variant.voxSoundId, variant.eventName);
+            if (!result) {
+                return result;
+            }
+        }
+    }
+    activeConfigIds_.clear();
+    return Result::success();
+}
+
+Result PlayerStateSoundBank::dispatchVariant(
+    std::int16_t configId, std::size_t variantIndex,
+    const PlayPlayerStateSound& play) {
+    if (!play) {
+        return Result::failure("Player sound callback is missing");
+    }
+    const auto variants = decodedByConfig_.find(configId);
+    if (variants == decodedByConfig_.end() ||
+        variantIndex >= variants->second.size()) {
+        return Result::failure("Player SoundConfig variant is invalid");
+    }
+    const DecodedVariant& variant = variants->second[variantIndex];
+    return play(variant.voxSoundId, variant.eventName, variant.audio,
+                variant.looping);
 }
 
 std::size_t PlayerStateSoundBank::decodedVariantCount() const noexcept {

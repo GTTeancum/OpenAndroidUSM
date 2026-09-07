@@ -1,0 +1,31 @@
+# A normal ground attack with no target in its authored 150 cm sector must
+# remain a miss: no enemy damage, no contact splash, and no impact SFX.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+
+# More than the native neutral-target search and attack reach from all three
+# thugs, on open roadway. The attack swoosh is valid; contact presentation is
+# not.
+teleport 13399 -5000 7 0 1 0
+punch
+wait 1000
+assert_enemy_health_near 394 500 0.01
+assert_enemy_health_near 395 500 0.01
+assert_enemy_health_near 397 500 0.01
+assert_audio_not_played SFX_PUNCH_IMPACT_1
+assert_audio_not_played SFX_PUNCH_IMPACT_2
+assert_event_not_observed player_hit_effect
+assert_health_above 0
+finish

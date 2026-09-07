@@ -4,7 +4,10 @@
 #include "assets/BtexTexture.hpp"
 #include "game/CinematicCamera.hpp"
 #include "game/CinematicUiRuntime.hpp"
+#include "game/DeathConfirmationRuntime.hpp"
+#include "game/GameplayPlayer.hpp"
 #include "game/LevelBonusRuntime.hpp"
+#include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
@@ -18,12 +21,24 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 
 namespace usm::renderer {
+
+// CAnimObjEffect::Init (0x00390bb8) uses two distinct attachment modes.
+// Live effects are parented to the animated bone. Snapshot effects copy the
+// bone's absolute position once but use the player's quaternion, deliberately
+// discarding the bone rotation.
+[[nodiscard]] std::array<float, 16> resolvePlayerHitEffectWorldTransform(
+    const std::array<float, 16>& playerWorld,
+    const std::array<float, 16>& boneTransform,
+    bool followsPlayerBone,
+    const assets::Vector3& driftOffset = {}) noexcept;
 
 class D3D11Renderer final : public IRenderer {
 public:
@@ -42,6 +57,9 @@ public:
     [[nodiscard]] Result updateLevelOneActors(
         const game::LevelOneBootstrap& levelOne,
         std::uint32_t timestampMilliseconds);
+    [[nodiscard]] Result updateLevelRooms(
+        const game::LevelOneBootstrap& levelOne,
+        const game::LevelCinematicRuntime& cinematics);
     [[nodiscard]] Result updateGameplayCinematicActors(
         const game::LevelOneBootstrap& levelOne,
         const game::LevelCinematicAsset* cinematic,
@@ -51,6 +69,9 @@ public:
         const assets::ColladaAnimationClip& clip,
         std::uint32_t clipTimeMilliseconds,
         const std::array<float, 16>& worldTransform);
+    [[nodiscard]] Result updatePlayerHitEffects(
+        const game::LevelOneBootstrap& levelOne,
+        const game::GameplayPlayer& player);
     [[nodiscard]] Result updateLevelOneEnemies(
         const game::LevelOneBootstrap& levelOne,
         const game::LevelEnemyRuntime& enemies);
@@ -59,9 +80,23 @@ public:
         const game::LevelObjectRuntime& objects);
     [[nodiscard]] Result updateWebLine(
         bool visible, const assets::Vector3& anchor = {},
-        const assets::Vector3& attachPosition = {});
+        const assets::Vector3& attachPosition = {},
+        const assets::Vector3* secondAttachPosition = nullptr,
+        const assets::Vector3& orientation = {0.0F, 0.0F, -1.0F});
     [[nodiscard]] Result updateEnemyGunLines(
         std::span<const game::EnemyGunLineState> gunLines);
+    [[nodiscard]] Result updatePlayerWebPellets(
+        const game::LevelOneBootstrap& levelOne,
+        std::span<const game::PlayerWebPelletState> pellets);
+    [[nodiscard]] Result updateEnemyMolotovs(
+        const game::LevelOneBootstrap& levelOne,
+        std::span<const game::EnemyMolotovState> molotovs);
+    [[nodiscard]] Result updateEnemyBoomerangs(
+        const game::LevelOneBootstrap& levelOne,
+        std::span<const game::EnemyBoomerangState> boomerangs);
+    [[nodiscard]] Result updateEnemyElectroEffects(
+        const game::LevelOneBootstrap& levelOne,
+        const game::LevelEnemyRuntime& enemies);
     [[nodiscard]] Result updateLevelOneEffects(
         const game::LevelEffectAsset& assets,
         const game::LevelEffectRuntime& effects,
@@ -76,10 +111,20 @@ public:
                                              shownHealthBarEnemy = nullptr,
                                          std::int32_t skillPoints = 0,
                                          bool showSkillPointTotal = false,
-                                         const game::LevelBonusPopupState*
-                                             skillPointPopup = nullptr);
+                                          const game::LevelBonusPopupState*
+                                              skillPointPopup = nullptr,
+                                          bool visible = true,
+                                          bool bossProgressVisible = false,
+                                          float bossProgressRatio = 0.0F);
     [[nodiscard]] Result updateCinematicUi(
+        const game::LevelHudAsset& hud,
         const game::CinematicUiFrame& frame);
+    [[nodiscard]] Result updateTransport(
+        const game::LevelHudAsset& hud,
+        const game::TransportFrame& frame);
+    [[nodiscard]] Result updateDeathConfirmation(
+        const game::LevelHudAsset& hud,
+        const game::DeathConfirmationFrame& frame);
     void setCinematicVisibleRooms(std::span<const bool> rooms) noexcept;
     void setCameraAreaRoomVisibility(
         std::span<const bool> invisibleRooms,
@@ -104,11 +149,25 @@ private:
         std::uint32_t secondaryTextureIndex{};
         bool alphaTest{};
         bool alphaBlend{};
+        bool additiveBlend{};
+        bool effectColorMask{};
+        // CAnimObjEffect::Init replaces every effect material with native
+        // type 0x1d (-1, subtract ambient RGB) or 0x1e (+1, add ambient RGB).
+        // Zero leaves ordinary scene materials on their authored renderer.
+        std::int8_t effectMaterialMode{};
+        std::array<float, 4> effectAmbientColor{};
+        std::uint32_t renderingLayer{};
+        bool backFaceCulling{true};
+        bool frontFaceCulling{};
         bool reflectionTwoLayer{};
+        bool lightmapTwoLayer{};
+        std::string materialAnimationTarget;
+        std::array<float, 2> textureOffset{};
     };
 
     struct GpuMesh {
         Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> lightmapCoordinateBuffer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
         std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> textures;
         std::vector<DrawBatch> drawBatches;
@@ -119,6 +178,20 @@ private:
         bool cameraRelative{};
         std::int32_t roomId{-1};
         assets::AxisAlignedBounds bounds;
+    };
+
+    enum class ConfirmationTexture : std::uint8_t {
+        BackgroundSuit,
+        MainMenu,
+        NormalWhiteFont,
+        OutlineSmallFont,
+        OutlineBigFont,
+    };
+
+    struct ConfirmationDrawBatch {
+        std::uint32_t startVertex{};
+        std::uint32_t vertexCount{};
+        ConfirmationTexture texture{};
     };
 
     [[nodiscard]] Result createDevice(D3D_DRIVER_TYPE driverType, UINT flags);
@@ -138,14 +211,20 @@ private:
         std::span<const assets::RgbaImage> previewTexture,
         const std::array<float, 16>* transform = nullptr,
         bool dynamicVertices = false,
-        bool omitUntexturedMaterials = false);
+        bool omitUntexturedMaterials = false,
+        std::string_view additiveTextureNameFragment = {});
     [[nodiscard]] Result createTextureView(
         std::span<const assets::RgbaImage> mipLevels,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);
     [[nodiscard]] Result updateDynamicMesh(
         GpuMesh& gpuMesh,
         std::span<const assets::ColladaGeometry> animatedGeometry,
-        const std::array<float, 16>* worldTransform);
+        const std::array<float, 16>* worldTransform,
+        float vertexAlphaScale = 1.0F);
+    void updateMaterialAnimation(
+        GpuMesh& gpuMesh,
+        const assets::ColladaAnimationFile& animation,
+        std::uint32_t timestampMilliseconds) noexcept;
     [[nodiscard]] Result uploadHudTexture(const game::LevelHudAsset& hud);
     void bindRenderTarget(std::uint32_t width, std::uint32_t height);
     void setMeshVisible(GpuMesh& mesh, bool visible) noexcept;
@@ -159,19 +238,27 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Texture2D> depthTarget_;
     Microsoft::WRL::ComPtr<ID3D11DepthStencilView> depthView_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader_;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> lightmapVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> alphaTestPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> effectColorMaskPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> reflectionPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> lightmapPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> lightmapAlphaTestPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> colorPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> hudColorPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> effectPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> hudVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> hudPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> lightmapInputLayout_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> transformBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> viewRotationBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> textureTransformBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> effectMaterialBuffer_;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState_;
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> frontCullRasterizerState_;
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> noCullRasterizerState_;
     Microsoft::WRL::ComPtr<ID3D11BlendState> alphaBlendState_;
     Microsoft::WRL::ComPtr<ID3D11BlendState> additiveBlendState_;
@@ -184,12 +271,38 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> effectVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> hintVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hudTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> webLineTexture_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> effectTexture_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> hintTexture_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> whiteTexture_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> transportSpriteVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> transportColorVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> transportTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cinematicUiTextTexture_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiMessagePanelVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiMessageIconVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer>
+        cinematicUiControllerIconVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiMessageTextVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        cinematicUiTutorialTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        cinematicUiControllerTexture_;
+    assets::RgbaImage cinematicUiControllerImage_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> deathConfirmationVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        deathConfirmationBackgroundTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        deathConfirmationMainMenuTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        deathConfirmationNormalFontTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        deathConfirmationOutlineFontTexture_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>
+        deathConfirmationOutlineBigFontTexture_;
+    std::vector<ConfirmationDrawBatch> deathConfirmationBatches_;
     std::vector<GpuMesh> gpuMeshes_;
     std::unordered_map<const assets::BtexTexture*,
                        Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>>
@@ -198,11 +311,45 @@ private:
     std::size_t roomMeshCount_{};
     std::size_t levelObjectMeshStart_{};
     std::size_t introActorMeshStart_{};
+    std::optional<std::size_t> playerMeshIndex_;
+    bool standalonePlayerMesh_{};
     std::size_t gameplayCinematicMeshStart_{};
     std::size_t enemyMeshStart_{};
+    std::size_t playerHitEffectMeshStart_{};
+    std::size_t playerHitEffectMeshCount_{};
+    std::size_t webPelletProjectileMeshStart_{};
+    std::size_t webPelletProjectileMeshCount_{};
+    std::size_t molotovProjectileMeshStart_{};
+    std::size_t molotovProjectileMeshCount_{};
+    std::size_t boomerangProjectileMeshStart_{};
+    std::size_t boomerangProjectileMeshCount_{};
+    std::size_t thunderclapWaveMeshStart_{};
+    std::size_t thunderclapWaveMeshCount_{};
+    std::size_t thunderclapBeamMeshStart_{};
+    std::size_t thunderclapBeamMeshCount_{};
+    std::size_t electroRotateWaveMeshStart_{};
+    std::size_t electroRotateWaveMeshCount_{};
+    std::size_t electroPostBeamMeshStart_{};
+    std::size_t electroPostBeamMeshCount_{};
+    std::size_t electroBurstWaveMeshStart_{};
+    std::size_t electroBurstWaveMeshCount_{};
+    std::size_t electroBurstBillboardMeshStart_{};
+    std::size_t electroBurstBillboardMeshCount_{};
+    std::size_t enemyLandingShockwaveMeshStart_{};
+    std::size_t enemyLandingShockwaveMeshCount_{};
+    std::size_t enemyLandingCrashWallMeshStart_{};
+    std::size_t enemyLandingCrashWallMeshCount_{};
     std::uint32_t hudVertexCount_{};
     std::uint32_t cinematicUiColorVertexCount_{};
+    std::uint32_t transportSpriteVertexCount_{};
+    std::uint32_t transportColorVertexCount_{};
     std::uint32_t cinematicUiTextVertexCount_{};
+    std::uint32_t cinematicUiMessagePanelVertexCount_{};
+    std::uint32_t cinematicUiMessageIconVertexCount_{};
+    std::uint32_t cinematicUiControllerIconVertexCount_{};
+    std::uint32_t cinematicUiMessageTextVertexCount_{};
+    std::uint32_t deathConfirmationVertexCount_{};
+    std::uint32_t deathConfirmationVertexCapacity_{};
     std::uint32_t hudVertexCapacity_{};
     std::uint32_t webLineVertexCount_{};
     std::uint32_t enemyGunLineVertexCount_{};
@@ -213,6 +360,13 @@ private:
     std::uint32_t hintVertexCapacity_{};
     std::u16string cinematicUiText_;
     bool cinematicUiTextCentered_{};
+    std::u16string cinematicUiMessageText_;
+    std::int32_t cinematicUiMessageFace_{-1};
+    std::int32_t cinematicUiMessagePage_{-1};
+    bool cinematicUiTutorialPanel_{};
+    game::InformationPanel cinematicUiInformationPanel_{
+        game::InformationPanel::None};
+    std::int32_t cinematicUiTutorialButton_{-1};
     DirectX::XMFLOAT4X4 worldViewProjection_{};
     DirectX::XMFLOAT4X4 skyViewProjection_{};
     DirectX::XMFLOAT4X4 viewRotation_{};

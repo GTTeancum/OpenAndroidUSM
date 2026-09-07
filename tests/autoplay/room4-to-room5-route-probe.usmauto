@@ -1,0 +1,33 @@
+# Follow the authored Room 4 street into Room 5, open SpiderWebWall 1195,
+# and use control-locked WebGrabPoint 383's forced exit to WayPoint 30031.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 85000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+# Begin before the two authored wrecks. Taxi 40034 and police car 40033 span
+# the street, so the player-flow route jumps their 94/148 cm collision tops.
+teleport -100 1200 5 0 1 0
+move_to -100 1450 5 100 2000
+jump
+move_until_state 4000 0 1 0
+move_until_cinematic 100 2850 5 1198 10000
+capture room5-web-wall-open
+move_to 100 2750 5 150 3000
+move_to 230 2610 5 25 2000
+jump
+wait 300
+web_on
+move_until_state 2000 0 0 18
+wait 200
+web_off
+move_until_state 1500 0 0 19
+move_until_state 4000 0 0 15
+move_to 2712 2953 148 300 5000
+assert_near 2712 2953 148 350
+capture room5-forced-web-exit
+assert_health_above 0
+finish

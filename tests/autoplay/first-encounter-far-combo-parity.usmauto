@@ -1,0 +1,34 @@
+# Production-input coverage for the long-range opening punch and its authored
+# state-88 follow-up.  Player::NeedDashToTarget (0x00340e70) substitutes state
+# 87 only for the opening acquisition; UpdateKeyTrigger (0x0034d0a4) retains
+# Player+0x594 and follows state 87's Square/press transition to state 88.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+
+# Actor 394 stages near (13399,-6484).  Eight metres of separation is inside
+# the native search cone but outside the ordinary 250 cm state-74 reach.
+teleport 12599 -6484 7 1 0 0
+punch
+assert_player_state 87
+punch_when_ready 1500
+move_until_state 1000 0 0 88
+assert_player_state 88
+wait 150
+assert_player_effect 0 1
+assert_enemy_health_near 394 415 0.01
+assert_audio_played SFX_PUNCH_IMPACT_1
+move_until_state 2000 0 0 0
+assert_health_above 0
+finish

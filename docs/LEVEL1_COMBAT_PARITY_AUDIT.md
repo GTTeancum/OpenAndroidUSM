@@ -1,0 +1,267 @@
+# Level 1 first-encounter combat parity audit
+
+This gate covers the first controllable fight in chronological player flow.
+Passing it does not claim that later combat encounters are complete.
+
+## Enemy health and player damage
+
+Room 1 objects 394, 395, and 397 each serialize `Health=500.000000` in the
+shipped scene. `Player::SendHitMessage` (`0x00345fe8`) multiplies attack damage
+by `GetHardLevelRate(0)` and `GetUpgradeRate(0)`. A new profile selects
+difficulty 1 and attack upgrade 0. The native constant tables give both of
+those selections a factor of 1.0, so this encounter has no hidden damage
+reduction or reconstruction-added health multiplier.
+
+The default ground chain is:
+
+| State | Registered impacts | Damage per impact | State total |
+| --- | ---: | ---: | ---: |
+| 74, right punch | 1 | 35 | 35 |
+| 75, left punch | 1 | 35 | 35 |
+| 79, right kick | 1 | 55 | 55 |
+| 90, fast kick | 4 | 21.25 | 85 |
+| 91, fast kick 2 | 4 | 21.25 | 85 |
+| 78, double kick | 2 authored; 1 contacts a grounded type-0 thug | 40 | 40 delivered |
+
+The first complete six-press chain leaves a grounded thug at 165 health. The
+next right punch, left punch, and right kick leave 40; the first two contacts
+of the following fast kick clamp that remainder to zero:
+`500 -> 465 -> 430 -> 375 -> 290 -> 205 -> 165 -> 130 -> 95 -> 40 -> 18.75 -> 0`.
+This is not a tuned exception. `Player::ResetObject` (`0x0034e258`) loads the
+185 cm player height from image address `0x0056ec94`, and
+`createEnemyPhysics` (`0x003d8980`) gives this enemy a 40 cm half-height.
+`Physics::testPieCollision` (`0x003d5434`) applies those centered vertical
+extents at each animated `Bip01` attack origin. State 78's second origin is
+high enough to miss the grounded capsule.
+The retained autoplay scenario
+`first-encounter-health-damage-audit.usmauto` enters the authored encounter,
+uses production input/targeting/hit dispatch, asserts all three starting
+health values, and pins every value in this ledger. It also verifies that
+post-death attack contacts cannot create additional damage, impact audio, or
+target contact effects.
+
+The serialized health and damage numbers are correct, but the “too many hits”
+symptom exposed a separate gameplay failure. The reconstruction omitted
+`Player::SendHitMessage`'s per-dispatch `0.85` vertical-force scale and its
+airborne collision path could move a thug through the shopping-center shell.
+There were two concrete errors: an overhead surface could be selected as
+floor, and the storefront wall was approximated from its longest XY edge
+instead of its authored triangle plane. Ground-recovery root motion also
+bypassed collision. Those errors could leave a living thug below the street
+and make it impossible to hit. Root displacement now writes through the
+collision solver as the native physics body does, and the production-input
+normal-flow gate verifies all three enemies stay reachable, are defeated,
+and allow the encounter to advance.
+
+Web and aerial continuations have separate source-authored ledgers; serialized
+damage fields are not assumed to be delivered hits:
+
+| Input path | Delivered damage | Fresh-thug result |
+| --- | --- | ---: |
+| Ground pellet, bind, and release (`58 -> 60 -> 62`) | pellet 20; state 62 entry hit 0 | 480 |
+| Ground pellet, bind, and directional throw (`58 -> 60 -> 64`) | 20 + 150 | 330 |
+| Ground pellet into back/540 throw (`58 -> 60 -> 65 -> 66 -> 67`) | 20 + 100 + 220 | 160 |
+| Punch into web throw (`74 -> 92 -> 93 -> 94 -> 66 -> 67`) | 35 + 35 + 150 + 220 | 60 |
+| Punch, jump-release launcher, then ground drag-down (`74 -> 97`, then `63`) | 35 + 60 + 70 | 335 |
+| Punch, jump-release launcher, then airborne target kick (`74 -> 97`, then `86`) | 35 + 60 + 50 | 355 |
+| Punch, jump-release launcher, then air web grab (`74 -> 97`, then `101 -> 102`) | 35 + 60 + 0 + 0 | 405 |
+| Air knockdown into 720 web throw (`99 -> 100 -> 103`) | 100 + 280 | 120 |
+| Air knockdown into kick-down/heavy kick (`99 -> 100 -> 104 -> 105`) | 100 + 100 + 80 | 220 |
+
+`Player::IsInWebBinding` (`0x00340f60`) and `UpdateAttackParam`
+(`0x00340fa0`) prove that binding motions do not use the generic hit-frame
+path. In particular, state 62's serialized 20 is not a second pellet hit.
+`Player::SetNextStateId` (`0x003491d0`) sends its entry hit with the damage of
+the state being left, which is zero in the normal `60 -> 62` route.
+`Player::UpdateAttacks` (`0x00351204`) delivers motion 127 at its attach and
+primary-finish events, motion 129 at primary finish, and motion 130 at its
+sound-trigger frame. The retained target receives those hits; a nearer
+bystander cannot steal them.
+
+State 64 is reached by native virtual movement event 0, produced by a fresh
+WASD/left-stick direction while state 60 is active. State 63 is selected only
+when the retained target is more than 160 cm above the player. States 101 and
+102 retain and render their target web line but intentionally deal zero
+damage. These are separate authored outcomes, not missing generic hit events.
+
+## Enemy offense and player hurt reactions
+
+The first-room knife uses attack 6 (`ATTACK_HIT_LIGHT`, native hit type 100):
+two 25-point contacts at 45 and 75 percent of its 1667 ms clip. The bat's
+state-11 table contains two equally ranked attacks. Native
+`CBehaviorMeleeAttack::StateEnter` resolves that exact tie with a 50-percent
+random branch: attack 7 is a 35-point standing contact at 47 percent of its
+1934 ms clip, while attack 11 is a 50-point jumping contact at 70 percent of
+its 1500 ms clip. The deterministic runtime alternates the tie winner so both
+native outcomes remain evenly represented and every autoplay run covers both.
+
+`Player::OnHit` (`0x0034d790`) maps hit type 100 to state 44
+(`k_state_hurt_light`) and hit type 101 to state 45
+(`k_state_hurt_heavy`). The corresponding shipped root tracks move about
+16.84 cm and 200.43 cm backward respectively. Both state selection and root
+motion are now retained; forcing bat contacts through the light reaction was
+a reconstruction bug that made the exchange timing and spacing incorrect.
+
+The shipped attack rows for IDs 6, 7, and 11 all contain zero horizontal
+force, zero vertical force, and zero post-hit protection time. Their special
+animation records also have empty effect names. Native
+`IBehaviorBase::NotifyEntityAttack` (`0x003a8100`) sends a null hit-effect
+pointer for these ordinary attacks, so the player should not receive an
+invented generic impact mesh. The authored presentation is the thug swoosh,
+the light/heavy player hurt animation, and state-enter hurt audio. Action type
+2 registers Spider-Sense at 2 percent of each attack clip, after the attack
+volume confirms the player is in range; merely entering the wind-up no longer
+makes a premature counter available.
+
+## Contact, trail, and audio timing
+
+- `Player::CheckFrame` (`0x003403fc`) converts authored frames through integer
+  `(frame * 2) / 3`. `FrameFixedTimelineController::getCurrentClipFrame`
+  (`0x003906c8`) rounds the 50 ms runtime frame with `time / 50 + 0.5`, so
+  state 74's authored hit frame 7 first becomes runtime frame 4 at 175 ms.
+- `CAnimObjEffect::Init` (`0x00390bb8`) gives snapshot trails the player's
+  orientation plus the authored bone position; it does not retain the bone's
+  rotation. Live attachments retain the complete bone transform.
+- `CEnemy::ProcessHitInfo` (`0x00330fe4`) creates
+  `cartoon_hit_splash` for ordinary accepted hits and the big variant for
+  heavy/special types. `Unit::AddPlayerHitEffect` (`0x00324234`) attaches this
+  target feedback to `Bip01_Spine1`.
+- `Player::PlaySound`/`UpdateSound` (`0x0034905c`/`0x003429d4`) retain combat
+  sounds with positive emitter frames. The first punch swoosh uses emitter
+  frame 2 and first crosses its rounded runtime frame at 25 ms. Its impact
+  range plays only when the 175 ms damage is accepted. Multi-emitter
+  configurations pair frame and Vox entries by index.
+- `Player::CleanSound`/`StopSound` (`0x00341f38`/`0x00341e10`) clean retained
+  state sounds during transitions, including the ultimate-wheel loop.
+- Ground Web pressed during state 74 retains the acquired Unit at
+  `Player+0x594` through states 92, 93, and 95. State 95 motion `0x6f` checks
+  and hits that same Unit; it is not a free sector attack that another thug
+  can steal. Its accepted contact deals 80 damage, launches with the authored
+  400/700 force pair, spawns effect 16 (`fx_in_air_diagonal_kick`) on frame 2,
+  and dispatches the state-95 kick-impact configuration.
+- The alternate aerial branch retains the live knocked-back target through
+  states 84 and 85. The fly kick and linked headbutt each deal 120 damage and
+  pair their accepted contacts with the authored kick-impact audio. Enemy
+  dummy/pelvis displacement is loaded and applied to the collision body as
+  well as the rendered skeleton, preventing a visible launched victim from
+  separating from its gameplay target.
+- Motions `0x6c`, `0x6d`, and `0x6f` copy their explicit velocity to the
+  native character controller and leave the state immediately when
+  `Unit::IsFalling` becomes false. The portable capsule now sweeps the road
+  support plane and performs that same early handoff. This prevents state 104
+  from carrying Spider-Man below the street and restores the buffered
+  state-105 heavy kick, its 80 damage, effect 20, and critical-hit cue.
+- Airborne target state 86 pursues `Bip01_Head` at the native 1400 cm/s,
+  retries its contact probe until the accepted-contact latch is set, deals 50
+  exactly once, and retains effect 26 for the travel duration plus effect 16
+  and the air-diagonal-kick/kick-impact audio at accepted contact.
+- State 64's motion-129 throw delivers 150 at primary-clip completion. State
+  63's motion-127 attach is non-damaging and its primary completion delivers
+  70 while the web line remains owned until state exit. States 101/102 retain
+  the airborne target and web line but send only their authored zero-damage
+  grab contact.
+- Directional spider-sense counters are distinct authored attacks, not one
+  generic response: states 38/39/40/41 each deal 300 and emit effects
+  7/6/8/9 respectively. Core coverage pins all four quadrants; the live
+  first-encounter gate also pins the front counter, enemy warning/attack,
+  three-times slow motion, damage immunity, and accepted target contact.
+- `EnemyAttributeFile::ReadEnemyAttackInfo` (`0x0033c2c0`) stores the
+  serialized Spider-Sense selector at `EnemyAttackInfo+0x48`, slow-motion
+  denominator at `+0x50`, forced-sense gate at `+0x54`, and photo target at
+  `+0x58`. `AISenseInfo` (`0x003a7a30`) and `Player::onMessage`
+  (`0x0034ddb4`) repack those fields before `DoNormalSenseAction`; the
+  opening knife and both bat attacks author selector 1, denominator 3, and
+  `-1` for both optional IDs. `Unit::CanBeCounterHit` (`0x002fe8ec`) returns
+  the archetype byte loaded from `EnemyAttributeInfo+0x4b`; both opening
+  thug archetypes enable it.
+- The native switch tables at `0x004cfd28` and `0x004cfd38` are
+  `[38,40,41,39]` for close quadrant counters and `[35,34,36,37]` for
+  reaction selectors 2--5. Airborne, distant, non-counterable, selector-6,
+  and early chained-sense cases instead choose the perpendicular evade pair
+  with the executable's 50-percent branch. A live airborne opening-knife
+  test now proves that the warning chooses state 36, deals no enemy damage,
+  preserves player health, and enters the authored three-times slow motion.
+- `Player::CheckBlinkStrike` (`0x00342550`) precedes the ordinary directional
+  response in `Player::DoNormalSenseAction` (`0x0034f630`). It accepts a live
+  enemy only when `CEnemy::IsNearAttackKeyFrame` (`0x00334dd0`) finds an
+  authored damage action from 200 ms before through 49 ms after its keyframe.
+  For the 1667 ms opening knife clip, the first 45-percent contact therefore
+  permits the red-suit blink strike at animation times 550--799 ms. State 42,
+  motion `0x1fd`, then emits effect 25 on entry, effect 24 at frame 16, deals
+  200 sector damage with preserved hit type `0x1fd` at frame 18, and emits
+  `super_web_splash` plus VoxSound `0x54` at frame 20. Immediately after effect
+  24 at frame 16, the same native branch (`0x00352f04`--`0x00352f18`) stops
+  VoxSound `0x53`; the shipped table resolves it to `SFX_SUPER_WEB_ATTACK`.
+  The corresponding live gate separately proves that exact stop and this
+  narrow path without replacing the earlier directional-counter coverage.
+- `Player::CanEnableSpiderSense` (`0x00341c98`) gates chained sense input at
+  the current class-6 state's inclusive `StateBasic+0x30` frame (the parsed
+  `soundTriggerFrame`: 3 for evades, 7/8 for directional counters, and 6 for
+  blink strikes). It also rejects state 73, ultimate states 107--113,
+  web-whirlwind motion 116, wall-attack motion 131, and air-bounce states
+  117/118. These are now native state-data predicates rather than an
+  unrestricted attack cancellation.
+
+## Shopping-center doorway
+
+The shipped Room 1 `geometry01.bdae` already contains the broken shopping-
+center doorway. Its geometry has no morph target, and the Room 1 scene has no
+mesh-bearing door node or intact alternate door mesh. Crash cinematic 1212
+has exactly 48 commands and moves the bus object 1210, plays its damage
+animation, and emits the impact presentation. Its only visibility changes are
+for Sandman and hint object 1216; no command swaps, hides, destroys, or changes
+a door. Therefore the source assets do **not** contain an intact-to-broken door
+transition at the bus impact. Implementing one would be an invention rather
+than parity with this shipped build.
+
+## Automated acceptance
+
+The coherent Release run in
+`analysis/generated/first-encounter-parity-verified/suite-manifest.json`
+completed all 23 selected scenarios with 23 passes and zero failures. The
+current retained gates are:
+
+- `OpenAndroidUSM.CoreTests.exe`
+- `OpenAndroidUSM.RenderTests.exe`
+- `first-encounter-health-damage-audit.usmauto` (53/53)
+- `first-encounter-full-combo-effects.usmauto` (50/50)
+- `first-encounter-alternate-combat-effects.usmauto` (80/80)
+- `combat-effects-parity-gate.usmauto` (43/43)
+- `first-encounter-normal-progression.usmauto` (14/14)
+- `first-encounter-ground-web-bind-parity.usmauto` (21/21)
+- `first-encounter-ground-web-throw-parity.usmauto` (32/32)
+- `first-encounter-punch-web-throw-parity.usmauto` (30/30)
+- `first-encounter-air-web-knockdown-parity.usmauto` (26/26)
+- `first-encounter-air-web-throw-parity.usmauto` (25/25)
+- `first-encounter-air-kick-down-combo-parity.usmauto` (29/29)
+- `first-encounter-jump-release-parity.usmauto` (37/37)
+- `first-encounter-launcher-parity.usmauto` (23/23)
+- `first-encounter-crowd-separation.usmauto` (11/11)
+- `first-encounter-spider-sense-counter.usmauto` (17/17)
+- `first-encounter-spider-sense-air-evade.usmauto` (16/16)
+- `first-encounter-spider-sense-blink-strike.usmauto` (23/23)
+- `first-encounter-ground-web-directional-throw-parity.usmauto` (23/23)
+- `first-encounter-ground-web-drag-down-parity.usmauto` (32/32)
+- `first-encounter-air-target-kick-parity.usmauto` (31/31)
+- `first-encounter-air-web-grab-parity.usmauto` (32/32)
+- `first-encounter-melee-miss-parity.usmauto` (18/18)
+- `first-encounter-enemy-interruption-parity.usmauto` (18/18)
+- `first-encounter-enemy-offense-parity.usmauto` (31/31)
+- `first-encounter-web-pellet-render.usmauto` (12/12)
+- `player-button-combat-probe.usmauto` (29/29)
+
+These gates establish the audited source facts and catch their regressions.
+They are not a blanket claim of parity for later-level enemy types,
+black-suit-only transitions, or the full campaign. Within the chronological
+first encounter, the normal-suit attack graph, target retention, miss path,
+enemy interruption, crowd separation, enemy offense, player hurt reactions,
+damage, trails, target splashes, web projectiles/lines, and audio now have
+source-to-runtime acceptance coverage. Opening knife and bat types have no
+behavior-slot-8 block state, so adding a block response would be invention.
+
+## Queued native parity audits
+
+- Opening thugs have multiple shipped color appearances. Recover the original
+  selection/randomization path and its asset/material inputs from the native
+  executable and data, then reproduce that distribution deterministically in
+  tests. Do not substitute a hand-authored palette or guessed random choice.

@@ -1,0 +1,64 @@
+# Combined first-encounter combat/effects gate. It reaches the first live fight
+# through the authored trigger path, freezes only enemy decision-making, and
+# then exercises the production player input, attack, damage, projectile,
+# special-attack mesh, particle, and audio paths.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 397 0
+
+# Ordinary single-button melee contact and travelling web pellet.
+teleport 13399 -6360 7 0 -1 0
+punch
+wait 225
+assert_player_effect 0 1
+capture punch-impact
+wait 175
+assert_enemy_health_below 394 500
+teleport 13399 -7400 7 0 1 0
+web_on
+capture web-pellet-near
+wait 100
+capture web-pellet-mid
+wait 150
+wait 250
+assert_enemy_health_below 394 446
+
+# Native ultimate state 107: expanding web-out mesh.
+teleport 13200 -6600 7 0 1 0
+super_attack
+assert_slow_motion 3
+assert_player_effect 24 1
+capture ultimate-prepare
+
+# Native state 108: four bone-attached web rings and timed pulse meshes.
+move_until_state 5000 0 0 108
+assert_player_effect 22 4
+capture ultimate-wheel
+
+# Native state 109: inward mesh, then radial hit + splash particle/Vox cue.
+move_until_state 5000 0 0 109
+assert_player_effect 25 1
+capture ultimate-impact-entry
+wait 300
+capture ultimate-impact-charge
+wait 900
+assert_enemy_health_below 397 300
+assert_audio_played SFX_SUPER_WEB_FINAL_ATTACK
+capture ultimate-impact
+
+# Let the special return through its authored secondary clip to idle.
+move_until_state 5000 0 0 0
+assert_enemy_distance_above 394 395 80
+assert_enemy_distance_above 394 397 80
+assert_enemy_distance_above 395 397 80
+assert_health_above 0
+finish

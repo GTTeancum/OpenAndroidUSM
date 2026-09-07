@@ -1,0 +1,22 @@
+# Replays the shipped Level 5 slide gate: cinematic 40941 remains conditional
+# until enemies 40841-40845 are dead, then enables authored Slide 40662.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 60000
+render_size 1280 720
+
+wait_cinematic_started 1000 12
+wait_controls 30000
+# Activate authored room 6 so Trigger 40948 can dispatch its while-outside
+# Cinematic 40941 exactly as the room-owned native trigger does.
+teleport 22056.970703 13832.803711 2443.947021 1 0 0
+wait_cinematic_started 5000 40941
+damage_enemy 40841 10000
+damage_enemy 40842 10000
+damage_enemy 40843 10000
+damage_enemy 40844 10000
+damage_enemy 40845 10000
+wait 100
+capture level5-slide-unlocked
+finish

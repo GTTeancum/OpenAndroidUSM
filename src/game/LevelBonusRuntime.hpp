@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <deque>
 #include <span>
 #include <vector>
 
@@ -33,6 +34,32 @@ struct LevelBonusPopupState {
     bool visible{};
 };
 
+// Observable state for one authored CBonus. Keeping collection and orb-flight
+// state together lets deterministic diagnostics verify the complete pickup
+// lifecycle without duplicating CBonus's rules.
+struct LevelBonusState {
+    const LevelBonusAsset* asset{};
+    assets::Vector3 startTangent;
+    assets::Vector3 endTangent;
+    float progress{};
+    bool visible{};
+    bool orbActive{};
+};
+
+// CLevel::Save/Load (0x00388558/0x00388450) serializes the level-owned
+// bonus objects as part of the checkpoint stream. Render-orb vertices and
+// output queues are derived/transient and are intentionally not stored.
+struct LevelBonusCheckPointState {
+    std::vector<LevelBonusState> bonuses;
+    std::uint32_t difficulty{};
+    std::uint32_t randomState{};
+    std::int32_t pendingSkillPointAmount{};
+    std::uint32_t pendingSkillPointMilliseconds{};
+    std::uint32_t skillPointPopupMilliseconds{};
+    std::uint32_t skillPointTotalRemainingMilliseconds{};
+    LevelBonusPopupState skillPointPopup;
+};
+
 // Portable CBonus/CHealthOrbs state reconstructed from CBonus::Update
 // (0x00393680), CHealthOrbs::Init (0x003a190c), and OnAnimate
 // (0x003a17c0). Rendering consumes only the sampled Hermite ribbon state.
@@ -47,6 +74,8 @@ public:
                                     std::uint32_t difficulty = 0);
     void update(const assets::Vector3& playerPosition,
                 std::uint32_t elapsedMilliseconds) noexcept;
+    void spawnOrbs(LevelBonusType type, const assets::Vector3& position,
+                   std::int32_t roomId, std::int32_t count) noexcept;
 
     [[nodiscard]] std::vector<std::int32_t> consumeCollectedBonusIds();
     [[nodiscard]] std::vector<LevelBonusGrant> consumeGrants();
@@ -55,6 +84,12 @@ public:
         return renderOrbs_;
     }
     [[nodiscard]] std::size_t visibleBonusCount() const noexcept;
+    [[nodiscard]] LevelBonusCheckPointState saveCheckPointState() const;
+    [[nodiscard]] Result loadCheckPointState(
+        const LevelBonusCheckPointState& state);
+    [[nodiscard]] std::span<const LevelBonusState> states() const noexcept {
+        return states_;
+    }
     [[nodiscard]] bool showSkillPointTotal() const noexcept {
         return skillPointTotalRemainingMilliseconds_ > 0;
     }
@@ -63,8 +98,6 @@ public:
     }
 
 private:
-    struct BonusState;
-
     [[nodiscard]] std::uint32_t randomBounded(
         std::uint32_t maximumExclusive) noexcept;
     [[nodiscard]] assets::Vector3 randomTangent(
@@ -76,7 +109,8 @@ private:
         const assets::Vector3& end, const assets::Vector3& startTangent,
         const assets::Vector3& endTangent) noexcept;
 
-    std::vector<BonusState> states_;
+    std::vector<LevelBonusState> states_;
+    std::deque<LevelBonusAsset> spawnedAssets_;
     std::vector<LevelBonusOrbRenderState> renderOrbs_;
     std::vector<std::int32_t> collectedBonusIds_;
     std::vector<LevelBonusGrant> grants_;
@@ -87,6 +121,7 @@ private:
     std::uint32_t skillPointPopupMilliseconds_{};
     std::uint32_t skillPointTotalRemainingMilliseconds_{};
     LevelBonusPopupState skillPointPopup_;
+    std::int32_t nextSpawnedObjectId_{-200000};
 };
 
 } // namespace usm::game

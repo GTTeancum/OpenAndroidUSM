@@ -1,0 +1,111 @@
+# Focused continuation from Slide 1039's waypoint-446 landing. The diagnostic
+# teleport begins on the verified roof; all following movement follows the
+# shipped Room 7 bonus trail down to Room 11 and then into Room 9's enabled
+# encounter trigger 40004. It then clears the authored Room 9 death watcher,
+# follows the Room 12 web route, and enters the boss presentation in player
+# flow order.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 380000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+teleport -8099 6598 1502 -1 0 0
+capture room7-waypoint446-landing
+
+# Bonuses 804..810 continue west from the slide endpoint, cross the roof edge,
+# and descend to the street beside Room 11 enemy 10375.
+move_to -8550 6580 1502 100 5000
+jump
+move_to -9400 6650 8 175 12000
+move_until_state 3000 0 0 0
+capture room11-street-arrival
+wait_enemies_grounded 5000 10375
+attack 30000 170 10375
+capture room11-encounter-complete
+
+# The connected street runs north into the overlapping enabled Room 9
+# triggers. Trigger 40004 starts the five-enemy 40005 encounter.
+move_to -9500 8500 8 150 12000
+move_until_cinematic -9410 9300 8 40005 10000
+wait_enemies_active 5000 488 489 505 506 30000
+capture room9-encounter-ready
+
+# Cinematic 1155 watches this complete cohort. Once all five objects are
+# destroyed, it closes and hides web barriers 1151..1153, disables its own
+# watcher trigger, and saves checkpoint 30032.
+attack 120000 180 488 489 505 506 30000
+wait 1000
+assert_last_checkpoint 30032
+capture room9-encounter-complete
+
+# The western barrier at x=-10798 is now hidden. Bonuses 811..814 lead along
+# the shipped Room 12 ground collision to jump_wall03. Native airborne states
+# ignore that 0x10 helper face, so an ordinary forward jump crosses the road
+# break; treating it as a climbable 0x20 wall would be incorrect.
+move_to -10950 10410 0 125 10000
+move_to -11150 10410 0 75 5000
+capture room12-first-web-takeoff
+
+# WebGrabPoints 1161 and 451 are the authored two-anchor crossing. Their
+# direction vectors and exit speeds both point west toward Room 13.
+jump
+wait 100
+web_on
+move_until_state 2500 0 0 18
+capture room12-first-web-swing
+move_until_state 3500 0 1 19
+move_until_state 3000 0 0 15
+web_on
+move_until_state 2500 0 0 18
+capture room12-second-web-swing
+move_until_state 3500 0 1 19
+# The second release clears the collapsed road but ends before Room 13's
+# collision begins. Native state 30 is the ordinary airborne web-jump that
+# carries this final gap; there is intentionally no Room 12 landing floor.
+move_until_state 3000 0 1 15
+jump
+move_until_cinematic -15400 10475 24 1253 10000
+capture room13-boss-entrance
+
+# Trigger 1252 owns the before-boss presentation. Its successor 1256 places
+# Spider-Man inside trigger 1174, which then enables Sandman and his health
+# display through cinematic 1175 on the following gameplay tick.
+wait_controls 60000
+wait_enemies_active 5000 1199
+capture room13-boss-ready
+
+# Defeat the naturally activated boss and follow the authored 1215 -> 1238
+# level-ending chain. This is the same player-flow run, not a boss teleport.
+attack 120000 900 1199
+assert_audio_played M_BOSS_SANDMAN
+assert_audio_played SFX_SANDMAN_PUNCH
+assert_audio_stopped M_BOSS_SANDMAN
+wait_cinematic_started 10000 1238
+wait 5000
+capture level-ending-early
+wait 10000
+capture level-ending-middle
+wait 13000
+capture level-ending-rhino
+wait 9000
+capture level-ending-final
+assert_audio_played VFX_LV1_02_SPIDY_01
+assert_audio_played SFX_CAR_FIRE_LOOP
+assert_audio_stopped SFX_CAR_FIRE_LOOP
+assert_audio_played VFX_LV1_02_SPIDY_02
+assert_audio_played SFX_SPIDER_SENSE_IN
+assert_audio_play_count SFX_LAND 2
+assert_audio_played VFX_LV1_02_SPIDY_03
+assert_audio_played SFX_JUMP_SWOOSH_2
+assert_audio_played SFX_SANDMAN_DIES
+assert_audio_played SFX_VENOM_HITS_GROUND
+assert_audio_played SFX_CAR_IMPACT
+assert_audio_played SFX_RHINO_CAR_THROW
+assert_audio_played SFX_RHINO_LAUGH
+assert_audio_play_count SFX_RHINO_FS_1 3
+assert_audio_played SFX_RHINO_FS_2
+assert_health_above 0
+finish

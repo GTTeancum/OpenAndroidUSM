@@ -1,0 +1,13 @@
+# Fast-forward through the real intro command stream and require its native
+# camera teardown to release gameplay controls, HUD, and cinematic bands.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 56000
+start_time_ms 53033
+render_size 640 360
+
+wait_controls 1000
+assert_gameplay_ui
+capture opening-gameplay-handoff
+finish

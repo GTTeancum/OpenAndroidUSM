@@ -36,6 +36,7 @@ public:
 
     [[nodiscard]] const VoxSoundRecord* find(
         std::string_view eventName) const noexcept;
+    [[nodiscard]] const VoxSoundRecord* find(std::uint16_t id) const noexcept;
     [[nodiscard]] const std::vector<VoxSoundRecord>& records() const noexcept {
         return records_;
     }

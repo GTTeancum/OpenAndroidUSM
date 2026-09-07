@@ -1,0 +1,27 @@
+# Process-local proof of Electro's authored Rotate record. CBoss::InitAiTask
+# (0x0032b66c) orders range -> weak -> rotate, while CBehaviorRotate
+# (0x003c2848/0x003c297c) owns the exact three 120-degree ElectricPosts.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 50000
+start_time_ms 0
+render_size 640 360
+
+wait_gameplay 1000
+wait_controls 25000
+teleport 24806.750000 14697.748047 -9.322998 -1 0 0
+set_enemy_ai 31094 1 1
+wait_enemy_animation 1000 31094 attack_fall
+wait_enemy_projectile 1500 31094
+# Stay clear of all three Thunderclaps and the rotating 1429.7869 cm rays.
+teleport 22000.000000 17500.000000 -9.322998 0 -1 0
+wait_enemy_animation 20000 31094 stand_to_weak
+wait_enemy_animation 1500 31094 weak
+wait_enemy_animation 6000 31094 scream
+wait_enemy_animation 5000 31094 attack_beam_ready
+wait_enemy_animation 3000 31094 attack_beam
+wait_enemy_projectile 1000 31094
+wait 1500
+assert_health_above 0
+finish

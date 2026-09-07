@@ -1,0 +1,32 @@
+# Exercise the first fight with ordinary encounter AI still active and single
+# controller-style button presses. This deliberately avoids the exact-contact
+# teleports and disabled enemies used by the narrower button wiring probe.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+
+# Stand at a normal engagement distance while all three enemies close in.
+teleport 13399 -7000 7 0 1 0
+wait 100
+punch
+wait 700
+assert_enemy_health_below 394 500
+
+web_on
+move_until_state 1500 0 0 95
+assert_player_effect 16 1
+wait 250
+assert_enemy_health_below 394 465
+assert_enemy_distance_above 394 395 80
+assert_enemy_distance_above 394 397 80
+assert_enemy_distance_above 395 397 80
+assert_health_above 0
+finish

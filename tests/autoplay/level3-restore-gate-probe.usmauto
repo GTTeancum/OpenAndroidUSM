@@ -1,0 +1,19 @@
+# Replays Level 3's authored restore-gate disable. Cinematic 30944 disables
+# restore 31106; entering that restore's exact authored center afterward must
+# not apply its 200 damage or start a fade.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 45000
+render_size 640 360
+
+wait_controls 30000
+cross_trigger 30943 30944 5000
+wait_cinematic_started 5000 30944
+wait 100
+assert_health_above 900
+# This point is inside 31106 but outside overlapping restore 30964.
+teleport 21000 -2200 883.862366 1 0 0
+wait 1500
+assert_health_above 900
+finish

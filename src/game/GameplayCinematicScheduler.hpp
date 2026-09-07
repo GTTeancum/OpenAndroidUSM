@@ -5,6 +5,7 @@
 #include "game/LevelOneBootstrap.hpp"
 
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <vector>
 
@@ -17,6 +18,10 @@ struct GameplayCinematicPlayback {
     bool completed{};
 };
 
+using GameplayCinematicCommandHandler = std::function<bool(
+    const LevelCinematicAsset&, const CinematicThread&,
+    const CinematicCommand&)>;
+
 // Portable counterpart of CCinematicManager. Unlike a cutscene player, the
 // original manager runs several command-only cinematics at once (encounter
 // condition monitors are authored this way) while at most one cinematic owns
@@ -27,7 +32,7 @@ public:
     [[nodiscard]] Result start(std::int32_t cinematicId);
     [[nodiscard]] Result update(
         std::uint32_t deltaMilliseconds,
-        const ConditionalCinematicCommandHandler& handler);
+        const GameplayCinematicCommandHandler& handler);
 
     [[nodiscard]] std::vector<const LevelCinematicAsset*>
     consumeCompletions();
@@ -35,6 +40,8 @@ public:
 
     [[nodiscard]] const GameplayCinematicPlayback* presentation() const
         noexcept;
+    [[nodiscard]] const GameplayCinematicPlayback* playback(
+        std::int32_t cinematicId) const noexcept;
     [[nodiscard]] bool hasActiveColladaPlayback() const noexcept;
     [[nodiscard]] bool active(std::int32_t cinematicId) const noexcept;
     [[nodiscard]] std::vector<std::int32_t> activeIds() const;

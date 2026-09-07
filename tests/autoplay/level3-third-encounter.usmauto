@@ -1,0 +1,48 @@
+# Follow the authored Level 3 route through the first two barrier encounters,
+# then exercise the room-5/room-6 split reveal feeding death monitor 40199.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 300000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+wait_enemies_active 5000 30314 31305 31306
+wait_enemies_grounded 5000 30314 31305 31306
+attack 60000 160 30314 31305 31306
+wait 1500
+assert_object_animation 30405 close
+assert_object_hidden 30405
+
+cross_trigger 31291 31292 5000
+wait_enemies_active 5000 30328 31307 31308
+cross_trigger 30412 30413 5000
+wait_cinematic_started 5000 30414
+wait_enemies_active 5000 30331 30332 30336 40701
+wait_enemies_grounded 5000 30331 30332 30336 40701
+teleport -4300 -4114 1389 1 0 0
+attack 90000 170 30331 30332 30336 40701
+wait 1500
+assert_object_animation 30411 close
+assert_object_hidden 30411
+
+cross_trigger 40192 40193 5000
+wait_cinematic_started 5000 40199
+cross_trigger 40488 40489 5000
+wait_enemies_active 5000 40024 31309 31310 40279
+wait_enemies_grounded 5000 40024 31309 31310 40279
+# Physics settles three actors onto the lower room-6 roof; 40279 uses the next
+# collision tier. The values are the recovered CFF XY nodes plus traced native
+# collision support heights, after wait_enemies_grounded has completed.
+teleport 3400 -6470 1653 1 0 0
+attack 90000 180 40024 31309 31310
+teleport 3550 -5960 1904 1 0 0
+attack 45000 180 40279
+wait 1500
+assert_object_animation 40191 close
+assert_object_hidden 40191
+assert_health_above 0
+finish

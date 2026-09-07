@@ -1,5 +1,8 @@
 #include "game/LevelCollision.hpp"
 
+#include "game/LevelObjectRuntime.hpp"
+#include "game/PlayerPhysicsConstants.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -15,10 +18,7 @@ using assets::ColladaPrimitive;
 using assets::Vector3;
 
 constexpr float kGridCellSize = 500.0F;
-// Player::GetRadius (0x0033fdf8) returns the preserved 50 cm `consts` value
-// at image address 0x0056ec90.
-constexpr float kGroundSupportRadius = 50.0F;
-constexpr float kPlayerCollisionHeight = 140.0F;
+constexpr float kGroundSupportRadius = kPlayerCollisionRadiusCentimeters;
 
 Vector3 subtract(const Vector3& left, const Vector3& right) noexcept {
     return {left.x - right.x, left.y - right.y, left.z - right.z};
@@ -65,14 +65,22 @@ std::int32_t cellCoordinate(float value) noexcept {
 
 Result LevelCollision::build(std::span<const LevelRoomAsset> rooms) {
     triangles_.clear();
+    staticTriangleCount_ = 0;
+    roomPositions_.clear();
     grid_.clear();
     broadTriangles_.clear();
-    for (const LevelRoomAsset& room : rooms) {
-        append(room.collision.sceneGeometries());
+    dynamicObjectSnapshots_.clear();
+    roomPositions_.reserve(rooms.size());
+    for (std::size_t roomIndex = 0; roomIndex < rooms.size(); ++roomIndex) {
+        const LevelRoomAsset& room = rooms[roomIndex];
+        roomPositions_.push_back(room.position);
+        append(room.collision.sceneGeometries(),
+               static_cast<std::int32_t>(roomIndex + 1), room.position);
     }
     if (triangles_.empty()) {
         return Result::failure("Level collision contains no triangles");
     }
+    staticTriangleCount_ = triangles_.size();
     rebuildGrid();
     return Result::success();
 }
@@ -80,31 +88,197 @@ Result LevelCollision::build(std::span<const LevelRoomAsset> rooms) {
 Result LevelCollision::build(
     std::span<const assets::ColladaGeometry> geometries) {
     triangles_.clear();
+    staticTriangleCount_ = 0;
+    roomPositions_.clear();
     grid_.clear();
     broadTriangles_.clear();
+    dynamicObjectSnapshots_.clear();
     append(geometries);
     if (triangles_.empty()) {
         return Result::failure("Collision geometry contains no triangles");
     }
+    staticTriangleCount_ = triangles_.size();
     rebuildGrid();
     return Result::success();
 }
 
-void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
-    auto appendTriangle = [this](const ColladaGeometry& geometry,
-                                 const ColladaMeshBuffer& buffer,
-                                 std::uint16_t firstIndex,
-                                 std::uint16_t secondIndex,
-                                 std::uint16_t thirdIndex) {
+void LevelCollision::appendObjectBox(const LevelObjectState& object) {
+    if (object.asset == nullptr || !object.asset->hasCollisionBounds) {
+        return;
+    }
+    const assets::Vector3& minimum = object.asset->collisionLocalMinimum;
+    const assets::Vector3& maximum = object.asset->collisionLocalMaximum;
+    const auto transform = [&object](const assets::Vector3& local) {
+        const auto& matrix = object.worldTransform;
+        return assets::Vector3{
+            local.x * matrix[0] + local.y * matrix[4] +
+                local.z * matrix[8] + matrix[12],
+            local.x * matrix[1] + local.y * matrix[5] +
+                local.z * matrix[9] + matrix[13],
+            local.x * matrix[2] + local.y * matrix[6] +
+                local.z * matrix[10] + matrix[14]};
+    };
+    const std::array<assets::Vector3, 8> corners{{
+        transform({minimum.x, minimum.y, minimum.z}),
+        transform({maximum.x, minimum.y, minimum.z}),
+        transform({minimum.x, maximum.y, minimum.z}),
+        transform({maximum.x, maximum.y, minimum.z}),
+        transform({minimum.x, minimum.y, maximum.z}),
+        transform({maximum.x, minimum.y, maximum.z}),
+        transform({minimum.x, maximum.y, maximum.z}),
+        transform({maximum.x, maximum.y, maximum.z}),
+    }};
+    const auto appendTriangle = [this, &corners, &object](
+                                    std::size_t firstIndex,
+                                    std::size_t secondIndex,
+                                    std::size_t thirdIndex,
+                                    std::uint32_t forcedPhysicsFlags = 0U) {
+        Triangle triangle;
+        triangle.first = corners[firstIndex];
+        triangle.second = corners[secondIndex];
+        triangle.third = corners[thirdIndex];
+        triangle.localFirst = triangle.first;
+        triangle.localSecond = triangle.second;
+        triangle.localThird = triangle.third;
+        triangle.normal = cross(subtract(triangle.second, triangle.first),
+                                subtract(triangle.third, triangle.first));
+        const float normalLength = length(triangle.normal);
+        if (normalLength <= std::numeric_limits<float>::epsilon()) {
+            return;
+        }
+        triangle.normal.x /= normalLength;
+        triangle.normal.y /= normalLength;
+        triangle.normal.z /= normalLength;
+        triangle.minimumX = std::min(
+            {triangle.first.x, triangle.second.x, triangle.third.x});
+        triangle.maximumX = std::max(
+            {triangle.first.x, triangle.second.x, triangle.third.x});
+        triangle.minimumY = std::min(
+            {triangle.first.y, triangle.second.y, triangle.third.y});
+        triangle.maximumY = std::max(
+            {triangle.first.y, triangle.second.y, triangle.third.y});
+        triangle.minimumZ = std::min(
+            {triangle.first.z, triangle.second.z, triangle.third.z});
+        triangle.maximumZ = std::max(
+            {triangle.first.z, triangle.second.z, triangle.third.z});
+        triangle.geometryName = object.asset->name + "/bbox";
+        triangle.materialName = "transmission_physics";
+        triangle.physicsFlags = forcedPhysicsFlags != 0U
+                                    ? forcedPhysicsFlags
+                                    : triangle.normal.z <=
+                                              LevelCollisionConstants::
+                                                  MinimumGroundNormalZ
+                                          ? LevelPhysicsFlags::Wall
+                                          : LevelPhysicsFlags::Ground;
+        triangle.roomId = -1;
+        triangle.objectId = object.asset->objectId;
+        triangles_.push_back(std::move(triangle));
+    };
+
+    if (object.asset->kind == LevelObjectKind::Platform ||
+        object.asset->kind == LevelObjectKind::ElectricPlatform) {
+        // platform_phy.bdae is not a closed box: `_11` is the upward-wound
+        // support plane at local minimum Z and the four tall side nodes are
+        // named jump_wall_East/South/West/North. Airborne player states mask
+        // JumpWall (0x10), allowing the jump arc onto the platform, while
+        // ordinary ground motion remains fenced by those authored sides.
+        appendTriangle(0, 3, 2, LevelPhysicsFlags::Ground);
+        appendTriangle(0, 1, 3, LevelPhysicsFlags::Ground);
+        appendTriangle(0, 4, 6, LevelPhysicsFlags::JumpWall);
+        appendTriangle(0, 6, 2, LevelPhysicsFlags::JumpWall);
+        appendTriangle(1, 3, 7, LevelPhysicsFlags::JumpWall);
+        appendTriangle(1, 7, 5, LevelPhysicsFlags::JumpWall);
+        appendTriangle(0, 1, 5, LevelPhysicsFlags::JumpWall);
+        appendTriangle(0, 5, 4, LevelPhysicsFlags::JumpWall);
+        appendTriangle(2, 6, 7, LevelPhysicsFlags::JumpWall);
+        appendTriangle(2, 7, 3, LevelPhysicsFlags::JumpWall);
+        return;
+    }
+
+    // Outward-wound faces for the transformed authored AABB.
+    appendTriangle(0, 2, 3);
+    appendTriangle(0, 3, 1);
+    appendTriangle(4, 5, 7);
+    appendTriangle(4, 7, 6);
+    appendTriangle(0, 4, 6);
+    appendTriangle(0, 6, 2);
+    appendTriangle(1, 3, 7);
+    appendTriangle(1, 7, 5);
+    appendTriangle(0, 1, 5);
+    appendTriangle(0, 5, 4);
+    appendTriangle(2, 6, 7);
+    appendTriangle(2, 7, 3);
+}
+
+Result LevelCollision::updateObjectColliders(
+    std::span<const LevelObjectState> objects) {
+    std::vector<DynamicObjectSnapshot> snapshots;
+    for (const LevelObjectState& object : objects) {
+        if (object.asset == nullptr ||
+            (object.asset->kind != LevelObjectKind::SlideCar &&
+             object.asset->kind != LevelObjectKind::BrokenBridge &&
+             object.asset->kind != LevelObjectKind::Platform &&
+             object.asset->kind != LevelObjectKind::ElectricPlatform) ||
+            !object.asset->hasCollisionBounds || !object.visible ||
+            !object.physicsEnabled || !object.collisionEnabled) {
+            continue;
+        }
+        snapshots.push_back(
+            {object.asset->objectId, object.worldTransform});
+    }
+    if (snapshots == dynamicObjectSnapshots_) {
+        return Result::success();
+    }
+    if (staticTriangleCount_ > triangles_.size()) {
+        return Result::failure(
+            "Dynamic collision static triangle boundary is invalid");
+    }
+    triangles_.resize(staticTriangleCount_);
+    for (const LevelObjectState& object : objects) {
+        if (object.asset == nullptr ||
+            (object.asset->kind != LevelObjectKind::SlideCar &&
+             object.asset->kind != LevelObjectKind::BrokenBridge &&
+             object.asset->kind != LevelObjectKind::Platform &&
+             object.asset->kind != LevelObjectKind::ElectricPlatform) ||
+            !object.asset->hasCollisionBounds || !object.visible ||
+            !object.physicsEnabled || !object.collisionEnabled) {
+            continue;
+        }
+        appendObjectBox(object);
+    }
+    dynamicObjectSnapshots_ = std::move(snapshots);
+    rebuildGrid();
+    return Result::success();
+}
+
+void LevelCollision::append(std::span<const ColladaGeometry> geometries,
+                            std::int32_t roomId,
+                            const assets::Vector3& roomPosition) {
+    auto appendTriangle = [this, roomId, &roomPosition](
+                              const ColladaGeometry& geometry,
+                              const ColladaMeshBuffer& buffer,
+                              std::uint16_t firstIndex,
+                              std::uint16_t secondIndex,
+                              std::uint16_t thirdIndex) {
         if (firstIndex >= geometry.vertices.size() ||
             secondIndex >= geometry.vertices.size() ||
             thirdIndex >= geometry.vertices.size()) {
             return;
         }
         Triangle triangle;
-        triangle.first = geometry.vertices[firstIndex].position;
-        triangle.second = geometry.vertices[secondIndex].position;
-        triangle.third = geometry.vertices[thirdIndex].position;
+        triangle.localFirst = geometry.vertices[firstIndex].position;
+        triangle.localSecond = geometry.vertices[secondIndex].position;
+        triangle.localThird = geometry.vertices[thirdIndex].position;
+        triangle.first = {triangle.localFirst.x + roomPosition.x,
+                          triangle.localFirst.y + roomPosition.y,
+                          triangle.localFirst.z + roomPosition.z};
+        triangle.second = {triangle.localSecond.x + roomPosition.x,
+                           triangle.localSecond.y + roomPosition.y,
+                           triangle.localSecond.z + roomPosition.z};
+        triangle.third = {triangle.localThird.x + roomPosition.x,
+                          triangle.localThird.y + roomPosition.y,
+                          triangle.localThird.z + roomPosition.z};
+        triangle.roomId = roomId;
         const auto finite = [](const Vector3& value) {
             return std::isfinite(value.x) && std::isfinite(value.y) &&
                    std::isfinite(value.z);
@@ -138,10 +312,10 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
         triangle.materialName = buffer.materialName;
         // PhysicsTriangleMeshShape::addSceneNodeInternal (0x003d9e94)
         // derives the native triangle flags from collision-node prefixes.
-        // constructMesh (0x003d95d8) applies the regular wall flag only to
-        // faces below its 0.70710677 ground-normal threshold.
+        // constructMesh (0x003d95d8) uses the SIGNED dot product with +Z.
+        // Downward-facing ceilings are not ground, even when horizontal.
         const bool vertical =
-            std::abs(triangle.normal.z) <
+            triangle.normal.z <=
             LevelCollisionConstants::MinimumGroundNormalZ;
         if (geometry.name.starts_with("wall")) {
             triangle.physicsFlags = vertical
@@ -151,6 +325,11 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
             triangle.physicsFlags = LevelPhysicsFlags::JumpWall;
         } else if (geometry.name.starts_with("edge_wall")) {
             triangle.physicsFlags = LevelPhysicsFlags::ClimbableEdge;
+        } else if (geometry.name.starts_with("double")) {
+            // NODE_NAME_PREFIX_DOUBLE_SIDE at 0x0056f53c -> "double".
+            triangle.physicsFlags = (vertical ? LevelPhysicsFlags::Wall
+                                              : LevelPhysicsFlags::Ground) |
+                                    LevelPhysicsFlags::DoubleSided;
         } else {
             triangle.physicsFlags = vertical ? LevelPhysicsFlags::Wall
                                              : LevelPhysicsFlags::Ground;
@@ -182,6 +361,8 @@ void LevelCollision::append(std::span<const ColladaGeometry> geometries) {
 }
 
 void LevelCollision::rebuildGrid() {
+    grid_.clear();
+    broadTriangles_.clear();
     for (std::uint32_t index = 0; index < triangles_.size(); ++index) {
         const Triangle& triangle = triangles_[index];
         const std::int32_t minimumCellX = cellCoordinate(triangle.minimumX);
@@ -207,6 +388,61 @@ void LevelCollision::rebuildGrid() {
     }
 }
 
+Result LevelCollision::updateRoomPositions(
+    std::span<const RoomMotionState> rooms) {
+    if (rooms.size() != roomPositions_.size()) {
+        return Result::failure("Collision room runtime count is invalid");
+    }
+    bool changed = false;
+    for (std::size_t index = 0; index < rooms.size(); ++index) {
+        if (rooms[index].roomId != static_cast<std::int32_t>(index + 1)) {
+            return Result::failure("Collision room runtime order is invalid");
+        }
+        const assets::Vector3& position = rooms[index].position;
+        assets::Vector3& previous = roomPositions_[index];
+        if (position.x == previous.x && position.y == previous.y &&
+            position.z == previous.z) {
+            continue;
+        }
+        previous = position;
+        changed = true;
+    }
+    if (!changed) {
+        return Result::success();
+    }
+    for (Triangle& triangle : triangles_) {
+        if (triangle.roomId < 1 ||
+            triangle.roomId > static_cast<std::int32_t>(rooms.size())) {
+            continue;
+        }
+        const assets::Vector3& position =
+            rooms[static_cast<std::size_t>(triangle.roomId - 1)].position;
+        triangle.first = {triangle.localFirst.x + position.x,
+                          triangle.localFirst.y + position.y,
+                          triangle.localFirst.z + position.z};
+        triangle.second = {triangle.localSecond.x + position.x,
+                           triangle.localSecond.y + position.y,
+                           triangle.localSecond.z + position.z};
+        triangle.third = {triangle.localThird.x + position.x,
+                          triangle.localThird.y + position.y,
+                          triangle.localThird.z + position.z};
+        triangle.minimumX = std::min(
+            {triangle.first.x, triangle.second.x, triangle.third.x});
+        triangle.maximumX = std::max(
+            {triangle.first.x, triangle.second.x, triangle.third.x});
+        triangle.minimumY = std::min(
+            {triangle.first.y, triangle.second.y, triangle.third.y});
+        triangle.maximumY = std::max(
+            {triangle.first.y, triangle.second.y, triangle.third.y});
+        triangle.minimumZ = std::min(
+            {triangle.first.z, triangle.second.z, triangle.third.z});
+        triangle.maximumZ = std::max(
+            {triangle.first.z, triangle.second.z, triangle.third.z});
+    }
+    rebuildGrid();
+    return Result::success();
+}
+
 std::int64_t LevelCollision::cellKey(std::int32_t x,
                                      std::int32_t y) noexcept {
     return static_cast<std::int64_t>(
@@ -217,14 +453,19 @@ std::int64_t LevelCollision::cellKey(std::int32_t x,
 bool LevelCollision::groundHeight(const Vector3& reference,
                                   float maximumStepUp, float maximumDrop,
                                   float& height,
-                                  std::uint32_t ignoredPhysicsFlags)
+                                  std::uint32_t ignoredPhysicsFlags,
+                                  std::int32_t* supportingObjectId)
     const noexcept {
     bool found = false;
     float best = -std::numeric_limits<float>::infinity();
+    std::int32_t bestObjectId = -1;
     const auto considerTriangle = [&](std::uint32_t triangleIndex) {
         const Triangle& triangle = triangles_[triangleIndex];
+        const float supportNormal =
+            (triangle.physicsFlags & LevelPhysicsFlags::DoubleSided) != 0U
+                ? std::abs(triangle.normal.z) : triangle.normal.z;
         if ((triangle.physicsFlags & ignoredPhysicsFlags) != 0U ||
-            std::abs(triangle.normal.z) <
+            supportNormal <=
                 LevelCollisionConstants::MinimumGroundNormalZ ||
             reference.x < triangle.minimumX - kGroundSupportRadius ||
             reference.x > triangle.maximumX + kGroundSupportRadius ||
@@ -277,6 +518,7 @@ bool LevelCollision::groundHeight(const Vector3& reference,
             return;
         }
         best = candidate;
+        bestObjectId = triangle.objectId;
         found = true;
     };
     const std::int32_t centerCellX = cellCoordinate(reference.x);
@@ -298,6 +540,11 @@ bool LevelCollision::groundHeight(const Vector3& reference,
     }
     if (found) {
         height = best;
+        if (supportingObjectId != nullptr) {
+            *supportingObjectId = bestObjectId;
+        }
+    } else if (supportingObjectId != nullptr) {
+        *supportingObjectId = -1;
     }
     return found;
 }
@@ -307,12 +554,50 @@ bool LevelCollision::resolveGroundMotion(const Vector3& start,
                                          Vector3& resolved,
                                          float maximumStepUp,
                                          float maximumDrop,
-                                         std::uint32_t ignoredPhysicsFlags)
+                                         std::uint32_t ignoredPhysicsFlags,
+                                         LevelCollisionDepenetration depenetration)
     const noexcept {
     Vector3 wallResolved = desired;
     if (std::abs(desired.x - start.x) > 1e-4F ||
         std::abs(desired.y - start.y) > 1e-4F) {
-        resolveWalls(start, wallResolved, ignoredPhysicsFlags);
+        resolveWalls(start, wallResolved, ignoredPhysicsFlags, depenetration);
+        const float normalRemainingX = desired.x - wallResolved.x;
+        const float normalRemainingY = desired.y - wallResolved.y;
+        const float normalRemainingSquared =
+            normalRemainingX * normalRemainingX +
+            normalRemainingY * normalRemainingY;
+        if (maximumStepUp > 1e-4F && normalRemainingSquared > 1e-4F) {
+            // The shipped controller accepts a maximum step height. Mirror
+            // that contract by sweeping again above the permitted step, then
+            // landing only on support that was reachable from the original
+            // height. This crosses low risers such as Level 5's 10 cm
+            // WayPoint 1 walkway lip without weakening taller wall shells.
+            constexpr float kStepSweepClearance = 0.01F;
+            Vector3 raisedStart = start;
+            raisedStart.z += maximumStepUp + kStepSweepClearance;
+            Vector3 raisedResolved = desired;
+            raisedResolved.z = raisedStart.z;
+            resolveWalls(raisedStart, raisedResolved, ignoredPhysicsFlags,
+                         depenetration);
+            const float raisedRemainingX = desired.x - raisedResolved.x;
+            const float raisedRemainingY = desired.y - raisedResolved.y;
+            const float raisedRemainingSquared =
+                raisedRemainingX * raisedRemainingX +
+                raisedRemainingY * raisedRemainingY;
+            float steppedHeight = 0.0F;
+            if (raisedRemainingSquared + 1e-4F < normalRemainingSquared &&
+                groundHeight(raisedResolved, 0.0F,
+                             maximumStepUp + maximumDrop +
+                                 kStepSweepClearance,
+                             steppedHeight, ignoredPhysicsFlags) &&
+                steppedHeight <= start.z + maximumStepUp +
+                                     kStepSweepClearance &&
+                steppedHeight >= start.z - maximumDrop) {
+                resolved = {raisedResolved.x, raisedResolved.y,
+                            steppedHeight};
+                return true;
+            }
+        }
     }
     float height = 0.0F;
     if (groundHeight(wallResolved, maximumStepUp, maximumDrop, height,
@@ -343,20 +628,39 @@ bool LevelCollision::resolveGroundMotion(const Vector3& start,
 void LevelCollision::resolveAirMotion(const Vector3& start,
                                       const Vector3& desired,
                                       Vector3& resolved,
-                                      std::uint32_t ignoredPhysicsFlags)
+                                      std::uint32_t ignoredPhysicsFlags,
+                                      LevelCollisionDepenetration depenetration)
     const noexcept {
+    // Most native callers update a PhysicsEntity in place. Preserve the
+    // sweep origin before writing the output so an in-place portable call
+    // cannot turn a crossing test into a zero-length, same-side test.
+    const Vector3 sweepStart = start;
     resolved = desired;
-    if (std::abs(desired.x - start.x) > 1e-4F ||
-        std::abs(desired.y - start.y) > 1e-4F) {
-        resolveWalls(start, resolved, ignoredPhysicsFlags);
+    if (std::abs(desired.x - sweepStart.x) > 1e-4F ||
+        std::abs(desired.y - sweepStart.y) > 1e-4F) {
+        resolveWalls(sweepStart, resolved, ignoredPhysicsFlags,
+                     depenetration);
     }
 }
 
 bool LevelCollision::segmentBlocked(const Vector3& start,
-                                    const Vector3& end) const noexcept {
+                                    const Vector3& end,
+                                    std::uint32_t ignoredPhysicsFlags) const
+    noexcept {
+    return segmentFirstHit(start, end, ignoredPhysicsFlags).has_value();
+}
+
+std::optional<LevelSegmentHit> LevelCollision::segmentFirstHit(
+    const Vector3& start, const Vector3& end,
+    std::uint32_t ignoredPhysicsFlags) const noexcept {
     const Vector3 direction = subtract(end, start);
     constexpr float kIntersectionEpsilon = 1e-5F;
+    const Triangle* closestTriangle = nullptr;
+    float closestTime = 1.0F;
     for (const Triangle& triangle : triangles_) {
+        if ((triangle.physicsFlags & ignoredPhysicsFlags) != 0U) {
+            continue;
+        }
         if (std::max(start.x, end.x) < triangle.minimumX ||
             std::min(start.x, end.x) > triangle.maximumX ||
             std::max(start.y, end.y) < triangle.minimumY ||
@@ -369,7 +673,16 @@ bool LevelCollision::segmentBlocked(const Vector3& start,
         const Vector3 secondEdge = subtract(triangle.third, triangle.first);
         const Vector3 determinantCross = cross(direction, secondEdge);
         const float determinant = dot(firstEdge, determinantCross);
-        if (std::abs(determinant) <= kIntersectionEpsilon) {
+        // PhysicsTriangleMeshShape::constructMesh (0x003d95d8) preserves
+        // authored winding. Ordinary mesh triangles are one-sided; only the
+        // NODE_NAME_PREFIX_DOUBLE_SIDE path enables the reverse face. This
+        // matters for room transition hulls: a web-grab ray leaving through
+        // their back face must not be occluded by that hull.
+        const bool doubleSided =
+            (triangle.physicsFlags & LevelPhysicsFlags::DoubleSided) != 0U;
+        if ((!doubleSided && determinant <= kIntersectionEpsilon) ||
+            (doubleSided &&
+             std::abs(determinant) <= kIntersectionEpsilon)) {
             continue;
         }
         const float inverseDeterminant = 1.0F / determinant;
@@ -391,11 +704,25 @@ bool LevelCollision::segmentBlocked(const Vector3& start,
         // Endpoints are omitted so standing on collision geometry or attaching
         // to a point placed directly on it does not self-occlude.
         if (segmentTime > kIntersectionEpsilon &&
-            segmentTime < 1.0F - kIntersectionEpsilon) {
-            return true;
+            segmentTime < 1.0F - kIntersectionEpsilon &&
+            segmentTime < closestTime) {
+            closestTriangle = &triangle;
+            closestTime = segmentTime;
         }
     }
-    return false;
+    if (closestTriangle == nullptr) {
+        return std::nullopt;
+    }
+    return LevelSegmentHit{
+        {start.x + direction.x * closestTime,
+         start.y + direction.y * closestTime,
+         start.z + direction.z * closestTime},
+        closestTriangle->normal,
+        closestTime,
+        closestTriangle->physicsFlags,
+        closestTriangle->roomId,
+        closestTriangle->geometryName,
+        closestTriangle->materialName};
 }
 
 bool LevelCollision::climbableWallContact(
@@ -485,7 +812,7 @@ bool LevelCollision::horizontalSurfaceContact(
     LevelWallContact& contact) const noexcept {
     // CheckClimbableWall(2) (0x0034863c) consumes the player's active 0x40
     // manifold contact. Jump-wall slabs use the same native manifold path
-    // with flag 0x10. Model both with the 50 cm support radius and 140 cm
+    // with flag 0x10. Model both with the 50 cm support radius and 185 cm
     // player height used by the portable body solver.
     bool found = false;
     float nearestVerticalDistance = std::numeric_limits<float>::infinity();
@@ -543,7 +870,8 @@ bool LevelCollision::horizontalSurfaceContact(
              triangle.normal.y * (capsuleBase.y - triangle.first.y)) /
                 triangle.normal.z;
         if (edgeHeight < capsuleBase.z - 1.0F ||
-            edgeHeight > capsuleBase.z + kPlayerCollisionHeight + 1.0F) {
+            edgeHeight > capsuleBase.z +
+                             kPlayerCollisionHeightCentimeters + 1.0F) {
             continue;
         }
         const float verticalDistance = std::abs(edgeHeight - capsuleBase.z);
@@ -569,7 +897,8 @@ bool LevelCollision::horizontalSurfaceContact(
 
 void LevelCollision::resolveWalls(const Vector3& start,
                                   Vector3& desired,
-                                  std::uint32_t ignoredPhysicsFlags)
+                                  std::uint32_t ignoredPhysicsFlags,
+                                  LevelCollisionDepenetration depenetration)
     const noexcept {
     std::vector<std::uint32_t> candidates = broadTriangles_;
     const std::int32_t centerCellX = cellCoordinate(desired.x);
@@ -596,53 +925,66 @@ void LevelCollision::resolveWalls(const Vector3& start,
                 std::abs(triangle.normal.z) >=
                     LevelCollisionConstants::MinimumGroundNormalZ ||
                 triangle.maximumZ < start.z ||
-                triangle.minimumZ > start.z + kPlayerCollisionHeight) {
+                triangle.minimumZ >
+                    start.z + kPlayerCollisionHeightCentimeters) {
                 continue;
             }
-            const std::array<std::pair<const Vector3*, const Vector3*>, 3>
-                edges{{{&triangle.first, &triangle.second},
-                       {&triangle.second, &triangle.third},
-                       {&triangle.third, &triangle.first}}};
-            const auto longest = std::max_element(
-                edges.begin(), edges.end(), [](const auto& left,
-                                               const auto& right) {
-                    const float leftX = left.second->x - left.first->x;
-                    const float leftY = left.second->y - left.first->y;
-                    const float rightX = right.second->x - right.first->x;
-                    const float rightY = right.second->y - right.first->y;
-                    return leftX * leftX + leftY * leftY <
-                           rightX * rightX + rightY * rightY;
-                });
-            const float edgeX = longest->second->x - longest->first->x;
-            const float edgeY = longest->second->y - longest->first->y;
-            const float edgeLengthSquared = edgeX * edgeX + edgeY * edgeY;
-            if (edgeLengthSquared <=
+            const float horizontalNormalLength =
+                std::hypot(triangle.normal.x, triangle.normal.y);
+            if (horizontalNormalLength <=
                 std::numeric_limits<float>::epsilon()) {
                 continue;
             }
-            const float edgeLength = std::sqrt(edgeLengthSquared);
-            const float normalX = -edgeY / edgeLength;
-            const float normalY = edgeX / edgeLength;
-            const float projection =
-                ((desired.x - longest->first->x) * edgeX +
-                 (desired.y - longest->first->y) * edgeY) /
-                edgeLengthSquared;
-            if (projection < 0.0F || projection > 1.0F) {
+            // PhysicsTriangleMeshShape::addSceneNodeInternal (0x003d9e94)
+            // preserves the authored collision-mesh plane and winding. Use
+            // that plane directly. Approximating it from the longest XY edge
+            // is incorrect for a vertical triangle whose third vertex is
+            // offset at the top: in Room 1 that shifted the storefront shell
+            // by roughly 20 cm and let an airborne thug cross the road edge.
+            const float normalX = triangle.normal.x / horizontalNormalLength;
+            const float normalY = triangle.normal.y / horizontalNormalLength;
+            const float tangentX = -normalY;
+            const float tangentY = normalX;
+            const auto tangentProjection = [&](const Vector3& point) {
+                return (point.x - triangle.first.x) * tangentX +
+                       (point.y - triangle.first.y) * tangentY;
+            };
+            const float desiredProjection =
+                (desired.x - triangle.first.x) * tangentX +
+                (desired.y - triangle.first.y) * tangentY;
+            const float secondProjection = tangentProjection(triangle.second);
+            const float thirdProjection = tangentProjection(triangle.third);
+            const float minimumProjection =
+                std::min({0.0F, secondProjection, thirdProjection});
+            const float maximumProjection =
+                std::max({0.0F, secondProjection, thirdProjection});
+            if (desiredProjection < minimumProjection ||
+                desiredProjection > maximumProjection) {
                 continue;
             }
-            const float closestX = longest->first->x + projection * edgeX;
-            const float closestY = longest->first->y + projection * edgeY;
             const float desiredSide =
-                (desired.x - closestX) * normalX +
-                (desired.y - closestY) * normalY;
+                (desired.x - triangle.first.x) * normalX +
+                (desired.y - triangle.first.y) * normalY;
             const float startSide =
-                (start.x - closestX) * normalX +
-                (start.y - closestY) * normalY;
+                (start.x - triangle.first.x) * normalX +
+                (start.y - triangle.first.y) * normalY;
             if (startSide * desiredSide >= 0.0F &&
                 std::abs(desiredSide) >= kGroundSupportRadius) {
                 continue;
             }
-            const float sideSign = startSide < 0.0F ? -1.0F : 1.0F;
+            float sideSign = startSide < 0.0F ? -1.0F : 1.0F;
+            // An authored spawn may begin inside the radius margin. Let
+            // intentional motion toward the face's authored-normal side
+            // depenetrate there instead of preserving the embedded side.
+            // Once the capsule is clear, normal two-sided collision keeps it
+            // from crossing the wall in either direction.
+            if (depenetration ==
+                    LevelCollisionDepenetration::TowardAuthoredNormal &&
+                startSide < 0.0F &&
+                std::abs(startSide) < kGroundSupportRadius &&
+                desiredSide > startSide) {
+                sideSign = 1.0F;
+            }
             const float correction =
                 sideSign * kGroundSupportRadius - desiredSide;
             desired.x += normalX * correction;

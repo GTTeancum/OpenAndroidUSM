@@ -24,6 +24,7 @@ struct ColladaVertex {
     Vector3 normal;
     std::array<float, 2> textureCoordinate{};
     std::uint32_t color{0xffffffff};
+    std::array<float, 2> secondaryTextureCoordinate{};
 };
 
 enum class ColladaPrimitive {
@@ -40,6 +41,7 @@ struct ColladaMeshBuffer {
     std::vector<std::uint16_t> indices;
     std::uint16_t firstVertex{};
     std::uint16_t lastVertex{};
+    bool usesSecondaryTextureCoordinates{};
     AxisAlignedBounds bounds;
 };
 
@@ -63,7 +65,15 @@ struct ColladaMaterial {
     std::string effectId;
     std::optional<std::uint32_t> diffuseImageIndex;
     std::optional<std::uint32_t> secondaryImageIndex;
+    std::optional<std::uint32_t> lightmapImageIndex;
     std::uint32_t secondaryTextureMode{};
+    bool additiveBlend{};
+    bool backFaceCulling{};
+    bool frontFaceCulling{};
+    bool transparentAlphaChannel{};
+    // SEffect ambient is copied byte-for-byte into SMaterial::AmbientColor.
+    // The game's custom combat-effect renderers use it as GL_TEXTURE_ENV_COLOR.
+    std::array<float, 4> ambientColor{};
 };
 
 struct ColladaVertexInfluence {
@@ -80,6 +90,13 @@ struct ColladaSkin {
     std::vector<std::vector<ColladaVertexInfluence>> vertexInfluences;
 };
 
+struct ColladaMorph {
+    std::string controllerId;
+    std::string sourceGeometryId;
+    std::vector<std::uint32_t> targetGeometryIndices;
+    std::vector<float> weights;
+};
+
 struct ColladaSceneNode {
     std::string id;
     std::string name;
@@ -88,6 +105,10 @@ struct ColladaSceneNode {
     Vector3 position;
     Quaternion rotation;
     Vector3 scale{1.0F, 1.0F, 1.0F};
+    std::array<float, 9> worldLinear{1.0F, 0.0F, 0.0F,
+                                     0.0F, 1.0F, 0.0F,
+                                     0.0F, 0.0F, 1.0F};
+    Vector3 worldPosition;
     std::vector<std::uint32_t> geometryIndices;
 };
 
@@ -114,6 +135,9 @@ public:
     [[nodiscard]] const std::vector<ColladaSkin>& skins() const noexcept {
         return skins_;
     }
+    [[nodiscard]] const std::vector<ColladaMorph>& morphs() const noexcept {
+        return morphs_;
+    }
     [[nodiscard]] const std::vector<ColladaSceneNode>& sceneNodes() const
         noexcept {
         return sceneNodes_;
@@ -132,6 +156,7 @@ private:
     std::vector<ColladaGeometry> geometries_;
     std::vector<ColladaGeometry> sceneGeometries_;
     std::vector<ColladaSkin> skins_;
+    std::vector<ColladaMorph> morphs_;
     std::vector<ColladaSceneNode> sceneNodes_;
 };
 

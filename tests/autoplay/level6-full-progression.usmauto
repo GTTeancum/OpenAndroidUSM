@@ -1,0 +1,299 @@
+# Follow Level 6 from its shipped player transform through the authored
+# interior, rooftop, bridge, and Venom sequences. Expanded chronologically as
+# each room-owned route is verified.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 500000
+render_size 640 360
+
+capture level6-gameplay-start
+
+# Spider-Man starts on Room 2's upper floor beside the three symbiotes watched
+# by Cinematic 125. Defeat them through ordinary combat so its IfEnemyDead
+# chain starts the shipped researcher/stone Cinematic 123 and successor 124.
+wait_enemies_active 5000 88 40594 40597
+wait_enemies_grounded 5000 88 40594 40597
+attack 150000 240 88 40594 40597
+assert_health_above 0
+wait_cinematic_started 5000 123
+capture level6-researcher-cinematic
+wait_controls 60000
+capture level6-post-researcher
+
+# Cinematic 124 leaves Spider-Man at the top of Object72's curved stair/ramp.
+# Follow its authored nav bands down from z=1959 to the z=1332 second floor,
+# then clear the four symbiotes watched by Cinematic 41426.
+move_to 33950 23850 1828 140 6000
+move_to 34025 24400 1667 140 6000
+move_to 33750 24875 1497 140 6000
+move_to 33250 25250 1332 180 6000
+wait_enemies_active 5000 41321 41322 41323 41324
+wait_enemies_grounded 5000 41321 41322 41323 41324
+attack 180000 240 41321 41322 41323 41324
+assert_health_above 0
+wait_cinematic_started 5000 41428
+capture level6-floor-break-qte
+
+# The default process-local QTE driver presses the abstract shipped action;
+# success follows 41464 -> 87 and lands both actors on the ground floor.
+wait_controls 30000
+assert_near 32717 24090 262 220
+assert_gameplay_ui
+wait_enemies_active 5000 89
+wait_enemies_grounded 5000 89
+capture level6-ground-floor
+attack 90000 240 89
+assert_health_above 0
+
+# Object 89's destroyed watcher reveals the final two interior symbiotes.
+# Their watcher closes/removes SpiderWebWall 84 and enables Trigger 40622.
+wait_enemies_active 5000 41204 41205
+wait_enemies_grounded 10000 41204 41205
+attack 120000 240 41204 41205
+assert_health_above 0
+wait 2000
+assert_object_hidden 84
+capture level6-interior-clear
+
+# Enter the newly enabled doorway transport and require every native logo
+# transition before Cinematic 40621 places Spider-Man in Room 1.
+move_until_cinematic 32183 24349 260 40621 10000
+wait_transport_state 1000 0
+wait_transport_state 1000 1
+wait_transport_state 1000 2
+wait_transport_state 1500 -1
+assert_camera_area 40941
+assert_near 27397 7280 1303 200
+assert_gameplay_ui
+capture level6-room1-arrival
+
+# Room 1's three standard thugs and big thug are already authored active.
+# Clear them with ordinary attacks, then use the real obj_collision207
+# crossing along WayPoints 3 -> 4 into Room 3.
+wait_enemies_active 5000 41304 41305 41306 41307
+wait_enemies_grounded 5000 41304 41305 41306 41307
+attack 180000 240 41304 41305 41306 41307
+assert_health_above 0
+capture level6-room1-combat-clear
+move_to 28387 8079 1324 110 12000
+move_to 28522 9684 1333 140 12000
+capture level6-room3-arrival
+
+# Room 3's western roof edge is a solid wall until jump_wall_01. Cross its
+# authored jump-only section onto Object22 beside WayPoint 6, then follow
+# the rising walkway toward WayPoint 7 and Slide 41133 in Room 4.
+move_to 28270 10380 1333 15 10000
+jump
+move_to 27915 10520 1320 35 8000
+move_until_state 2000 0 0 0
+assert_near 27915 10520 1320 100
+move_to 27257 11009 1493 110 8000
+assert_near 27257 11009 1493 160
+capture level6-room3-rising-walkway
+move_to 27320 11720 1641 50 12000
+rescue_hostage 15000 41144
+assert_hostage_freed 41144
+# Object22's final roof is 272 cm above the hostage ledge at y=11827.
+# Jump the authored vertical face rather than walking through it.
+jump
+move_to 27320 12075 1913 50 6000
+move_until_state 2000 0 0 0
+assert_near 27320 12075 1913 100
+capture level6-room4-slide-approach
+
+# Jump through jump_wall_02 to catch Slide 41133's shipped 41131 -> 41132
+# cable. Its landing enters Trigger 111 and reveals Room 4's first cohort.
+move_to 27365 12205 1913 12 4000
+jump
+move_to 27379 12245 1960 15 1000
+move_until_state 3000 0 0 23
+move_until_state 3000 0 0 22
+move_until_state 7000 0 0 15
+move_until_state 3000 0 0 0
+assert_near 28571 13642 1225 220
+wait_cinematic_started 5000 112
+capture level6-room4-slide-landing
+# Approach wall01 from the real slide landing. The six authored OnWall
+# enemies must remain wall actors while the player climbs toward Object17.
+move_until_wall 28571 14300 1295 7000
+move_until_state 2000 0 0 1
+move_input 1300 0 1
+wait 600
+capture level6-room4-wall-combat
+attack 15000 230 41357
+capture level6-room4-wall-after-attacks
+assert_enemy_health_below 41357 1
+move_until_state 15000 0 1 7
+move_until_state 3000 0 0 0
+assert_near 28571 14290 2997 180
+capture level6-room4-rooftop-arrival
+wait_enemies_grounded 5000 41453 41454 41455
+attack 120000 200 41453 41454 41455
+assert_health_above 0
+wait_enemies_active 5000 41195 41196 41197
+wait_enemies_grounded 8000 41195 41196 41197
+attack 120000 200 41195 41196 41197
+assert_health_above 0
+wait 1000
+assert_camera_area 41187
+capture level6-room4-rooftop-waves-clear
+# Camera switch 20 points toward jump_wall_03 and WebGrabPoint 41185.
+# Leave Object17 through that authored airborne-only boundary, then ride the
+# anchor toward Room 6's western landing rather than walking across the void.
+move_to 29450 14540 2997 25 6000
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 2500 0 0 18
+capture level6-room4-web-grab
+move_until_state 4000 0 1 19
+move_until_state 7000 0 1 0
+capture level6-room6-landing
+assert_near 33101 15505 2984 200
+assert_last_checkpoint 41348
+move_to 33420 15611 3099 35 6000
+jump
+move_to 35013 16176 3111 40 10000
+capture level6-room6-walkway-crossed
+wait_enemies_grounded 6000 41285 41286 41287 41288
+attack 120000 200 41285 41286 41287 41288
+capture level6-room6-enemies-clear
+move_until_state 3000 0 0 0
+move_to 36320 16350 2988 25 8000
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 2500 0 0 18
+capture level6-room6-web-grab
+move_until_state 4000 0 1 19
+capture level6-room6-web-release
+# Room 7 is an uninterrupted airborne route, not another landing roof.
+# Finish the release clip, then catch the next authored grab point.
+move_until_state 3000 0 1 15
+web_on
+move_until_state 2500 0 0 18
+capture level6-room7-second-web-grab
+move_until_state 4000 0 1 19
+# The cable is camera-left of a straight release; steer toward its authored
+# 40721 -> 40722 segment while descending.
+move_until_state 7000 -0.1 1 23
+capture level6-room7-slide-catch
+move_until_state 2000 0 0 22
+move_input 600 0 0
+# Jump before the cable's low endpoint enters its authored restore volume.
+jump
+move_input 150 0 1
+web_on
+move_until_state 2500 0 0 18
+capture level6-room7-third-web-grab
+move_until_state 4000 0 1 19
+move_until_state 7000 0 1 0
+capture level6-room8-landing
+assert_last_checkpoint 41349
+# The landing trigger starts the shipped Venom bridge presentation and its
+# chained camera/player handoff; do not skip or dispatch either cinematic.
+wait_cinematic_started 1000 90
+wait_cinematic_started 15000 41462
+wait_controls 10000
+capture level6-bridge-controls-returned
+move_to 48650 20476 1219 60 10000
+capture level6-bridge-entry-road
+move_to 51400 20476 1207 50 8000
+capture level6-bridge-first-sections-crossed
+jump
+move_input 200 0 1
+jump
+move_to 53400 20476 1207 60 8000
+capture level6-bridge-before-first-vehicles
+jump
+move_input 200 0 1
+jump
+move_input 1000 0 1
+jump
+move_input 200 0 1
+jump
+move_to_3d 56500 20476 1207 100 10000
+capture level6-bridge-first-vehicles-crossed
+# Keep using normal jump input across the short alternating bridge sections.
+# The 3-D destination proves Spider-Man reaches the safe roadway between the
+# first and second authored vehicle groups without satisfying the step below it.
+jump
+move_input 200 0 1
+jump
+move_input 1000 0 1
+jump
+move_input 200 0 1
+jump
+move_to_3d 60350 20476 1207 80 12000
+jump
+move_input 200 0 1
+jump
+move_input 450 0 1
+# Re-arm while still above the leading edge of bridge 40908; waiting until
+# road height lets the controller pass below its 1205-unit top face.
+move_to_3d 61300 20476 1450 160 3000
+jump
+move_input 200 0 1
+jump
+move_input 1000 0 1
+jump
+move_to_3d 63500 20476 1205 200 10000
+capture level6-bridge-second-vehicle-group
+jump
+move_input 200 0 1
+jump
+move_input 1000 0 1
+jump
+move_input 200 0 1
+jump
+move_to_3d 65900 20476 1203 140 12000
+capture level6-bridge-instant-drop-approach
+jump
+move_input 200 0 1
+jump
+move_input 600 0 1
+jump
+move_input 200 0 1
+jump
+move_to_3d 68000 20476 1201 160 10000
+capture level6-bridge-middle-approach
+# Cross the final two vehicle-bearing spans before the authored long grab at
+# 41072 carries Spider-Man over the last instant-drop section.
+move_to_3d 68900 20476 1200 180 6000
+capture level6-bridge-third-vehicle-group
+jump
+move_input 200 0 1
+jump
+move_input 1000 0 1
+jump
+move_input 200 0 1
+jump
+move_to_3d 71800 20476 1200 200 12000
+capture level6-bridge-final-grab-approach
+jump 0 1
+move_input 200 0 1
+web_on
+move_until_state 2500 0 0 18
+capture level6-bridge-final-web-grab
+move_until_state 4500 0 1 19
+# Steer the released swing directly toward the shipped checkpoint instead of
+# holding camera-forward and flying past its narrow landing strip.
+move_to_3d 75450 20800 1500 250 4000
+jump
+move_to_3d 76090 20579 1268 260 10000
+capture level6-bridge-exit
+assert_last_checkpoint 9
+wait_cinematic_started 1000 41459
+capture level6-venom-introduction
+wait_cinematic_started 80000 24
+wait_controls 5000
+wait_enemies_active 5000 41460
+capture level6-venom-fight-start
+attack 180000 300 41460
+wait_cinematic_started 10000 12
+capture level6-venom-defeated
+wait_cinematic_started 15000 96
+wait_level_end 20000
+assert_health_above 0
+finish

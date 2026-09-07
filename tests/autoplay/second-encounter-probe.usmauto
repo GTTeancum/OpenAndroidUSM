@@ -3,7 +3,7 @@
 # enemies, and activates their physics before combat begins.
 fixed_step_ms 50
 sample_interval_ms 50
-capture_interval_ms 1000
+capture_interval_ms 0
 max_time_ms 120000
 start_time_ms 53033
 render_size 1280 720
@@ -11,6 +11,11 @@ render_size 1280 720
 wait_gameplay 60000
 teleport 8800 -5860 7 -1 0 0
 move_until_cinematic 8430 -5710 7 974 5000
+# Cinematic 974 opens the indefinite spider-sense tutorial at 2300 ms. Let
+# that authored command arrive, then acknowledge it before waiting on the
+# three revealed enemies' landing states.
+wait 2600
+wait_controls 12000
 wait_enemies_grounded 10000 398 399 401
 capture second-encounter-landed
 attack 30000 135 398 399 401

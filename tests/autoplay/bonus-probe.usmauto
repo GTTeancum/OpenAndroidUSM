@@ -1,0 +1,28 @@
+# Exercises both first-level CBonus variants end to end: hide the authored
+# effect, run the Hermite orb/trail to the player, grant the value, update the
+# skill total, play the pickup sound, and leave a deterministic trace.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+teleport 11060.7 -4847.15 154.646 1 0 0
+collect_bonus 6000 662
+assert_bonus_collected 662
+assert_audio_played SFX_ORBS_COLLECT
+assert_skill_points_at_least 5
+# TriggerRestore 539 applies its authored 200 damage. This gives the health
+# pickup observable headroom instead of merely clamping against full health.
+teleport 4744.765 -6427.654 -500 1 0 0
+wait_controls 5000
+assert_health_above 799
+assert_health_below 801
+teleport 3588.63 3061.31 92.133 1 0 0
+collect_bonus 6000 782
+assert_bonus_collected 782
+assert_health_above 879
+assert_health_below 881
+finish

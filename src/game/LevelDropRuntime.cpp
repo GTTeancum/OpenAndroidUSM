@@ -1,5 +1,7 @@
 #include "game/LevelDropRuntime.hpp"
 
+#include "game/PlayerPhysicsConstants.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -7,8 +9,6 @@
 namespace usm::game {
 namespace {
 
-constexpr float kPlayerRadius = 50.0F;
-constexpr float kPlayerHeight = 140.0F;
 constexpr float kDropAcceleration = 4000.0F;
 
 } // namespace
@@ -131,11 +131,16 @@ bool LevelDropRuntime::areaContainsPlayer(
     const assets::Vector3 half{std::abs(area.sizes.x) * 0.5F,
                               std::abs(area.sizes.y) * 0.5F,
                               std::abs(area.sizes.z) * 0.5F};
-    return player.x + kPlayerRadius >= area.position.x - half.x &&
-           player.x - kPlayerRadius <= area.position.x + half.x &&
-           player.y + kPlayerRadius >= area.position.y - half.y &&
-           player.y - kPlayerRadius <= area.position.y + half.y &&
-           player.z + kPlayerHeight >= area.position.z - half.z &&
+    return player.x + kPlayerCollisionRadiusCentimeters >=
+               area.position.x - half.x &&
+           player.x - kPlayerCollisionRadiusCentimeters <=
+               area.position.x + half.x &&
+           player.y + kPlayerCollisionRadiusCentimeters >=
+               area.position.y - half.y &&
+           player.y - kPlayerCollisionRadiusCentimeters <=
+               area.position.y + half.y &&
+           player.z + kPlayerCollisionHeightCentimeters >=
+               area.position.z - half.z &&
            player.z <= area.position.z + half.z;
 }
 
@@ -144,16 +149,16 @@ bool LevelDropRuntime::objectHitsPlayer(
     const assets::Vector3& objectPosition,
     const assets::Vector3& player) noexcept {
     return objectPosition.x + object.halfExtents.x >=
-               player.x - kPlayerRadius &&
+               player.x - kPlayerCollisionRadiusCentimeters &&
            objectPosition.x - object.halfExtents.x <=
-               player.x + kPlayerRadius &&
+               player.x + kPlayerCollisionRadiusCentimeters &&
            objectPosition.y + object.halfExtents.y >=
-               player.y - kPlayerRadius &&
+               player.y - kPlayerCollisionRadiusCentimeters &&
            objectPosition.y - object.halfExtents.y <=
-               player.y + kPlayerRadius &&
+               player.y + kPlayerCollisionRadiusCentimeters &&
            objectPosition.z + object.halfExtents.z >= player.z &&
            objectPosition.z - object.halfExtents.z <=
-               player.z + kPlayerHeight;
+               player.z + kPlayerCollisionHeightCentimeters;
 }
 
 } // namespace usm::game

@@ -1,0 +1,115 @@
+# Production-input coverage for source-authored Level 1 alternate combat
+# branches. Enemy decisions are frozen only after normal encounter activation;
+# state selection, targeting, animation, hit timing, damage, FX, and sound all
+# remain on the application path.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+
+# Punch-to-held-jump follows the authored state-74 -> state-76 launcher.
+teleport 13399 -6360 7 0 -1 0
+punch
+assert_player_state 74
+jump_attack_when_ready 1000
+move_until_state 1000 0 0 76
+assert_player_state 76
+wait 225
+assert_player_effect 3 1
+capture alternate-uppercut
+move_until_state 2000 0 0 0
+set_enemy_ai 394 1
+wait_enemies_grounded 3000 394
+set_enemy_ai 394 0
+
+# Web during the first punch window follows state-74 -> state-92 rather than
+# falling through to the standalone pellet state.
+teleport 13399 -6360 7 0 -1 0
+punch
+assert_player_state 74
+web_attack_when_ready 1000
+move_until_state 1000 0 0 92
+assert_player_state 92
+capture alternate-ground-web-bind
+wait 1050
+# Motion 0x6f hands off to state 96 as soon as the native IsFalling check
+# observes road contact; it does not wait out the complete kick clip.
+assert_player_state 96
+assert_player_effect 16 1
+assert_enemy_health_near 394 245 0.01
+move_until_state 2500 0 0 0
+set_enemy_ai 394 1
+wait_enemies_grounded 3000 394
+set_enemy_ai 394 0
+
+# Normal airborne punches traverse 81 -> 82 -> 83. States 81 and 82 each
+# divide 65 across five authored contacts, but their 535 ms clips finish before
+# the fifth contact (runtime frame 12/13), so the shipped path delivers four
+# 13-point contacts apiece. Let the heavy finisher's frame-11 contact occur so
+# its 85 damage and effect 15 are both pinned. This scenario intentionally
+# accumulates the earlier launcher and complete ground-web branch on thug 394:
+# 500-105-70-80-52-52-85 = 56.
+teleport 13399 -6360 7 0 -1 0
+jump
+punch
+assert_player_state 81
+punch_attack_when_ready 1000
+move_until_state 1000 0 0 82
+assert_player_state 82
+punch_attack_when_ready 1000
+move_until_state 1000 0 0 83
+assert_player_state 83
+wait 375
+assert_player_effect 15 1
+assert_audio_played SFX_CRITICAL_HIT_1
+assert_enemy_health_near 394 56 0.01
+capture alternate-air-heavy-punch
+move_until_state 3000 0 0 0
+
+# Repeat the aerial two-punch entry against the untouched bat thug. Web in
+# state 83's input window cancels that heavy contact and enters state 84. Its
+# frame-21 fly kick lands before a second Web press advances to state 85's
+# frame-35 headbutt. The preceding two light aerial states and state-83 heavy
+# contact leave 311 health; fly kick and headbutt subtract 120 each.
+teleport 13148 -6335 7 0 -1 0
+jump
+punch
+assert_player_state 81
+punch_attack_when_ready 1000
+move_until_state 1000 0 0 82
+assert_player_state 82
+punch_attack_when_ready 1000
+move_until_state 1000 0 0 83
+assert_player_state 83
+web_attack_when_ready 1000
+move_until_state 1000 0 0 84
+assert_player_state 84
+# Keep decisions frozen while allowing state-83's authored knockback to lift
+# the victim into the following aerial web-sector attacks.
+set_enemy_physics 395 1
+wait 725
+assert_enemy_health_near 395 191 0.01
+assert_audio_played SFX_KICK_IMPACT_1
+capture alternate-air-fly-kick
+web_attack_when_ready 1000
+move_until_state 1000 0 0 85
+assert_player_state 85
+wait 1200
+assert_enemy_health_near 395 71 0.01
+assert_audio_played SFX_KICK_IMPACT_2
+assert_audio_played SFX_LAND
+capture alternate-air-headbutt
+move_until_state 3000 0 0 0
+
+assert_health_above 0
+finish

@@ -1,0 +1,23 @@
+# Exercise the native long-range attack acquisition path without pre-aligning
+# Spider-Man at melee distance. SetNextStateId should acquire actor 394 from
+# the 1000 cm search cone, select state 87, and commit the authored center-node
+# lunge to the gameplay/physics position before the impact is evaluated.
+fixed_step_ms 50
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 85000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+# Actor 394 stages near (13399,-6484). Approach along the open street's X
+# axis; the previous Y-axis fixture crossed the shopping-center planters.
+teleport 12599 -6484 10 1 0 0
+capture far-attack-acquisition
+attack 12000 900 394
+capture far-attack-impact
+assert_health_above 0
+finish

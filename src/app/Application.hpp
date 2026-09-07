@@ -9,17 +9,22 @@
 #include "audio/PlayerStateSoundBank.hpp"
 #include "game/CinematicPlayer.hpp"
 #include "game/CinematicUiRuntime.hpp"
+#include "game/DeathConfirmationRuntime.hpp"
+#include "game/ExitMenuRuntime.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/GameplayCinematicScheduler.hpp"
 #include "game/GameplayPlayer.hpp"
 #include "game/LevelCollision.hpp"
+#include "game/LevelCheckPointRuntime.hpp"
 #include "game/LevelCinematicRuntime.hpp"
 #include "game/LevelBonusRuntime.hpp"
 #include "game/LevelDamageRuntime.hpp"
+#include "game/LevelDeathRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
 #include "game/LevelEffectRuntime.hpp"
 #include "game/LevelDropRuntime.hpp"
 #include "game/LevelHintRuntime.hpp"
+#include "game/LevelHostageRuntime.hpp"
 #include "game/LevelMusicRuntime.hpp"
 #include "game/LevelObjectRuntime.hpp"
 #include "game/LevelRestoreRuntime.hpp"
@@ -46,6 +51,7 @@ namespace usm {
 struct ApplicationOptions {
     std::optional<std::filesystem::path> autoplayScript;
     std::optional<std::filesystem::path> autoplayOutput;
+    std::uint32_t levelNumber{1};
     bool autoplayAudio{};
 };
 
@@ -70,13 +76,22 @@ private:
     audio::CinematicSoundBank gameplaySounds_;
     audio::PcmAudio slowMotionEnterSound_;
     audio::PcmAudio slowMotionExitSound_;
+    audio::PcmAudio transportInSound_;
+    audio::PcmAudio transportOutSound_;
     audio::PcmAudio bonusCollectSound_;
+    audio::PcmAudio comicCollectSound_;
     audio::PcmAudio dropObjectSound_;
+    audio::PcmAudio ultimateSplashSound_;
+    std::map<std::int32_t, audio::PcmAudio> hostageSounds_;
+    std::map<std::int32_t, audio::PcmAudio> wallWebSounds_;
+    std::int32_t wallWebLoopSoundId_{-1};
+    std::map<std::int32_t, audio::PcmAudio> destroyableHitSounds_;
     std::map<std::string, audio::PcmAudio, std::less<>> triggerSoundClips_;
     game::CinematicPlayer introPlayer_;
     game::CinematicUiRuntime cinematicUi_;
     game::GameplayCamera gameplayCamera_;
     game::LevelCollision levelCollision_;
+    game::LevelCheckPointRuntime checkPointRuntime_;
     game::GameplayPlayer gameplayPlayer_;
     game::PlayerHudHealthState playerHudHealth_;
     game::PlayerStateConfigDatabase playerStateConfigs_;
@@ -84,7 +99,11 @@ private:
     game::LevelTriggerSoundRuntime triggerSoundRuntime_;
     game::LevelCinematicRuntime levelCinematicRuntime_;
     game::LevelBonusRuntime levelBonusRuntime_;
+    game::LevelHostageRuntime hostageRuntime_;
     game::LevelDamageRuntime levelDamageRuntime_;
+    game::LevelDeathRuntime levelDeathRuntime_;
+    game::DeathConfirmationRuntime deathConfirmationRuntime_;
+    game::ExitMenuRuntime exitMenuRuntime_;
     game::LevelEnemyRuntime enemyRuntime_;
     game::LevelEffectRuntime effectRuntime_;
     game::LevelDropRuntime dropRuntime_;

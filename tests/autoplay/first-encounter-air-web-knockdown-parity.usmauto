@@ -1,0 +1,41 @@
+# Source-authored Level 1 launcher-to-air-web knockdown chain. All combat
+# selection, targeting, damage, animation, effects, and enemy physics remain on
+# the production application path; only unrelated enemy decisions are frozen.
+fixed_step_ms 10
+sample_interval_ms 10
+capture_interval_ms 0
+max_time_ms 75000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+
+set_enemy_ai 394 0
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+teleport 13356 -6411 7 0 1 0
+
+# GetAirWebSpecialState reads the nearest non-airborne helper target before its
+# generic tie/drag search. At this authored encounter position an ordinary jump
+# keeps enemy 394 inside the exact 40,000 cm^2 branch threshold.
+set_enemy_physics 394 1
+jump
+web_on
+move_until_state 500 0 0 99
+web_off
+assert_player_state 99
+move_until_state 1000 0 0 100
+assert_player_state 100
+move_until_state 1500 0 0 104
+assert_player_state 104
+wait 100
+assert_player_effect 19 1
+wait_enemy_animation 3000 394 onground_to_whirl_flying
+assert_enemy_health_near 394 300 0.01
+assert_audio_played SFX_CRITICAL_HIT_1
+assert_audio_played SFX_VERTICAL_IMPACT
+assert_health_above 0
+finish

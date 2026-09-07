@@ -1,0 +1,62 @@
+# Focused traversal probe for the first Room 6 WebGrabPoint after the
+# post-hostage helipad encounter.  The teleport is diagnostic setup only;
+# post-crash-route-probe carries the finalized path chronologically.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 180000
+start_time_ms 53033
+render_size 1280 720
+
+wait_gameplay 1000
+teleport 7420 6920 3579 1 1 0
+# Satisfy Cinematic 10336's authored IfEnemyDead gate so this focused setup
+# performs the same 10275 -> 166 camera switch as the chronological route.
+damage_enemy 1139 100000
+start_cinematic 10338
+wait 100
+assert_camera_area 166
+move_to 8300 7600 3579 100 8000
+capture room6-web-takeoff
+jump
+wait 100
+web_on
+move_until_state 2500 0 0 18
+capture room6-web-swing
+move_until_state 3000 0 1 19
+capture room6-web-release
+move_to 11550 9600 3479 300 5000
+move_until_state 1500 0 0 0
+capture room6-far-roof-arrival
+assert_near 11500 9500 3479 650
+wait_enemies_grounded 5000 481 482 483 10344
+capture room6-far-roof-encounter-ready
+attack 90000 180 481 482 10344
+capture room6-far-roof-south-encounter-complete
+# The shipped roof collision is split by a roughly three-metre alley between
+# the south combat pad and the north run toward Slide 1038.  Cross it with the
+# ordinary jump state after the final combo has returned control; grounded
+# movement correctly stops at the authored lip.
+move_until_state 3000 0 0 0
+jump
+move_to 11850 10200 3479 175 6000
+move_to 11000 10800 3479 175 6000
+move_to 10000 11200 3479 200 6000
+attack 40000 180 483
+capture room6-far-roof-encounter-complete
+# The walkable roof ends just east of Slide 1038.  Approach that authored lip;
+# the following airborne frame is what CSlider's 800 cm catch radius consumes.
+move_to 8950 11155 3479 75 10000
+jump 0.33 0.95
+move_input_until_cinematic 2000 0.33 0.95 1150
+capture room7-slide-tutorial
+wait_controls 5000
+move_until_state 3000 0.33 0.95 23
+capture room7-first-slide-catch
+move_until_state 2000 0 0 22
+assert_audio_played SFX_SLIDING
+move_until_state 10000 0 0 15
+capture room7-first-slide-exit
+assert_near 4214 8558 2488 150
+assert_health_above 0
+finish

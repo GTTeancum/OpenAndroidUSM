@@ -53,7 +53,7 @@ Result GameplayCinematicScheduler::start(std::int32_t cinematicId) {
 
 Result GameplayCinematicScheduler::update(
     std::uint32_t deltaMilliseconds,
-    const ConditionalCinematicCommandHandler& handler) {
+    const GameplayCinematicCommandHandler& handler) {
     for (Instance& instance : instances_) {
         if (instance.playback.completed) {
             continue;
@@ -62,7 +62,11 @@ Result GameplayCinematicScheduler::update(
             instance.playback.elapsedMilliseconds + deltaMilliseconds,
             instance.playback.durationMilliseconds);
         Result result = instance.player.advanceToConditional(
-            instance.playback.elapsedMilliseconds, handler);
+            instance.playback.elapsedMilliseconds,
+            [&instance, &handler](const CinematicThread& thread,
+                                  const CinematicCommand& command) {
+                return handler(*instance.playback.asset, thread, command);
+            });
         if (!result) {
             return result;
         }
@@ -89,6 +93,17 @@ void GameplayCinematicScheduler::remove(
         return instance.playback.asset != nullptr &&
                instance.playback.asset->objectId == cinematicId;
     });
+}
+
+const GameplayCinematicPlayback*
+GameplayCinematicScheduler::playback(std::int32_t cinematicId) const noexcept {
+    const auto instance = std::find_if(
+        instances_.begin(), instances_.end(),
+        [cinematicId](const Instance& candidate) {
+            return candidate.playback.asset != nullptr &&
+                   candidate.playback.asset->objectId == cinematicId;
+        });
+    return instance == instances_.end() ? nullptr : &instance->playback;
 }
 
 const GameplayCinematicPlayback*

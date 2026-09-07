@@ -1,0 +1,28 @@
+# Verify CElectriferous timing directly against the shipped Level 3 board
+# attributes. Object 30831 begins 4500 ms into its off phase; object 40628 has
+# zero ready/on durations and therefore remains off under native ChangeState.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 15000
+start_time_ms 0
+render_size 640 360
+
+assert_object_electric_state 30831 off
+assert_object_animation 30831 off
+teleport 5343.010254 -3733.028076 1990.153809 1 0 0
+wait 100
+assert_health_below 1000
+wait_object_electric_state 1000 30831 warning
+assert_object_animation 30831 warning
+wait_object_electric_state 3000 30831 release
+assert_object_animation 30831 release
+wait_object_electric_state 3000 30831 off
+assert_object_animation 30831 off
+
+assert_object_electric_state 40628 off
+assert_object_animation 40628 off
+wait 6000
+assert_object_electric_state 40628 off
+assert_object_animation 40628 off
+finish

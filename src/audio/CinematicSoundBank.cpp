@@ -46,9 +46,16 @@ Result CinematicSoundBank::preload(
                 }
                 const game::CinematicAttribute* event =
                     command.findAttribute(kEventAttribute);
-                if (event == nullptr || event->value.empty()) {
+                if (event == nullptr) {
                     return Result::failure(
                         "CFF SoundControl command has no $VoxSounds event");
+                }
+                // The shipped Level 2 cinematic 20085 contains one Play3D
+                // SoundControl command whose $VoxSounds string is present but
+                // empty. The original command stream treats that placeholder
+                // as silent; there is no event to resolve or decode.
+                if (event->value.empty()) {
+                    continue;
                 }
                 if (decodedByEvent_.contains(event->value) ||
                     std::find(unresolvedEvents_.begin(),

@@ -1,11 +1,9 @@
 #include "game/CinematicUiRuntime.hpp"
 
 #include <algorithm>
-#include <array>
 #include <charconv>
 #include <limits>
 #include <string_view>
-#include <utility>
 
 namespace usm::game {
 namespace {
@@ -39,33 +37,81 @@ bool booleanAttribute(const CinematicCommand& command, std::string_view name,
     return false;
 }
 
-std::u16string controllerText(std::u16string value) {
-    constexpr std::array replacements{
-        std::pair{u"^J", u"[A]"}, std::pair{u"^X", u"[A]"},
-        std::pair{u"^K", u"[X]"}, std::pair{u"^u", u"[X]"},
-        std::pair{u"^L", u"[B]"}, std::pair{u"^C", u"[B]"},
-    };
-    for (const auto& [source, replacement] : replacements) {
-        std::size_t offset = 0;
-        while ((offset = value.find(source, offset)) !=
-               std::u16string::npos) {
-            value.replace(offset, std::char_traits<char16_t>::length(source),
-                          replacement);
-            offset += std::char_traits<char16_t>::length(replacement);
-        }
-    }
-    return value;
-}
-
 void advanceTimer(std::int32_t elapsedMilliseconds,
                   std::int32_t& remainingMilliseconds,
                   bool& visible) noexcept {
-    if (!visible || remainingMilliseconds < 0) {
+    if (!visible || remainingMilliseconds < 1) {
         return;
     }
     remainingMilliseconds =
         std::max(0, remainingMilliseconds - elapsedMilliseconds);
     visible = remainingMilliseconds != 0;
+}
+
+std::u16string stripFontColorControls(std::u16string_view text) {
+    std::u16string result;
+    result.reserve(text.size());
+    for (std::size_t index = 0; index < text.size(); ++index) {
+        if (text[index] == u'^' && index + 1U < text.size() &&
+            text[index + 1U] >= u'0' && text[index + 1U] <= u'9') {
+            ++index;
+            continue;
+        }
+        result.push_back(text[index]);
+    }
+    return result;
+}
+
+std::u16string controllerTutorialText(std::string_view stringId,
+                                      const std::u16string& localized) {
+    // The shipped English table describes both the Android touch overlay and
+    // the Xperia Play controls. The Windows reconstruction has neither UI,
+    // so present the same actions with the XInput bindings that are actually
+    // routed by XperiaKeyRouter. The renderer replaces supported bracket
+    // tokens with the supplied Xbox atlas and retains the labels as fallback.
+    if (stringId == "STR_MOVE") {
+        return u"Use the left stick to move.";
+    }
+    if (stringId == "STR_JUMP") {
+        return u"Press [A] once to jump.";
+    }
+    if (stringId == "STR_SHORT_SWING") {
+        return u"Press [A] in the air to use the SHORT WEB SWING.";
+    }
+    if (stringId == "STR_COMBAT") {
+        return u"Press [X] for a NORMAL ATTACK!";
+    }
+    if (stringId == "STR_WEB_ATTACK") {
+        return u"Press [B] for a WEB ATTACK!\nWEB ATTACKS cost web power.";
+    }
+    if (stringId == "STR_LAUNCH") {
+        return u"During a NORMAL ATTACK, press or hold [A] to launch enemies "
+               u"into the air.";
+    }
+    if (stringId == "STR_SAVE_HOSTAGE") {
+        return u"When close to a hostage, press [X] to rescue them and "
+               u"acquire restorative orbs.";
+    }
+    if (stringId == "STR_SPIDER_SENSE") {
+        return u"When SPIDER-SENSE appears, press [LB] to avoid or counter "
+               u"the enemy's attack! Try it now!";
+    }
+    if (stringId == "STR_WEB_SWING") {
+        return u"When a web-swing point appears, press [A] in the air to use "
+               u"the LONG WEB SWING.";
+    }
+    if (stringId == "STR_JUMP_WALL") {
+        return u"Use the left stick and press [A] to jump over the gap.";
+    }
+    if (stringId == "STR_SLIDE") {
+        return u"Jump on the rope to slide.\nWhile sliding, press [A] to "
+               u"jump up.";
+    }
+    if (stringId == "STR_ULTIMATE_COMBO") {
+        return u"Press [Y] when the web power gauge blinks to activate the "
+               u"ULTIMATE WEB COMBO.";
+    }
+    return localized;
 }
 
 } // namespace
@@ -75,14 +121,57 @@ void CinematicUiRuntime::bind(const LevelTextCatalog& strings) noexcept {
     tutorialText_.clear();
     messageText_.clear();
     tutorialRemainingMilliseconds_ = 0;
+    tutorialButton_ = -1;
     messageRemainingMilliseconds_ = 0;
+    messageDurationMilliseconds_ = 0;
+    messageFace_ = -1;
     tutorialVisible_ = false;
     messageVisible_ = false;
+    messagePanelVisible_ = false;
+    informationPanel_ = InformationPanel::None;
     tutorialDimBackground_ = false;
     letterboxVisible_ = false;
+    comicCoverTipShown_ = false;
+}
+
+Result CinematicUiRuntime::showComicCover(std::int32_t comicIndex) {
+    if (strings_ == nullptr || comicIndex < 0) {
+        return Result::failure("Comic cover notice has invalid state");
+    }
+    // CComicCover::RenderTip (0x00304228) uses Main string 0x24b for
+    // the first five-second explanation in a session, then 0x24a for each
+    // three-second reminder. Profile persistence is intentionally outside
+    // this single-level target, while the session behavior is retained.
+    const std::size_t stringIndex = comicCoverTipShown_ ? 0x24aU : 0x24bU;
+    const std::u16string* localized = strings_->main().at(stringIndex);
+    if (localized == nullptr) {
+        return Result::failure("Comic cover notice string is missing");
+    }
+    // RenderComicCoverInfo (0x0038c434) draws Main[0x24a/0x24b] verbatim;
+    // AddCoverInfo stores the collected cover index at +0x20d0 but does not
+    // append or substitute it into the localized sentence. Native CFont
+    // consumes ^N color controls. Until font palettes are reconstructed,
+    // remove those nonprinting controls instead of exposing them.
+    messageText_ = stripFontColorControls(*localized);
+    messageRemainingMilliseconds_ = comicCoverTipShown_ ? 3000 : 5000;
+    messageDurationMilliseconds_ = messageRemainingMilliseconds_;
+    messageFace_ = -1;
+    messageVisible_ = true;
+    messagePanelVisible_ = false;
+    // RenderComicCoverInfo uses tutorial.bsprite frame 0 for Main[0x24b]
+    // and frame 0xf for Main[0x24a], not the portrait/speech frame or a
+    // generic subtitle rectangle. Keep this a timed notice, not a tutorial.
+    informationPanel_ = comicCoverTipShown_ ? InformationPanel::Compact
+                                          : InformationPanel::Expanded;
+    comicCoverTipShown_ = true;
+    return Result::success();
 }
 
 Result CinematicUiRuntime::applyCommand(const CinematicCommand& command) {
+    if (command.name == "PlayDAECamera") {
+        setColladaMovieUi(true);
+        return Result::success();
+    }
     if (command.name == "InterfaceControl") {
         bool black = false;
         if (!booleanAttribute(command, "BlackEnable", black)) {
@@ -97,10 +186,20 @@ Result CinematicUiRuntime::applyCommand(const CinematicCommand& command) {
         }
         const CinematicAttribute* content =
             command.findAttribute("Content$Tutorial_STRINGID");
-        std::int32_t timer = -1;
+        // IAttributes::getAttributeAsInt/getAttributeAsBool return zero/false
+        // for absent attributes in CCinematicThread::OnTutorial (0x003710d4).
+        // Several authored traversal tutorials intentionally omit Timer;
+        // CTutorial::AddInfo (0x0038dea0) treats that zero as modal.
+        std::int32_t timer = 0;
+        std::int32_t tutorialButton = 0;
         bool blackScreen = false;
-        if (content == nullptr || !integerAttribute(command, "Timer", timer) ||
-            !booleanAttribute(command, "blackScreen", blackScreen)) {
+        if (content == nullptr ||
+            (command.findAttribute("Timer") != nullptr &&
+             !integerAttribute(command, "Timer", timer)) ||
+            (command.findAttribute("$TutorialButton") != nullptr &&
+             !integerAttribute(command, "$TutorialButton", tutorialButton)) ||
+            (command.findAttribute("blackScreen") != nullptr &&
+             !booleanAttribute(command, "blackScreen", blackScreen))) {
             return Result::failure("Tutorial has invalid attributes");
         }
         const std::u16string* localized =
@@ -108,8 +207,9 @@ Result CinematicUiRuntime::applyCommand(const CinematicCommand& command) {
         if (localized == nullptr) {
             return Result::failure("Tutorial references an unknown string");
         }
-        tutorialText_ = controllerText(*localized);
+        tutorialText_ = controllerTutorialText(content->value, *localized);
         tutorialRemainingMilliseconds_ = timer;
+        tutorialButton_ = tutorialButton;
         tutorialDimBackground_ = blackScreen;
         tutorialVisible_ = true;
         return Result::success();
@@ -121,8 +221,9 @@ Result CinematicUiRuntime::applyCommand(const CinematicCommand& command) {
         const CinematicAttribute* message =
             command.findAttribute("$LEVEL_STRINGID");
         std::int32_t timer = 0;
+        std::int32_t face = 0;
         if (message == nullptr || !integerAttribute(command, "Timer", timer) ||
-            timer < 0) {
+            !integerAttribute(command, "$MessageFace", face) || timer < 0) {
             return Result::failure("ShowMessage has invalid attributes");
         }
         const std::u16string* localized =
@@ -132,7 +233,11 @@ Result CinematicUiRuntime::applyCommand(const CinematicCommand& command) {
         }
         messageText_ = *localized;
         messageRemainingMilliseconds_ = timer;
+        messageDurationMilliseconds_ = timer;
+        messageFace_ = face;
         messageVisible_ = timer != 0;
+        messagePanelVisible_ = messageVisible_;
+        informationPanel_ = InformationPanel::None;
         return Result::success();
     }
     return Result::success();
@@ -146,7 +251,7 @@ void CinematicUiRuntime::update(std::uint32_t elapsedMilliseconds,
             static_cast<std::uint32_t>(
                 std::numeric_limits<std::int32_t>::max())));
     if (dismissPressed && tutorialVisible_ &&
-        tutorialRemainingMilliseconds_ < 0) {
+        tutorialRemainingMilliseconds_ < 1) {
         tutorialVisible_ = false;
     }
     advanceTimer(elapsed, tutorialRemainingMilliseconds_, tutorialVisible_);
@@ -163,13 +268,22 @@ CinematicUiFrame CinematicUiRuntime::frame(
     if (tutorialVisible_) {
         result.text = tutorialText_;
         result.textVisible = true;
+        result.tutorialPanelVisible = true;
+        result.tutorialButton = tutorialButton_;
         result.dimBackground = tutorialDimBackground_;
     } else if (messageVisible_) {
         result.text = messageText_;
         result.textVisible = true;
+        result.messagePanelVisible = messagePanelVisible_;
+        result.informationPanel = informationPanel_;
+        result.messageFace = messageFace_;
+        result.messageDurationMilliseconds = messageDurationMilliseconds_;
+        result.messageElapsedMilliseconds = std::max(
+            0, messageDurationMilliseconds_ - messageRemainingMilliseconds_);
     } else if (quickTimeEventVisible) {
         result.text = u"Press [A]";
         result.textVisible = true;
+        result.tutorialPanelVisible = true;
     }
     return result;
 }

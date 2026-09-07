@@ -1,0 +1,26 @@
+# The overlapping Room 9 volumes start both the gate animation and Cinematic
+# 40005, which enables the five staged enemies. Room 11 follows independently.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 270000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+cross_trigger 40004 40005 5000
+wait_enemies_active 5000 488 489 505 506 30000
+teleport -10080 10409 8 -1 0 0
+attack 25000 170 488
+teleport -9410 9814 8 0 -1 0
+attack 25000 170 489
+teleport -9003 11232 8 0 1 0
+attack 25000 170 505
+teleport -9922 11249 8 0 1 0
+attack 25000 170 506
+teleport -8505 10458 8 1 0 0
+attack 35000 180 30000
+teleport -9589 7030 8 0 -1 0
+attack 30000 170 10375
+assert_health_above 0
+finish

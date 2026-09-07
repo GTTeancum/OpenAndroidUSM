@@ -1,0 +1,14 @@
+# Exercise the authored 0/750/1050/1250 ms player MoveObject keys in the
+# shipped Level 3 arrival cinematic. frames.csv and player_move_object events
+# expose the exact native interpolation clock without host input or captures.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 2000
+start_time_ms 0
+render_size 640 360
+
+wait_cinematic_started 1000 31110
+wait 1350
+assert_health_above 0
+finish

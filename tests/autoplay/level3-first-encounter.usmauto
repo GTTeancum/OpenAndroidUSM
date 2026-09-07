@@ -1,0 +1,22 @@
+# Follow the shipped 31110 -> 30408 -> 30407 graph into the first playable
+# Level 3 encounter. Cinematic 30408 exposes and enables these three enemies
+# from its basic thread; 30407 waits for all three deaths before closing the
+# authored barrier object.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 100000
+start_time_ms 0
+render_size 1280 720
+
+wait_cinematic_started 1000 31110
+wait_cinematic_started 15000 30408
+wait_controls 12000
+wait_enemies_active 5000 30314 31305 31306
+wait_enemies_grounded 5000 30314 31305 31306
+attack 60000 160 30314 31305 31306
+wait 1500
+assert_object_animation 30405 close
+assert_object_hidden 30405
+assert_health_above 0
+finish

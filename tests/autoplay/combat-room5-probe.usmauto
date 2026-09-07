@@ -1,0 +1,21 @@
+# Room 5's three disabled enemies are activated by the authored 40039 volume
+# and Cinematic 40040 before combat is attempted.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 150000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+cross_trigger 40039 40040 5000
+wait_enemies_active 5000 10339 10340 1251
+teleport 2830 2950 117 1 0 0
+wait_cinematic_started 5000 969
+capture room5-ultimate-web-tutorial
+wait_controls 5000
+capture room5-encounter-ready
+attack 80000 150 10339 10340 1251
+capture room5-encounter-complete
+assert_health_above 0
+finish

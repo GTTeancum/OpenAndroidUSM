@@ -3,6 +3,7 @@
 #include "filesystem/GbmpArchive.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <limits>
 
 namespace usm::game {
@@ -72,6 +73,16 @@ bool validCount(std::int16_t count, std::int16_t maximum = 4096) noexcept {
 
 bool validBoolean(std::int32_t value) noexcept {
     return value == 0 || value == 1;
+}
+
+std::string_view normalizedAnimationName(
+    std::string_view animationName) noexcept {
+    while (!animationName.empty() &&
+           std::isspace(static_cast<unsigned char>(animationName.back())) !=
+               0) {
+        animationName.remove_suffix(1);
+    }
+    return animationName;
 }
 
 } // namespace
@@ -364,8 +375,8 @@ EnemyBehaviorConfigDatabase::resolveStateAnimationNames(
             if (map == nullptr) {
                 continue;
             }
-            const std::string& animationName =
-                map->animationNames[static_cast<std::size_t>(enemyTypeId)];
+            const std::string_view animationName = normalizedAnimationName(
+                map->animationNames[static_cast<std::size_t>(enemyTypeId)]);
             if (!animationName.empty()) {
                 result.push_back(animationName);
             }
