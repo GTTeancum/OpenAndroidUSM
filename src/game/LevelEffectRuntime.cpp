@@ -92,6 +92,7 @@ struct LevelEffectRuntime::EmitterRuntimeState {
     std::uint32_t activeElapsedMilliseconds{};
     std::uint32_t restartElapsedMilliseconds{};
     std::uint32_t startDelayElapsedMilliseconds{};
+    std::uint32_t suspendedElapsedMilliseconds{};
     std::int32_t selectedSystemLifetimeMilliseconds{-1};
     std::int32_t selectedRestartMilliseconds{-1};
     std::int32_t roomId{-1};
@@ -263,6 +264,7 @@ LevelEffectCheckPointState LevelEffectRuntime::saveCheckPointState() const {
              runtime.activeElapsedMilliseconds,
              runtime.restartElapsedMilliseconds,
              runtime.startDelayElapsedMilliseconds,
+             runtime.suspendedElapsedMilliseconds,
              runtime.selectedSystemLifetimeMilliseconds,
              runtime.selectedRestartMilliseconds, runtime.firstUpdate,
              runtime.emissionComplete, runtime.rotationAffectorInitialized,
@@ -292,6 +294,8 @@ Result LevelEffectRuntime::loadCheckPointState(
         runtime.restartElapsedMilliseconds = saved.restartElapsedMilliseconds;
         runtime.startDelayElapsedMilliseconds =
             saved.startDelayElapsedMilliseconds;
+        runtime.suspendedElapsedMilliseconds =
+            saved.suspendedElapsedMilliseconds;
         runtime.selectedSystemLifetimeMilliseconds =
             saved.selectedSystemLifetimeMilliseconds;
         runtime.selectedRestartMilliseconds = saved.selectedRestartMilliseconds;
@@ -308,15 +312,38 @@ Result LevelEffectRuntime::loadCheckPointState(
     return Result::success();
 }
 
-void LevelEffectRuntime::update(std::uint32_t elapsedMilliseconds) noexcept {
+void LevelEffectRuntime::update(
+    std::uint32_t elapsedMilliseconds,
+    std::span<const bool> roomVisibility) noexcept {
+    const auto roomIsVisible = [roomVisibility](std::int32_t roomId) {
+        return roomVisibility.empty() || roomId < 1 ||
+               static_cast<std::size_t>(roomId) > roomVisibility.size() ||
+               roomVisibility[static_cast<std::size_t>(roomId - 1)];
+    };
+    const auto updateVisibleEmitter =
+        [this, elapsedMilliseconds](EmitterRuntimeState& emitter,
+                                    bool visible) {
+            if (!visible) {
+                if (!emitter.firstUpdate) {
+                    emitter.suspendedElapsedMilliseconds +=
+                        elapsedMilliseconds;
+                }
+                return;
+            }
+            const std::uint32_t resumedElapsed =
+                elapsedMilliseconds + emitter.suspendedElapsedMilliseconds;
+            emitter.suspendedElapsedMilliseconds = 0;
+            updateEmitter(emitter, resumedElapsed);
+        };
     for (PersistentEmitter& emitter : persistentEmitters_) {
-        if (emitter.visible) {
-            updateEmitter(emitter.runtime, elapsedMilliseconds);
-        }
+        updateVisibleEmitter(
+            emitter.runtime,
+            emitter.visible && roomIsVisible(emitter.runtime.roomId));
     }
 
     for (PendingEmitter& emitter : pendingEmitters_) {
-        updateEmitter(emitter.runtime, elapsedMilliseconds);
+        updateVisibleEmitter(emitter.runtime,
+                             roomIsVisible(emitter.runtime.roomId));
     }
     std::erase_if(pendingEmitters_, [this](const PendingEmitter& emitter) {
         return emitter.runtime.emissionComplete &&
@@ -373,6 +400,7 @@ void LevelEffectRuntime::restartEmitter(EmitterRuntimeState& emitter) noexcept {
     emitter.activeElapsedMilliseconds = 0;
     emitter.restartElapsedMilliseconds = 0;
     emitter.startDelayElapsedMilliseconds = 0;
+    emitter.suspendedElapsedMilliseconds = 0;
     emitter.firstUpdate = true;
     emitter.emissionComplete = false;
     emitter.rotationAffectorInitialized = false;

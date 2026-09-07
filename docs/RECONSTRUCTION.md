@@ -1930,6 +1930,29 @@ its render branch takes precedence over both directional modes. This restores
 the authored orientation path shared by hit splashes, muzzle flashes, fire,
 electricity, and the red/black super-web splashes.
 
+Particle simulation also occupies its native frame position now.
+`CLevel::Update` (`0x003820bc`) completes player, room, AI,
+`EffectManager`, and bonus updates before the scene graph animates during
+rendering. `CFpsParticleSystemSceneNode::OnAnimate` (`0x0039f7c8`) delegates
+to `ISceneNode::OnAnimate` (`0x004093f4`), whose visibility guard prevents a
+hidden room parent from traversing or animating any child emitter. The
+portable runtime therefore advances particles after gameplay and only for
+currently visible rooms. It accumulates time while a previously started node
+is hidden; on return, `doParticleSystem`'s native greater-than-150-ms rejection
+updates the clock without aging or catching up the particles. A never-before-
+visited emitter instead retains the native zero-delta first invocation.
+
+Persistent room effects also retain serialized scene-node order. The ordinary
+`CEffect::ProcessUserAttr` path (`0x0030afb8`) and the room-authored
+`CBonus::ProcessUserAttr` path (`0x003937a8`) both attach visible effect nodes
+to the room hierarchy; they are consequently interleaved by the same scene
+traversal rather than advanced in separate effect and bonus batches. The
+portable bootstrap records that combined order and the effect runtime uses the
+game's shared native randomizer. Level 1's 79 accepted persistent sources all
+have fixed system-lifetime and restart ranges, verified during the bootstrap
+test, so registering them cannot consume a random selection before their first
+visible emission.
+
 The affector math follows the preserved implementations rather than treating
 the XML values as generic forces. `CFpsParticleGravityAffector::affect` at
 `0x0039d7d4` captures the incoming velocity and linearly reaches its target

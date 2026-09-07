@@ -501,6 +501,17 @@ struct LevelEnvironmentEffectAsset {
     bool visible{true};
 };
 
+// Every room-owned particle source in serialized scene-node order. This
+// includes both authored CEffect objects and CBonus-owned effects because the
+// scene graph animates them in one shared traversal/randomizer order.
+struct LevelPersistentEffectAsset {
+    std::int32_t objectId{-1};
+    std::string effectType;
+    std::int32_t roomId{-1};
+    assets::Vector3 position;
+    bool visible{true};
+};
+
 enum class LevelBonusType : std::int32_t {
     Health = 0,
     WebPower = 1,
@@ -789,6 +800,10 @@ public:
     environmentEffects() const noexcept {
         return environmentEffects_;
     }
+    [[nodiscard]] const std::vector<LevelPersistentEffectAsset>&
+    persistentEffectsInSceneOrder() const noexcept {
+        return persistentEffectsInSceneOrder_;
+    }
     [[nodiscard]] const std::vector<LevelBonusAsset>& bonuses() const noexcept {
         return bonuses_;
     }
@@ -869,6 +884,7 @@ private:
     PlayerHitEffectConfigDatabase playerHitEffectConfigs_;
     std::vector<PlayerHitEffectAsset> playerHitEffects_;
     std::vector<LevelEnvironmentEffectAsset> environmentEffects_;
+    std::vector<LevelPersistentEffectAsset> persistentEffectsInSceneOrder_;
     std::vector<LevelBonusAsset> bonuses_;
     std::vector<LevelHintAsset> hints_;
     std::vector<LevelDamageAsset> damageVolumes_;

@@ -4577,6 +4577,42 @@ int main() {
                    nullptr);
         }
         assert(bootstrap.bonuses().size() == 56);
+        assert(bootstrap.persistentEffectsInSceneOrder().size() ==
+               bootstrap.environmentEffects().size() +
+                   bootstrap.bonuses().size());
+        std::vector<std::int32_t> authoredPersistentEffectIds;
+        for (const auto& room : bootstrap.rooms()) {
+            for (const auto& node : room.scene.nodes()) {
+                const bool isRegisteredPersistentSource = std::any_of(
+                    bootstrap.persistentEffectsInSceneOrder().begin(),
+                    bootstrap.persistentEffectsInSceneOrder().end(),
+                    [&node](const auto& source) {
+                        return source.objectId == node.id;
+                    });
+                if (isRegisteredPersistentSource) {
+                    authoredPersistentEffectIds.push_back(node.id);
+                }
+            }
+        }
+        std::vector<std::int32_t> registeredPersistentEffectIds;
+        for (const auto& source :
+             bootstrap.persistentEffectsInSceneOrder()) {
+            registeredPersistentEffectIds.push_back(source.objectId);
+            const auto* preset =
+                bootstrap.effects().presets.find(source.effectType);
+            assert(preset != nullptr);
+            // These room-authored sources do not consume native randomness
+            // while choosing emitter lifetime or restart time at creation.
+            // They can therefore share the scene traversal's single native
+            // randomizer without moving unrelated gameplay selections.
+            for (const auto& emitter : preset->emitters) {
+                assert(emitter.systemMinimumLifetimeMilliseconds ==
+                       emitter.systemMaximumLifetimeMilliseconds);
+                assert(emitter.restartMinimumMilliseconds ==
+                       emitter.restartMaximumMilliseconds);
+            }
+        }
+        assert(registeredPersistentEffectIds == authoredPersistentEffectIds);
         assert(std::count_if(
                    bootstrap.bonuses().begin(), bootstrap.bonuses().end(),
                    [](const usm::game::LevelBonusAsset& bonus) {
@@ -5228,6 +5264,30 @@ int main() {
                    attractionRuntime.particles().front().position.x -
                    attractionStartX + 10.0F) <
                0.001F);
+        usm::game::LevelEffectRuntime roomVisibilityRuntime;
+        assert(roomVisibilityRuntime.initialize(attractionPresets));
+        assert(roomVisibilityRuntime.addPersistentEffect(
+            "attraction_test", {}, 1, true, 1001));
+        const std::array visibleRoom{true};
+        const std::array hiddenRoom{false};
+        roomVisibilityRuntime.update(0, visibleRoom);
+        roomVisibilityRuntime.update(100, visibleRoom);
+        assert(roomVisibilityRuntime.particles().size() == 1);
+        const float beforeRoomHide =
+            roomVisibilityRuntime.particles().front().position.x;
+        roomVisibilityRuntime.update(500, hiddenRoom);
+        assert(roomVisibilityRuntime.particles().front().position.x ==
+               beforeRoomHide);
+        // ISceneNode::OnAnimate (0x004093f4) does not recurse through a
+        // hidden room. On return, doParticleSystem records and rejects the
+        // accumulated >150 ms delta (0x0039f36c-0x0039f38e).
+        roomVisibilityRuntime.update(16, visibleRoom);
+        assert(roomVisibilityRuntime.particles().front().position.x ==
+               beforeRoomHide);
+        roomVisibilityRuntime.update(100, visibleRoom);
+        assert(std::abs(roomVisibilityRuntime.particles().front().position.x -
+                        beforeRoomHide) >
+               1.0F);
         assert(bootstrap.effects().presets.find("bonus_green") != nullptr);
         assert(bootstrap.effects().presets.find("bonus_red") != nullptr);
         const auto* ambientFirePreset =

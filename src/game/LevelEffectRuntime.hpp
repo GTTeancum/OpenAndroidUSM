@@ -34,6 +34,7 @@ struct PersistentEffectCheckPointState {
     std::uint32_t activeElapsedMilliseconds{};
     std::uint32_t restartElapsedMilliseconds{};
     std::uint32_t startDelayElapsedMilliseconds{};
+    std::uint32_t suspendedElapsedMilliseconds{};
     std::int32_t selectedSystemLifetimeMilliseconds{-1};
     std::int32_t selectedRestartMilliseconds{-1};
     bool firstUpdate{true};
@@ -76,7 +77,8 @@ public:
     [[nodiscard]] LevelEffectCheckPointState saveCheckPointState() const;
     [[nodiscard]] Result loadCheckPointState(
         const LevelEffectCheckPointState& state);
-    void update(std::uint32_t elapsedMilliseconds) noexcept;
+    void update(std::uint32_t elapsedMilliseconds,
+                std::span<const bool> roomVisibility = {}) noexcept;
 
     [[nodiscard]] std::span<const EffectParticleState> particles()
         const noexcept {

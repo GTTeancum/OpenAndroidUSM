@@ -1828,12 +1828,13 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     if (!result) {
         return fail(result.message());
     }
-    result = effectRuntime_.initialize(levelOne_.effects().presets);
+    result = effectRuntime_.initialize(levelOne_.effects().presets,
+                                       &nativeRandomizer_);
     if (!result) {
         return fail(result.message());
     }
-    for (const game::LevelEnvironmentEffectAsset& effect :
-         levelOne_.environmentEffects()) {
+    for (const game::LevelPersistentEffectAsset& effect :
+         levelOne_.persistentEffectsInSceneOrder()) {
         result = effectRuntime_.addPersistentEffect(
             effect.effectType, effect.position, effect.roomId, effect.visible,
             effect.objectId);
@@ -1852,19 +1853,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     result = hintRuntime_.initialize(levelOne_.hints());
     if (!result) {
         return fail(result.message());
-    }
-    for (const game::LevelBonusAsset& bonus : levelOne_.bonuses()) {
-        const std::string_view effectType =
-            bonus.type == game::LevelBonusType::Health
-                ? "bonus_green"
-            : bonus.type == game::LevelBonusType::WebPower ? "bonus_blue"
-                                                            : "bonus_red";
-        result = effectRuntime_.addPersistentEffect(
-            effectType, bonus.position, bonus.roomId, bonus.visible,
-            bonus.objectId);
-        if (!result) {
-            return fail(result.message());
-        }
     }
     levelCinematicRuntime_.bind(triggerRuntime_, gameplayCamera_,
                                 levelOne_.waypoints(), levelOne_.rooms());
@@ -2586,7 +2574,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 }
             }
         }
-        effectRuntime_.update(gameDeltaMilliseconds);
         if (audioEnabled) {
             audio_.update();
         }
@@ -4335,7 +4322,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             // newly created zero-delay emitters without advancing time. This
             // keeps the authored hit splash on the contact frame instead of
             // presenting it one 25/50 ms frame late.
-            effectRuntime_.update(0);
             gameplayPlayer_.updateComboState(syntheticElapsedMilliseconds);
             (void)gameplayCamera_.updateArea(gameplayPlayer_.position(),
                                              gameDeltaMilliseconds);
@@ -5383,6 +5369,14 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             result = renderer_.updateLevelOneHints(hintRuntime_);
         }
         if (result) {
+            // CFpsParticleSystemSceneNode::OnAnimate (0x0039f7c8) runs from
+            // the visible scene graph after CLevel::Update has completed its
+            // player, room, AI, EffectManager, and bonus stages. A newly
+            // thrown emitter initializes its native timestamp here and sees
+            // a zero delta; existing visible emitters receive this frame's
+            // elapsed time.
+            effectRuntime_.update(gameDeltaMilliseconds,
+                                  renderer_.roomVisibility());
             result = renderer_.updateLevelOneEffects(
                 levelOne_.effects(), effectRuntime_, levelBonusRuntime_);
         }

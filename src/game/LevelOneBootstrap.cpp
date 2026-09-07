@@ -573,6 +573,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
     objectArchetypes_.clear();
     objects_.clear();
     environmentEffects_.clear();
+    persistentEffectsInSceneOrder_.clear();
     bonuses_.clear();
     hints_.clear();
     damageVolumes_.clear();
@@ -1199,10 +1200,14 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
                     // 4's big_firesomke placeholder cannot abort room loading.
                     continue;
                 }
-                environmentEffects_.push_back(
-                    {node.id, effectType,
-                     static_cast<std::int32_t>(roomIndex + 1),
-                     worldPosition(node), node.visible});
+                const LevelEnvironmentEffectAsset effect{
+                    node.id, effectType,
+                    static_cast<std::int32_t>(roomIndex + 1),
+                    worldPosition(node), node.visible};
+                environmentEffects_.push_back(effect);
+                persistentEffectsInSceneOrder_.push_back(
+                    {effect.objectId, effect.effectType, effect.roomId,
+                     effect.position, effect.visible});
                 continue;
             }
             if (node.gameType == "Bonus") {
@@ -1216,10 +1221,19 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
                                            std::to_string(node.id) +
                                            " has no enabled type flag");
                 }
-                bonuses_.push_back(
-                    {node.id, type,
-                     static_cast<std::int32_t>(roomIndex + 1),
-                     worldPosition(node), node.visible});
+                const LevelBonusAsset bonus{
+                    node.id, type,
+                    static_cast<std::int32_t>(roomIndex + 1),
+                    worldPosition(node), node.visible};
+                bonuses_.push_back(bonus);
+                const std::string_view effectType =
+                    type == LevelBonusType::Health
+                        ? "bonus_green"
+                    : type == LevelBonusType::WebPower ? "bonus_blue"
+                                                       : "bonus_red";
+                persistentEffectsInSceneOrder_.push_back(
+                    {bonus.objectId, std::string(effectType), bonus.roomId,
+                     bonus.position, bonus.visible});
                 continue;
             }
             if (node.gameType == "Hint") {
