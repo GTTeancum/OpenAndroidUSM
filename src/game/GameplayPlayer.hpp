@@ -237,6 +237,7 @@ public:
     }
     [[nodiscard]] std::vector<WebGrabCandidateDiagnostics>
     webGrabCandidateDiagnostics() const;
+    [[nodiscard]] std::int32_t availableWebGrabPointObjectId() const noexcept;
     [[nodiscard]] bool releaseWeb() noexcept;
     [[nodiscard]] bool applyDamage(
         float damage, std::int32_t damageType = 0,

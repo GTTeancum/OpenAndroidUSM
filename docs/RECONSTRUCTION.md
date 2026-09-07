@@ -1591,9 +1591,12 @@ terminal rejection. The exact eligible states are 0, 4, 14, 15, 16, 19, and
 waypoint gravity/electric metadata. Airborne player states can now enter state
 23 (`k_state_trigger_slider_land`), advance through the authored
 `fall_to_slide` clip, and loop state 22 (`k_state_trigger_slider_move`) with
-its looping Vox 77 slide sound. Forced web releases retain their linked
-waypoint destination, allowing grab point 443 to feed waypoint 445 and the
-second authored slide. At a terminal waypoint, the native update preserves
+its looping Vox 77 slide sound. On catch, the native update replaces the
+current velocity with its 800 cm/s literal at `0x0031dd18`-`0x0031dd3a`;
+only state 21 preserves the magnitude stored at `Player+0x454`. Forced web
+releases retain their linked waypoint destination long enough for grab point
+443 to feed waypoint 445 and the second authored slide, but do not make that
+slide run faster. At a terminal waypoint, the native update preserves
 the segment's horizontal body velocity in `Player+0x478/+0x47c`; the
 `UseGravityWhenEnd` byte at waypoint offset `+0x29` selects the outgoing
 vertical component. The portable handoff now retains that momentum instead of

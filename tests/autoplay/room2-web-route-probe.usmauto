@@ -21,7 +21,10 @@ move_until_state 2000 0 0 18
 move_until_state 3000 0 1 19
 move_to 3650 -5800 5 100 12000
 move_until_state 2000 0 0 0
-move_to 3000 -5200 5 250 5000
+# The street corner's collision bevel stops direct steering roughly 257 cm
+# from this diagnostic guide point; advance once inside a 300 cm corridor so
+# the next westbound target supplies the authored around-corner direction.
+move_to 3000 -5200 5 300 5000
 move_to 2200 -5000 5 250 5000
 move_to 1446 -4180 5 1350 2000
 jump
@@ -29,7 +32,10 @@ move_to 1446 -4180 5 1000 1500
 web_on
 move_until_state 2000 0 0 18
 move_until_state 3000 0 1 19
-move_until_state 1500 0 1 15
+# Native Player::UpdateMove keeps TryGrabPoint active during release state 19.
+# Chain as soon as authored point 379 is visible/selectable instead of waiting
+# for the release animation to discard its momentum into fallback state 15.
+wait_web_grab_point 1500 379
 web_on
 move_until_state 2000 0 0 18
 move_until_state 3500 0 1 19

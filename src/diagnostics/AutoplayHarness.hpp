@@ -115,6 +115,7 @@ struct AutoplaySnapshot {
     int wallWebAngle{};
     std::int16_t wallWebCompletedActions{};
     bool wallWebLineActive{};
+    std::int32_t playerWebGrabPointObjectId{-1};
 };
 
 struct AutoplayTeleport {
@@ -246,6 +247,7 @@ private:
         CrossTrigger,
         WaitEnemiesGrounded,
         WaitEnemiesActive,
+        WaitWebGrabPoint,
         WaitEnemyMeleeAttack,
         WaitEnemyProjectile,
         SetEnemyAi,
@@ -488,6 +490,10 @@ private:
     std::uint32_t previousExitMenuState_{};
     bool previousMainMenuRequested_{};
     bool activeAttackFarStateObserved_{};
+    std::int32_t activeAttackTargetObjectId_{-1};
+    assets::Vector3 activeAttackProgressPosition_{};
+    std::uint64_t activeAttackProgressMilliseconds_{};
+    std::uint32_t activeAttackObstacleRecoveryCount_{};
     float previousPlayerHealth_{};
     std::string previousPlayerAnimation_;
     std::int32_t previousCameraAreaId_{-1};

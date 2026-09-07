@@ -676,6 +676,7 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
         }
         LevelObjectState state;
         state.asset = &object;
+        state.archetype = &level.objectArchetypes()[object.archetypeIndex];
         state.position = object.position;
         state.worldTransform = object.worldTransform;
         state.activeAnimation = object.initialAnimation;
@@ -685,7 +686,8 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
         state.collisionEnabled = object.hasCollision;
         state.health = object.health;
         if (object.kind == LevelObjectKind::SlideCar ||
-            object.kind == LevelObjectKind::BrokenBridge) {
+            object.kind == LevelObjectKind::BrokenBridge ||
+            object.kind == LevelObjectKind::SpiderWebWall) {
             state.physicsEnabled = object.hasCollisionBounds;
             state.collisionEnabled = object.hasCollisionBounds;
         }

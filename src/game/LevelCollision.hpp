@@ -53,6 +53,7 @@ struct LevelSegmentHit {
     float segmentFraction{};
     std::uint32_t physicsFlags{};
     std::int32_t roomId{-1};
+    std::int32_t objectId{-1};
     std::string_view geometryName;
     std::string_view materialName;
 };
@@ -151,6 +152,7 @@ private:
                 std::int32_t roomId = -1,
                 const assets::Vector3& roomPosition = {});
     void appendObjectBox(const LevelObjectState& object);
+    void appendSpiderWebWall(const LevelObjectState& object);
     void rebuildGrid();
     void resolveWalls(const assets::Vector3& start,
                       assets::Vector3& desired,

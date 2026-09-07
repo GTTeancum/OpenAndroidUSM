@@ -2664,6 +2664,17 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             const game::CameraPose harnessCamera = gameplayActive
                 ? gameplayCamera_.sample(gameplayPlayer_.position())
                 : levelOne_.introCamera().sample(timestamp);
+            const float harnessAspect =
+                static_cast<float>(autoplay->renderWidth()) /
+                autoplay->renderHeight();
+            if (gameplayActive) {
+                gameplayPlayer_.setWebGrabViewContext(
+                    harnessCamera, harnessAspect,
+                    renderer_.roomVisibility());
+            }
+            const std::int32_t harnessWebGrabPointId = gameplayActive
+                ? gameplayPlayer_.availableWebGrabPointObjectId()
+                : -1;
             autoplayInput = autoplay->update(
                 {frameIndex,
                  syntheticElapsedMilliseconds,
@@ -2756,7 +2767,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.webLineTargetObjectId(),
                  gameplayPlayer_.wallWeb().phase(), gameplayPlayer_.wallWeb().targetObjectId(),
                  gameplayPlayer_.wallWeb().angle(), gameplayPlayer_.wallWeb().completedActionCount(),
-                 gameplayPlayer_.wallWeb().lineActive()});
+                 gameplayPlayer_.wallWeb().lineActive(),
+                 harnessWebGrabPointId});
             if (autoplayInput.teleport) {
                 gameplayPlayer_.restoreAt(autoplayInput.teleport->position,
                                           autoplayInput.teleport->facing);
@@ -5574,7 +5586,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                   gameplayPlayer_.webLineTargetObjectId(),
                   gameplayPlayer_.wallWeb().phase(), gameplayPlayer_.wallWeb().targetObjectId(),
                   gameplayPlayer_.wallWeb().angle(), gameplayPlayer_.wallWeb().completedActionCount(),
-                  gameplayPlayer_.wallWeb().lineActive()});
+                  gameplayPlayer_.wallWeb().lineActive(),
+                  gameplayActive
+                      ? gameplayPlayer_.availableWebGrabPointObjectId()
+                      : -1});
             const bool periodicCapture = autoplay->periodicCaptureDue(
                 syntheticElapsedMilliseconds);
             if (periodicCapture || !autoplayInput.captureLabels.empty()) {

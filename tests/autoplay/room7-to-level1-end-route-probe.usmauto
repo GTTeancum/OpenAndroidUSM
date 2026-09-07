@@ -57,7 +57,9 @@ web_on
 move_until_state 2500 0 0 18
 capture room12-first-web-swing
 move_until_state 3500 0 1 19
-move_until_state 3000 0 0 15
+# Player::UpdateMove keeps TryGrabPoint active in state 19 at 0x00350a8c.
+# Chain before point 451's 1200 cm VisiableLength/on-screen gate expires.
+wait_web_grab_point 1500 451
 web_on
 move_until_state 2500 0 0 18
 capture room12-second-web-swing

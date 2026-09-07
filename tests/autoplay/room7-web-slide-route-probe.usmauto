@@ -18,8 +18,10 @@ capture room7-rooftop-encounter-complete
 move_until_state 3000 0 0 0
 
 # The landing roof ends at x=2939; the adjacent 2612 cm roof begins there
-# one storey higher.  Use an ordinary jump before approaching point 441.
-move_to 3050 8450 2454 100 6000
+# one storey higher. Collision07 triangle 52 places the obstacle's south
+# face at y=7849.47, so stage outside the native 50 cm capsule margin and use
+# an ordinary jump before approaching point 441.
+move_to 3050 7750 2454 100 6000
 jump
 move_to 2600 8450 2612 200 6000
 move_until_state 3000 0 0 0
@@ -33,9 +35,10 @@ capture room7-web441-swing
 move_until_state 3000 0 0 19
 capture room7-web441-release
 
-# Point 441's automatic exit crosses the first gap.  Once motion 19 returns
-# to ordinary airborne state 15, point 443 is the next facing-valid grab.
-move_until_state 2500 0 0 15
+# Player::UpdateMove's state-19 branch at 0x00350a8c continues to call
+# TryGrabPoint. Chain while point 443 still passes GetBestWebGrabPoint's
+# native facing gate.
+wait_web_grab_point 1500 443
 web_on
 move_until_state 2500 0 0 18
 capture room7-web443-swing
@@ -49,9 +52,8 @@ capture room7-second-slide-catch
 move_until_state 2000 0 0 22
 assert_audio_played SFX_SLIDING
 wait 2250
-# Forced motion 28 hands its approximately 1219 cm/s arrival speed to
-# CSlider, so this uninterrupted chain advances farther than the standalone
-# 700 cm/s slide fixture after the same interval.
+# CSlider::Update replaces the state-19 arrival speed with the recovered
+# 800 cm/s literal at 0x0031dd18-0x0031dd3a.
 assert_near -5790 6699 1960 200
 capture room7-second-slide-moving
 # Native obbox::test_obb applies a world-space broad phase before volume 554's

@@ -14,6 +14,9 @@ namespace usm::game {
 namespace {
 
 constexpr float kMaximumRunSpeedCentimetersPerSecond = 700.0F;
+// CSlider::Update loads this literal from 0x0031e0d4 at
+// 0x0031dd28 and applies it to every catch except native state 21.
+constexpr float kDefaultSlideCatchSpeedCentimetersPerSecond = 800.0F;
 // Player::UpdateMove (0x00350f42-0x00350f94) caps the horizontal velocity
 // calculated for a WebGrabPoint's linked WayPoint at this shipped constant.
 constexpr float kMaximumForcedWebExitSpeedCentimetersPerSecond = 3000.0F;
@@ -1607,6 +1610,16 @@ GameplayPlayer::webGrabCandidateDiagnostics() const {
                                          currentPointId);
 }
 
+std::int32_t GameplayPlayer::availableWebGrabPointObjectId() const noexcept {
+    assets::Vector3 visualPosition = position_;
+    visualPosition.z = animatedFootHeight();
+    const std::int32_t currentPointId =
+        selectedWebGrabPoint_ == nullptr ? -1 : selectedWebGrabPoint_->objectId;
+    const LevelWebGrabPointAsset* point = webGrabPointRuntime_.search(
+        visualPosition, facing_, currentPointId);
+    return point == nullptr ? -1 : point->objectId;
+}
+
 bool GameplayPlayer::releaseWeb() noexcept {
     if (locomotionState_ == LocomotionState::WebThrow) {
         webReleaseRequested_ = true;
@@ -2478,9 +2491,8 @@ void GameplayPlayer::enterSwingRelease() noexcept {
     if (swingReleaseHasTarget_) {
         // Player::UpdateMove (0x00350dd2-0x00350f94) divides the remaining
         // point-to-WayPoint displacement by the release animation length and
-        // installs that result as the motion-28 physics velocity. The original
-        // also subtracts animation root displacement; this runtime renders the
-        // clip in place, so the entire world-space delta belongs here.
+        // installs that result as the motion-28 physics velocity after
+        // subtracting the animation's complete authored root displacement.
         assets::Vector3 animationDisplacement;
         if (clip != nullptr && animationDisplacement_ != nullptr &&
             animationDisplacement_->frameCount() != 0) {
@@ -2506,23 +2518,33 @@ void GameplayPlayer::enterSwingRelease() noexcept {
             swingReleaseTarget_.z - position_.z -
                 worldAnimationDisplacement.z,
         };
-        const float distance = length3D(toTarget);
         const std::uint32_t durationMilliseconds =
             clip == nullptr ? 1U
                             : std::max(clip->durationMilliseconds(), 1U);
-        if (distance > std::numeric_limits<float>::epsilon()) {
-            const float requiredSpeed =
-                distance * 1000.0F /
-                static_cast<float>(durationMilliseconds);
-            const float travelSpeed = std::min(
-                requiredSpeed,
-                kMaximumForcedWebExitSpeedCentimetersPerSecond);
-            const float velocityScale = travelSpeed / distance;
-            swingReleaseVelocity_ = {
-                toTarget.x * velocityScale,
-                toTarget.y * velocityScale,
-                toTarget.z * velocityScale,
-            };
+        const float inverseDuration =
+            1000.0F / static_cast<float>(durationMilliseconds);
+        swingReleaseVelocity_ = {
+            toTarget.x * inverseDuration,
+            toTarget.y * inverseDuration,
+            0.0F,
+        };
+        // Player::UpdateMove 0x00350efe-0x00350f94 divides the complete
+        // target-minus-position-minus-root vector by the clip length, but
+        // caps only the XY projection and then explicitly clears both the
+        // Player and PhysicsContext Z speeds with the 0.0 literal at
+        // 0x003510d0. SetNextStateId's motion-28 release impulse at
+        // Player+0x434/+0x438 remains intact and is accumulated separately by
+        // UpdateMCSpeed; the linked WayPoint therefore aims the release but
+        // is not a per-frame homing destination.
+        const float horizontalSpeed = std::hypot(
+            swingReleaseVelocity_.x, swingReleaseVelocity_.y);
+        if (horizontalSpeed >
+            kMaximumForcedWebExitSpeedCentimetersPerSecond) {
+            const float scale =
+                kMaximumForcedWebExitSpeedCentimetersPerSecond /
+                horizontalSpeed;
+            swingReleaseVelocity_.x *= scale;
+            swingReleaseVelocity_.y *= scale;
         }
     }
     queueEnteredState(swingIdleState_->name);
@@ -2642,26 +2664,7 @@ void GameplayPlayer::updateWebTraversal(
         facing_.y * rootDelta.x + facing_.x * rootDelta.y,
         rootDelta.z,
     };
-    if (swingReleaseHasTarget_) {
-        // Motion type 28 consumes CWebGrabPoint's linked WayPoint as a forced
-        // release destination. This is the authored bridge from point 443 to
-        // WayPoint 445, where CSlider's proximity test catches the player.
-        const assets::Vector3 toTarget{
-            swingReleaseTarget_.x - position_.x,
-            swingReleaseTarget_.y - position_.y,
-            swingReleaseTarget_.z - position_.z,
-        };
-        const float targetDistance = length3D(toTarget);
-        const float travelSpeed = length3D(swingReleaseVelocity_);
-        if (targetDistance > std::numeric_limits<float>::epsilon()) {
-            const float inverseDistance = 1.0F / targetDistance;
-            swingReleaseVelocity_ = {
-                toTarget.x * inverseDistance * travelSpeed,
-                toTarget.y * inverseDistance * travelSpeed,
-                toTarget.z * inverseDistance * travelSpeed,
-            };
-        }
-    } else if (selectedWebGrabPoint_ != nullptr &&
+    if (!swingReleaseHasTarget_ && selectedWebGrabPoint_ != nullptr &&
         !selectedWebGrabPoint_->cannotControl &&
         !selectedWebGrabPoint_->hasTargetWaypoint) {
         // UpdateMCSpeed motion 28 (0x00347e66-0x00347fd0) removes the prior
@@ -2684,17 +2687,21 @@ void GameplayPlayer::updateWebTraversal(
         }
         swingReleaseVelocity_.x += swingReleaseSteeringVelocity_.x;
         swingReleaseVelocity_.y += swingReleaseSteeringVelocity_.y;
-        const float releaseDecay = std::pow(
-            kWebSwingIdleAccelerationDecrease, elapsedSeconds);
-        swingReleaseDecayVelocity_.x *= releaseDecay;
-        swingReleaseDecayVelocity_.y *= releaseDecay;
-        swingReleaseVelocity_.x += swingReleaseDecayVelocity_.x;
-        swingReleaseVelocity_.y += swingReleaseDecayVelocity_.y;
     }
-    if (!swingReleaseHasTarget_) {
-        swingReleaseVelocity_.z +=
-            kDefaultGravityCentimetersPerSecondSquared * elapsedSeconds;
-    }
+    // SetNextStateId motion 28 (0x003499c2-0x00349a50) stores the undoubled
+    // release impulse at Player+0x434/+0x438. UpdateMCSpeed
+    // (0x00347f5c-0x00347fbc) decays and adds that impulse for both ordinary
+    // and linked-WayPoint releases; the target branch never clears it.
+    const float releaseDecay = std::pow(
+        kWebSwingIdleAccelerationDecrease, elapsedSeconds);
+    swingReleaseDecayVelocity_.x *= releaseDecay;
+    swingReleaseDecayVelocity_.y *= releaseDecay;
+    swingReleaseVelocity_.x += swingReleaseDecayVelocity_.x;
+    swingReleaseVelocity_.y += swingReleaseDecayVelocity_.y;
+    // The native PhysicsContext continues applying its existing gravity after
+    // the target branch writes an initial Z speed of zero.
+    swingReleaseVelocity_.z +=
+        kDefaultGravityCentimetersPerSecondSquared * elapsedSeconds;
     const float previousHeight = position_.z;
     assets::Vector3 desired{
         position_.x + swingReleaseVelocity_.x * elapsedSeconds +
@@ -2704,9 +2711,6 @@ void GameplayPlayer::updateWebTraversal(
         position_.z + swingReleaseVelocity_.z * elapsedSeconds +
             worldRootDelta.z,
     };
-    const float intendedTravelDistance = length3D(
-        {desired.x - position_.x, desired.y - position_.y,
-         desired.z - position_.z});
     if (collision_ != nullptr) {
         collision_->resolveAirMotion(
             position_, desired, desired, 0U,
@@ -2715,14 +2719,6 @@ void GameplayPlayer::updateWebTraversal(
     if (tryAttachSwingReleaseWall(position_, desired,
                                   swingReleaseVelocity_)) {
         return;
-    }
-    if (swingReleaseHasTarget_ &&
-        length3D({swingReleaseTarget_.x - position_.x,
-                  swingReleaseTarget_.y - position_.y,
-                  swingReleaseTarget_.z - position_.z}) <=
-            intendedTravelDistance) {
-        desired = swingReleaseTarget_;
-        swingReleaseHasTarget_ = false;
     }
     position_ = desired;
     locomotionRootTranslation_ = rootDisplacement;
@@ -2757,9 +2753,8 @@ void GameplayPlayer::updateWebTraversal(
                    swingReleaseVelocity_.y / horizontalLength, 0.0F};
     }
     animationTimeMilliseconds_ = nextAnimationTime;
-    if (releaseClip != nullptr && !swingReleaseHasTarget_ &&
-        animationTimeMilliseconds_ >= releaseClip->durationMilliseconds() &&
-        swingReleaseVelocity_.z <= 0.0F) {
+    if (releaseClip != nullptr &&
+        animationTimeMilliseconds_ >= releaseClip->durationMilliseconds()) {
         selectedWebGrabPoint_ = nullptr;
         enterLocomotionState(LocomotionState::SustainedFall);
         // Motion 19 -> 15 changes the animation/state predicate, not the
@@ -2791,8 +2786,11 @@ bool GameplayPlayer::tryCatchSlide() noexcept {
     if (caught.slide == nullptr) {
         return false;
     }
-    float incomingSpeed = kMaximumRunSpeedCentimetersPerSecond;
-    if (locomotionState_ == LocomotionState::SwingRelease) {
+    float incomingSpeed = kDefaultSlideCatchSpeedCentimetersPerSecond;
+    // CSlider::Update's 0x0031dd18 comparison preserves the magnitude of
+    // Player+0x454 only for native state 21 (slider jump fall). State 19 web
+    // release, like every other eligible catch state, is reset to 800 cm/s.
+    if (locomotionState_ == LocomotionState::SliderJumpFall) {
         incomingSpeed = length3D(swingReleaseVelocity_);
     }
     if (!slideRuntime_.start(caught, incomingSpeed)) {

@@ -39,6 +39,77 @@ float dot(const Vector3& left, const Vector3& right) noexcept {
     return left.x * right.x + left.y * right.y + left.z * right.z;
 }
 
+Vector3 closestPointOnTriangle(const Vector3& point, const Vector3& first,
+                               const Vector3& second,
+                               const Vector3& third) noexcept {
+    // processSphereTriangle (0x003d23cc) first projects onto the authored
+    // face and otherwise tests all three edges. This Voronoi-region form
+    // returns the same closest face/edge/vertex point without choosing a
+    // dominant projection axis.
+    const Vector3 firstEdge = subtract(second, first);
+    const Vector3 secondEdge = subtract(third, first);
+    const Vector3 firstOffset = subtract(point, first);
+    const float firstDot = dot(firstEdge, firstOffset);
+    const float secondDot = dot(secondEdge, firstOffset);
+    if (firstDot <= 0.0F && secondDot <= 0.0F) {
+        return first;
+    }
+
+    const Vector3 secondOffset = subtract(point, second);
+    const float thirdDot = dot(firstEdge, secondOffset);
+    const float fourthDot = dot(secondEdge, secondOffset);
+    if (thirdDot >= 0.0F && fourthDot <= thirdDot) {
+        return second;
+    }
+
+    const float firstRegion = firstDot * fourthDot - thirdDot * secondDot;
+    if (firstRegion <= 0.0F && firstDot >= 0.0F && thirdDot <= 0.0F) {
+        const float factor = firstDot / (firstDot - thirdDot);
+        return {first.x + factor * firstEdge.x,
+                first.y + factor * firstEdge.y,
+                first.z + factor * firstEdge.z};
+    }
+
+    const Vector3 thirdOffset = subtract(point, third);
+    const float fifthDot = dot(firstEdge, thirdOffset);
+    const float sixthDot = dot(secondEdge, thirdOffset);
+    if (sixthDot >= 0.0F && fifthDot <= sixthDot) {
+        return third;
+    }
+
+    const float secondRegion = fifthDot * secondDot - firstDot * sixthDot;
+    if (secondRegion <= 0.0F && secondDot >= 0.0F && sixthDot <= 0.0F) {
+        const float factor = secondDot / (secondDot - sixthDot);
+        return {first.x + factor * secondEdge.x,
+                first.y + factor * secondEdge.y,
+                first.z + factor * secondEdge.z};
+    }
+
+    const float thirdRegion =
+        thirdDot * sixthDot - fifthDot * fourthDot;
+    if (thirdRegion <= 0.0F && (fourthDot - thirdDot) >= 0.0F &&
+        (fifthDot - sixthDot) >= 0.0F) {
+        const Vector3 edge = subtract(third, second);
+        const float factor = (fourthDot - thirdDot) /
+                             ((fourthDot - thirdDot) +
+                              (fifthDot - sixthDot));
+        return {second.x + factor * edge.x,
+                second.y + factor * edge.y,
+                second.z + factor * edge.z};
+    }
+
+    const float denominator =
+        1.0F / (firstRegion + secondRegion + thirdRegion);
+    const float secondWeight = secondRegion * denominator;
+    const float thirdWeight = thirdRegion * denominator;
+    return {first.x + firstEdge.x * secondWeight +
+                secondEdge.x * thirdWeight,
+            first.y + firstEdge.y * secondWeight +
+                secondEdge.y * thirdWeight,
+            first.z + firstEdge.z * secondWeight +
+                secondEdge.z * thirdWeight};
+}
+
 float pointSegmentDistanceSquared(float pointX, float pointY,
                                   const Vector3& start,
                                   const Vector3& end) noexcept {
@@ -210,12 +281,108 @@ void LevelCollision::appendObjectBox(const LevelObjectState& object) {
     appendTriangle(2, 7, 3);
 }
 
+void LevelCollision::appendSpiderWebWall(const LevelObjectState& object) {
+    if (object.asset == nullptr || object.archetype == nullptr ||
+        !object.asset->hasCollisionBounds) {
+        return;
+    }
+    const auto transform = [&object](const assets::Vector3& local) {
+        const auto& matrix = object.worldTransform;
+        return assets::Vector3{
+            local.x * matrix[0] + local.y * matrix[4] +
+                local.z * matrix[8] + matrix[12],
+            local.x * matrix[1] + local.y * matrix[5] +
+                local.z * matrix[9] + matrix[13],
+            local.x * matrix[2] + local.y * matrix[6] +
+                local.z * matrix[10] + matrix[14]};
+    };
+    const auto appendTriangle = [this, &object, &transform](
+                                    const ColladaGeometry& geometry,
+                                    const ColladaMeshBuffer& buffer,
+                                    std::uint16_t firstIndex,
+                                    std::uint16_t secondIndex,
+                                    std::uint16_t thirdIndex) {
+        if (firstIndex >= geometry.vertices.size() ||
+            secondIndex >= geometry.vertices.size() ||
+            thirdIndex >= geometry.vertices.size()) {
+            return;
+        }
+        Triangle triangle;
+        triangle.localFirst = geometry.vertices[firstIndex].position;
+        triangle.localSecond = geometry.vertices[secondIndex].position;
+        triangle.localThird = geometry.vertices[thirdIndex].position;
+        triangle.first = transform(triangle.localFirst);
+        triangle.second = transform(triangle.localSecond);
+        triangle.third = transform(triangle.localThird);
+        triangle.normal = cross(subtract(triangle.second, triangle.first),
+                                subtract(triangle.third, triangle.first));
+        const float normalLength = length(triangle.normal);
+        if (normalLength <= std::numeric_limits<float>::epsilon()) {
+            return;
+        }
+        triangle.normal.x /= normalLength;
+        triangle.normal.y /= normalLength;
+        triangle.normal.z /= normalLength;
+        triangle.minimumX = std::min(
+            {triangle.first.x, triangle.second.x, triangle.third.x});
+        triangle.maximumX = std::max(
+            {triangle.first.x, triangle.second.x, triangle.third.x});
+        triangle.minimumY = std::min(
+            {triangle.first.y, triangle.second.y, triangle.third.y});
+        triangle.maximumY = std::max(
+            {triangle.first.y, triangle.second.y, triangle.third.y});
+        triangle.minimumZ = std::min(
+            {triangle.first.z, triangle.second.z, triangle.third.z});
+        triangle.maximumZ = std::max(
+            {triangle.first.z, triangle.second.z, triangle.third.z});
+        triangle.geometryName = object.asset->name + "/" + geometry.name;
+        triangle.materialName = buffer.materialName;
+        // CSpiderWebWall::Init (0x0031ee04) calls setFlagsAll(..., 6)
+        // after creating the exact bbox triangle mesh. Native 0x06 is the
+        // ordinary wall flag combined with two-sided collision.
+        triangle.physicsFlags =
+            LevelPhysicsFlags::Wall | LevelPhysicsFlags::DoubleSided;
+        triangle.roomId = -1;
+        triangle.objectId = object.asset->objectId;
+        triangles_.push_back(std::move(triangle));
+    };
+
+    for (const ColladaGeometry& geometry :
+         object.archetype->mesh.sceneGeometries()) {
+        if (geometry.name != "bbox") {
+            continue;
+        }
+        for (const ColladaMeshBuffer& buffer : geometry.meshBuffers) {
+            if (buffer.primitive == ColladaPrimitive::Triangles) {
+                for (std::size_t index = 0;
+                     index + 2 < buffer.indices.size(); index += 3) {
+                    appendTriangle(geometry, buffer, buffer.indices[index],
+                                   buffer.indices[index + 1],
+                                   buffer.indices[index + 2]);
+                }
+            } else if (buffer.primitive ==
+                       ColladaPrimitive::TriangleStrip) {
+                for (std::size_t index = 2; index < buffer.indices.size();
+                     ++index) {
+                    const bool odd = (index & 1U) != 0;
+                    appendTriangle(
+                        geometry, buffer,
+                        buffer.indices[index - (odd ? 0 : 2)],
+                        buffer.indices[index - 1],
+                        buffer.indices[index - (odd ? 2 : 0)]);
+                }
+            }
+        }
+    }
+}
+
 Result LevelCollision::updateObjectColliders(
     std::span<const LevelObjectState> objects) {
     std::vector<DynamicObjectSnapshot> snapshots;
     for (const LevelObjectState& object : objects) {
         if (object.asset == nullptr ||
-            (object.asset->kind != LevelObjectKind::SlideCar &&
+            (object.asset->kind != LevelObjectKind::SpiderWebWall &&
+             object.asset->kind != LevelObjectKind::SlideCar &&
              object.asset->kind != LevelObjectKind::BrokenBridge &&
              object.asset->kind != LevelObjectKind::Platform &&
              object.asset->kind != LevelObjectKind::ElectricPlatform) ||
@@ -236,7 +403,8 @@ Result LevelCollision::updateObjectColliders(
     triangles_.resize(staticTriangleCount_);
     for (const LevelObjectState& object : objects) {
         if (object.asset == nullptr ||
-            (object.asset->kind != LevelObjectKind::SlideCar &&
+            (object.asset->kind != LevelObjectKind::SpiderWebWall &&
+             object.asset->kind != LevelObjectKind::SlideCar &&
              object.asset->kind != LevelObjectKind::BrokenBridge &&
              object.asset->kind != LevelObjectKind::Platform &&
              object.asset->kind != LevelObjectKind::ElectricPlatform) ||
@@ -244,7 +412,11 @@ Result LevelCollision::updateObjectColliders(
             !object.physicsEnabled || !object.collisionEnabled) {
             continue;
         }
-        appendObjectBox(object);
+        if (object.asset->kind == LevelObjectKind::SpiderWebWall) {
+            appendSpiderWebWall(object);
+        } else {
+            appendObjectBox(object);
+        }
     }
     dynamicObjectSnapshots_ = std::move(snapshots);
     rebuildGrid();
@@ -561,43 +733,6 @@ bool LevelCollision::resolveGroundMotion(const Vector3& start,
     if (std::abs(desired.x - start.x) > 1e-4F ||
         std::abs(desired.y - start.y) > 1e-4F) {
         resolveWalls(start, wallResolved, ignoredPhysicsFlags, depenetration);
-        const float normalRemainingX = desired.x - wallResolved.x;
-        const float normalRemainingY = desired.y - wallResolved.y;
-        const float normalRemainingSquared =
-            normalRemainingX * normalRemainingX +
-            normalRemainingY * normalRemainingY;
-        if (maximumStepUp > 1e-4F && normalRemainingSquared > 1e-4F) {
-            // The shipped controller accepts a maximum step height. Mirror
-            // that contract by sweeping again above the permitted step, then
-            // landing only on support that was reachable from the original
-            // height. This crosses low risers such as Level 5's 10 cm
-            // WayPoint 1 walkway lip without weakening taller wall shells.
-            constexpr float kStepSweepClearance = 0.01F;
-            Vector3 raisedStart = start;
-            raisedStart.z += maximumStepUp + kStepSweepClearance;
-            Vector3 raisedResolved = desired;
-            raisedResolved.z = raisedStart.z;
-            resolveWalls(raisedStart, raisedResolved, ignoredPhysicsFlags,
-                         depenetration);
-            const float raisedRemainingX = desired.x - raisedResolved.x;
-            const float raisedRemainingY = desired.y - raisedResolved.y;
-            const float raisedRemainingSquared =
-                raisedRemainingX * raisedRemainingX +
-                raisedRemainingY * raisedRemainingY;
-            float steppedHeight = 0.0F;
-            if (raisedRemainingSquared + 1e-4F < normalRemainingSquared &&
-                groundHeight(raisedResolved, 0.0F,
-                             maximumStepUp + maximumDrop +
-                                 kStepSweepClearance,
-                             steppedHeight, ignoredPhysicsFlags) &&
-                steppedHeight <= start.z + maximumStepUp +
-                                     kStepSweepClearance &&
-                steppedHeight >= start.z - maximumDrop) {
-                resolved = {raisedResolved.x, raisedResolved.y,
-                            steppedHeight};
-                return true;
-            }
-        }
     }
     float height = 0.0F;
     if (groundHeight(wallResolved, maximumStepUp, maximumDrop, height,
@@ -721,6 +856,7 @@ std::optional<LevelSegmentHit> LevelCollision::segmentFirstHit(
         closestTime,
         closestTriangle->physicsFlags,
         closestTriangle->roomId,
+        closestTriangle->objectId,
         closestTriangle->geometryName,
         closestTriangle->materialName};
 }
@@ -922,12 +1058,93 @@ void LevelCollision::resolveWalls(const Vector3& start,
         for (std::uint32_t triangleIndex : candidates) {
             const Triangle& triangle = triangles_[triangleIndex];
             if ((triangle.physicsFlags & ignoredPhysicsFlags) != 0U ||
-                std::abs(triangle.normal.z) >=
-                    LevelCollisionConstants::MinimumGroundNormalZ ||
-                triangle.maximumZ < start.z ||
-                triangle.minimumZ >
-                    start.z + kPlayerCollisionHeightCentimeters) {
+                triangle.normal.z >=
+                    LevelCollisionConstants::MinimumGroundNormalZ) {
                 continue;
+            }
+
+            const Vector3 startSphereCenter{
+                start.x, start.y, start.z + kGroundSupportRadius};
+            const float startPlaneSide =
+                dot(subtract(startSphereCenter, triangle.first),
+                    triangle.normal);
+            const bool doubleSided =
+                (triangle.physicsFlags & LevelPhysicsFlags::DoubleSided) != 0U;
+            // PhysicsTriangleMeshShape::constructMesh (0x003d95d8) retains
+            // winding and processSphereTriangle (0x003d23cc) distinguishes
+            // ordinary faces from the explicit DoubleSide flag. A body
+            // already behind an ordinary face may leave through that back;
+            // treating all wall triangles as two-sided creates authored
+            // one-way faces as invisible walls.
+            if (!doubleSided && startPlaneSide < -1e-4F) {
+                continue;
+            }
+
+            // createSpridemanPhysics (0x003d8a34) installs a lower sphere
+            // centered 50 cm above the Unit origin with a 50 cm radius.
+            // CapsuleTriangleMeshCollisionAlgorithm::processCollision
+            // (0x003ce6e4) delegates that sphere to processSphereTriangle
+            // (0x003d23cc), which resolves against the closest point on the
+            // authored face or any of its edges. TManifoldPoint::refresh
+            // (0x003d3a1c) gives a dynamic hero the full static-mesh
+            // penetration vector. Reproduce that rounded contact: treating
+            // the separate 185 cm gameplay height as a flat collision prism
+            // traps the native sphere on tiny rooftop lips.
+            Vector3 sphereCenter{desired.x, desired.y,
+                                 desired.z + kGroundSupportRadius};
+            if (sphereCenter.x + kGroundSupportRadius >= triangle.minimumX &&
+                sphereCenter.x - kGroundSupportRadius <= triangle.maximumX &&
+                sphereCenter.y + kGroundSupportRadius >= triangle.minimumY &&
+                sphereCenter.y - kGroundSupportRadius <= triangle.maximumY &&
+                sphereCenter.z + kGroundSupportRadius >= triangle.minimumZ &&
+                sphereCenter.z - kGroundSupportRadius <= triangle.maximumZ) {
+                const Vector3 closest = closestPointOnTriangle(
+                    sphereCenter, triangle.first, triangle.second,
+                    triangle.third);
+                Vector3 separation = subtract(sphereCenter, closest);
+                const float separationSquared = dot(separation, separation);
+                const float radiusSquared =
+                    kGroundSupportRadius * kGroundSupportRadius;
+                if (separationSquared < radiusSquared) {
+                    const float desiredSide =
+                        dot(subtract(sphereCenter, triangle.first),
+                            triangle.normal);
+                    const float separationLength =
+                        std::sqrt(separationSquared);
+                    float penetration =
+                        kGroundSupportRadius - separationLength;
+                    if (!doubleSided && desiredSide < 0.0F &&
+                        triangle.maximumZ >= sphereCenter.z) {
+                        // A front-side sweep that penetrates a tall face must
+                        // remain on its authored-normal side. The native
+                        // persistent manifold catches the crossing before the
+                        // sphere center changes sides; restore that continuous
+                        // result for portable fixed steps.
+                        separation = triangle.normal;
+                        penetration = kGroundSupportRadius - desiredSide;
+                    } else if (depenetration ==
+                            LevelCollisionDepenetration::TowardAuthoredNormal &&
+                        startPlaneSide < 0.0F &&
+                        std::abs(startPlaneSide) < kGroundSupportRadius &&
+                        desiredSide > startPlaneSide) {
+                        separation = triangle.normal;
+                    } else if (separationLength > 1e-5F) {
+                        separation.x /= separationLength;
+                        separation.y /= separationLength;
+                        separation.z /= separationLength;
+                    } else {
+                        const float side =
+                            desiredSide < 0.0F ? -1.0F : 1.0F;
+                        separation = {triangle.normal.x * side,
+                                      triangle.normal.y * side,
+                                      triangle.normal.z * side};
+                    }
+                    desired.x += separation.x * penetration;
+                    desired.y += separation.y * penetration;
+                    desired.z += separation.z * penetration;
+                    corrected = true;
+                    continue;
+                }
             }
             const float horizontalNormalLength =
                 std::hypot(triangle.normal.x, triangle.normal.y);
@@ -968,6 +1185,31 @@ void LevelCollision::resolveWalls(const Vector3& start,
             const float startSide =
                 (start.x - triangle.first.x) * normalX +
                 (start.y - triangle.first.y) * normalY;
+            // A vertical face ending below both lower-sphere centers is a
+            // ledge, not a full-height barrier. Intermediate native manifold
+            // contacts push the sphere upward around that top edge; a
+            // continuous flat-plane fallback would erase that rounded
+            // response when a portable timestep ends beyond the face.
+            const float startSphereCenterZ =
+                start.z + kGroundSupportRadius;
+            const float desiredSphereCenterZ =
+                desired.z + kGroundSupportRadius;
+            if (triangle.maximumZ <
+                std::min(startSphereCenterZ, desiredSphereCenterZ)) {
+                continue;
+            }
+            const float startSphereMinimumZ = start.z;
+            const float startSphereMaximumZ =
+                start.z + 2.0F * kGroundSupportRadius;
+            const float desiredSphereMinimumZ = desired.z;
+            const float desiredSphereMaximumZ =
+                desired.z + 2.0F * kGroundSupportRadius;
+            if (std::max(startSphereMaximumZ, desiredSphereMaximumZ) <
+                    triangle.minimumZ ||
+                std::min(startSphereMinimumZ, desiredSphereMinimumZ) >
+                    triangle.maximumZ) {
+                continue;
+            }
             if (startSide * desiredSide >= 0.0F &&
                 std::abs(desiredSide) >= kGroundSupportRadius) {
                 continue;

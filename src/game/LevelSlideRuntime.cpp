@@ -10,7 +10,9 @@ namespace usm::game {
 namespace {
 
 constexpr float kCatchDistanceSquared = 640000.0F;
-constexpr float kFallbackSlideSpeedCentimetersPerSecond = 1100.0F;
+// CSlider::Update uses the literal 800.0 at 0x0031e0d4 for every catch
+// except native state 21 (0x0031dd18-0x0031dd3a).
+constexpr float kFallbackSlideSpeedCentimetersPerSecond = 800.0F;
 
 assets::Vector3 subtract(const assets::Vector3& left,
                          const assets::Vector3& right) noexcept {

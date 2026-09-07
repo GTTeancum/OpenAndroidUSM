@@ -1738,7 +1738,8 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
                         std::string(userAttribute(node, "$LEVEL_STRINGID"));
                 }
             }
-            if (*kind == LevelObjectKind::SlideCar ||
+            if (*kind == LevelObjectKind::SpiderWebWall ||
+                *kind == LevelObjectKind::SlideCar ||
                 *kind == LevelObjectKind::BrokenBridge ||
                 *kind == LevelObjectKind::AreaDamage) {
                 object.collisionLocalMinimum = {
@@ -1792,8 +1793,11 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
                         node.gameType + " " + std::to_string(node.id) +
                         " has no authored bbox scene node");
                 }
-                // CSlideCar's constructor registers this transmission body
-                // regardless of the room node's serialized Collision flag.
+                // CSpiderWebWall::Init (0x0031ee04) passes its `bbox` child
+                // to createCollisionMeshPhysics (0x003d8830) and forces all
+                // triangles to native flags 0x06 at 0x003d8cc8. Like
+                // CSlideCar, this constructs a transmission body regardless
+                // of the room node's serialized Collision flag.
                 if (*kind != LevelObjectKind::AreaDamage) {
                     object.hasCollision = true;
                 }

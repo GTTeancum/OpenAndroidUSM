@@ -100,7 +100,7 @@ move_until_state 2000 0 0 18
 move_until_state 3000 0 1 19
 move_to 3650 -5800 5 100 12000
 move_until_state 2000 0 0 0
-move_to 3000 -5200 5 250 5000
+move_to 3000 -5200 5 300 5000
 move_to 2200 -5000 5 250 5000
 move_to 1446 -4180 5 1350 2000
 jump
@@ -108,7 +108,7 @@ move_to 1446 -4180 5 1000 1500
 web_on
 move_until_state 2000 0 0 18
 move_until_state 3000 0 1 19
-move_until_state 1500 0 1 15
+wait_web_grab_point 1500 379
 web_on
 move_until_state 2000 0 0 18
 move_until_state 3500 0 1 19
@@ -125,9 +125,11 @@ attack 60000 175 416 418 419
 capture room4-encounter-complete
 # Taxi 40034 and police car 40033 intentionally span the street. Their
 # collision tops are only 94/148 cm high, and the normal player-flow route is
-# an ordinary forward jump over the visible wrecks.
-move_to -100 1450 5 100 5000
+# an ordinary forward jump over the visible wrecks. Combat knockback can leave
+# the final target on either side, so continue north instead of first forcing
+# Spider-Man back to the south curb.
 jump
+move_to -100 2100 5 100 5000
 move_until_state 4000 0 1 0
 move_until_cinematic 100 2850 5 1198 15000
 capture room5-web-wall-open
@@ -144,18 +146,21 @@ move_until_state 2000 0 0 18
 wait 200
 web_off
 move_until_state 1500 0 0 19
-move_until_state 4000 0 0 15
-assert_near 2712 2953 148 350
-capture room5-forced-web-exit
-assert_health_above 0
-
-# Crossing trigger 40039 starts 40040 and activates Room 5's three-enemy
-# cohort. The adjacent timer-less 969 tutorial is modal by native design; its
-# supplied Y glyph must be visible at the bottom before autoplay dismisses it.
+# Crossing trigger 40039 starts 40040 while native state 19 is still carrying
+# Spider-Man toward WayPoint 30031, and activates Room 5's three-enemy cohort.
+# The adjacent timer-less 969 tutorial is modal by native design: it pauses
+# that state until dismissed, and its supplied Y glyph must be visible at the
+# bottom before autoplay resumes the authored forced exit.
 wait_enemies_active 5000 10339 10340 1251
 wait_cinematic_started 5000 969
 capture room5-ultimate-web-tutorial
 wait_controls 5000
+# Player::UpdateMove 0x003510e8-0x003510fa observes the road contact and
+# selects native landing state 16 before the release clip can fall through to
+# state 15.
+move_until_state 4000 0 0 16
+capture room5-forced-web-exit
+assert_health_above 0
 capture room5-encounter-ready
 attack 80000 150 10339 10340 1251
 assert_last_checkpoint 30030
@@ -221,7 +226,11 @@ move_until_state 3000 0 0 0
 wait 100
 assert_camera_area 166
 
-move_to 8300 7600 3579 100 8000
+# Finish the approach facing authored WebGrabPoint 437 at
+# (9818.3, 8462.23, 4028.28). The preceding fight can leave the player's
+# facing in any direction even though the point is visible, in range, and has
+# clear line of sight.
+move_to 8700 7800 3579 160 8000
 capture room6-web-takeoff
 jump
 wait 100
@@ -231,9 +240,13 @@ capture room6-web-swing
 move_until_state 3000 0 1 19
 capture room6-web-release
 move_to 11550 9600 3479 300 5000
-move_until_state 1500 0 0 0
+move_until_state 2500 0 0 0
 capture room6-far-roof-arrival
-assert_near 11500 9500 3479 650
+# Player::UpdateMove 0x00350dd2-0x00350f94 aims the release velocity at the
+# point; UpdateMCSpeed 0x00347f5c-0x00347fbc then adds the retained impulse, so
+# the native landing is farther along the same roof rather than at a homing
+# endpoint.
+assert_near 12250 9950 3479 300
 wait_enemies_grounded 5000 481 482 483 10344
 capture room6-far-roof-encounter-ready
 attack 90000 180 481 482 10344
@@ -242,16 +255,16 @@ jump
 move_to 11850 10200 3479 175 6000
 move_to 11000 10800 3479 175 6000
 move_to 10000 11200 3479 200 6000
+# Trigger 1149 spans the route at (8899.09, 11080.9). Present and dismiss its
+# one-time modal slide tutorial before the final thug chase can cross it and
+# pause an in-progress combat goal.
+move_until_cinematic 8950 11155 3479 1150 10000
+capture room7-slide-tutorial
+wait_controls 5000
 attack 40000 180 483
 capture room6-far-roof-encounter-complete
 move_to 8950 11155 3479 75 10000
 jump 0.33 0.95
-# Trigger 1149 presents the one-time modal slide tutorial as the player
-# commits to this takeoff. Preserve a frame, then dismiss it before expecting
-# simulation time or the jump arc to advance.
-move_input_until_cinematic 2000 0.33 0.95 1150
-capture room7-slide-tutorial
-wait_controls 5000
 move_until_state 3000 0.33 0.95 23
 capture room7-first-slide-catch
 move_until_state 2000 0 0 22
@@ -266,7 +279,9 @@ wait_enemies_grounded 5000 618 10342 10343
 capture room7-rooftop-encounter-ready
 attack 70000 180 618 10342 10343
 move_until_state 3000 0 0 0
-move_to 3050 8450 2454 100 6000
+# collision07 triangle 52 places this obstacle's south face at y=7849.47;
+# stage outside the native 50 cm capsule margin before jumping across it.
+move_to 3050 7750 2454 100 6000
 jump
 move_to 2600 8450 2612 200 6000
 move_until_state 3000 0 0 0
@@ -278,7 +293,10 @@ web_on
 move_until_state 2500 0 0 18
 capture room7-web441-swing
 move_until_state 3000 0 0 19
-move_until_state 2500 0 0 15
+# Player::UpdateMove's state-19 branch at 0x00350a8c continues to call
+# TryGrabPoint. Chain while authored point 443 still passes the native
+# GetBestWebGrabPoint facing gate instead of waiting for fallback state 15.
+wait_web_grab_point 1500 443
 web_on
 move_until_state 2500 0 0 18
 capture room7-web443-swing
@@ -292,7 +310,9 @@ move_until_state 5000 0 0 23
 capture room7-second-slide-catch
 move_until_state 2000 0 0 22
 assert_audio_played SFX_SLIDING
-wait 1500
+# CSlider::Update replaces state-19 incoming speed with its 800 cm/s literal
+# at 0x0031dd18-0x0031dd3a; sample one second into that authored motion.
+wait 1000
 assert_near -4874 6742 2143 175
 capture room7-second-slide-moving
 move_until_state 10000 0 0 15
@@ -334,7 +354,10 @@ web_on
 move_until_state 2500 0 0 18
 capture room12-first-web-swing
 move_until_state 3500 0 1 19
-move_until_state 3000 0 0 15
+# Player::UpdateMove keeps TryGrabPoint active in state 19 at 0x00350a8c.
+# Chain to point 451 while its 1200 cm VisiableLength/on-screen gate still
+# passes, before the first release carries it behind the camera in state 15.
+wait_web_grab_point 1500 451
 web_on
 move_until_state 2500 0 0 18
 capture room12-second-web-swing

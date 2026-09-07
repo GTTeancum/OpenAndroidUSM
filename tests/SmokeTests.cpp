@@ -414,6 +414,46 @@ int main() {
     (void)wallCombatHarness.update(wallCombatSnapshot);
     assert(wallCombatHarness.complete() && !wallCombatHarness.failed());
 
+    const auto obstructedCombatScript =
+        autoplayTestRoot / "obstructed-combat.usmauto";
+    {
+        std::ofstream stream(obstructedCombatScript);
+        stream << "capture_interval_ms 0\nmax_time_ms 2000\n"
+                  "attack 1500 180 42\nfinish\n";
+    }
+    usm::diagnostics::AutoplayHarness obstructedCombatHarness;
+    assert(obstructedCombatHarness.initialize(
+        obstructedCombatScript,
+        autoplayTestRoot / "obstructed-combat-output"));
+    auto obstructedCombatSnapshot = wallCombatSnapshot;
+    obstructedCombatSnapshot.realTimeMilliseconds = 0;
+    obstructedCombatSnapshot.playerOnWall = false;
+    obstructedCombatSnapshot.playerStateId = 0;
+    obstructedCombatSnapshot.playerPosition = {};
+    wallCombatEnemy.onWall = false;
+    wallCombatEnemy.health = 500.0F;
+    wallCombatEnemy.position = {300.0F, 0.0F, 0.0F};
+    assert(!obstructedCombatHarness.update(obstructedCombatSnapshot)
+                .webPressed);
+    obstructedCombatSnapshot.realTimeMilliseconds = 600;
+    const auto obstructedJumpRecovery =
+        obstructedCombatHarness.update(obstructedCombatSnapshot);
+    assert(obstructedJumpRecovery.jumpPressed &&
+           obstructedJumpRecovery.jumpHeld);
+    assert(!obstructedJumpRecovery.webPressed);
+    obstructedCombatSnapshot.realTimeMilliseconds = 1200;
+    const auto obstructedWebRecovery =
+        obstructedCombatHarness.update(obstructedCombatSnapshot);
+    assert(obstructedWebRecovery.webPressed && obstructedWebRecovery.webHeld);
+    assert(!obstructedWebRecovery.jumpPressed);
+    wallCombatEnemy.health = 0.0F;
+    obstructedCombatSnapshot.realTimeMilliseconds = 1250;
+    (void)obstructedCombatHarness.update(obstructedCombatSnapshot);
+    obstructedCombatSnapshot.realTimeMilliseconds = 1300;
+    (void)obstructedCombatHarness.update(obstructedCombatSnapshot);
+    assert(obstructedCombatHarness.complete() &&
+           !obstructedCombatHarness.failed());
+
     const auto wallClimbScript = autoplayTestRoot / "wall-climb-input.usmauto";
     {
         std::ofstream stream(wallClimbScript);
@@ -5359,6 +5399,134 @@ int main() {
         usm::game::LevelObjectRuntime objectRuntime;
         assert(objectRuntime.initialize(bootstrap));
         assert(objectRuntime.states().size() == bootstrap.objects().size());
+        const auto roomTwoWebWallAsset = std::find_if(
+            bootstrap.objects().begin(), bootstrap.objects().end(),
+            [](const auto& object) { return object.objectId == 1116; });
+        assert(roomTwoWebWallAsset != bootstrap.objects().end());
+        assert(roomTwoWebWallAsset->kind ==
+               usm::game::LevelObjectKind::SpiderWebWall);
+        assert(roomTwoWebWallAsset->hasCollision);
+        assert(roomTwoWebWallAsset->hasCollisionBounds);
+        const auto& roomTwoWebWallArchetype =
+            bootstrap.objectArchetypes()[
+                roomTwoWebWallAsset->archetypeIndex];
+        const auto roomTwoWebWallBbox = std::find_if(
+            roomTwoWebWallArchetype.mesh.sceneGeometries().begin(),
+            roomTwoWebWallArchetype.mesh.sceneGeometries().end(),
+            [](const auto& geometry) { return geometry.name == "bbox"; });
+        assert(roomTwoWebWallBbox !=
+               roomTwoWebWallArchetype.mesh.sceneGeometries().end());
+        assert(roomTwoWebWallBbox->meshBuffers.size() == 1);
+        assert(roomTwoWebWallBbox->meshBuffers.front().indices.size() == 72);
+        assert(objectRuntime.find(1116)->archetype ==
+               &roomTwoWebWallArchetype);
+        assert(objectRuntime.find(1116)->physicsEnabled);
+        assert(objectRuntime.find(1116)->collisionEnabled);
+
+        // CSpiderWebWall::Init (0x0031ee04) creates collision from the
+        // authored `bbox` child even though the IRR node has Collision=false,
+        // then setFlagsAll (0x003d8cc8) assigns 0x06 to every triangle. Keep
+        // the exact transformed 24-triangle mesh, and remove it when the
+        // watcher hides the wall after its close animation.
+        usm::game::LevelObjectRuntime isolatedWebWallRuntime;
+        assert(isolatedWebWallRuntime.initialize(bootstrap));
+        for (const auto& state : isolatedWebWallRuntime.states()) {
+            if (state.asset == nullptr) {
+                continue;
+            }
+            const auto kind = state.asset->kind;
+            if (kind == usm::game::LevelObjectKind::SpiderWebWall ||
+                kind == usm::game::LevelObjectKind::SlideCar ||
+                kind == usm::game::LevelObjectKind::BrokenBridge ||
+                kind == usm::game::LevelObjectKind::Platform ||
+                kind == usm::game::LevelObjectKind::ElectricPlatform) {
+                assert(isolatedWebWallRuntime.setRuntimeState(
+                    state.asset->objectId, state.position, false,
+                    state.physicsEnabled));
+            }
+        }
+        assert(isolatedWebWallRuntime.setRuntimeState(
+            1116, roomTwoWebWallAsset->position, true, true));
+        usm::assets::ColladaGeometry webWallCollisionSeed;
+        webWallCollisionSeed.name = "collision_seed";
+        webWallCollisionSeed.vertices = {
+            {{100000.0F, 100000.0F, 100000.0F}},
+            {{100100.0F, 100000.0F, 100000.0F}},
+            {{100000.0F, 100100.0F, 100000.0F}},
+        };
+        usm::assets::ColladaMeshBuffer webWallCollisionSeedBuffer;
+        webWallCollisionSeedBuffer.indices = {0, 1, 2};
+        webWallCollisionSeed.meshBuffers.push_back(
+            webWallCollisionSeedBuffer);
+        const std::array webWallCollisionSeedSet{webWallCollisionSeed};
+        usm::game::LevelCollision webWallCollision;
+        assert(webWallCollision.build(webWallCollisionSeedSet));
+        const std::size_t webWallSeedTriangleCount =
+            webWallCollision.triangleCount();
+        assert(webWallCollision.updateObjectColliders(
+            isolatedWebWallRuntime.states()));
+        assert(webWallCollision.triangleCount() ==
+               webWallSeedTriangleCount + 24U);
+        const auto& webWallMatrix =
+            isolatedWebWallRuntime.find(1116)->worldTransform;
+        const usm::assets::Vector3 webWallLocalCenter{
+            (roomTwoWebWallAsset->collisionLocalMinimum.x +
+             roomTwoWebWallAsset->collisionLocalMaximum.x) * 0.5F,
+            (roomTwoWebWallAsset->collisionLocalMinimum.y +
+             roomTwoWebWallAsset->collisionLocalMaximum.y) * 0.5F,
+            (roomTwoWebWallAsset->collisionLocalMinimum.z +
+             roomTwoWebWallAsset->collisionLocalMaximum.z) * 0.5F};
+        const usm::assets::Vector3 webWallWorldCenter{
+            webWallLocalCenter.x * webWallMatrix[0] +
+                webWallLocalCenter.y * webWallMatrix[4] +
+                webWallLocalCenter.z * webWallMatrix[8] +
+                webWallMatrix[12],
+            webWallLocalCenter.x * webWallMatrix[1] +
+                webWallLocalCenter.y * webWallMatrix[5] +
+                webWallLocalCenter.z * webWallMatrix[9] +
+                webWallMatrix[13],
+            webWallLocalCenter.x * webWallMatrix[2] +
+                webWallLocalCenter.y * webWallMatrix[6] +
+                webWallLocalCenter.z * webWallMatrix[10] +
+                webWallMatrix[14]};
+        usm::assets::Vector3 webWallNormal{
+            webWallMatrix[1] * webWallMatrix[6] -
+                webWallMatrix[2] * webWallMatrix[5],
+            webWallMatrix[2] * webWallMatrix[4] -
+                webWallMatrix[0] * webWallMatrix[6],
+            webWallMatrix[0] * webWallMatrix[5] -
+                webWallMatrix[1] * webWallMatrix[4]};
+        const float webWallNormalLength = std::sqrt(
+            webWallNormal.x * webWallNormal.x +
+            webWallNormal.y * webWallNormal.y +
+            webWallNormal.z * webWallNormal.z);
+        assert(webWallNormalLength > 0.0F);
+        webWallNormal.x /= webWallNormalLength;
+        webWallNormal.y /= webWallNormalLength;
+        webWallNormal.z /= webWallNormalLength;
+        const usm::assets::Vector3 webWallSegmentStart{
+            webWallWorldCenter.x - webWallNormal.x * 100.0F,
+            webWallWorldCenter.y - webWallNormal.y * 100.0F,
+            webWallWorldCenter.z - webWallNormal.z * 100.0F};
+        const usm::assets::Vector3 webWallSegmentEnd{
+            webWallWorldCenter.x + webWallNormal.x * 100.0F,
+            webWallWorldCenter.y + webWallNormal.y * 100.0F,
+            webWallWorldCenter.z + webWallNormal.z * 100.0F};
+        const auto visibleWebWallHit = webWallCollision.segmentFirstHit(
+            webWallSegmentStart, webWallSegmentEnd);
+        assert(visibleWebWallHit.has_value());
+        assert(visibleWebWallHit->objectId == 1116);
+        assert(visibleWebWallHit->physicsFlags ==
+               (usm::game::LevelPhysicsFlags::Wall |
+                usm::game::LevelPhysicsFlags::DoubleSided));
+        assert(isolatedWebWallRuntime.setRuntimeState(
+            1116, roomTwoWebWallAsset->position, false, true));
+        assert(webWallCollision.updateObjectColliders(
+            isolatedWebWallRuntime.states()));
+        assert(webWallCollision.triangleCount() ==
+               webWallSeedTriangleCount);
+        assert(!webWallCollision.segmentFirstHit(webWallSegmentStart,
+                                                  webWallSegmentEnd));
         const auto roomTwoHostageAsset = std::find_if(
             bootstrap.objects().begin(), bootstrap.objects().end(),
             [](const auto& object) { return object.objectId == 30018; });
@@ -5501,15 +5669,34 @@ int main() {
         assert(objectRuntime.find(1210) != nullptr);
         assert(objectRuntime.find(1210)->physicsEnabled);
         assert(objectRuntime.find(1210)->collisionEnabled);
+        usm::game::LevelObjectRuntime isolatedSlideCarRuntime;
+        assert(isolatedSlideCarRuntime.initialize(bootstrap));
+        for (const auto& state : isolatedSlideCarRuntime.states()) {
+            if (state.asset == nullptr) {
+                continue;
+            }
+            const auto kind = state.asset->kind;
+            if (kind == usm::game::LevelObjectKind::SpiderWebWall ||
+                kind == usm::game::LevelObjectKind::SlideCar ||
+                kind == usm::game::LevelObjectKind::BrokenBridge ||
+                kind == usm::game::LevelObjectKind::Platform ||
+                kind == usm::game::LevelObjectKind::ElectricPlatform) {
+                assert(isolatedSlideCarRuntime.setRuntimeState(
+                    state.asset->objectId, state.position, false,
+                    state.physicsEnabled));
+            }
+        }
+        assert(isolatedSlideCarRuntime.setRuntimeState(
+            1210, slideCarAsset->position, true, true));
         usm::game::LevelCollision slideCarCollision;
         assert(slideCarCollision.build(bootstrap.rooms()));
         const std::size_t roomTriangleCount =
             slideCarCollision.triangleCount();
         assert(slideCarCollision.updateObjectColliders(
-            objectRuntime.states()));
+            isolatedSlideCarRuntime.states()));
         assert(slideCarCollision.triangleCount() ==
                roomTriangleCount + 12U);
-        const auto* slideCarState = objectRuntime.find(1210);
+        const auto* slideCarState = isolatedSlideCarRuntime.find(1210);
         const usm::assets::Vector3 slideCarLocalTop{
             (slideCarAsset->collisionLocalMinimum.x +
              slideCarAsset->collisionLocalMaximum.x) * 0.5F,
@@ -8450,6 +8637,46 @@ int main() {
         usm::game::LevelCollision levelCollision;
         assert(levelCollision.build(bootstrap.rooms()));
         assert(levelCollision.triangleCount() > 100);
+        // Room 8 Plane02 has a 4.15 cm lip at y=5243.45: triangles 7/8
+        // raise the roof from z=3141.20 to z=3145.35, while triangles 22/23
+        // form its vertical edge. createSpridemanPhysics (0x003d8a34) uses a
+        // 50 cm lower sphere and processSphereTriangle (0x003d23cc) resolves
+        // its closest edge point. The player therefore rolls across this lip
+        // instead of treating the separate 185 cm gameplay height as a wall.
+        usm::assets::Vector3 rooftopLipResolved;
+        assert(levelCollision.resolveGroundMotion(
+            {5984.235840F, 5236.448242F, 3141.200000F},
+            {5984.235840F, 5255.000000F, 3141.200000F},
+            rooftopLipResolved));
+        assert(rooftopLipResolved.y > 5243.45F);
+        assert(std::abs(rooftopLipResolved.z - 3145.348145F) < 0.02F);
+        // The same edge is wholly below the lower sphere late in the jump.
+        // The native capsule/mesh query has no contact in that frame, so the
+        // airborne sweep must not retain the old tall-prism obstruction.
+        usm::assets::Vector3 rooftopLipAirResolved;
+        levelCollision.resolveAirMotion(
+            {5984.235840F, 5227.000000F, 3248.000000F},
+            {5984.235840F, 5250.000000F, 3195.000000F},
+            rooftopLipAirResolved);
+        assert(std::abs(rooftopLipAirResolved.y - 5250.0F) < 0.01F);
+        // Plane02 triangles 40/41 form a tall authored-normal +Y face at
+        // y=5286.45. The normal player route approaches from its back side.
+        // PhysicsTriangleMeshShape::constructMesh (0x003d95d8) preserves
+        // that winding, so the ordinary face is one-way; only an explicit
+        // DoubleSide flag blocks both directions. The reverse traversal must
+        // still stop at the native 50 cm lower-sphere margin.
+        usm::assets::Vector3 rooftopBackfaceResolved;
+        assert(levelCollision.resolveGroundMotion(
+            {5984.235840F, 5236.448242F, 3145.348145F},
+            {5984.235840F, 5320.000000F, 3145.348145F},
+            rooftopBackfaceResolved));
+        assert(rooftopBackfaceResolved.y > 5286.45F);
+        usm::assets::Vector3 rooftopFrontFaceResolved;
+        assert(levelCollision.resolveGroundMotion(
+            {5984.235840F, 5350.000000F, 3145.348145F},
+            {5984.235840F, 5200.000000F, 3145.348145F},
+            rooftopFrontFaceResolved));
+        assert(rooftopFrontFaceResolved.y >= 5336.44F);
         // Room 8 enemy 421 starts on the first rooftop after the falling-tank
         // traversal.  Its first awareness tick must advance by only the
         // authored 0.3 cm/ms line speed.  This catches wall depenetration
@@ -11107,7 +11334,10 @@ int main() {
                "k_state_trigger_slider_move");
         const float slideStartX = slidingPlayer.position().x;
         slidingPlayer.update({}, gameplayCameraPose, 100);
-        assert(slidingPlayer.position().x > slideStartX + 60.0F);
+        // CSlider::Update selects the literal 800 cm/s for an ordinary
+        // state-14 catch at 0x0031dd18-0x0031dd3a.
+        assert(std::abs(slidingPlayer.position().x - slideStartX - 80.0F) <
+               0.1F);
         slidingPlayer.update({}, gameplayCameraPose, 2000);
         assert(slidingPlayer.activeStateId() == 15);
         const float terminalSlideX = slidingPlayer.position().x;
@@ -11302,7 +11532,6 @@ int main() {
         assert(forcedSwingPlayer.requestWeb());
         forcedSwingPlayer.update({}, gameplayCameraPose, 267);
         assert(forcedSwingPlayer.releaseWeb());
-        forcedSwingPlayer.update({}, gameplayCameraPose, 0);
         assert(forcedSwingPlayer.activeStateId() == 19);
         const auto forcedReleaseStart = forcedSwingPlayer.position();
         const auto* forcedReleaseClip =
@@ -11321,28 +11550,37 @@ int main() {
                 forcedReleaseClip->durationMilliseconds());
         assert(forcedRootMiddle.z > forcedRootStart.z + 100.0F);
         assert(forcedRootMiddle.z > forcedRootEnd.z + 100.0F);
-        const float forcedReleaseFraction =
-            500.0F / static_cast<float>(
-                         forcedReleaseClip->durationMilliseconds());
-        const float straightChordMiddleHeight =
-            forcedReleaseStart.z +
-            (forcedGrabPoint.targetWaypointPosition.z - forcedReleaseStart.z) *
-                forcedReleaseFraction;
-        forcedSwingPlayer.update({}, gameplayCameraPose, 500);
+        for (std::uint32_t elapsed = 0; elapsed < 500; elapsed += 25) {
+            forcedSwingPlayer.update({}, gameplayCameraPose, 25);
+        }
         // The release clip's recovered Dummy_center track rises through a
-        // large mid-animation arc before returning near its start height.
-        // Native forced exits combine that root motion with the velocity
-        // toward the linked WayPoint instead of following a straight chord.
+        // large mid-animation arc. Native target setup explicitly zeros its
+        // Z speed at 0x00350fb8/0x00350fc0, so vertical movement comes from
+        // that root track plus the existing PhysicsContext gravity rather
+        // than a straight three-dimensional chord to the WayPoint.
         assert(forcedSwingPlayer.position().z >
-               straightChordMiddleHeight + 25.0F);
-        forcedSwingPlayer.update({}, gameplayCameraPose, 1500);
+               forcedReleaseStart.z + 25.0F);
+        for (std::uint32_t elapsed = 500;
+             elapsed < forcedReleaseClip->durationMilliseconds();
+             elapsed += 25) {
+            forcedSwingPlayer.update({}, gameplayCameraPose, 25);
+        }
         const auto forcedExitPosition = forcedSwingPlayer.position();
-        assert(std::abs(forcedExitPosition.x -
-                        forcedGrabPoint.targetWaypointPosition.x) < 1.0F);
-        assert(std::abs(forcedExitPosition.y -
-                        forcedGrabPoint.targetWaypointPosition.y) < 1.0F);
-        assert(std::abs(forcedExitPosition.z -
-                        forcedGrabPoint.targetWaypointPosition.z) < 1.0F);
+        const float targetForwardTravel =
+            (forcedGrabPoint.targetWaypointPosition.x -
+             forcedReleaseStart.x) * initialFacing.x +
+            (forcedGrabPoint.targetWaypointPosition.y -
+             forcedReleaseStart.y) * initialFacing.y;
+        const float actualForwardTravel =
+            (forcedExitPosition.x - forcedReleaseStart.x) * initialFacing.x +
+            (forcedExitPosition.y - forcedReleaseStart.y) * initialFacing.y;
+        // SetNextStateId motion 28 retains the release impulse at
+        // Player+0x434/+0x438. UpdateMCSpeed 0x00347f5c-0x00347fbc adds its
+        // decaying value on top of the target-derived XY velocity every
+        // frame, so the linked point aims the launch and is not a homing
+        // endpoint that clamps the body to the exact WayPoint coordinate.
+        assert(actualForwardTravel > 0.0F);
+        assert(std::abs(actualForwardTravel - targetForwardTravel) > 25.0F);
 
         auto makeCameraArea = [](std::int32_t id, float minimumX,
                                  float maximumX) {

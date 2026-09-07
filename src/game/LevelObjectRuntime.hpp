@@ -45,6 +45,7 @@ struct ObjectCinematicMotionState {
 
 struct LevelObjectState {
     const LevelObjectAsset* asset{};
+    const LevelObjectArchetypeAsset* archetype{};
     assets::Vector3 position;
     std::array<float, 16> worldTransform{};
     std::string activeAnimation;

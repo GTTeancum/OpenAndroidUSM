@@ -26,7 +26,8 @@ jump
 move_until_state 3000 0 0 23
 move_until_state 2000 0 0 22
 wait 1500
-assert_near -3941.393 6783.574 2320.841 125
+# Native CSlider::Update uses 800 cm/s for this state-14 catch.
+assert_near -4072 6778 2296 125
 move_until_state 10000 0 0 15
 assert_near -8099.410 6598.260 1529.000 150
 assert_health_above 0

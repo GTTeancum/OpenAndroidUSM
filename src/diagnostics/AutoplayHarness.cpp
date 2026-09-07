@@ -617,6 +617,15 @@ Result AutoplayHarness::parseScript(
                 return invalid(
                     "wait_enemies_active requires at least one enemy ID");
             }
+        } else if (command == "wait_web_grab_point") {
+            step.kind = StepKind::WaitWebGrabPoint;
+            std::int32_t objectId = -1;
+            if (!(tokens >> step.durationOrTimeoutMilliseconds >> objectId) ||
+                step.durationOrTimeoutMilliseconds == 0 || objectId < 0) {
+                return invalid(
+                    "wait_web_grab_point requires timeout object_id");
+            }
+            step.objectIds.push_back(objectId);
         } else if (command == "wait_enemy_melee_attack") {
             step.kind = StepKind::WaitEnemyMeleeAttack;
             std::int32_t objectId = -1;
@@ -1647,6 +1656,18 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         }
         break;
     }
+    case StepKind::WaitWebGrabPoint:
+        if (snapshot.playerWebGrabPointObjectId == step.objectIds.front()) {
+            completeStep(snapshot, step);
+        } else if (timedOut()) {
+            failStep(snapshot, step,
+                     "web-grab point did not become selectable; expected=" +
+                         std::to_string(step.objectIds.front()) +
+                         ";actual=" +
+                         std::to_string(
+                             snapshot.playerWebGrabPointObjectId));
+        }
+        break;
     case StepKind::WaitEnemyMeleeAttack: {
         const std::int32_t objectId = step.objectIds.front();
         const auto match = std::find_if(
@@ -1894,6 +1915,58 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                 break;
             }
             input.motion = steerToward(snapshot, target->position);
+            if (activeAttackTargetObjectId_ != target->asset->objectId) {
+                activeAttackTargetObjectId_ = target->asset->objectId;
+                activeAttackProgressPosition_ = snapshot.playerPosition;
+                activeAttackProgressMilliseconds_ =
+                    snapshot.realTimeMilliseconds;
+                activeAttackObstacleRecoveryCount_ = 0;
+            } else if (distance2D(snapshot.playerPosition,
+                                  activeAttackProgressPosition_) >= 20.0F) {
+                activeAttackProgressPosition_ = snapshot.playerPosition;
+                activeAttackProgressMilliseconds_ =
+                    snapshot.realTimeMilliseconds;
+                activeAttackObstacleRecoveryCount_ = 0;
+            } else if (snapshot.playerStateId != 0) {
+                activeAttackProgressMilliseconds_ =
+                    snapshot.realTimeMilliseconds;
+            } else if (targetDistance > step.radius &&
+                       snapshot.realTimeMilliseconds >=
+                           activeAttackProgressMilliseconds_ + 500U) {
+                // `attack` is a goal-directed process-local test driver, not
+                // game AI. If ordinary ground input has moved the player less
+                // than 20 cm for 500 ms, use a normal ranged web press for a
+                // nearby obstructed enemy and the native jump control for a
+                // farther route obstruction. This keeps normal-flow coverage
+                // from deadlocking when native knockback carries a thug across
+                // the Room 4 vehicles or Room 7 rooftop machinery.
+                const bool useWebRecovery =
+                    activeAttackObstacleRecoveryCount_ != 0 &&
+                    targetDistance <= 500.0F;
+                if (useWebRecovery) {
+                    input.webPressed = true;
+                    input.webHeld = true;
+                } else {
+                    input.jumpPressed = true;
+                    input.jumpHeld = true;
+                }
+                recordEvent(
+                    snapshot.realTimeMilliseconds,
+                    "harness_obstacle_recovery",
+                    "command=attack;action=" +
+                        std::string(useWebRecovery ? "web" : "jump") +
+                        ";target=" +
+                        std::to_string(target->asset->objectId) +
+                        ";distance=" + std::to_string(targetDistance) +
+                        ";player=" +
+                        std::to_string(snapshot.playerPosition.x) + "|" +
+                        std::to_string(snapshot.playerPosition.y) + "|" +
+                        std::to_string(snapshot.playerPosition.z));
+                activeAttackProgressPosition_ = snapshot.playerPosition;
+                activeAttackProgressMilliseconds_ =
+                    snapshot.realTimeMilliseconds;
+                ++activeAttackObstacleRecoveryCount_;
+            }
             if (targetDistance <= step.radius) {
                 if (snapshot.playerPunchTransitionReady) {
                     // Preserve the goal-directed stick vector. Native attack
@@ -2734,6 +2807,10 @@ void AutoplayHarness::beginStep(const AutoplaySnapshot& snapshot,
     activeStepPhase_ = 0;
     if (step.kind == StepKind::Attack) {
         activeAttackFarStateObserved_ = false;
+        activeAttackTargetObjectId_ = -1;
+        activeAttackProgressPosition_ = snapshot.playerPosition;
+        activeAttackProgressMilliseconds_ = snapshot.realTimeMilliseconds;
+        activeAttackObstacleRecoveryCount_ = 0;
     }
     recordEvent(snapshot.realTimeMilliseconds, "step_begin",
                 std::to_string(activeStepIndex_) + ":" +
@@ -4693,6 +4770,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::CrossTrigger: return "cross_trigger";
     case StepKind::WaitEnemiesGrounded: return "wait_enemies_grounded";
     case StepKind::WaitEnemiesActive: return "wait_enemies_active";
+    case StepKind::WaitWebGrabPoint: return "wait_web_grab_point";
     case StepKind::WaitEnemyMeleeAttack: return "wait_enemy_melee_attack";
     case StepKind::WaitEnemyProjectile: return "wait_enemy_projectile";
     case StepKind::SetEnemyAi: return "set_enemy_ai";

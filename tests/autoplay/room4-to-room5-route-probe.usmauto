@@ -1,5 +1,5 @@
 # Follow the authored Room 4 street into Room 5, open SpiderWebWall 1195,
-# and use control-locked WebGrabPoint 383's forced exit to WayPoint 30031.
+# and use control-locked WebGrabPoint 383's WayPoint-aimed forced exit.
 fixed_step_ms 25
 sample_interval_ms 25
 capture_interval_ms 0
@@ -25,9 +25,15 @@ move_until_state 2000 0 0 18
 wait 200
 web_off
 move_until_state 1500 0 0 19
-move_until_state 4000 0 0 15
-move_to 2712 2953 148 300 5000
-assert_near 2712 2953 148 350
+# Cinematic 969 starts while the native forced exit is still in state 19 and
+# pauses it until the timer-less tutorial is dismissed. Preserve that order.
+wait_enemies_active 5000 10339 10340 1251
+wait_cinematic_started 5000 969
+capture room5-ultimate-web-tutorial
+wait_controls 5000
+# The aimed release reaches the road, so native motion 28 takes its grounded
+# branch at 0x003510e8-0x003510fa and enters landing state 16.
+move_until_state 4000 0 0 16
 capture room5-forced-web-exit
 assert_health_above 0
 finish
