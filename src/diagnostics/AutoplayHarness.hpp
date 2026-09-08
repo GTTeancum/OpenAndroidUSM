@@ -55,6 +55,7 @@ struct AutoplaySnapshot {
     assets::Vector3 playerAttackRootTranslation;
     assets::Vector3 playerFacing{1.0F, 0.0F, 0.0F};
     float playerHealth{};
+    float playerWebPower{};
     std::int32_t playerSkillPoints{};
     std::int32_t playerComboScore{};
     std::string_view playerAnimation;
@@ -119,6 +120,7 @@ struct AutoplaySnapshot {
     std::int16_t wallWebCompletedActions{};
     bool wallWebLineActive{};
     std::int32_t playerWebGrabPointObjectId{-1};
+    bool spiderSenseCueVisible{};
 };
 
 struct AutoplayTeleport {
@@ -161,6 +163,7 @@ struct AutoplayFrameInput {
     std::vector<AutoplayEnemyAiOverride> enemyAiOverrides;
     std::vector<AutoplayEnemyPhysicsOverride> enemyPhysicsOverrides;
     std::vector<AutoplayEnemyDamage> enemyDamage;
+    std::vector<std::int32_t> skillUnlockRequests;
     std::vector<std::int32_t> cinematicStartRequests;
     std::vector<std::string> captureLabels;
 };
@@ -287,6 +290,7 @@ private:
         MenuDown,
         MenuSelect,
         Teleport,
+        UnlockSkill,
         StartCinematic,
         Capture,
         AssertNear,
@@ -310,9 +314,11 @@ private:
         AssertComboScoreAtLeast,
         AssertPlayerState,
         AssertPlayerEffect,
+        AssertSpiderSenseCue,
         AssertPlayerWebLine,
         AssertSlowMotion,
         AssertHealthAbove,
+        AssertWebPowerNear,
         AssertGameplayUi,
         AssertHealthBelow,
         AssertCinematicNotStarted,
@@ -499,6 +505,7 @@ private:
     std::uint64_t activeAttackProgressMilliseconds_{};
     std::uint32_t activeAttackObstacleRecoveryCount_{};
     float previousPlayerHealth_{};
+    float previousPlayerWebPower_{};
     std::string previousPlayerAnimation_;
     std::int32_t previousCameraAreaId_{-1};
     std::int32_t previousLastCheckPointId_{-1};

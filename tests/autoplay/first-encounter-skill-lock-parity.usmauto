@@ -1,0 +1,33 @@
+# A new Level 1 profile reaches the opening fight before either shipped
+# Unlock command: Spider-Sense is unlocked by cinematic 974 and Ultimate by
+# cinematic 969. Player::CanEnableSpiderSense (0x00341c98) and
+# Player::CanEnableUltimate (0x00345e98) both enforce their profile bits while
+# CLevel+0x44 is zero. This normal-flow gate intentionally does not use the
+# diagnostic unlock_skill command.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 80000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 60000
+teleport 14172 -7978 7 -0.416 -0.909 0
+move_until_cinematic 14067 -8205 7 71 10000
+wait_enemies_active 5000 394 395 397
+set_enemy_ai 395 0
+set_enemy_ai 397 0
+
+# Ultimate input is ignored before cinematic 969 supplies profile bit 0.
+super_attack
+assert_player_state 0
+assert_slow_motion 1
+
+# Spider-Sense input is also ignored even during a valid native knife warning
+# before cinematic 974 supplies profile bit 1.
+teleport 13399 -6650 7 0 1 0
+wait_enemy_melee_attack 10000 394
+spider_sense
+assert_player_state 0
+assert_slow_motion 1
+finish

@@ -3,6 +3,53 @@
 This gate covers the first controllable fight in chronological player flow.
 Passing it does not claim that later combat encounters are complete.
 
+On a new Level 1 profile, this fight occurs before either special skill is
+available. `Player::CanEnableUltimate` (`0x00345e98`) checks profile bit 0 and
+`Player::CanEnableSpiderSense` (`0x00341c98`) checks profile bit 1 while
+`CLevel+0x44` is zero (Level 1). The shipped commands set those bits later:
+cinematic 974 unlocks Spider-Sense at 4000 ms and cinematic 969 unlocks
+Ultimate at 0 ms. Normal gameplay now honors both gates. Isolated component
+scenarios replay `CCinematicThread::OnUnlock` (`0x0037240c`) through the
+autoplay harness without consuming a gameplay tick; the opening-flow lock
+scenario deliberately does not.
+
+## Web-power economy
+
+The shared white HUD bar is live combat state rather than decoration.
+`Player::Player` (`0x0034e4d4`) initializes current power at `Player+0x6f4`
+and maximum power at `Player+0x700`; `CLevel::InitAfterRoomInit`
+(`0x00382bdc`) fills the new Level 1 player to the shipped 1000-point maximum.
+`Player::SetNextStateId` (`0x0034b84e`--`0x0034b86c`) asks
+`Player::GetSpellMagic` (`0x00345c48`) for every entered state and deducts the
+result through `Player::AddWebPower` (`0x00345d74`). At the default difficulty
+and upgrade level, the reachable red-suit costs are 40 for a web pellet, 80
+for web-combo/web-zip states, 160 for strike-land, 70 for a Spider-Sense evade,
+200 total for a Spider-Sense counter or blink strike, and the full 1000 for
+Ultimate.
+
+`Player::CheckCanDoAction` (`0x00345e20`) rejects a requested transition when
+the current meter cannot afford it. `Player::CanEnableUltimate`
+(`0x00345e98`) requires the full meter but does allow Ultimate to replace an
+ordinary grounded attack immediately. `Player::DoNormalSenseAction`
+(`0x0034f7ee`--`0x0034f8b4`) charges the extra 130 points that distinguishes a
+counter from the common 70-point class-six entry cost.
+
+Passive recovery is also native state. `Player::PreUpdate` (`0x0034dfd8`)
+calls `Player::UpdatePowerRestore` (`0x00345f3c`) before the state update and
+adds 20 points per second for a new default profile. Positive restoration is
+blocked while the active state itself has a spell cost and during Ultimate
+states 107--113 or state 116. Successful hits use the actual target-health
+loss in `Player::SendHitMessage` (`0x003460de`--`0x00346132`): their recovery
+factor is 0.8 at or below 250 power and falls linearly to 0.25 at full power.
+That permission is captured at the impact frame because native
+`SendHitMessage` calls `NoPowerRestoreState` synchronously, before the state
+runner can cross a linked-animation boundary; deferred application dispatch
+must not accidentally test the following state instead.
+The renderer now receives the measured current/maximum ratio, and autoplay
+records both a `web_power` frame column and every meter transition. The
+combined effects gate proves the 40-point pellet cost, native recovery to
+1000, and only then the full-meter Ultimate transition.
+
 ## Enemy health and player damage
 
 Room 1 objects 394, 395, and 397 each serialize `Health=500.000000` in the
@@ -145,6 +192,26 @@ the light/heavy player hurt animation, and state-enter hurt audio. Action type
 2 registers Spider-Sense at 2 percent of each attack clip, after the attack
 volume confirms the player is in range; merely entering the wind-up no longer
 makes a premature counter available.
+
+When LB is accepted, `Player::UpdateSpiderSense` calls
+`CTargetHelper::popAttack` (`0x0034fc40`--`0x0034fc48`) before entering the
+response. `CTargetHelper::popAttack` (`0x00353d98`) copies the selected
+`AISenseInfo` and removes that attacker from the pending list. The portable
+warning now has the same one-shot lifetime: the knife animation may continue,
+but another LB edge cannot consume the same warning or replace the response
+already playing.
+
+The warning itself is also native gameplay state, not merely the tutorial
+textbox. `Player::SpawnPlayer` (`0x003455fe`--`0x0034564a`) creates a second
+`Hint`, assigns `hintbb.bsprite` animation 0, links it directly to
+`Bip01_Head`, and places it 50 cm above that bone. `Player::UpdateSpiderSense`
+(`0x0034fba0`--`0x0034fbea`) shows this cue at size 50 only while state 34
+passes `CheckCanDoAction` and a target-helper warning can be consumed;
+`ClearSpiderSense` hides it otherwise. The runtime cue is distinct from
+cinematic 974's authored tutorial Hint, so a cinematic `SetVisible` command
+cannot erase a live attack warning. Core, D3D11, and autoplay coverage prove
+its independent visibility and same-frame dismissal after an accepted LB
+edge.
 
 ## Contact, trail, and audio timing
 
@@ -399,8 +466,8 @@ Android executable and Level 1 scene.
 ## Automated acceptance
 
 The coherent native-cadence Release run in
-`analysis/generated/combat-native-cadence-final/suite-manifest.json`
-completed all 33 selected scenarios with 33 passes and zero failures. The run
+`analysis/generated/combat-sense-cue-suite/suite-manifest.json`
+completed all 34 selected scenarios with 34 passes and zero failures. The run
 used one executable hash for every scenario and removed 23 generated BMP
 captures after their assertions. The current retained gates are:
 
@@ -410,7 +477,7 @@ captures after their assertions. The current retained gates are:
 - `first-encounter-full-combo-effects.usmauto` (46/46)
 - `first-encounter-simultaneous-input-order.usmauto` (20/20)
 - `first-encounter-alternate-combat-effects.usmauto` (82/82)
-- `combat-effects-parity-gate.usmauto` (43/43)
+- `combat-effects-parity-gate.usmauto` (47/47)
 - `first-encounter-normal-progression.usmauto` (14/14)
 - `first-encounter-ground-web-bind-parity.usmauto` (21/21)
 - `first-encounter-ground-web-throw-parity.usmauto` (32/32)
@@ -421,12 +488,13 @@ captures after their assertions. The current retained gates are:
 - `first-encounter-jump-release-parity.usmauto` (37/37)
 - `first-encounter-launcher-parity.usmauto` (23/23)
 - `first-encounter-crowd-separation.usmauto` (11/11)
-- `first-encounter-spider-sense-counter.usmauto` (17/17)
-- `first-encounter-spider-sense-back-counter.usmauto` (17/17)
-- `first-encounter-spider-sense-left-counter.usmauto` (17/17)
-- `first-encounter-spider-sense-right-counter.usmauto` (17/17)
-- `first-encounter-spider-sense-air-evade.usmauto` (16/16)
-- `first-encounter-spider-sense-blink-strike.usmauto` (24/24)
+- `first-encounter-spider-sense-counter.usmauto` (25/25)
+- `first-encounter-spider-sense-back-counter.usmauto` (18/18)
+- `first-encounter-spider-sense-left-counter.usmauto` (18/18)
+- `first-encounter-spider-sense-right-counter.usmauto` (18/18)
+- `first-encounter-spider-sense-air-evade.usmauto` (17/17)
+- `first-encounter-spider-sense-blink-strike.usmauto` (25/25)
+- `first-encounter-skill-lock-parity.usmauto` (15/15)
 - `first-encounter-ground-web-directional-throw-parity.usmauto` (23/23)
 - `first-encounter-ground-web-drag-down-parity.usmauto` (32/32)
 - `first-encounter-air-target-kick-parity.usmauto` (32/32)

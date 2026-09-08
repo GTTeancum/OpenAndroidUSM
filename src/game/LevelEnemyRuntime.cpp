@@ -2947,6 +2947,21 @@ const LevelEnemyState* LevelEnemyRuntime::findSpiderSenseAttacker(
     return nearest;
 }
 
+bool LevelEnemyRuntime::consumeSpiderSenseAttacker(
+    std::int32_t objectId) noexcept {
+    LevelEnemyState* enemy = findMutable(objectId);
+    if (enemy == nullptr || !enemy->meleeAttackActive ||
+        !enemy->meleeSenseActive) {
+        return false;
+    }
+    // Player::UpdateSpiderSense (0x0034fc40-0x0034fc48) calls
+    // CTargetHelper::popAttack (0x00353d98) before DoNormalSenseAction.
+    // popAttack copies the selected AISenseInfo and then removeAttack erases
+    // that attacker from the helper's pending list.
+    enemy->meleeSenseActive = false;
+    return true;
+}
+
 float LevelEnemyRuntime::spiderSenseSlowMotionDenominator(
     std::int32_t objectId) const noexcept {
     const LevelEnemyState* enemy = find(objectId);

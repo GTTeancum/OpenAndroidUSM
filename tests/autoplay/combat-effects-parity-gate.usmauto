@@ -28,6 +28,7 @@ assert_enemy_health_below 394 500
 # then retains the enemy for the production travelling-pellet path.
 teleport 13399 -7000 7 0 1 0
 web_on
+assert_web_power_near 960 0.001
 capture web-pellet-near
 wait 100
 capture web-pellet-mid
@@ -35,8 +36,15 @@ wait 150
 wait 250
 assert_enemy_health_below 394 446
 
+# The projectile spent 40 points. UpdatePowerRestore adds the shipped 20
+# points/second only after the cost-bearing shot state exits, so wait for the
+# meter that CanEnableUltimate requires to be full again.
+wait 1500
+assert_web_power_near 1000 0.001
+
 # Native ultimate state 107: expanding web-out mesh.
 teleport 13200 -6600 7 0 1 0
+unlock_skill 0
 super_attack
 assert_slow_motion 3
 assert_player_effect 24 1

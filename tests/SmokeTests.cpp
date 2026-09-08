@@ -224,6 +224,21 @@ int main() {
         (void)tapHarness.update(snap);
         assert(tapHarness.complete() && !tapHarness.failed());
     }
+    {
+        const auto unlockScript = autoplayTestRoot / "skill-unlock.usmauto";
+        {
+            std::ofstream stream(unlockScript);
+            stream << "unlock_skill 0\nunlock_skill 1\nfinish\n";
+        }
+        usm::diagnostics::AutoplayHarness unlockHarness;
+        assert(unlockHarness.initialize(
+            unlockScript, autoplayTestRoot / "skill-unlock-output"));
+        usm::diagnostics::AutoplaySnapshot snap;
+        const auto unlocks = unlockHarness.update(snap);
+        assert((unlocks.skillUnlockRequests ==
+                std::vector<std::int32_t>{0, 1}));
+        assert(unlockHarness.complete() && !unlockHarness.failed());
+    }
     assert(autoplayHarness.renderWidth() == 320);
     assert(autoplayHarness.renderHeight() == 180);
     usm::game::LevelTriggerAsset autoplayTrigger;
@@ -4863,9 +4878,26 @@ int main() {
 
         usm::game::LevelHintRuntime hintRuntime;
         assert(hintRuntime.initialize(bootstrap.hints()));
+        assert(hintRuntime.states().size() == 2);
+        assert(!hintRuntime.combatSenseCueVisible());
         const auto* hintState = hintRuntime.find(1113);
         assert(hintState != nullptr && !hintState->visible);
         assert(hintState->frameIndex == 6);
+        hintRuntime.setCombatSenseCueVisible(true);
+        assert(hintRuntime.combatSenseCueVisible());
+        hintRuntime.update(99, [](std::int32_t objectId) {
+            assert(objectId == 288);
+            return usm::assets::Vector3{10.0F, 20.0F, 30.0F};
+        });
+        const auto& combatSenseState = hintRuntime.states().back();
+        assert(combatSenseState.combatSenseCue);
+        assert(combatSenseState.visible);
+        assert(combatSenseState.frameIndex == 6);
+        assert(combatSenseState.position.x == 10.0F);
+        assert(combatSenseState.position.y == 20.0F);
+        assert(combatSenseState.position.z == 240.0F);
+        hintRuntime.setCombatSenseCueVisible(false);
+        assert(!hintRuntime.combatSenseCueVisible());
         usm::game::CinematicThread hintThread;
         hintThread.objectId = 1113;
         usm::game::CinematicCommand showHint;
@@ -8334,6 +8366,13 @@ int main() {
         senseTimingRuntime.updateGameplay(1U, knifeVictim);
         assert(senseTimingRuntime.find(394)->meleeSenseActive);
         assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) != nullptr);
+        // UpdateSpiderSense pops exactly one CTargetHelper warning before it
+        // enters the response state. The live knife animation continues, but
+        // the same warning cannot be accepted a second time.
+        assert(senseTimingRuntime.consumeSpiderSenseAttacker(394));
+        assert(!senseTimingRuntime.find(394)->meleeSenseActive);
+        assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) == nullptr);
+        assert(!senseTimingRuntime.consumeSpiderSenseAttacker(394));
         enemyAttackRuntime.updateGameplay(firstKnifeImpact, knifeVictim);
         auto enemyHits = enemyAttackRuntime.consumePlayerHits();
         const auto firstKnifeHit = std::find_if(
@@ -10587,8 +10626,13 @@ int main() {
                                         nullptr,
                                         &bootstrap.playerHitEffectConfigs(),
                                         bootstrap.playerHitEffects()));
+        assert(ultimatePlayer.webPower() == 1000.0F);
+        // Native CanEnableUltimate permits a full-meter Ultimate to replace
+        // an ordinary grounded combo state immediately.
+        assert(ultimatePlayer.requestPunch());
         assert(ultimatePlayer.requestUltimate());
         assert(ultimatePlayer.activeStateId() == 107);
+        assert(ultimatePlayer.webPower() == 0.0F);
         assert(!ultimatePlayer.requestSpiderSense(
             usm::game::PlayerAttackTarget{
                 {150.0F, 0.0F, 0.0F}, 40.0F, 1241, false, 150.0F}));
@@ -10707,6 +10751,76 @@ int main() {
         assert(ultimateSplash.has_value());
         assert(ultimateSplash->effectType == "super_web_splash");
         assert(ultimateSplash->voxSoundId == 0x54);
+
+        usm::game::GameplayPlayer webPowerPlayer;
+        assert(webPowerPlayer.initialize(bootstrap.player(), nullptr,
+                                         &playerStateConfigs));
+        assert(webPowerPlayer.requestWeb());
+        assert(std::abs(webPowerPlayer.webPower() - 960.0F) < 0.001F);
+        // Positive hit restoration is rejected while GetSpellMagic for the
+        // current web-shot state is nonzero.
+        webPowerPlayer.addCombo(100.0F, false, 0);
+        assert(std::abs(webPowerPlayer.webPower() - 960.0F) < 0.001F);
+        for (int update = 0;
+             update < 100 && webPowerPlayer.activeStateId() != 0;
+             ++update) {
+            webPowerPlayer.update({}, gameplayCameraPose, 50);
+        }
+        assert(webPowerPlayer.activeStateId() == 0);
+        const float powerAfterWebRecovery = webPowerPlayer.webPower();
+        assert(std::abs(powerAfterWebRecovery - 964.0F) < 0.001F);
+        assert(!webPowerPlayer.requestUltimate());
+        assert(webPowerPlayer.lastActionRejectionReason() ==
+               "insufficient_web_power");
+        webPowerPlayer.update({}, gameplayCameraPose, 1000);
+        const float powerBeforeHit = powerAfterWebRecovery + 20.0F;
+        assert(std::abs(webPowerPlayer.webPower() - powerBeforeHit) < 0.001F);
+        webPowerPlayer.addCombo(10.0F, false, 1000);
+        const float expectedHitRestore =
+            10.0F * ((powerBeforeHit - 250.0F) / 750.0F * -0.55F +
+                     0.8F);
+        assert(std::abs(webPowerPlayer.webPower() -
+                        (powerBeforeHit + expectedHitRestore)) < 0.001F);
+
+        usm::game::GameplayPlayer senseCounterPowerPlayer;
+        assert(senseCounterPowerPlayer.initialize(bootstrap.player(), nullptr,
+                                                  &playerStateConfigs));
+        senseCounterPowerPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                          {1.0F, 0.0F, 0.0F});
+        assert(senseCounterPowerPlayer.requestSpiderSense(
+            usm::game::PlayerAttackTarget{
+                {150.0F, 0.0F, 0.0F}, 40.0F, 1241, false, 150.0F}));
+        assert(std::abs(senseCounterPowerPlayer.webPower() - 800.0F) <
+               0.001F);
+        senseCounterPowerPlayer.update({}, gameplayCameraPose, 400);
+        const auto sensePowerImpact =
+            senseCounterPowerPlayer.consumeMeleeImpact();
+        assert(sensePowerImpact.has_value());
+        assert(sensePowerImpact->senseAttack);
+        assert(sensePowerImpact->powerRestoreBlocked);
+        for (int update = 0;
+             update < 100 && senseCounterPowerPlayer.activeStateId() != 0;
+             ++update) {
+            senseCounterPowerPlayer.update({}, gameplayCameraPose, 50);
+        }
+        assert(senseCounterPowerPlayer.activeStateId() == 0);
+        const float powerBeforeDeferredSenseHit =
+            senseCounterPowerPlayer.webPower();
+        senseCounterPowerPlayer.addCombo(
+            100.0F, false, 1000,
+            !sensePowerImpact->powerRestoreBlocked);
+        assert(std::abs(senseCounterPowerPlayer.webPower() -
+                        powerBeforeDeferredSenseHit) < 0.001F);
+        usm::game::GameplayPlayer senseEvadePowerPlayer;
+        assert(senseEvadePowerPlayer.initialize(bootstrap.player(), nullptr,
+                                                &playerStateConfigs));
+        senseEvadePowerPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                        {1.0F, 0.0F, 0.0F});
+        assert(senseEvadePowerPlayer.requestSpiderSense(
+            usm::game::PlayerAttackTarget{
+                {300.0F, 0.0F, 0.0F}, 40.0F, 1242, false, 150.0F}));
+        assert(std::abs(senseEvadePowerPlayer.webPower() - 930.0F) <
+               0.001F);
 
         usm::game::GameplayPlayer farAttackPlayer;
         assert(farAttackPlayer.initialize(bootstrap.player(), nullptr,

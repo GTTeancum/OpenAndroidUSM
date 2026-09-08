@@ -1161,6 +1161,18 @@ int main() {
         assert(countChangedPixels(hintHiddenFrame, hintVisibleFrame) > 10);
         showHint.attributes.front().value = "false";
         assert(hintRuntime.applyCinematicCommand(hintThread, showHint));
+        hintRuntime.setCombatSenseCueVisible(true);
+        hintRuntime.update(100, [&levelOne](std::int32_t objectId) {
+            assert(objectId == levelOne.player().objectId);
+            return levelOne.player().position;
+        });
+        assert(gameRenderer.updateLevelOneHints(hintRuntime));
+        gameRenderer.renderFrame();
+        RgbaImage combatSenseHintFrame;
+        assert(gameRenderer.readBackImage(combatSenseHintFrame));
+        assert(countChangedPixels(hintHiddenFrame, combatSenseHintFrame) >
+               10);
+        hintRuntime.setCombatSenseCueVisible(false);
         assert(gameRenderer.updateLevelOneHints(hintRuntime));
         cinematicVisibleRooms.fill(false);
         gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);

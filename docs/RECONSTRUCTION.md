@@ -432,6 +432,18 @@ have all passed production-combat acceptance.
 
 ## Native gameplay and combat
 
+The player web-power subsystem follows the original `Player` fields and call
+order. `Player::Player` (`0x0034e4d4`) and `CLevel::InitAfterRoomInit`
+(`0x00382bdc`) establish a full 1000-point Level 1 meter. State entry deducts
+the exact `Player::GetSpellMagic` (`0x00345c48`) result through
+`Player::AddWebPower` (`0x00345d74`), while `Player::CheckCanDoAction`
+(`0x00345e20`) gates unaffordable transitions. `Player::PreUpdate`
+(`0x0034dfd8`) restores the default red-suit meter at 20 points per second,
+subject to `Player::NoPowerRestoreState` (`0x00345d30`). Accepted target
+health loss restores the nonlinear amount calculated by
+`Player::SendHitMessage` (`0x00345fe8`). The HUD and deterministic trace now
+consume the reconstructed live value instead of an always-full placeholder.
+
 `GameplayPlayer` implements renderer-independent ground movement, collision,
 camera-relative controller input, named punch clips, authored impact timing,
 and health. `LevelEnemyRuntime` owns the mutable state of all 34 level-one
@@ -2365,6 +2377,17 @@ animation and frame-module offsets. Core tests prove the recovered frames 6
 and 13 on their exact 100 ms boundary; a WARP regression shows and hides the
 cue through the original `SetVisible` commands and verifies changed pixels
 above the player.
+
+The live combat warning is a separate native object. `Player::SpawnPlayer`
+(`0x003455fe`--`0x0034564a`) obtains `HintManager::GetSenseHint`, loads the
+same `hintbb.bsprite` animation 0, links it directly to `Bip01_Head`, and
+authors a 50 cm Z offset. `Player::UpdateSpiderSense` (`0x0034fba0`--
+`0x0034fbea`) makes that runtime hint visible at size 50 only while state 34
+is affordable/actionable and a target-helper attack remains queued.
+`CTargetHelper::popAttack` removes the warning on accepted input, after which
+`ClearSpiderSense` hides the cue. The portable runtime therefore maintains a
+second independently visible state backed by the decoded Level 1 atlas; the
+tutorial's cinematic visibility never substitutes for or overwrites it.
 
 ## Animated environment and comic-cover objects
 

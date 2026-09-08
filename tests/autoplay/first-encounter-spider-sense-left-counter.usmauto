@@ -16,6 +16,7 @@ set_enemy_ai 395 0
 set_enemy_ai 397 0
 teleport 13399 -6650 7 1 0 0
 wait_enemy_melee_attack 10000 394
+unlock_skill 1
 spider_sense
 assert_player_state 40
 assert_slow_motion 3

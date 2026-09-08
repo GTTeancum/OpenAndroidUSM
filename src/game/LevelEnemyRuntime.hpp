@@ -565,6 +565,11 @@ public:
     // engager to the spider-sense input path.
     [[nodiscard]] const LevelEnemyState* findSpiderSenseAttacker(
         const assets::Vector3& playerPosition) const noexcept;
+    // CTargetHelper::popAttack (0x00353d98) removes the selected warning as
+    // soon as UpdateSpiderSense accepts it. This prevents one enemy attack
+    // from being consumed repeatedly during its remaining animation.
+    [[nodiscard]] bool consumeSpiderSenseAttacker(
+        std::int32_t objectId) noexcept;
     [[nodiscard]] float spiderSenseSlowMotionDenominator(
         std::int32_t objectId) const noexcept;
     [[nodiscard]] std::int32_t spiderSenseReactionType(

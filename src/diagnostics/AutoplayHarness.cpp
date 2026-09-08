@@ -134,7 +134,7 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
     frameLog_ << "frame,real_ms,game_ms,slow_motion_denominator,phase,controls,attribution,player_x,player_y,"
                  "player_z,render_x,render_y,render_z,attack_root_x,"
                  "attack_root_y,attack_root_z,facing_x,facing_y,facing_z,"
-                 "health,skill_points,combo_score,animation,"
+                 "health,web_power,skill_points,combo_score,animation,"
                  "animation_ms,state_id,state_name,punch_transition_ready,"
                  "punch_attack_transition_ready,"
                  "jump_attack_transition_ready,jump_release_attack_transition_ready,"
@@ -913,6 +913,13 @@ Result AutoplayHarness::parseScript(
                   step.facing.z)) {
                 return invalid("teleport requires x y z facing_x facing_y facing_z");
             }
+        } else if (command == "unlock_skill") {
+            step.kind = StepKind::UnlockSkill;
+            std::int32_t skillId = -1;
+            if (!(tokens >> skillId) || skillId < 0 || skillId > 1) {
+                return invalid("unlock_skill requires skill_id 0 or 1");
+            }
+            step.objectIds.push_back(skillId);
         } else if (command == "start_cinematic") {
             step.kind = StepKind::StartCinematic;
             std::int32_t cinematicId = -1;
@@ -1104,6 +1111,14 @@ Result AutoplayHarness::parseScript(
             }
             step.objectIds.push_back(effectId);
             step.value = static_cast<float>(minimumCount);
+        } else if (command == "assert_spider_sense_cue") {
+            step.kind = StepKind::AssertSpiderSenseCue;
+            std::int32_t visible = -1;
+            if (!(tokens >> visible) || (visible != 0 && visible != 1)) {
+                return invalid(
+                    "assert_spider_sense_cue requires visible (0 or 1)");
+            }
+            step.objectIds.push_back(visible);
         } else if (command == "assert_player_web_line") {
             step.kind = StepKind::AssertPlayerWebLine;
             std::int32_t active = -1;
@@ -1127,6 +1142,14 @@ Result AutoplayHarness::parseScript(
             step.kind = StepKind::AssertHealthAbove;
             if (!(tokens >> step.value)) {
                 return invalid("assert_health_above requires a value");
+            }
+        } else if (command == "assert_web_power_near") {
+            step.kind = StepKind::AssertWebPowerNear;
+            if (!(tokens >> step.value >> step.radius) ||
+                !std::isfinite(step.value) || !std::isfinite(step.radius) ||
+                step.radius < 0.0F) {
+                return invalid(
+                    "assert_web_power_near requires value tolerance");
             }
         } else if (command == "assert_health_below") {
             step.kind = StepKind::AssertHealthBelow;
@@ -1281,6 +1304,10 @@ AutoplayFrameInput AutoplayHarness::update(
         input.enemyDamage.insert(input.enemyDamage.end(),
                                  stepInput.enemyDamage.begin(),
                                  stepInput.enemyDamage.end());
+        input.skillUnlockRequests.insert(
+            input.skillUnlockRequests.end(),
+            stepInput.skillUnlockRequests.begin(),
+            stepInput.skillUnlockRequests.end());
         input.cinematicStartRequests.insert(
             input.cinematicStartRequests.end(),
             stepInput.cinematicStartRequests.begin(),
@@ -1316,6 +1343,7 @@ AutoplayFrameInput AutoplayHarness::update(
                                step.kind == StepKind::MenuDown ||
                                step.kind == StepKind::MenuSelect ||
                                step.kind == StepKind::Teleport ||
+                               step.kind == StepKind::UnlockSkill ||
                                step.kind == StepKind::StartCinematic ||
                                step.kind == StepKind::SetEnemyAi ||
                                step.kind == StepKind::SetEnemyPhysics ||
@@ -1323,6 +1351,12 @@ AutoplayFrameInput AutoplayHarness::update(
                                step.kind == StepKind::Capture;
         if (!immediate || complete_ || failed_) {
             break;
+        }
+        // unlock_skill is diagnostic setup, not a simulated input edge. It
+        // replays the native cinematic command without consuming a gameplay
+        // tick, then lets the following combat action share this snapshot.
+        if (step.kind == StepKind::UnlockSkill) {
+            continue;
         }
         // Immediate steps must return their one-frame action before advancing
         // into another step, otherwise an edge-triggered input can disappear.
@@ -2292,6 +2326,10 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         input.teleport = AutoplayTeleport{step.position, step.facing};
         completeStep(snapshot, step);
         break;
+    case StepKind::UnlockSkill:
+        input.skillUnlockRequests.push_back(step.objectIds.front());
+        completeStep(snapshot, step);
+        break;
     case StepKind::StartCinematic:
         input.cinematicStartRequests.push_back(step.objectIds.front());
         completeStep(snapshot, step);
@@ -2657,6 +2695,18 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         }
         break;
     }
+    case StepKind::AssertSpiderSenseCue:
+        if (step.objectIds.empty() ||
+            snapshot.spiderSenseCueVisible !=
+                (step.objectIds.front() != 0)) {
+            failStep(snapshot, step,
+                     "spider-sense cue visibility differed; actual=" +
+                         std::to_string(snapshot.spiderSenseCueVisible ? 1
+                                                                      : 0));
+        } else {
+            completeStep(snapshot, step);
+        }
+        break;
     case StepKind::AssertPlayerWebLine: {
         const bool expectedActive = step.objectIds[0] != 0;
         const std::size_t expectedCount =
@@ -2705,6 +2755,15 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         if (snapshot.playerHealth <= step.value) {
             failStep(snapshot, step,
                      "player health did not satisfy assert_health_above");
+        } else {
+            completeStep(snapshot, step);
+        }
+        break;
+    case StepKind::AssertWebPowerNear:
+        if (std::abs(snapshot.playerWebPower - step.value) > step.radius) {
+            failStep(snapshot, step,
+                     "player web power differed from assertion; actual=" +
+                         std::to_string(snapshot.playerWebPower));
         } else {
             completeStep(snapshot, step);
         }
@@ -2970,6 +3029,12 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                    std::to_string(previousPlayerHealth_) + "->" +
                        std::to_string(snapshot.playerHealth));
         previousPlayerHealth_ = snapshot.playerHealth;
+    }
+    if (snapshot.playerWebPower != previousPlayerWebPower_) {
+        transition("player_web_power",
+                   std::to_string(previousPlayerWebPower_) + "->" +
+                       std::to_string(snapshot.playerWebPower));
+        previousPlayerWebPower_ = snapshot.playerWebPower;
     }
     if (snapshot.deathConfirmationActive !=
         previousDeathConfirmationActive_) {
@@ -3443,6 +3508,7 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
               << snapshot.playerFacing.x
               << ',' << snapshot.playerFacing.y << ','
               << snapshot.playerFacing.z << ',' << snapshot.playerHealth << ','
+              << snapshot.playerWebPower << ','
               << snapshot.playerSkillPoints << ','
               << snapshot.playerComboScore << ','
               << csv(snapshot.playerAnimation) << ','
@@ -4855,6 +4921,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::MenuDown: return "menu_down";
     case StepKind::MenuSelect: return "menu_select";
     case StepKind::Teleport: return "teleport";
+    case StepKind::UnlockSkill: return "unlock_skill";
     case StepKind::StartCinematic: return "start_cinematic";
     case StepKind::Capture: return "capture";
     case StepKind::AssertNear: return "assert_near";
@@ -4886,10 +4953,12 @@ std::string AutoplayHarness::stepName(StepKind kind) {
         return "assert_combo_score_at_least";
     case StepKind::AssertPlayerState: return "assert_player_state";
     case StepKind::AssertPlayerEffect: return "assert_player_effect";
+    case StepKind::AssertSpiderSenseCue: return "assert_spider_sense_cue";
     case StepKind::AssertPlayerWebLine:
         return "assert_player_web_line";
     case StepKind::AssertSlowMotion: return "assert_slow_motion";
     case StepKind::AssertHealthAbove: return "assert_health_above";
+    case StepKind::AssertWebPowerNear: return "assert_web_power_near";
     case StepKind::AssertGameplayUi: return "assert_gameplay_ui";
     case StepKind::AssertHealthBelow: return "assert_health_below";
     case StepKind::AssertCinematicNotStarted:

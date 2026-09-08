@@ -20,13 +20,25 @@ set_enemy_ai 397 0
 # injecting an attack or damage event.
 teleport 13399 -6650 7 0 1 0
 wait_enemy_melee_attack 10000 394
+unlock_skill 1
+wait 50
+assert_spider_sense_cue 1
 spider_sense
 assert_player_state 38
+assert_spider_sense_cue 0
 assert_slow_motion 3
+assert_web_power_near 800 0.01
+
+# UpdateSpiderSense pops this warning from CTargetHelper before entering the
+# counter. A second LB edge during the same knife animation must not consume
+# the already-handled attack and replace state 38 with another sense state.
+spider_sense
+assert_player_state 38
+assert_web_power_near 800 0.01
 
 # State 38's serialized contact is frame 8 (400 game ms). EnemyAttackInfo
 # supplies 3x slow motion until CheckAttackTarget resets it at that frame.
-wait 750
+wait 550
 assert_enemy_health_near 394 200 0.01
 assert_player_effect 7 1
 assert_slow_motion 1

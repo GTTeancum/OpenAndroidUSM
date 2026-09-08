@@ -78,6 +78,10 @@ struct PlayerMeleeImpact {
     std::int16_t hitType{100};
     float horizontalForce{};
     float verticalForce{};
+    // Player::SendHitMessage decides AddWebPower eligibility synchronously
+    // while this source state is still current. Application consumes the
+    // portable impact after update(), so preserve that contact-time decision.
+    bool powerRestoreBlocked{};
 };
 
 struct PlayerWebPelletLaunch {
@@ -222,6 +226,10 @@ public:
     [[nodiscard]] bool requestUltimate() noexcept;
     [[nodiscard]] bool requestSpiderSense(
         const PlayerAttackTarget& attacker) noexcept;
+    // Player::UpdateSpiderSense shows its warning only when both
+    // CheckCanDoAction(k_state_sense_avoid_front) and
+    // CanEnableSpiderSense succeed.
+    [[nodiscard]] bool canDisplaySpiderSense() const noexcept;
     // Player::UpdateKeyTrigger (0x0034d0a4) scans the current state's
     // serialized transition rows and lets later qualifying rows replace the
     // pending state. Use this before dispatching simultaneous face buttons;
@@ -252,7 +260,9 @@ public:
     // score separate from skill points. Damage is the target's actual health
     // delta recovered from Player::SendHitMessage (0x00345fe8).
     void addCombo(float actualDamage, bool ultimateActive,
-                  std::uint64_t timeMilliseconds) noexcept;
+                  std::uint64_t timeMilliseconds,
+                  std::optional<bool> powerRestoreAllowedAtContact =
+                      std::nullopt) noexcept;
     void updateComboState(std::uint64_t timeMilliseconds) noexcept;
     void setComboScore(std::int32_t score) noexcept;
     void restoreAt(const assets::Vector3& position,
@@ -352,6 +362,10 @@ public:
         noexcept;
     [[nodiscard]] float health() const noexcept { return health_; }
     [[nodiscard]] float maximumHealth() const noexcept { return maximumHealth_; }
+    [[nodiscard]] float webPower() const noexcept { return webPower_; }
+    [[nodiscard]] float maximumWebPower() const noexcept {
+        return maximumWebPower_;
+    }
     [[nodiscard]] std::int32_t skillPoints() const noexcept {
         return skillPoints_;
     }
@@ -474,7 +488,7 @@ private:
     [[nodiscard]] assets::Vector3 animationRenderOffset(
         const assets::ColladaAnimationClip* clip,
         std::uint32_t localMilliseconds) const noexcept;
-    void queueAttackTransition(
+    [[nodiscard]] bool queueAttackTransition(
         const PlayerStateDefinition& state,
         const std::optional<PlayerAttackTarget>& target,
         bool airborne) noexcept;
@@ -522,6 +536,13 @@ private:
     [[nodiscard]] bool attackInputWindowOpen() const noexcept;
     [[nodiscard]] bool locomotionInputWindowOpen() const noexcept;
     [[nodiscard]] bool canEnableSpiderSense() const noexcept;
+    [[nodiscard]] float spellMagicForState(
+        const PlayerStateDefinition& state) const noexcept;
+    [[nodiscard]] bool canAffordState(
+        const PlayerStateDefinition& state) const noexcept;
+    [[nodiscard]] bool powerRestoreBlocked() const noexcept;
+    void addWebPower(float amount) noexcept;
+    void updateWebPowerRestore(std::uint32_t elapsedMilliseconds) noexcept;
     void enterLocomotionState(LocomotionState state) noexcept;
     void updateJump(const PlayerMotionInput& input, const CameraPose& camera,
                     std::uint32_t elapsedMilliseconds) noexcept;
@@ -698,6 +719,9 @@ private:
     std::size_t enteredStateCount_{};
     float health_{1000.0F};
     float maximumHealth_{1000.0F};
+    float webPower_{1000.0F};
+    float maximumWebPower_{1000.0F};
+    float webPowerRestoreDelayMilliseconds_{};
     std::int32_t skillPoints_{};
     std::int32_t normalComboCount_{};
     std::int32_t ultimateComboCount_{};

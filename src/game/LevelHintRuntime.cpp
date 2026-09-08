@@ -60,8 +60,38 @@ Result LevelHintRuntime::initialize(std::span<const LevelHintAsset> hints) {
         state.visible = hint.visible;
         updateFrame(state);
         states_.push_back(state);
+
+        // Player::SpawnPlayer (0x00345260, 0x003455fe-0x0034564a) creates a
+        // separate HintManager sense cue from hintbb animation 0, links it
+        // to Bip01_Head, and leaves it hidden. Level 1 packages an authored
+        // node with the same sprite/animation for the tutorial, so retain a
+        // second runtime state backed by those decoded resources.
+        if (hint.spriteFile == "hintbb.bsprite" &&
+            hint.animationIndex == 0) {
+            LevelHintState combatSense = state;
+            combatSense.visible = false;
+            combatSense.combatSenseCue = true;
+            states_.push_back(combatSense);
+        }
     }
     return Result::success();
+}
+
+void LevelHintRuntime::setCombatSenseCueVisible(bool visible) noexcept {
+    const auto match = std::find_if(
+        states_.begin(), states_.end(), [](const LevelHintState& state) {
+            return state.combatSenseCue;
+        });
+    if (match != states_.end()) {
+        match->visible = visible;
+    }
+}
+
+bool LevelHintRuntime::combatSenseCueVisible() const noexcept {
+    return std::any_of(states_.begin(), states_.end(),
+                       [](const LevelHintState& state) {
+                           return state.combatSenseCue && state.visible;
+                       });
 }
 
 Result LevelHintRuntime::applyCinematicCommand(
@@ -98,7 +128,11 @@ void LevelHintRuntime::update(
                 // then adds the recovered 35 + 25 unit head clearance. The
                 // gameplay root is at the feet, so retain the player's
                 // reconstructed 160-unit standing height as the fallback.
-                state.position.z += 220.0F;
+                // The dynamic sense cue is linked directly to Bip01_Head
+                // with a 50 cm Z offset in Player::SpawnPlayer. The authored
+                // HintBase path adds 35 + 25 cm above the reconstructed
+                // 160 cm player root.
+                state.position.z += state.combatSenseCue ? 210.0F : 220.0F;
             }
         }
         state.animationTimeMilliseconds =
@@ -114,7 +148,7 @@ const LevelHintState* LevelHintRuntime::find(std::int32_t objectId) const
     noexcept {
     const auto match = std::find_if(
         states_.begin(), states_.end(), [objectId](const LevelHintState& state) {
-            return state.asset != nullptr &&
+            return !state.combatSenseCue && state.asset != nullptr &&
                    state.asset->objectId == objectId;
         });
     return match == states_.end() ? nullptr : &*match;
@@ -123,7 +157,7 @@ const LevelHintState* LevelHintRuntime::find(std::int32_t objectId) const
 LevelHintState* LevelHintRuntime::findMutable(std::int32_t objectId) noexcept {
     const auto match = std::find_if(
         states_.begin(), states_.end(), [objectId](const LevelHintState& state) {
-            return state.asset != nullptr &&
+            return !state.combatSenseCue && state.asset != nullptr &&
                    state.asset->objectId == objectId;
         });
     return match == states_.end() ? nullptr : &*match;

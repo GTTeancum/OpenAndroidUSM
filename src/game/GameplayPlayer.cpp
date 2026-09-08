@@ -104,6 +104,14 @@ constexpr std::array<float, 4> kAttackPowerUpgrade{
     1.0F, 1.16F, 1.32F, 1.5F};
 constexpr std::array<float, 4> kMagicPowerUpgrade{
     1.0F, 1.16F, 1.32F, 1.5F};
+constexpr std::array<float, 4> kMagicRestoreUpgrade{
+    1.0F, 1.16F, 1.32F, 1.5F};
+constexpr std::array<float, 4> kMagicConsumeUpgrade{
+    1.0F, 0.97F, 0.94F, 0.9F};
+constexpr std::array<float, 4> kMagicRestoreHardLevel{
+    1.2F, 1.0F, 0.7F, 0.5F};
+constexpr std::array<float, 4> kMagicConsumeHardLevel{
+    0.6F, 1.0F, 1.2F, 1.35F};
 constexpr std::array<float, 4> kHardLevelUpgradeRatio{
     1.0F, 1.0F, 0.6F, 0.2F};
 
@@ -744,6 +752,12 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     }
     maximumHealth_ = std::max(asset.health, 1.0F);
     health_ = maximumHealth_;
+    // Player::Player (0x0034e4d4) stores Player::consts+0xc (1000) at
+    // Player+0x700. CLevel::InitAfterRoomInit (0x00382bdc) passes that exact
+    // value to AddWebPower after Player::Init, filling Player+0x6f4.
+    maximumWebPower_ = 1000.0F;
+    webPower_ = maximumWebPower_;
+    webPowerRestoreDelayMilliseconds_ = 0.0F;
     skillPoints_ = 0;
     normalComboCount_ = 0;
     ultimateComboCount_ = 0;
@@ -911,8 +925,8 @@ bool GameplayPlayer::requestPunch(
         requested->motionType == 109 || requested->motionType == 111 ||
         requested->motionType == 112 || requested->motionType == 114;
     if (activeAttackState_ != nullptr) {
-        queueAttackTransition(*requested, selectedTarget, requestedAirborne);
-        return true;
+        return queueAttackTransition(*requested, selectedTarget,
+                                     requestedAirborne);
     }
     activeAttackTarget_ = selectedTarget;
     activeAttackAirborne_ = requestedAirborne;
@@ -968,8 +982,8 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
             if (const PlayerStateDefinition* transition =
                     transitionForButton(kJumpButton, airborneTarget);
                 transition != nullptr) {
-                queueAttackTransition(*transition, activeAttackTarget_, true);
-                return true;
+                return queueAttackTransition(*transition,
+                                             activeAttackTarget_, true);
             }
         }
         if (phase == PlayerButtonPhase::Pressed) {
@@ -988,8 +1002,7 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
         if (transition == nullptr) {
             return false;
         }
-        queueAttackTransition(*transition, activeAttackTarget_, true);
-        return true;
+        return queueAttackTransition(*transition, activeAttackTarget_, true);
     }
     // UpdateKeyTrigger polls hold/release predicates only as transitions from
     // the current state. A held or released A/Cross must not create a new
@@ -1241,9 +1254,8 @@ bool GameplayPlayer::requestWeb(
             // Unit while it buffers a ground-chain web transition. A target
             // need not be reacquired on the exact input frame; losing that
             // pointer here turns state 95 into an untargeted sector kick.
-            queueAttackTransition(*requested, activeAttackTarget_,
-                                  requestedAirborne);
-            return true;
+            return queueAttackTransition(*requested, activeAttackTarget_,
+                                         requestedAirborne);
         }
         activeAttackTarget_ = target;
         activeAttackAirborne_ = requestedAirborne;
@@ -1269,8 +1281,7 @@ bool GameplayPlayer::requestWeb(
         }
         // As with the ground chain, ordinary Web predicates do not execute
         // UpdateKeyTrigger's target-search branch. Preserve Player+0x594.
-        queueAttackTransition(*requested, activeAttackTarget_, true);
-        return true;
+        return queueAttackTransition(*requested, activeAttackTarget_, true);
     }
     if (!airborne() || locomotionState_ == LocomotionState::WebThrow ||
         locomotionState_ == LocomotionState::SwingHang || dead() ||
@@ -1384,11 +1395,26 @@ bool GameplayPlayer::requestUltimate() noexcept {
         lastActionRejectionReason_ = dead() ? "dead" : "hurt_reaction";
         return false;
     }
-    if (locomotionState_ != LocomotionState::Grounded ||
-        activeAttackState_ != nullptr || wallWeb_.active() ||
-        ultimatePrepareState_ == nullptr) {
+    const bool currentUltimate = activeAttackState_ != nullptr &&
+        activeAttackState_->id >= 107 && activeAttackState_->id <= 113;
+    const bool blockedState = activeAttackState_ != nullptr &&
+        (activeAttackState_->stateClass == 7 ||
+         activeAttackState_->id == 73 || currentUltimate);
+    if (airborne() || locomotionState_ != LocomotionState::Grounded ||
+        onWall() || slideRuntime_.active() || wallWeb_.active() ||
+        blockedState || ultimatePrepareState_ == nullptr) {
         lastActionRejectionReason_ = "ultimate_unavailable";
         return false;
+    }
+    if (!canAffordState(*ultimatePrepareState_)) {
+        lastActionRejectionReason_ = "insufficient_web_power";
+        return false;
+    }
+    // CanEnableUltimate (0x00345e98) does not reject an ordinary grounded
+    // attack. Its final CheckCanDoAction(107) checks the meter, so Ultimate
+    // can replace that attack immediately once the full 1000 points exist.
+    if (activeAttackState_ != nullptr) {
+        cancelAttack();
     }
     activeAttackTarget_.reset();
     activeAttackAirborne_ = false;
@@ -1494,6 +1520,10 @@ bool GameplayPlayer::requestSpiderSense(
         lastActionRejectionReason_ = "missing_sense_state";
         return false;
     }
+    if (!canAffordState(*requested)) {
+        lastActionRejectionReason_ = "insufficient_web_power";
+        return false;
+    }
     if (activeAttackState_ != nullptr) {
         cancelAttack();
     }
@@ -1509,7 +1539,31 @@ bool GameplayPlayer::requestSpiderSense(
         lastActionRejectionReason_ = "missing_sense_animation";
         return false;
     }
+    const bool counterState =
+        requested == senseBlinkRedState_ ||
+        requested == senseBlinkBlackState_ ||
+        std::find(senseAttackStates_.begin(), senseAttackStates_.end(),
+                  requested) != senseAttackStates_.end();
+    if (counterState) {
+        // DoNormalSenseAction (0x0034f7ee-0x0034f804 and
+        // 0x0034f89e-0x0034f8b4) deducts SPIDER_SENSE_ATTACK (200) minus
+        // SPIDER_SENSE_AVOID (70). SetNextStateId already deducted the
+        // common 70-point class-six cost above.
+        addWebPower(-(200.0F - 70.0F));
+    }
     return true;
+}
+
+bool GameplayPlayer::canDisplaySpiderSense() const noexcept {
+    if (dead() || hurtReactionRemainingMilliseconds_ != 0 ||
+        wallWeb_.active() || stateDatabase_ == nullptr ||
+        !canEnableSpiderSense() || senseAvoidStates_[0] == nullptr) {
+        return false;
+    }
+    // Player::UpdateSpiderSense passes state ID 34 to CheckCanDoAction
+    // (0x0034fba0-0x0034fba6). That is k_state_sense_avoid_front, so its
+    // class-six 70-point cost is the warning's native affordability gate.
+    return canAffordState(*senseAvoidStates_[0]);
 }
 
 PlayerInputAction GameplayPlayer::preferredInputAction(
@@ -1755,13 +1809,40 @@ void GameplayPlayer::addSkillPoints(std::int32_t points) noexcept {
     }
 }
 
-void GameplayPlayer::addCombo(float actualDamage, bool ultimateActive,
-                              std::uint64_t timeMilliseconds) noexcept {
+void GameplayPlayer::addCombo(
+    float actualDamage, bool ultimateActive,
+    std::uint64_t timeMilliseconds,
+    std::optional<bool> powerRestoreAllowedAtContact) noexcept {
     // Player::AddCombo (0x00340584). Player+0x4fd is the ultimate-mode flag:
     // DoUltimate (0x0034def4) sets it and ResetObject (0x0034e258) clears it.
     // It is not an airborne classifier.
     if (!(actualDamage > 0.0F) || !std::isfinite(actualDamage)) {
         return;
+    }
+    // Player::SendHitMessage (0x003460de-0x00346132) restores a fraction of
+    // actual target-health loss. The factor is 0.8 at/below 250 power and
+    // decreases linearly to 0.25 at the 1000-point maximum. AddWebPower
+    // suppresses this positive award while the current spell state blocks
+    // restoration, exactly as it does for passive restoration.
+    const float restoreRange = maximumWebPower_ - 250.0F;
+    const float restorePosition =
+        std::max(webPower_ - 250.0F, 0.0F);
+    const float restoreFactor = restoreRange > 0.0F
+        ? restorePosition / restoreRange * -0.55F + 0.8F
+        : 0.8F;
+    const float restoredPower = actualDamage * restoreFactor;
+    const bool restoreAllowed = powerRestoreAllowedAtContact.value_or(
+        !powerRestoreBlocked());
+    if (restoreAllowed) {
+        // This is AddWebPower's positive branch with NoPowerRestoreState's
+        // result captured at the synchronous native contact site.
+        webPower_ = std::clamp(webPower_ + restoredPower, 0.0F,
+                               maximumWebPower_);
+        webPowerRestoreDelayMilliseconds_ = 1500.0F;
+    } else {
+        // AddWebPower writes the 1500 ms field even when
+        // NoPowerRestoreState suppresses the actual award.
+        webPowerRestoreDelayMilliseconds_ = 1500.0F;
     }
     if (ultimateActive) {
         ultimateComboDamage_ += actualDamage;
@@ -2096,6 +2177,9 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     } hitEffectUpdateScope{hitEffectUpdateInProgress_,
                            hitEffectFrameAdvanceMilliseconds_};
     slideRuntime_.advanceCooldown(elapsedMilliseconds);
+    // Player::PreUpdate (0x0034dfd8) calls UpdatePowerRestore at
+    // 0x0034e124 before the native attack/movement state update.
+    updateWebPowerRestore(elapsedMilliseconds);
     if (dead()) {
         enterDeadState();
         return;
@@ -2237,8 +2321,9 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
                 // Unit::SetFaceDir, whose source vector is the current
                 // camera-relative joystick direction.
                 facing_ = movement;
-                queueAttackTransition(*transition, activeAttackTarget_,
-                                      activeAttackAirborne_);
+                (void)queueAttackTransition(*transition,
+                                            activeAttackTarget_,
+                                            activeAttackAirborne_);
             }
         }
         updateAttack(deferNewAttackAdvance ? 0U : elapsedMilliseconds);
@@ -3648,6 +3733,10 @@ bool GameplayPlayer::enterAttackState(
     if (clip == nullptr) {
         return false;
     }
+    if (!canAffordState(state)) {
+        lastActionRejectionReason_ = "insufficient_web_power";
+        return false;
+    }
     // Every displacement clip owns its own center-node track. The previous
     // clip's final displacement has already been committed to position_, so a
     // combo transition must begin from a fresh local origin instead of
@@ -3664,6 +3753,9 @@ bool GameplayPlayer::enterAttackState(
     applyAttackRootMotion(animationPhysicalDisplacement(&state, 0),
                           animationRenderOffset(&state, 0));
     activeAttackState_ = &state;
+    // Player::SetNextStateId (0x0034b84e-0x0034b86c) calls GetSpellMagic
+    // twice and passes its negation to AddWebPower for every entered state.
+    addWebPower(-spellMagicForState(state));
     queuedAttackState_ = nullptr;
     queuedAttackTarget_.reset();
     queuedAttackAirborne_ = false;
@@ -3840,14 +3932,22 @@ bool GameplayPlayer::enterAttackState(
         impact.hitType = enemyHitTypeForState(state);
         impact.horizontalForce = state.timingParameters[0];
         impact.verticalForce = state.timingParameters[1];
+        impact.powerRestoreBlocked = powerRestoreBlocked();
     }
     return true;
 }
 
-void GameplayPlayer::queueAttackTransition(
+bool GameplayPlayer::queueAttackTransition(
     const PlayerStateDefinition& state,
     const std::optional<PlayerAttackTarget>& target,
     bool airborne) noexcept {
+    // UpdateKeyTrigger's action predicates finish in CheckCanDoAction, whose
+    // native 0x00345e20 meter comparison happens when the transition is
+    // requested rather than at the later linked-animation boundary.
+    if (!canAffordState(state)) {
+        lastActionRejectionReason_ = "insufficient_web_power";
+        return false;
+    }
     // Player::UpdateKeyTrigger (0x0034d0a4) writes the requested state to
     // Player+0x4d8. UpdateAttacks does not enter it until the current linked
     // animation finishes. Retaining the request here prevents a buffered
@@ -3863,8 +3963,9 @@ void GameplayPlayer::queueAttackTransition(
     // zero during the primary clip and becomes one when our first link is
     // selected, so it is the portable equivalent of that native condition.
     if (nextAttackLinkAnimationIndex_ != 0) {
-        (void)enterQueuedAttackTransition();
+        return enterQueuedAttackTransition();
     }
+    return true;
 }
 
 bool GameplayPlayer::enterQueuedAttackTransition() noexcept {
@@ -4620,6 +4721,7 @@ void GameplayPlayer::queueAttackFrameEvents(
             };
             auto& impact = pendingMeleeImpacts_[pendingMeleeImpactCount_ - 1];
             impact.hitType = hitType;
+            impact.powerRestoreBlocked = powerRestoreBlocked();
         };
 
     // UpdateAttackParam deliberately excludes web-binding motions 0x7c..0x82
@@ -4767,6 +4869,7 @@ void GameplayPlayer::queueAttackFrameEvents(
                 activeAttackState_->motionType <= 140;
             queued.ultimateAttack = ultimateActive_;
             queued.senseAttack = activeAttackState_->stateClass == 6;
+            queued.powerRestoreBlocked = powerRestoreBlocked();
             if (activeAttackState_->motionType == 109 &&
                 activeAttackTarget_.has_value()) {
                 // Player::CheckAttackTarget (0x0034fca0, 0x003505ce-
@@ -4855,6 +4958,7 @@ void GameplayPlayer::queueAttackFrameEvents(
         retry.hitType = enemyHitTypeForState(*activeAttackState_);
         retry.horizontalForce = activeAttackState_->timingParameters[0];
         retry.verticalForce = activeAttackState_->timingParameters[1];
+        retry.powerRestoreBlocked = powerRestoreBlocked();
         if (activeAttackState_->motionType == 109 &&
             activeAttackTarget_.has_value()) {
             // Same native split as the authored-frame contact above. The
@@ -5249,6 +5353,106 @@ bool GameplayPlayer::canEnableSpiderSense() const noexcept {
                state->id != 118;
     }
     return false;
+}
+
+float GameplayPlayer::spellMagicForState(
+    const PlayerStateDefinition& state) const noexcept {
+    // Player::GetSpellMagic (0x00345c48). MC_CONST::AdjustValue2 is 0.8 and
+    // AdjustValue is 1.0 in the shipped .data image. State class six has
+    // priority over its motion ID, exactly matching the native branch order.
+    float baseCost = 0.0F;
+    if (state.stateClass == 6) {
+        baseCost = 70.0F;
+    } else {
+        switch (state.motionType) {
+        case 123:
+            baseCost = 40.0F; // WEB_BULLET: 0.8 * 50
+            break;
+        case 118:
+        case 119:
+            baseCost = 80.0F; // WEB_COMBO: 0.8 * 100
+            break;
+        case 129:
+        case 126:
+        case 130:
+        case 114:
+        case 110:
+        case 107:
+        case 104:
+        case 143:
+            baseCost = 80.0F; // WEB_ZIP: 0.8 * 100
+            break;
+        case 142:
+            baseCost = 160.0F; // STRIKE_LAND: 0.8 * 200
+            break;
+        case 135:
+            // SUPER_WEB_POWER at 0x004c6b04 bypasses the
+            // upgrade/difficulty multiplication in GetSpellMagic.
+            return 1000.0F;
+        default:
+            if (state.id == 114 || state.id == 115) {
+                baseCost = 80.0F;
+            }
+            break;
+        }
+    }
+    return baseCost * comboUpgradeRate(kMagicConsumeUpgrade) *
+           kMagicConsumeHardLevel[kDefaultDifficulty];
+}
+
+bool GameplayPlayer::canAffordState(
+    const PlayerStateDefinition& state) const noexcept {
+    // Player::CheckCanDoAction (0x00345e20) compares Player+0x6f4 against
+    // GetSpellMagic(requestedState) before accepting the transition.
+    return webPower_ >= spellMagicForState(state);
+}
+
+bool GameplayPlayer::powerRestoreBlocked() const noexcept {
+    // Player::NoPowerRestoreState (0x00345d30) blocks positive AddWebPower
+    // while the current state has any spell cost. Its remaining explicit
+    // exclusions are states 107..113 and state 116.
+    const PlayerStateDefinition* state = activeAttackState_ != nullptr
+        ? activeAttackState_
+        : activeLocomotionState_;
+    if (state == nullptr) {
+        return false;
+    }
+    return spellMagicForState(*state) > 0.0F ||
+           (state->id >= 107 && state->id <= 113) || state->id == 116;
+}
+
+void GameplayPlayer::addWebPower(float amount) noexcept {
+    // Player::AddWebPower (0x00345d74). Negative costs always apply;
+    // positive restoration is conditional on NoPowerRestoreState. The
+    // native 1500 ms field is maintained even though UpdatePowerRestore does
+    // not consult it anywhere in this binary.
+    const bool positive = amount > 0.0F;
+    if ((positive && !powerRestoreBlocked()) || amount < 0.0F) {
+        webPower_ = std::clamp(webPower_ + amount, 0.0F,
+                               maximumWebPower_);
+    }
+    if (positive) {
+        webPowerRestoreDelayMilliseconds_ = 1500.0F;
+    }
+}
+
+void GameplayPlayer::updateWebPowerRestore(
+    std::uint32_t elapsedMilliseconds) noexcept {
+    // Player::UpdatePowerRestore (0x00345f3c) restores red-suit power at
+    // GAP_RESTORE_WEB_RED (20 points/second), scaled by the shipped index-4
+    // restore tables. A new level-one profile selects difficulty 1 and
+    // upgrade 0, for an exact combined multiplier of 1.0.
+    if (elapsedMilliseconds == 0) {
+        return;
+    }
+    const float seconds =
+        static_cast<float>(elapsedMilliseconds) / 1000.0F;
+    const float restoreRate = 20.0F *
+        comboUpgradeRate(kMagicRestoreUpgrade) *
+        kMagicRestoreHardLevel[kDefaultDifficulty];
+    addWebPower(seconds * restoreRate);
+    webPowerRestoreDelayMilliseconds_ -=
+        static_cast<float>(elapsedMilliseconds);
 }
 
 bool GameplayPlayer::combatTransitionReady() const noexcept {

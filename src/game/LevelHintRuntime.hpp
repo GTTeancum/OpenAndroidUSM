@@ -19,6 +19,10 @@ struct LevelHintState {
     std::int32_t animationFrameIndex{-1};
     std::int32_t frameIndex{-1};
     bool visible{};
+    // HintManager::GetSenseHint owns a second, runtime-only Hint using the
+    // same hintbb animation as the authored tutorial node. Keep it distinct
+    // so cinematic SetVisible commands cannot hide an active attack warning.
+    bool combatSenseCue{};
 };
 
 // Portable state behind Hint::Update (0x0033db20),
@@ -34,6 +38,9 @@ public:
         const CinematicThread& thread, const CinematicCommand& command);
     void update(std::uint32_t elapsedMilliseconds,
                 const PositionResolver& resolvePosition) noexcept;
+    void setCombatSenseCueVisible(bool visible) noexcept;
+
+    [[nodiscard]] bool combatSenseCueVisible() const noexcept;
 
     [[nodiscard]] const std::vector<LevelHintState>& states() const noexcept {
         return states_;

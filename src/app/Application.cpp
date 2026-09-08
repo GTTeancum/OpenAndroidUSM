@@ -2739,6 +2739,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.attackRootTranslation(),
                  gameplayPlayer_.facing(),
                  gameplayPlayer_.health(),
+                 gameplayPlayer_.webPower(),
                  gameplayPlayer_.skillPoints(),
                  gameplayPlayer_.comboScore(),
                  gameplayPlayer_.activeAnimation(),
@@ -2804,7 +2805,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.wallWeb().phase(), gameplayPlayer_.wallWeb().targetObjectId(),
                  gameplayPlayer_.wallWeb().angle(), gameplayPlayer_.wallWeb().completedActionCount(),
                  gameplayPlayer_.wallWeb().lineActive(),
-                 harnessWebGrabPointId});
+                 harnessWebGrabPointId,
+                 hintRuntime_.combatSenseCueVisible()});
             if (autoplayInput.teleport) {
                 gameplayPlayer_.restoreAt(autoplayInput.teleport->position,
                                           autoplayInput.teleport->facing);
@@ -2822,6 +2824,23 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         std::to_string(gameplayCamera_.currentAreaId()) +
                         ";camera_relocated=" +
                         (cameraRelocated ? "1" : "0"));
+            }
+            for (const std::int32_t skillId :
+                 autoplayInput.skillUnlockRequests) {
+                game::CinematicCommand unlock;
+                unlock.id = 96;
+                unlock.name = "Unlock";
+                unlock.attributes.push_back(
+                    {"string", "$SkillID", std::to_string(skillId)});
+                result = levelCinematicRuntime_.applyCommand(unlock);
+                if (!result) {
+                    return fail(result.message());
+                }
+                autoplay->recordEvent(
+                    syntheticElapsedMilliseconds,
+                    "diagnostic_skill_unlock",
+                    "skill=" + std::to_string(skillId) +
+                        ";source=CCinematicThread::OnUnlock");
             }
             for (const std::int32_t cinematicId :
                  autoplayInput.cinematicStartRequests) {
@@ -3223,10 +3242,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         : selectObjectTarget(object);
                 };
             if (controlsEnabled && spiderSensePressed) {
-                const game::LevelEnemyState* attacker =
-                    enemyRuntime_.findSpiderSenseAttacker(
-                        gameplayPlayer_.position());
-                const bool accepted = attacker != nullptr &&
+                // Player::CanEnableSpiderSense (0x00341c98) consults profile
+                // bit 1 only in Level 1 (CLevel+0x44 == 0). Cinematic 974's
+                // shipped Unlock command supplies that bit at 4000 ms.
+                const bool skillUnlocked = levelOne_.levelNumber() != 1 ||
+                    levelCinematicRuntime_.skillUnlocked(1);
+                const game::LevelEnemyState* attacker = skillUnlocked
+                    ? enemyRuntime_.findSpiderSenseAttacker(
+                          gameplayPlayer_.position())
+                    : nullptr;
+                const bool accepted = skillUnlocked && attacker != nullptr &&
                     gameplayPlayer_.requestSpiderSense({
                         attacker->position, attacker->collisionRadius,
                         attacker->asset->objectId, !attacker->grounded,
@@ -3240,6 +3265,12 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         attacker->canBeCounterHit,
                         attacker->asset->enemyTypeId});
                 if (accepted) {
+                    // UpdateSpiderSense pops the selected CTargetHelper
+                    // record before DoNormalSenseAction (0x0034fc40-
+                    // 0x0034fc4e). Keep that one-shot warning lifetime even
+                    // though the source enemy's attack animation continues.
+                    (void)enemyRuntime_.consumeSpiderSenseAttacker(
+                        attacker->asset->objectId);
                     const float denominator =
                         enemyRuntime_.spiderSenseSlowMotionDenominator(
                             attacker->asset->objectId);
@@ -3266,12 +3297,20 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             (attacker == nullptr
                                  ? std::string{"none"}
                                  : std::to_string(attacker->asset->objectId)) +
+                            ";skill_unlocked=" +
+                            std::to_string(skillUnlocked) +
                             ";state=" +
                             std::to_string(gameplayPlayer_.activeStateId()));
                 }
             }
             if (controlsEnabled && superAttackPressed) {
-                const bool accepted = gameplayPlayer_.requestUltimate();
+                // Player::CanEnableUltimate (0x00345e98) applies the same
+                // Level-1-only profile gate to bit 0. Cinematic 969 unlocks
+                // it through CCinematicThread::OnUnlock (0x0037240c).
+                const bool skillUnlocked = levelOne_.levelNumber() != 1 ||
+                    levelCinematicRuntime_.skillUnlocked(0);
+                const bool accepted = skillUnlocked &&
+                    gameplayPlayer_.requestUltimate();
                 if (accepted) {
                     // Player::DoUltimate (0x0034def4-0x0034df3a) calls
                     // Application::SetSlowMotion(3.0, animLength * 3, 0,
@@ -3297,6 +3336,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         syntheticElapsedMilliseconds, "player_action",
                         "super_attack_" +
                             std::string(accepted ? "accepted" : "rejected") +
+                            ";skill_unlocked=" +
+                            std::to_string(skillUnlocked) +
                             ";state=" +
                             std::to_string(gameplayPlayer_.activeStateId()));
                 }
@@ -4001,7 +4042,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     for (const auto& hit : hits) {
                         gameplayPlayer_.addCombo(
                             hit.actualDamage, impact->ultimateAttack,
-                            syntheticElapsedMilliseconds);
+                            syntheticElapsedMilliseconds,
+                            !impact->powerRestoreBlocked);
                         result = playPlayerHitEffect(hit.objectId);
                         if (!result) {
                             return fail(result.message());
@@ -4010,7 +4052,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     for (const auto& hit : objectHits) {
                         gameplayPlayer_.addCombo(
                             hit.actualDamage, impact->ultimateAttack,
-                            syntheticElapsedMilliseconds);
+                            syntheticElapsedMilliseconds,
+                            !impact->powerRestoreBlocked);
                     }
                     if (!hits.empty() || !objectHits.empty()) {
                         result = playerSounds_.dispatchStateFrame(
@@ -4056,7 +4099,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     for (const auto& hit : hits) {
                         gameplayPlayer_.addCombo(
                             hit.actualDamage, impact->ultimateAttack,
-                            syntheticElapsedMilliseconds);
+                            syntheticElapsedMilliseconds,
+                            !impact->powerRestoreBlocked);
                         result = playPlayerHitEffect(hit.objectId);
                         if (!result) {
                             return fail(result.message());
@@ -4104,8 +4148,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         impact->maximumAngleDegrees, impact->hitType,
                         impact->horizontalForce, impact->verticalForce);
                     for (const auto& hit : hits) {
-                        gameplayPlayer_.addCombo(hit.actualDamage, false,
-                                                syntheticElapsedMilliseconds);
+                        gameplayPlayer_.addCombo(
+                            hit.actualDamage, false,
+                            syntheticElapsedMilliseconds,
+                            !impact->powerRestoreBlocked);
                         result = playPlayerHitEffect(hit.objectId);
                         if (!result) {
                             return fail(result.message());
@@ -4199,7 +4245,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     // measured health delta, not the authored attack damage.
                     gameplayPlayer_.addCombo(
                         hitEnemy.actualDamage, impact->ultimateAttack,
-                        syntheticElapsedMilliseconds);
+                        syntheticElapsedMilliseconds,
+                        !impact->powerRestoreBlocked);
                     result = playPlayerHitEffect(hitEnemy.objectId);
                     if (!result) {
                         return fail(result.message());
@@ -4208,7 +4255,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 for (const auto& hitObject : hitObjects) {
                     gameplayPlayer_.addCombo(
                         hitObject.actualDamage, impact->ultimateAttack,
-                        syntheticElapsedMilliseconds);
+                        syntheticElapsedMilliseconds,
+                        !impact->powerRestoreBlocked);
                 }
                 if (!hitEnemies.empty() || !hitObjects.empty()) {
                     gameplayPlayer_.notifyMeleeImpactAccepted(
@@ -5241,9 +5289,13 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             }
             playerHudHealth_.update(gameplayPlayer_.health(),
                                     gameDeltaMilliseconds);
+            const float webPowerRatio = gameplayPlayer_.maximumWebPower() > 0.0F
+                ? gameplayPlayer_.webPower() /
+                      gameplayPlayer_.maximumWebPower()
+                : 0.0F;
             result = renderer_.updatePlayerHud(
                 levelOne_.hud(), playerHudHealth_.currentRatio(),
-                playerHudHealth_.delayedRatio(), 1.0F,
+                playerHudHealth_.delayedRatio(), webPowerRatio,
                 enemyRuntime_.shownHealthBarEnemy(),
                 gameplayPlayer_.skillPoints(),
                 levelBonusRuntime_.showSkillPointTotal(),
@@ -5392,6 +5444,18 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             result = renderer_.updateLevelOneObjects(levelOne_,
                                                      objectRuntime_);
         }
+        // UpdateSpiderSense (0x0034fba0-0x0034fbea) shows the dedicated
+        // hintbb animation only while state 34 is affordable/enabled and a
+        // CTargetHelper attack warning remains queued. popAttack removes it
+        // in the accepted-input frame, independently of tutorial visibility.
+        const bool spiderSenseSkillUnlocked =
+            levelOne_.levelNumber() != 1 ||
+            levelCinematicRuntime_.skillUnlocked(1);
+        hintRuntime_.setCombatSenseCueVisible(
+            gameplayActive && spiderSenseSkillUnlocked &&
+            gameplayPlayer_.canDisplaySpiderSense() &&
+            enemyRuntime_.findSpiderSenseAttacker(
+                gameplayPlayer_.position()) != nullptr);
         hintRuntime_.update(
             gameDeltaMilliseconds,
             [this](std::int32_t objectId)
@@ -5573,6 +5637,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  gameplayPlayer_.attackRootTranslation(),
                  gameplayPlayer_.facing(),
                  gameplayPlayer_.health(),
+                 gameplayPlayer_.webPower(),
                  gameplayPlayer_.skillPoints(),
                  gameplayPlayer_.comboScore(),
                  gameplayPlayer_.activeAnimation(),
@@ -5640,7 +5705,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                   gameplayPlayer_.wallWeb().lineActive(),
                   gameplayActive
                       ? gameplayPlayer_.availableWebGrabPointObjectId()
-                      : -1});
+                      : -1,
+                  hintRuntime_.combatSenseCueVisible()});
             const bool periodicCapture = autoplay->periodicCaptureDue(
                 syntheticElapsedMilliseconds);
             if (periodicCapture || !autoplayInput.captureLabels.empty()) {
