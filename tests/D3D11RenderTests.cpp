@@ -1174,6 +1174,20 @@ int main() {
                10);
         hintRuntime.setCombatSenseCueVisible(false);
         assert(gameRenderer.updateLevelOneHints(hintRuntime));
+        assert(hintRuntime.setCombatTargetCue(
+            394,
+            {levelOne.player().position.x,
+             levelOne.player().position.y,
+             levelOne.player().position.z + 220.0F},
+            500.0F, 500.0F));
+        assert(gameRenderer.updateLevelOneHints(hintRuntime));
+        gameRenderer.renderFrame();
+        RgbaImage combatTargetHintFrame;
+        assert(gameRenderer.readBackImage(combatTargetHintFrame));
+        assert(countChangedPixels(hintHiddenFrame,
+                                  combatTargetHintFrame) > 10);
+        assert(hintRuntime.clearCombatTargetCue());
+        assert(gameRenderer.updateLevelOneHints(hintRuntime));
         cinematicVisibleRooms.fill(false);
         gameRenderer.setCinematicVisibleRooms(cinematicVisibleRooms);
         const usm::game::LevelBonusPopupState skillPointPopup{

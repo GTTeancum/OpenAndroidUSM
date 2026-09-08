@@ -230,6 +230,9 @@ public:
     // CheckCanDoAction(k_state_sense_avoid_front) and
     // CanEnableSpiderSense succeed.
     [[nodiscard]] bool canDisplaySpiderSense() const noexcept;
+    // Player::UpdateTarget (0x00343058) suppresses its continuous target
+    // search only for class-six states and Player::IsInAirAttack states.
+    [[nodiscard]] bool canUpdateCombatTarget() const noexcept;
     // Player::UpdateKeyTrigger (0x0034d0a4) scans the current state's
     // serialized transition rows and lets later qualifying rows replace the
     // pending state. Use this before dispatching simultaneous face buttons;

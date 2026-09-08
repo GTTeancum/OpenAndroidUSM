@@ -1576,6 +1576,27 @@ bool GameplayPlayer::canDisplaySpiderSense() const noexcept {
     return canAffordState(*senseAvoidStates_[0]);
 }
 
+bool GameplayPlayer::canUpdateCombatTarget() const noexcept {
+    const PlayerStateDefinition* state = activeAttackState_ != nullptr
+        ? activeAttackState_
+        : activeScriptedState_ != nullptr
+            ? activeScriptedState_
+            : activeLocomotionState_;
+    if (state == nullptr) {
+        return true;
+    }
+    if (state->stateClass == 6) {
+        return false;
+    }
+    // Player::IsInAirAttack (0x0034111c) is an exact state/motion test, not
+    // a generic airborne predicate.
+    return state->id != 0x5f &&
+           !(state->motionType >= 0x66 && state->motionType < 0x78) &&
+           state->id != 0x5c && state->id != 0x5d &&
+           state->id != 0x5e && state->id != 0x67 &&
+           state->id != 0x7f;
+}
+
 PlayerInputAction GameplayPlayer::preferredInputAction(
     const std::optional<PlayerButtonPhase>& jump,
     const std::optional<PlayerButtonPhase>& punch,

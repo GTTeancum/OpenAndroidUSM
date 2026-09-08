@@ -46,7 +46,8 @@ std::int32_t commandObjectId(const CinematicThread& thread,
 
 Result LevelHintRuntime::initialize(std::span<const LevelHintAsset> hints) {
     states_.clear();
-    states_.reserve(hints.size());
+    states_.reserve(hints.size() + 2);
+    bool runtimeCombatHintsCreated = false;
     for (const LevelHintAsset& hint : hints) {
         if (hint.animationIndex < 0 ||
             static_cast<std::size_t>(hint.animationIndex) >=
@@ -57,6 +58,7 @@ Result LevelHintRuntime::initialize(std::span<const LevelHintAsset> hints) {
         LevelHintState state;
         state.asset = &hint;
         state.position = hint.position;
+        state.animationIndex = hint.animationIndex;
         state.visible = hint.visible;
         updateFrame(state);
         states_.push_back(state);
@@ -66,12 +68,32 @@ Result LevelHintRuntime::initialize(std::span<const LevelHintAsset> hints) {
         // to Bip01_Head, and leaves it hidden. Level 1 packages an authored
         // node with the same sprite/animation for the tutorial, so retain a
         // second runtime state backed by those decoded resources.
-        if (hint.spriteFile == "hintbb.bsprite" &&
+        if (!runtimeCombatHintsCreated &&
+            hint.spriteFile == "hintbb.bsprite" &&
             hint.animationIndex == 0) {
+            runtimeCombatHintsCreated = true;
             LevelHintState combatSense = state;
             combatSense.visible = false;
             combatSense.combatSenseCue = true;
             states_.push_back(combatSense);
+
+            // Player::SpawnPlayer (0x00345260, 0x00345662-0x00345688)
+            // obtains HintManager::GetPlayerTargetHint, assigns the same
+            // hintbb sprite, selects animation 4, and hides it. The three
+            // health states selected by UpdateTargetPointer are animations
+            // 4, 5, and 6, so all must exist in the shipped atlas.
+            if (hint.atlas.animations().size() <= 6) {
+                states_.clear();
+                return Result::failure(
+                    "hintbb sprite is missing combat target animations");
+            }
+            LevelHintState combatTarget = state;
+            combatTarget.animationIndex = 4;
+            combatTarget.animationTimeMilliseconds = 0;
+            combatTarget.visible = false;
+            combatTarget.combatTargetCue = true;
+            updateFrame(combatTarget);
+            states_.push_back(combatTarget);
         }
     }
     return Result::success();
@@ -92,6 +114,54 @@ bool LevelHintRuntime::combatSenseCueVisible() const noexcept {
                        [](const LevelHintState& state) {
                            return state.combatSenseCue && state.visible;
                        });
+}
+
+bool LevelHintRuntime::setCombatTargetCue(
+    std::int32_t objectId, const assets::Vector3& position,
+    float health, float maximumHealth) noexcept {
+    LevelHintState* state = combatTargetCueMutable();
+    if (state == nullptr || objectId < 0 || maximumHealth <= 0.0F) {
+        return false;
+    }
+    const float ratio = health / maximumHealth;
+    // Player::UpdateTargetPointer (0x00342ed0, 0x00342fac-0x00342ffc)
+    // uses strict greater-than comparisons. Equality at 0.6 selects 5 and
+    // equality at 0.3 selects 6.
+    const std::int32_t animationIndex = ratio > 0.6F ? 4
+        : ratio > 0.3F ? 5
+                       : 6;
+    const bool changed = !state->visible ||
+        state->combatTargetObjectId != objectId ||
+        state->animationIndex != animationIndex;
+    if (state->animationIndex != animationIndex) {
+        // CSpriteInstance::SetAnim (0x002e9ce8) restarts only when the
+        // animation index actually changes.
+        state->animationIndex = animationIndex;
+        state->animationTimeMilliseconds = 0;
+    }
+    state->combatTargetObjectId = objectId;
+    state->position = position;
+    state->visible = true;
+    updateFrame(*state);
+    return changed;
+}
+
+bool LevelHintRuntime::clearCombatTargetCue() noexcept {
+    LevelHintState* state = combatTargetCueMutable();
+    if (state == nullptr || !state->visible) {
+        return false;
+    }
+    state->visible = false;
+    state->combatTargetObjectId = -1;
+    return true;
+}
+
+const LevelHintState* LevelHintRuntime::combatTargetCue() const noexcept {
+    const auto match = std::find_if(
+        states_.begin(), states_.end(), [](const LevelHintState& state) {
+            return state.combatTargetCue;
+        });
+    return match == states_.end() ? nullptr : &*match;
 }
 
 Result LevelHintRuntime::applyCinematicCommand(
@@ -119,7 +189,7 @@ void LevelHintRuntime::update(
         if (!state.visible || state.asset == nullptr) {
             continue;
         }
-        if (resolvePosition) {
+        if (resolvePosition && !state.combatTargetCue) {
             const auto linked =
                 resolvePosition(state.asset->linkedObjectId);
             if (linked) {
@@ -148,7 +218,8 @@ const LevelHintState* LevelHintRuntime::find(std::int32_t objectId) const
     noexcept {
     const auto match = std::find_if(
         states_.begin(), states_.end(), [objectId](const LevelHintState& state) {
-            return !state.combatSenseCue && state.asset != nullptr &&
+            return !state.combatSenseCue && !state.combatTargetCue &&
+                   state.asset != nullptr &&
                    state.asset->objectId == objectId;
         });
     return match == states_.end() ? nullptr : &*match;
@@ -157,14 +228,23 @@ const LevelHintState* LevelHintRuntime::find(std::int32_t objectId) const
 LevelHintState* LevelHintRuntime::findMutable(std::int32_t objectId) noexcept {
     const auto match = std::find_if(
         states_.begin(), states_.end(), [objectId](const LevelHintState& state) {
-            return !state.combatSenseCue && state.asset != nullptr &&
+            return !state.combatSenseCue && !state.combatTargetCue &&
+                   state.asset != nullptr &&
                    state.asset->objectId == objectId;
         });
     return match == states_.end() ? nullptr : &*match;
 }
 
+LevelHintState* LevelHintRuntime::combatTargetCueMutable() noexcept {
+    const auto match = std::find_if(
+        states_.begin(), states_.end(), [](const LevelHintState& state) {
+            return state.combatTargetCue;
+        });
+    return match == states_.end() ? nullptr : &*match;
+}
+
 void LevelHintRuntime::updateFrame(LevelHintState& state) noexcept {
-    if (state.asset == nullptr || state.asset->animationIndex < 0) {
+    if (state.asset == nullptr || state.animationIndex < 0) {
         state.animationFrameIndex = -1;
         state.frameIndex = -1;
         return;
@@ -173,7 +253,7 @@ void LevelHintRuntime::updateFrame(LevelHintState& state) noexcept {
     const auto& animations = atlas.animations();
     const auto& animationFrames = atlas.animationFrames();
     const std::size_t animationIndex =
-        static_cast<std::size_t>(state.asset->animationIndex);
+        static_cast<std::size_t>(state.animationIndex);
     if (animationIndex >= animations.size()) {
         state.animationFrameIndex = -1;
         state.frameIndex = -1;

@@ -372,10 +372,11 @@ to the autoplay event log.
   configurations pair frame and Vox entries by index.
 - `Player::CleanSound`/`StopSound` (`0x00341f38`/`0x00341e10`) clean retained
   state sounds during transitions, including the ultimate-wheel loop.
-- Ground Web pressed during state 74 retains the acquired Unit at
-  `Player+0x594` through states 92, 93, and 95. State 95 motion `0x6f` checks
-  and hits that same Unit; it is not a free sector attack that another thug
-  can steal. Its accepted contact deals 80 damage, launches with the authored
+- Ground Web pressed during state 74 enters state 92, whose
+  `Player::NeedRelocateTarget` path performs a fresh target search. States 93
+  and 95 retain that newly acquired Unit at `Player+0x594`. State 95 motion
+  `0x6f` checks and hits that same Unit; it is not a free sector attack that
+  another thug can steal. Its accepted contact deals 80 damage, launches with the authored
   400/700 force pair, spawns effect 16 (`fx_in_air_diagonal_kick`) on frame 2,
   and dispatches the state-95 kick-impact configuration.
 - The alternate aerial branch retains the live knocked-back target through
@@ -471,6 +472,20 @@ filters, ordering, ties, world rays, and target IDs through the attack update;
 web lines aimed at targetable scenery also follow the retained object rather
 than snapping back to a stale launch point.
 
+The passive target marker uses a different native search contract from an
+attack press. `Player::UpdateTarget` (`0x00343058`) runs every player update
+outside class-six and the exact `Player::IsInAirAttack` (`0x0034111c`)
+state/motion set. It forces `SearchTargetByEyeHorizon` to weight 1.0 with a
+1000 cm range, using joystick direction when present and current facing when
+neutral; it never falls back to the nearest-range search. A null result keeps
+the previous marker while `CurTargetAlive` succeeds. `Player::SpawnPlayer`
+(`0x00345260`, `0x00345662`--`0x00345688`) creates the hidden marker from
+`hintbb.bsprite` animation 4. `Player::UpdateTargetPointer` (`0x00342ed0`)
+links it to `Bip01_Head` with a 60 cm offset (or root height plus 25 cm when
+that node is unavailable) and selects animation 4 above 60% health, 5 above
+30%, and 6 at or below 30%. Core, D3D11, and the opening health-ledger
+autoplay now cover all three bands and the hide-on-death transition.
+
 ## Shopping-center doorway
 
 The shipped Room 1 `geometry01.bdae` already contains the broken shopping-
@@ -533,11 +548,15 @@ captures after their assertions. The focused post-fix run in
 new executable hash and passes all 11 selected opening-combat regressions,
 including every directional Spider-Sense branch, launcher and kick-down hurt
 graphs, enemy offense, the health ledger, and the full combo/effects sequence.
-The current retained gates are:
+The target-marker integration run in
+`analysis/generated/combat-target-hint-suite/suite-manifest.json` passes all
+five selected combat scenarios under one executable hash; its health ledger
+records the 4/5/6 animation changes and hide-on-death event while cleaning all
+ten generated captures. The current retained gates are:
 
 - `OpenAndroidUSM.CoreTests.exe`
 - `OpenAndroidUSM.RenderTests.exe`
-- `first-encounter-health-damage-audit.usmauto` (53/53)
+- `first-encounter-health-damage-audit.usmauto` (58/58)
 - `first-encounter-full-combo-effects.usmauto` (46/46)
 - `first-encounter-simultaneous-input-order.usmauto` (20/20)
 - `first-encounter-alternate-combat-effects.usmauto` (82/82)

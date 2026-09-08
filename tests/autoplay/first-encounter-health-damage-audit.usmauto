@@ -38,6 +38,7 @@ move_until_state 1000 0 0 75
 assert_player_state 75
 # The transition window opens only after state 74's rounded 175 ms impact.
 assert_enemy_health_near 394 465 0.01
+capture target-hint-healthy
 
 punch_when_ready 1000
 move_until_state 1000 0 0 79
@@ -57,6 +58,8 @@ assert_player_state 91
 # State 90 has delivered its 85 total, and state 91's first frame-zero
 # contact is dispatched on the same native tick that enters the state.
 assert_enemy_health_near 394 268.75 0.01
+wait 50
+capture target-hint-injured
 
 # State 91 is another 85 total. State 78 authors two 40-damage contacts and
 # both intersect the correctly centered target cylinder.
@@ -66,6 +69,7 @@ move_until_state 1000 0 0 78
 assert_player_state 78
 wait 500
 assert_enemy_health_near 394 125 0.01
+capture target-hint-critical
 move_until_state 2000 0 0 0
 
 # The next chain removes the remaining 125 in its first three contacts.
@@ -84,5 +88,8 @@ punch_when_ready 1000
 move_until_state 1000 0 0 79
 wait 200
 assert_enemy_health_near 394 0 0.01
+# Player::UpdateTargetPointer emits one native health-band transition at
+# >60%, <=60%, and <=30%, then hides when CurTargetAlive fails after death.
+assert_event_count player_target_hint 4
 assert_health_above 0
 finish

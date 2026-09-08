@@ -4887,8 +4887,12 @@ int main() {
 
         usm::game::LevelHintRuntime hintRuntime;
         assert(hintRuntime.initialize(bootstrap.hints()));
-        assert(hintRuntime.states().size() == 2);
+        assert(hintRuntime.states().size() == 3);
         assert(!hintRuntime.combatSenseCueVisible());
+        const auto* targetCue = hintRuntime.combatTargetCue();
+        assert(targetCue != nullptr && !targetCue->visible);
+        assert(targetCue->combatTargetCue);
+        assert(targetCue->animationIndex == 4);
         const auto* hintState = hintRuntime.find(1113);
         assert(hintState != nullptr && !hintState->visible);
         assert(hintState->frameIndex == 6);
@@ -4898,15 +4902,50 @@ int main() {
             assert(objectId == 288);
             return usm::assets::Vector3{10.0F, 20.0F, 30.0F};
         });
-        const auto& combatSenseState = hintRuntime.states().back();
-        assert(combatSenseState.combatSenseCue);
-        assert(combatSenseState.visible);
-        assert(combatSenseState.frameIndex == 6);
-        assert(combatSenseState.position.x == 10.0F);
-        assert(combatSenseState.position.y == 20.0F);
-        assert(combatSenseState.position.z == 240.0F);
+        const auto combatSenseState = std::find_if(
+            hintRuntime.states().begin(), hintRuntime.states().end(),
+            [](const usm::game::LevelHintState& state) {
+                return state.combatSenseCue;
+            });
+        assert(combatSenseState != hintRuntime.states().end());
+        assert(combatSenseState->visible);
+        assert(combatSenseState->frameIndex == 6);
+        assert(combatSenseState->position.x == 10.0F);
+        assert(combatSenseState->position.y == 20.0F);
+        assert(combatSenseState->position.z == 240.0F);
         hintRuntime.setCombatSenseCueVisible(false);
         assert(!hintRuntime.combatSenseCueVisible());
+
+        // Player::UpdateTargetPointer uses three native hintbb animations
+        // and strict health thresholds. Runtime target positioning is
+        // already the resolved Bip01_Head position plus 60 cm, so the
+        // authored LinkID resolver must not overwrite it.
+        assert(hintRuntime.setCombatTargetCue(
+            394, {100.0F, 200.0F, 300.0F}, 500.0F, 500.0F));
+        targetCue = hintRuntime.combatTargetCue();
+        assert(targetCue != nullptr && targetCue->visible);
+        assert(targetCue->combatTargetObjectId == 394);
+        assert(targetCue->animationIndex == 4);
+        hintRuntime.update(50, [](std::int32_t) {
+            assert(false && "target cue must not resolve the authored LinkID");
+            return std::optional<usm::assets::Vector3>{};
+        });
+        targetCue = hintRuntime.combatTargetCue();
+        assert(targetCue->position.x == 100.0F);
+        assert(targetCue->position.y == 200.0F);
+        assert(targetCue->position.z == 300.0F);
+        assert(hintRuntime.setCombatTargetCue(
+            394, {100.0F, 200.0F, 300.0F}, 300.0F, 500.0F));
+        targetCue = hintRuntime.combatTargetCue();
+        assert(targetCue->animationIndex == 5);
+        assert(targetCue->animationTimeMilliseconds == 0);
+        assert(hintRuntime.setCombatTargetCue(
+            394, {100.0F, 200.0F, 300.0F}, 150.0F, 500.0F));
+        targetCue = hintRuntime.combatTargetCue();
+        assert(targetCue->animationIndex == 6);
+        assert(hintRuntime.clearCombatTargetCue());
+        assert(!hintRuntime.combatTargetCue()->visible);
+        assert(!hintRuntime.clearCombatTargetCue());
         usm::game::CinematicThread hintThread;
         hintThread.objectId = 1113;
         usm::game::CinematicCommand showHint;
@@ -9958,6 +9997,7 @@ int main() {
                                          &playerStateConfigs, {}, {}, {},
                                          nullptr,
                                          &bootstrap.playerHitEffectConfigs()));
+        assert(gameplayPlayer.canUpdateCombatTarget());
         usm::game::GameplayPlayer checkPointPlayer;
         assert(checkPointPlayer.initialize(bootstrap.player(), nullptr,
                                            &playerStateConfigs));
@@ -10568,6 +10608,7 @@ int main() {
             usm::game::PlayerAttackTarget{
                 targetedAirTarget, 40.0F, 1239, true, 150.0F}));
         assert(targetedAirPlayer.activeStateId() == 86);
+        assert(!targetedAirPlayer.canUpdateCombatTarget());
         assert(targetedAirPlayer.hitEffects().size() == 1);
         assert(targetedAirPlayer.hitEffects().front().effectId == 26);
         const float targetedAirDx =
@@ -10600,6 +10641,7 @@ int main() {
             usm::game::PlayerAttackTarget{
                 {150.0F, 0.0F, 0.0F}, 40.0F, 1240, false, 150.0F}));
         assert(sensePlayer.activeStateId() == 38);
+        assert(!sensePlayer.canUpdateCombatTarget());
         assert(sensePlayer.senseReactState() == 6);
         sensePlayer.update({}, gameplayCameraPose, 267);
         const auto senseImpact = sensePlayer.consumeMeleeImpact();

@@ -3241,6 +3241,42 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         ? selectEnemyTarget(enemy)
                         : selectObjectTarget(object);
                 };
+            const auto acquireCombatPointerEnemy =
+                [this, &attackDirection]()
+                    -> const game::LevelEnemyState* {
+                // Player::UpdateTarget (0x00343058) forces the
+                // SearchTargetByEyeHorizon decision to weight 1.0. Unlike a
+                // button-triggered search, neutral input therefore uses the
+                // current facing and never falls back to nearest range.
+                const assets::Vector3 direction =
+                    attackDirection.value_or(gameplayPlayer_.facing());
+                const game::LevelEnemyState* enemy =
+                    enemyRuntime_.findPlayerAttackTarget(
+                        gameplayPlayer_.position(), direction, true,
+                        1000.0F, &levelCollision_);
+                const game::LevelObjectState* object =
+                    objectRuntime_.findPlayerEyeAttackTarget(
+                        gameplayPlayer_.position(), direction, 1000.0F,
+                        &levelCollision_);
+                if (enemy == nullptr || object == nullptr) {
+                    return object == nullptr ? enemy : nullptr;
+                }
+                const auto facingDot = [this, &direction](
+                    const assets::Vector3& position) {
+                    const float x = position.x - gameplayPlayer_.position().x;
+                    const float y = position.y - gameplayPlayer_.position().y;
+                    const float length = std::hypot(x, y);
+                    return length > std::numeric_limits<float>::epsilon()
+                        ? (x * direction.x + y * direction.y) / length
+                        : -1.0F;
+                };
+                // SearchTargetByEyeHorizon (0x00343b70) reverse-walks the
+                // combined list. Destroyables are appended last and retain
+                // a dot tie; UpdateTargetPointer ignores that non-Unit.
+                return facingDot(enemy->position) > facingDot(object->position)
+                    ? enemy
+                    : nullptr;
+            };
             if (controlsEnabled && spiderSensePressed) {
                 // Player::CanEnableSpiderSense (0x00341c98) consults profile
                 // bit 1 only in Level 1 (CLevel+0x44 == 0). Cinematic 974's
@@ -3710,6 +3746,68 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                               relocationTarget->target}
                         : std::nullopt,
                     attackDirection);
+            }
+            if (levelCinematicRuntime_.attributionEnabled() &&
+                gameplayPlayer_.canUpdateCombatTarget()) {
+                const game::LevelEnemyState* pointerTarget =
+                    acquireCombatPointerEnemy();
+                if (pointerTarget != nullptr &&
+                    pointerTarget->asset != nullptr) {
+                    assets::Vector3 pointerPosition;
+                    const auto head = enemyRuntime_.nodeWorldPosition(
+                        pointerTarget->asset->objectId, "Bip01_Head");
+                    if (head.has_value()) {
+                        pointerPosition = *head;
+                        pointerPosition.z += 60.0F;
+                    } else {
+                        pointerPosition = pointerTarget->position;
+                        pointerPosition.z +=
+                            pointerTarget->collisionHeight + 25.0F;
+                    }
+                    if (hintRuntime_.setCombatTargetCue(
+                            pointerTarget->asset->objectId, pointerPosition,
+                            pointerTarget->health,
+                            pointerTarget->maximumHealth) && autoplay) {
+                        const game::LevelHintState* cue =
+                            hintRuntime_.combatTargetCue();
+                        autoplay->recordEvent(
+                            traceTimeMilliseconds, "player_target_hint",
+                            "visible=1;target=" +
+                                std::to_string(
+                                    pointerTarget->asset->objectId) +
+                                ";animation=" +
+                                std::to_string(cue == nullptr
+                                    ? -1
+                                    : cue->animationIndex) +
+                                ";health=" +
+                                std::to_string(pointerTarget->health) +
+                                ";maximum_health=" +
+                                std::to_string(
+                                    pointerTarget->maximumHealth));
+                    }
+                } else if (const game::LevelHintState* cue =
+                               hintRuntime_.combatTargetCue();
+                           cue != nullptr && cue->visible) {
+                    const std::int32_t previousTarget =
+                        cue->combatTargetObjectId;
+                    const game::LevelEnemyState* retainedTarget =
+                        enemyRuntime_.find(previousTarget);
+                    // SearchTarget leaves Player+0x6e0 untouched when its
+                    // forced eye search returns null. UpdateTarget then
+                    // keeps the marker while CurTargetAlive succeeds.
+                    if (retainedTarget == nullptr ||
+                        retainedTarget->asset == nullptr ||
+                        !retainedTarget->visible ||
+                        retainedTarget->health <= 0.0F) {
+                        if (hintRuntime_.clearCombatTargetCue() && autoplay) {
+                            autoplay->recordEvent(
+                                traceTimeMilliseconds,
+                                "player_target_hint",
+                                "visible=0;target=" +
+                                    std::to_string(previousTarget));
+                        }
+                    }
+                }
             }
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    gameDeltaMilliseconds);

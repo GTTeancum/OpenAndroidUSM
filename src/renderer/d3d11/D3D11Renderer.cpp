@@ -3804,7 +3804,12 @@ Result D3D11Renderer::updateLevelOneHints(
             continue;
         }
         const game::LevelHintAsset& hint = *state.asset;
-        if (hint.roomId >= 1 &&
+        // HintManager's Spider-Sense and player-target hints are standalone
+        // runtime nodes created by Player::SpawnPlayer (0x00345260), not
+        // children of the authored Hint's room. The authored instance only
+        // supplies the decoded hintbb sprite resources here.
+        if (!state.combatSenseCue && !state.combatTargetCue &&
+            hint.roomId >= 1 &&
             hint.roomId <= static_cast<std::int32_t>(roomVisibility_.size()) &&
             !roomVisibility_[static_cast<std::size_t>(hint.roomId - 1)]) {
             continue;
