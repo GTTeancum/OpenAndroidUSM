@@ -1,4 +1,4 @@
-# Level 1 first-encounter combat parity audit
+# Level 1 chronological combat parity audit
 
 This gate covers the first controllable fight in chronological player flow.
 Passing it does not claim that later combat encounters are complete.
@@ -11,7 +11,11 @@ cinematic 974 unlocks Spider-Sense at 4000 ms and cinematic 969 unlocks
 Ultimate at 0 ms. Normal gameplay now honors both gates. Isolated component
 scenarios replay `CCinematicThread::OnUnlock` (`0x0037240c`) through the
 autoplay harness without consuming a gameplay tick; the opening-flow lock
-scenario deliberately does not.
+scenario deliberately does not. The chronological
+`second-encounter-spider-sense-normal-flow.usmauto` gate instead reaches
+cinematic 974 through its shipped trigger, waits for a live knife attack, and
+proves that the resulting profile bit admits the front counter without using
+the diagnostic unlock command.
 
 ## Web-power economy
 
@@ -23,9 +27,13 @@ and maximum power at `Player+0x700`; `CLevel::InitAfterRoomInit`
 `Player::GetSpellMagic` (`0x00345c48`) for every entered state and deducts the
 result through `Player::AddWebPower` (`0x00345d74`). At the default difficulty
 and upgrade level, the reachable red-suit costs are 40 for a web pellet, 80
-for web-combo/web-zip states, 160 for strike-land, 70 for a Spider-Sense evade,
-200 total for a Spider-Sense counter or blink strike, and the full 1000 for
-Ultimate.
+for web-combo/web-zip states, 70 for a Spider-Sense evade, 200 total for a
+Spider-Sense counter or blink strike, and the full 1000 for Ultimate.
+Strike-land costs 160, but its predicate 151 path in
+`Player::UpdateKeyTrigger` (`0x0034d0a4`, branch at `0x0034d15e`) requires
+`CGameProfile+0x110 == 1`. `Player::Player` (`0x0034eda0`) uses that same value
+to select `SpiderManBlackMesh`, proving strike-land is a black-suit move and
+not reachable in this red-suit Level 1 flow.
 
 `Player::CheckCanDoAction` (`0x00345e20`) rejects a requested transition when
 the current meter cannot afford it. `Player::CanEnableUltimate`
@@ -626,6 +634,8 @@ two rendered captures. The current retained gates are:
 - `first-encounter-spider-sense-air-evade.usmauto` (17/17)
 - `first-encounter-spider-sense-blink-strike.usmauto` (25/25)
 - `first-encounter-skill-lock-parity.usmauto` (15/15)
+- `second-encounter-spider-sense-normal-flow.usmauto` (23/23)
+- `room5-ultimate-normal-flow.usmauto` (32/32)
 - `first-encounter-ground-web-directional-throw-parity.usmauto` (23/23)
 - `first-encounter-ground-web-drag-down-parity.usmauto` (32/32)
 - `first-encounter-air-target-kick-parity.usmauto` (31/31)

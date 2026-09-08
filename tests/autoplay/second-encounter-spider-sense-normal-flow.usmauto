@@ -1,0 +1,37 @@
+# Chronological coverage for the first encounter where Spider-Sense is
+# actually unlocked. Cinematic 974 must supply skill 1; this scenario does
+# not use the diagnostic unlock command. One of the revealed knife thugs then
+# enters its native melee attack and LB must consume that live warning.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 120000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 60000
+teleport 8800 -5860 7 -1 0 0
+move_until_cinematic 8430 -5710 7 974 5000
+wait 2600
+wait_controls 12000
+wait_enemies_active 5000 398 399 401
+wait_enemies_grounded 10000 398 399 401
+
+# Isolate one authored attacker after the shipped reveal. Stand inside its
+# 200 cm knife range and face it so selector 1 chooses the front counter.
+set_enemy_ai 398 0
+set_enemy_ai 401 0
+teleport 8022 -6150 5 0 -1 0
+wait_enemy_melee_attack 10000 399
+assert_spider_sense_cue 1
+spider_sense
+assert_player_state 38
+assert_spider_sense_cue 0
+assert_slow_motion 3
+assert_web_power_near 800 0.01
+wait 550
+assert_enemy_health_near 399 200 0.01
+assert_player_effect 7 1
+assert_slow_motion 1
+assert_health_above 999
+finish
