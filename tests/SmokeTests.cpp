@@ -10193,10 +10193,9 @@ int main() {
                 senseFarPriorityPlayer.animationTimeMilliseconds());
         assert(senseFarPriorityPlayer.activeStateId() == 87);
 
-        // Ordinary combo predicates write only Player+0x4d8. They retain the
-        // original Player+0x594 target and do not re-run either target search
-        // or NeedDashToTarget when that victim has been knocked out of the
-        // opening punch's direct reach.
+        // Ordinary combo predicates first buffer Player+0x4d8. At the actual
+        // state boundary, SetNextStateId calls NeedRelocateTarget and replaces
+        // Player+0x594 with a fresh search result before facing it.
         usm::game::GameplayPlayer retainedComboTargetPlayer;
         assert(retainedComboTargetPlayer.initialize(
             bootstrap.player(), nullptr, &playerStateConfigs));
@@ -10208,8 +10207,8 @@ int main() {
         assert(retainedComboTargetPlayer.requestPunch(retainedComboTarget));
         retainedComboTargetPlayer.update({}, gameplayCameraPose, 150);
         const usm::game::PlayerAttackTarget newBestCandidate{
-            {retainedComboTargetPlayer.position().x + 80.0F,
-             retainedComboTargetPlayer.position().y,
+            {retainedComboTargetPlayer.position().x,
+             retainedComboTargetPlayer.position().y + 80.0F,
              retainedComboTargetPlayer.position().z},
             40.0F, 8102, false, 150.0F, true};
         retainedComboTarget.position.x =
@@ -10219,6 +10218,13 @@ int main() {
         assert(retainedComboTargetPlayer.requestPunch(newBestCandidate));
         assert(retainedComboTargetPlayer.trackedAttackTargetObjectId() ==
                8101);
+        // Buffering the input does not rotate early.
+        assert(std::abs(retainedComboTargetPlayer.facing().x - 1.0F) <
+               0.001F);
+        assert(std::abs(retainedComboTargetPlayer.facing().y) < 0.001F);
+        retainedComboTargetPlayer.setQueuedAttackRelocationTarget(
+            newBestCandidate,
+            usm::assets::Vector3{0.0F, 1.0F, 0.0F});
         // Player::UpdateAttacks returns immediately after SetNextStateId.
         // Deliberately overshoot the remaining 183 ms of state 74 and prove
         // that the queued state still begins at time zero rather than
@@ -10228,7 +10234,42 @@ int main() {
         assert(retainedComboTargetPlayer.animationTimeMilliseconds() == 0);
         assert(retainedComboTargetPlayer.attackTimelineMilliseconds() == 0);
         assert(retainedComboTargetPlayer.trackedAttackTargetObjectId() ==
-               8101);
+               8102);
+        const float newTargetX = newBestCandidate.position.x -
+            retainedComboTargetPlayer.position().x;
+        const float newTargetY = newBestCandidate.position.y -
+            retainedComboTargetPlayer.position().y;
+        const float newTargetLength = std::hypot(newTargetX, newTargetY);
+        assert(std::abs(retainedComboTargetPlayer.facing().x -
+                        newTargetX / newTargetLength) < 0.001F);
+        assert(std::abs(retainedComboTargetPlayer.facing().y -
+                        newTargetY / newTargetLength) < 0.001F);
+
+        // The same entry-time search feeds NeedDashToTarget. A newly selected
+        // victim outside state 75's direct reach substitutes native state 87.
+        usm::game::GameplayPlayer relocatedFarComboPlayer;
+        assert(relocatedFarComboPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        assert(relocatedFarComboPlayer.requestPunch(
+            usm::game::PlayerAttackTarget{
+                {relocatedFarComboPlayer.position().x + 90.0F,
+                 relocatedFarComboPlayer.position().y,
+                 relocatedFarComboPlayer.position().z},
+                40.0F, 8111, false, 150.0F, true}));
+        relocatedFarComboPlayer.update({}, gameplayCameraPose, 150);
+        const usm::game::PlayerAttackTarget relocatedFarTarget{
+            {relocatedFarComboPlayer.position().x,
+             relocatedFarComboPlayer.position().y + 500.0F,
+             relocatedFarComboPlayer.position().z},
+            40.0F, 8112, false, 150.0F, true};
+        assert(relocatedFarComboPlayer.requestPunch(relocatedFarTarget));
+        relocatedFarComboPlayer.setQueuedAttackRelocationTarget(
+            relocatedFarTarget);
+        relocatedFarComboPlayer.update({}, gameplayCameraPose, 300);
+        assert(relocatedFarComboPlayer.activeStateId() == 87);
+        assert(relocatedFarComboPlayer.trackedAttackTargetObjectId() == 8112);
+        assert(std::abs(relocatedFarComboPlayer.facing().x) < 0.001F);
+        assert(std::abs(relocatedFarComboPlayer.facing().y - 1.0F) < 0.001F);
 
         assert(gameplayPlayer.requestPunch());
         assert(gameplayPlayer.consumeEnteredState() ==
@@ -10347,6 +10388,7 @@ int main() {
         assert(mixedComboPlayer.requestPunch(mixedComboTarget));
         mixedComboPlayer.update({}, gameplayCameraPose, 150);
         assert(mixedComboPlayer.requestWeb());
+        mixedComboPlayer.setQueuedAttackRelocationTarget(mixedComboTarget);
         assert(mixedComboPlayer.activeStateId() == 74);
         mixedComboPlayer.update({}, gameplayCameraPose, 183);
         assert(mixedComboPlayer.activeStateId() == 92);

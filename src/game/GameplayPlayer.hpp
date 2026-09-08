@@ -300,6 +300,13 @@ public:
     [[nodiscard]] std::int32_t trackedAttackTargetObjectId() const noexcept;
     void refreshTrackedAttackTarget(
         const std::optional<PlayerAttackTarget>& target) noexcept;
+    // Player::NeedRelocateTarget (0x003412d0) makes ordinary ground attacks
+    // repeat target search when the queued state is actually entered.
+    [[nodiscard]] bool queuedAttackNeedsTargetRelocation() const noexcept;
+    void setQueuedAttackRelocationTarget(
+        const std::optional<PlayerAttackTarget>& target,
+        const std::optional<assets::Vector3>& directionalInput =
+            std::nullopt) noexcept;
     [[nodiscard]] std::optional<assets::Vector3> attackDirection(
         const PlayerMotionInput& input,
         const CameraPose& camera) const noexcept;
@@ -492,7 +499,13 @@ private:
     [[nodiscard]] bool queueAttackTransition(
         const PlayerStateDefinition& state,
         const std::optional<PlayerAttackTarget>& target,
-        bool airborne) noexcept;
+        bool airborne,
+        const std::optional<PlayerAttackTarget>& relocationTarget =
+            std::nullopt,
+        const std::optional<assets::Vector3>& relocationDirection =
+            std::nullopt) noexcept;
+    [[nodiscard]] bool attackStateNeedsTargetRelocation(
+        const PlayerStateDefinition& state) const noexcept;
     [[nodiscard]] bool enterQueuedAttackTransition() noexcept;
     [[nodiscard]] bool switchToNextAttackLinkAnimation() noexcept;
     void applyAttackRootMotion(
@@ -673,6 +686,8 @@ private:
     const PlayerStateDefinition* queuedAttackState_{};
     std::optional<PlayerAttackTarget> queuedAttackTarget_;
     bool queuedAttackAirborne_{};
+    std::optional<PlayerAttackTarget> queuedAttackRelocationTarget_;
+    std::optional<assets::Vector3> queuedAttackRelocationDirection_;
     std::size_t nextAttackLinkAnimationIndex_{};
     std::uint64_t attackTimelineMilliseconds_{};
     std::uint32_t inputFrameAdvanceMilliseconds_{};

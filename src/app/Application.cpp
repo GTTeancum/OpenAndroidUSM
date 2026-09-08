@@ -3353,7 +3353,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             }
             std::optional<PlayerTargetSelection> attackTarget;
             std::optional<game::PlayerAttackTarget> playerAttackTarget;
-            if (controlsEnabled && punchPressed && !rescuePressed) {
+            if (controlsEnabled && (punchPressed || punchHeld) &&
+                !rescuePressed) {
                 attackTarget = acquireAttackTarget(1000.0F, 1000.0F);
                 if (attackTarget.has_value()) {
                     playerAttackTarget = attackTarget->target;
@@ -3435,15 +3436,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         ? gameplayPlayer_.trackedAttackTargetObjectId()
                         : -1;
                 if (retainedWebTargetId >= 0) {
-                    // UpdateKeyTrigger keeps Player+0x594 across an authored
-                    // attack-window transition. Reacquiring here lets a
-                    // nearer bystander steal state 84/85 or state 92/95.
-                    webTarget = selectEnemyTarget(
-                        enemyRuntime_.find(retainedWebTargetId));
-                    if (!webTarget.has_value()) {
-                        webTarget = selectObjectTarget(
-                            objectRuntime_.find(retainedWebTargetId));
-                    }
+                    // NeedRelocateTarget (0x003412d0) decides at state entry
+                    // whether to use this fresh search result or preserve
+                    // Player+0x594. State 92 relocates; the later motion
+                    // 103..119/124..130 web states retain their old target.
+                    webTarget = acquireAttackTarget(1000.0F, 1000.0F);
                 } else if (traversalRequest) {
                     // GetAirWebSpecialState first asks CTargetHelper for mask
                     // 2: its nearest non-airborne enemy from the 2000 cm
@@ -3608,8 +3605,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 (punchPressed || punchHeld) &&
                 !rescuePressed) {
                 const bool accepted = gameplayPlayer_.requestPunch(
-                    punchPressed ? playerAttackTarget : std::nullopt,
-                    punchPressed ? attackDirection : std::nullopt,
+                    playerAttackTarget,
+                    attackDirection,
                     punchPressed ? game::PlayerButtonPhase::Pressed
                                  : game::PlayerButtonPhase::Held);
                 if (autoplay && accepted) {
@@ -3690,8 +3687,54 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     gameplayPlayer_.refreshTrackedAttackTarget(std::nullopt);
                 }
             }
+            const bool attackRelocationPending =
+                gameplayPlayer_.queuedAttackNeedsTargetRelocation();
+            const std::uint16_t attackRelocationFromState =
+                gameplayPlayer_.activeStateId();
+            const std::int32_t attackRelocationFromTarget =
+                gameplayPlayer_.trackedAttackTargetObjectId();
+            std::int32_t attackRelocationCandidate = -1;
+            if (attackRelocationPending) {
+                // Player::SetNextStateId (0x003491d0) invokes
+                // NeedRelocateTarget (0x003412d0) at the linked-animation
+                // boundary, not when the button was buffered. Repeat the
+                // native 1000 cm search with the current actor transforms.
+                const auto relocationTarget =
+                    acquireAttackTarget(1000.0F, 1000.0F);
+                attackRelocationCandidate = relocationTarget.has_value()
+                    ? relocationTarget->target.objectId
+                    : -1;
+                gameplayPlayer_.setQueuedAttackRelocationTarget(
+                    relocationTarget.has_value()
+                        ? std::optional<game::PlayerAttackTarget>{
+                              relocationTarget->target}
+                        : std::nullopt,
+                    attackDirection);
+            }
             gameplayPlayer_.update(motion, cameraBeforeMovement,
                                    gameDeltaMilliseconds);
+            if (autoplay && attackRelocationPending &&
+                !gameplayPlayer_.queuedAttackNeedsTargetRelocation() &&
+                gameplayPlayer_.activeStateId() !=
+                    attackRelocationFromState) {
+                autoplay->recordEvent(
+                    traceTimeMilliseconds, "player_target_relocated",
+                    "from_state=" +
+                        std::to_string(attackRelocationFromState) +
+                        ";to_state=" +
+                        std::to_string(gameplayPlayer_.activeStateId()) +
+                        ";from_target=" +
+                        std::to_string(attackRelocationFromTarget) +
+                        ";candidate=" +
+                        std::to_string(attackRelocationCandidate) +
+                        ";selected=" +
+                        std::to_string(gameplayPlayer_
+                                           .trackedAttackTargetObjectId()) +
+                        ";facing_x=" +
+                        std::to_string(gameplayPlayer_.facing().x) +
+                        ";facing_y=" +
+                        std::to_string(gameplayPlayer_.facing().y));
+            }
             for (const auto& event : gameplayPlayer_.consumeWallWebEvents()) {
                 const bool applied = enemyRuntime_.applyWallWebEvent(event);
                 const auto* target = enemyRuntime_.find(event.targetObjectId);

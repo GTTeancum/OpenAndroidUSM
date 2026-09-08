@@ -654,6 +654,16 @@ the native frame-3 gate, and every linked state emits its own hit and sound
 frames. Autoplay traces record the active state ID/name and wait until all
 impacts have fired before issuing the next deterministic combo request.
 
+Target steering is also state-driven. `Player::NeedRelocateTarget`
+(`0x003412d0`) returns true for the ordinary ground combo states, and
+`Player::SetNextStateId` (`0x003491d0`) consequently searches again only when
+the buffered state is entered, turns toward that live candidate, and reruns
+`NeedDashToTarget`. Follow-up attacks can switch enemies or become state 87;
+the initial victim is retained only by the native state/motion exclusions for
+far, wall, web, aerial, and ultimate specials. The runtime now logs those
+entry-boundary decisions as `player_target_relocated` instead of presenting
+press-time target acquisition as the combo's permanent target.
+
 Ground and airborne web attacks use the original state selection instead of
 sharing the traversal-only swing action. `Player::GetGroundWebSpecialState`
 (`0x00343f48`) selects the ground web graph beginning at state 58; its pellet

@@ -19,9 +19,10 @@ wait_enemies_active 5000 394 395 397
 set_enemy_ai 394 0
 set_enemy_ai 395 0
 set_enemy_ai 397 0
-# Keep the retained victim alive for the complete native 375-damage ground
-# chain. This gate proves both state-78 contact/effect pairs against the same
-# target and keeps the effect/contact audit independent of an earlier death.
+# Keep the nearest victim alive for the complete native 375-damage ground
+# chain. The native entry-time search can reselect on every ordinary state;
+# this placement keeps that search deterministic while proving both state-78
+# contact/effect pairs and avoiding an earlier death.
 teleport 13399 -6360 7 0 -1 0
 
 punch

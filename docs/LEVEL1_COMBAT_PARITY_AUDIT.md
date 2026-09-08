@@ -101,6 +101,19 @@ collision solver as the native physics body does, and the production-input
 normal-flow gate verifies all three enemies stay reachable, are defeated,
 and allow the encounter to advance.
 
+Ordinary class-four combat states do not lock the first selected enemy for an
+entire combo. `Player::NeedRelocateTarget` (`0x003412d0`) and
+`Player::SetNextStateId` (`0x003491d0`) prove that states 74, 75, 79, 90, 91,
+78, and 92 repeat the native target search when each state actually begins,
+then face the selected unit and rerun `NeedDashToTarget`. The reconstruction
+therefore buffers input without rotating early, refreshes the candidate from
+live enemy/object transforms at the linked-animation boundary, and permits an
+ordinary follow-up to redirect to state 87. State 87 itself, web/air motions
+103 through 119 and 124 through 130, on-wall states, and state IDs 107 through
+113 preserve the existing target exactly as the native exclusion list does.
+Autoplay records each completed boundary as `player_target_relocated`, with
+the former target, fresh candidate, selected target, state pair, and facing.
+
 Web and aerial continuations have separate source-authored ledgers; serialized
 damage fields are not assumed to be delivered hits:
 

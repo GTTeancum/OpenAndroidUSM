@@ -550,6 +550,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     queuedAttackState_ = nullptr;
     queuedAttackTarget_.reset();
     queuedAttackAirborne_ = false;
+    queuedAttackRelocationTarget_.reset();
+    queuedAttackRelocationDirection_.reset();
     nextAttackLinkAnimationIndex_ = 0;
     attackTimelineMilliseconds_ = 0;
     inputFrameAdvanceMilliseconds_ = 0;
@@ -846,10 +848,10 @@ bool GameplayPlayer::requestPunch(
     }
     const bool beganAirborne = airborne();
     const bool continuingAttack = activeAttackState_ != nullptr;
-    // Ordinary 0x65/0x96 button predicates in UpdateKeyTrigger
-    // (0x0034d0a4) write only Player+0x4d8. They do not run the target-search
-    // branch, so an attack already in progress retains Player+0x594 even if
-    // another actor has become the best candidate on this input frame.
+    // UpdateKeyTrigger (0x0034d0a4) only buffers Player+0x4d8 here. Ordinary
+    // ground states replace Player+0x594 later, when SetNextStateId enters
+    // the requested state and NeedRelocateTarget (0x003412d0) returns true.
+    // Target-retaining aerial/web specials use the current Player+0x594.
     const std::optional<PlayerAttackTarget>& selectedTarget =
         continuingAttack ? activeAttackTarget_ : target;
     const PlayerStateDefinition* requested = nullptr;
@@ -892,7 +894,7 @@ bool GameplayPlayer::requestPunch(
         return false;
     }
 
-    if (selectedTarget.has_value()) {
+    if (!continuingAttack && selectedTarget.has_value()) {
         const float x = selectedTarget->position.x - position_.x;
         const float y = selectedTarget->position.y - position_.y;
         const float length = std::hypot(x, y);
@@ -901,7 +903,7 @@ bool GameplayPlayer::requestPunch(
             // Unit::SetLookAt before it selects the attack animation.
             facing_ = {x / length, y / length, 0.0F};
         }
-    } else if (directionalInput.has_value()) {
+    } else if (!continuingAttack && directionalInput.has_value()) {
         const float length = std::hypot(directionalInput->x,
                                         directionalInput->y);
         if (length > std::numeric_limits<float>::epsilon()) {
@@ -911,9 +913,9 @@ bool GameplayPlayer::requestPunch(
                        directionalInput->y / length, 0.0F};
         }
     }
-    // NeedDashToTarget is reached from UpdateKeyTrigger's target-search
-    // predicate for the opening attack. A direct 0x65/0x96 combo transition
-    // does not re-run it merely because knockback moved the retained victim.
+    // The opening state is entered immediately, so perform its native
+    // SetNextStateId target/dash selection now. Buffered ordinary combo
+    // states repeat this at their actual entry boundary below.
     if (!beganAirborne && !continuingAttack &&
         phase == PlayerButtonPhase::Pressed) {
         requested = attackStateForTarget(*requested, selectedTarget);
@@ -926,7 +928,8 @@ bool GameplayPlayer::requestPunch(
         requested->motionType == 112 || requested->motionType == 114;
     if (activeAttackState_ != nullptr) {
         return queueAttackTransition(*requested, selectedTarget,
-                                     requestedAirborne);
+                                     requestedAirborne, target,
+                                     directionalInput);
     }
     activeAttackTarget_ = selectedTarget;
     activeAttackAirborne_ = requestedAirborne;
@@ -983,7 +986,9 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
                     transitionForButton(kJumpButton, airborneTarget);
                 transition != nullptr) {
                 return queueAttackTransition(*transition,
-                                             activeAttackTarget_, true);
+                                             activeAttackTarget_, true,
+                                             activeAttackTarget_,
+                                             attackDirection(input, camera));
             }
         }
         if (phase == PlayerButtonPhase::Pressed) {
@@ -1002,7 +1007,9 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
         if (transition == nullptr) {
             return false;
         }
-        return queueAttackTransition(*transition, activeAttackTarget_, true);
+        return queueAttackTransition(*transition, activeAttackTarget_, true,
+                                     activeAttackTarget_,
+                                     attackDirection(input, camera));
     }
     // UpdateKeyTrigger polls hold/release predicates only as transitions from
     // the current state. A held or released A/Cross must not create a new
@@ -1233,14 +1240,15 @@ bool GameplayPlayer::requestWeb(
         }
         const std::optional<PlayerAttackTarget>& selectedTarget =
             activeAttackState_ != nullptr ? activeAttackTarget_ : target;
-        if (selectedTarget.has_value()) {
+        if (activeAttackState_ == nullptr && selectedTarget.has_value()) {
             const float x = selectedTarget->position.x - position_.x;
             const float y = selectedTarget->position.y - position_.y;
             const float length = std::hypot(x, y);
             if (length > std::numeric_limits<float>::epsilon()) {
                 facing_ = {x / length, y / length, 0.0F};
             }
-        } else if (directionalInput.has_value()) {
+        } else if (activeAttackState_ == nullptr &&
+                   directionalInput.has_value()) {
             const float length = std::hypot(directionalInput->x,
                                             directionalInput->y);
             if (length > std::numeric_limits<float>::epsilon()) {
@@ -1250,12 +1258,12 @@ bool GameplayPlayer::requestWeb(
         }
         const bool requestedAirborne = requested == groundWebFlyKickState_;
         if (activeAttackState_ != nullptr) {
-            // UpdateKeyTrigger leaves Player+0x594 pointing at the acquired
-            // Unit while it buffers a ground-chain web transition. A target
-            // need not be reacquired on the exact input frame; losing that
-            // pointer here turns state 95 into an untargeted sector kick.
+            // SetNextStateId preserves Player+0x594 for the excluded web/air
+            // motions, but state 92 is an ordinary motion-100 attack and
+            // NeedRelocateTarget performs a fresh search at entry.
             return queueAttackTransition(*requested, activeAttackTarget_,
-                                         requestedAirborne);
+                                         requestedAirborne, target,
+                                         directionalInput);
         }
         activeAttackTarget_ = target;
         activeAttackAirborne_ = requestedAirborne;
@@ -1279,9 +1287,11 @@ bool GameplayPlayer::requestWeb(
             lastActionRejectionReason_ = "missing_transition";
             return false;
         }
-        // As with the ground chain, ordinary Web predicates do not execute
-        // UpdateKeyTrigger's target-search branch. Preserve Player+0x594.
-        return queueAttackTransition(*requested, activeAttackTarget_, true);
+        // NeedRelocateTarget decides whether this target is replaced at the
+        // state boundary. Motions 103..119 and 124..130 retain Player+0x594;
+        // any ordinary requested state uses the fresh candidate.
+        return queueAttackTransition(*requested, activeAttackTarget_, true,
+                                     target, directionalInput);
     }
     if (!airborne() || locomotionState_ == LocomotionState::WebThrow ||
         locomotionState_ == LocomotionState::SwingHang || dead() ||
@@ -3754,6 +3764,8 @@ bool GameplayPlayer::enterAttackState(
     queuedAttackState_ = nullptr;
     queuedAttackTarget_.reset();
     queuedAttackAirborne_ = false;
+    queuedAttackRelocationTarget_.reset();
+    queuedAttackRelocationDirection_.reset();
     nextAttackLinkAnimationIndex_ = 0;
     attackTimelineMilliseconds_ = 0;
     nextAttackImpactFrameIndex_ = 0;
@@ -3935,7 +3947,9 @@ bool GameplayPlayer::enterAttackState(
 bool GameplayPlayer::queueAttackTransition(
     const PlayerStateDefinition& state,
     const std::optional<PlayerAttackTarget>& target,
-    bool airborne) noexcept {
+    bool airborne,
+    const std::optional<PlayerAttackTarget>& relocationTarget,
+    const std::optional<assets::Vector3>& relocationDirection) noexcept {
     // UpdateKeyTrigger's action predicates finish in CheckCanDoAction, whose
     // native 0x00345e20 meter comparison happens when the transition is
     // requested rather than at the later linked-animation boundary.
@@ -3950,6 +3964,8 @@ bool GameplayPlayer::queueAttackTransition(
     queuedAttackState_ = &state;
     queuedAttackTarget_ = target;
     queuedAttackAirborne_ = airborne;
+    queuedAttackRelocationTarget_ = relocationTarget;
+    queuedAttackRelocationDirection_ = relocationDirection;
 
     // Once SwitchToNextLinkAnim has selected the first linked/recovery clip,
     // Player::UpdateAttacks does not wait for that clip to finish.  At
@@ -3968,14 +3984,58 @@ bool GameplayPlayer::enterQueuedAttackTransition() noexcept {
         return false;
     }
     const PlayerStateDefinition* state = queuedAttackState_;
-    const std::optional<PlayerAttackTarget> target = queuedAttackTarget_;
-    const bool airborne = queuedAttackAirborne_;
+    std::optional<PlayerAttackTarget> target = queuedAttackTarget_;
+    bool airborne = queuedAttackAirborne_;
+    if (attackStateNeedsTargetRelocation(*state)) {
+        target = queuedAttackRelocationTarget_;
+        if (target.has_value()) {
+            const float x = target->position.x - position_.x;
+            const float y = target->position.y - position_.y;
+            const float length = std::hypot(x, y);
+            if (length > std::numeric_limits<float>::epsilon()) {
+                facing_ = {x / length, y / length, 0.0F};
+            }
+        } else if (queuedAttackRelocationDirection_.has_value()) {
+            const float length = std::hypot(
+                queuedAttackRelocationDirection_->x,
+                queuedAttackRelocationDirection_->y);
+            if (length > std::numeric_limits<float>::epsilon()) {
+                facing_ = {queuedAttackRelocationDirection_->x / length,
+                           queuedAttackRelocationDirection_->y / length,
+                           0.0F};
+            }
+        }
+        // SetNextStateId runs NeedDashToTarget after its fresh search. An
+        // ordinary follow-up can therefore become state 87 when the newly
+        // selected target is outside that attack's direct reach.
+        state = attackStateForTarget(*state, target);
+    }
     queuedAttackState_ = nullptr;
     queuedAttackTarget_.reset();
     queuedAttackAirborne_ = false;
+    queuedAttackRelocationTarget_.reset();
+    queuedAttackRelocationDirection_.reset();
     activeAttackTarget_ = target;
     activeAttackAirborne_ = airborne;
     return enterAttackState(*state);
+}
+
+bool GameplayPlayer::attackStateNeedsTargetRelocation(
+    const PlayerStateDefinition& state) const noexcept {
+    // Exact exclusions in Player::NeedRelocateTarget (0x003412d0): state
+    // 0x3b, state 0x57, motions 0x67..0x77 and 0x7c..0x82, the motion set
+    // returned by IsOnWall (0x003411cc), and state IDs 0x6b..0x71.
+    if (state.id == 59 || state.id == 87 ||
+        (state.motionType >= 103 && state.motionType <= 119) ||
+        (state.motionType >= 124 && state.motionType <= 130) ||
+        state.motionType == 1 || state.motionType == 13 ||
+        state.motionType == 14 || state.motionType == 16 ||
+        state.motionType == 131 || state.motionType == 132 ||
+        state.motionType == 205 ||
+        (state.id >= 107 && state.id <= 113)) {
+        return false;
+    }
+    return true;
 }
 
 bool GameplayPlayer::switchToNextAttackLinkAnimation() noexcept {
@@ -4404,6 +4464,8 @@ void GameplayPlayer::cancelAttack() noexcept {
     queuedAttackState_ = nullptr;
     queuedAttackTarget_.reset();
     queuedAttackAirborne_ = false;
+    queuedAttackRelocationTarget_.reset();
+    queuedAttackRelocationDirection_.reset();
     nextAttackLinkAnimationIndex_ = 0;
     attackTimelineMilliseconds_ = 0;
     ultimateActive_ = false;
@@ -4650,6 +4712,23 @@ void GameplayPlayer::refreshTrackedAttackTarget(
     };
     refresh(activeAttackTarget_);
     refresh(queuedAttackTarget_);
+}
+
+bool GameplayPlayer::queuedAttackNeedsTargetRelocation() const noexcept {
+    return queuedAttackState_ != nullptr &&
+           attackStateNeedsTargetRelocation(*queuedAttackState_);
+}
+
+void GameplayPlayer::setQueuedAttackRelocationTarget(
+    const std::optional<PlayerAttackTarget>& target,
+    const std::optional<assets::Vector3>& directionalInput) noexcept {
+    if (!queuedAttackNeedsTargetRelocation()) {
+        queuedAttackRelocationTarget_.reset();
+        queuedAttackRelocationDirection_.reset();
+        return;
+    }
+    queuedAttackRelocationTarget_ = target;
+    queuedAttackRelocationDirection_ = directionalInput;
 }
 
 void GameplayPlayer::queueAttackFrameEvents(
