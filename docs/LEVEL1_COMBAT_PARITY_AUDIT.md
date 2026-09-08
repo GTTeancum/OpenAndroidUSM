@@ -231,6 +231,17 @@ warning now has the same one-shot lifetime: the knife animation may continue,
 but another LB edge cannot consume the same warning or replace the response
 already playing.
 
+Projectile danger uses that same queue. `CRocket::UpdateRocketPos`
+(`0x003637b4`) calls `IWeapon::NotifyEntityDanger` (`0x0035a5d0`) once when
+the missile enters the native 1000 cm radius. The resulting default entry
+names the rocket Unit as its source, requests reaction type 1 and denominator
+3, and cannot be counter-hit. Accepted LB removes only that queue entry; the
+message sent back to the rocket falls through inherited `Unit::onMessage`
+(`0x00322b98`), so the missile is not erased and must actually be evaded.
+Sense-avoid motions 501--504 retain their complete shipped XYZ root through
+`Unit::UpdateDisplacement` (`0x00324df0`), including the roughly 144 cm arc
+of `air_to_right_to_fall`.
+
 The warning itself is also native gameplay state, not merely the tutorial
 textbox. `Player::SpawnPlayer` (`0x003455fe`--`0x0034564a`) creates a second
 `Hint`, assigns `hintbb.bsprite` animation 0, links it directly to

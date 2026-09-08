@@ -3341,24 +3341,21 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 // shipped Unlock command supplies that bit at 4000 ms.
                 const bool skillUnlocked = levelOne_.levelNumber() != 1 ||
                     levelCinematicRuntime_.skillUnlocked(1);
-                const game::LevelEnemyState* attacker = skillUnlocked
-                    ? enemyRuntime_.findSpiderSenseAttacker(
-                          gameplayPlayer_.position())
-                    : nullptr;
-                const bool accepted = skillUnlocked && attacker != nullptr &&
+                const std::optional<game::EnemySpiderSenseThreat> attacker =
+                    skillUnlocked
+                        ? enemyRuntime_.findSpiderSenseThreat()
+                        : std::nullopt;
+                const bool accepted = skillUnlocked && attacker.has_value() &&
                     gameplayPlayer_.requestSpiderSense({
                         attacker->position, attacker->collisionRadius,
-                        attacker->asset->objectId,
-                        enemyRuntime_.isInAir(attacker->asset->objectId),
+                        attacker->targetObjectId, attacker->airborne,
                         attacker->collisionHeight, attacker->canBeTiedUp,
-                        attacker->canBeDraggedTo, attacker->onWall, false,
-                        std::nullopt,
-                        enemyRuntime_.isNearAttackKeyFrame(
-                            attacker->asset->objectId),
-                        enemyRuntime_.spiderSenseReactionType(
-                            attacker->asset->objectId),
+                        attacker->canBeDraggedTo, attacker->onWall,
+                        attacker->canEnterWallWeb, attacker->headPosition,
+                        attacker->nearAttackKeyFrame,
+                        attacker->senseReactionType,
                         attacker->canBeCounterHit,
-                        attacker->asset->enemyTypeId});
+                        attacker->enemySubType});
                 if (accepted) {
                     // DoNormalSenseAction (0x0034f650) starts the native
                     // interface.bsprite frame-13 flash at alpha 160 before
@@ -3368,11 +3365,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     // record before DoNormalSenseAction (0x0034fc40-
                     // 0x0034fc4e). Keep that one-shot warning lifetime even
                     // though the source enemy's attack animation continues.
-                    (void)enemyRuntime_.consumeSpiderSenseAttacker(
-                        attacker->asset->objectId);
+                    (void)enemyRuntime_.consumeSpiderSenseThreat(*attacker);
                     const float denominator =
-                        enemyRuntime_.spiderSenseSlowMotionDenominator(
-                            attacker->asset->objectId);
+                        attacker->slowMotionDenominator;
                     // UpdateSpiderSense (0x0034fb70, 0x0034fc62-0x0034fc76)
                     // forces the attack's EnemyAttackInfo+0x50 denominator
                     // for 1000 ms, with the native enter/exit SFX enabled.
@@ -3398,9 +3393,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         "spider_sense_" +
                             std::string(accepted ? "accepted" : "rejected") +
                             ";attacker=" +
-                            (attacker == nullptr
+                            (!attacker.has_value()
                                  ? std::string{"none"}
-                                 : std::to_string(attacker->asset->objectId)) +
+                                 : std::to_string(attacker->targetObjectId)) +
                             ";skill_unlocked=" +
                             std::to_string(skillUnlocked) +
                             ";state=" +
@@ -5734,8 +5729,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         hintRuntime_.setCombatSenseCueVisible(
             gameplayActive && spiderSenseSkillUnlocked &&
             gameplayPlayer_.canDisplaySpiderSense() &&
-            enemyRuntime_.findSpiderSenseAttacker(
-                gameplayPlayer_.position()) != nullptr);
+            enemyRuntime_.findSpiderSenseThreat().has_value());
         hintRuntime_.update(
             gameDeltaMilliseconds,
             [this](std::int32_t objectId)

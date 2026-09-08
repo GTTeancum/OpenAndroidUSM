@@ -96,7 +96,9 @@ constexpr float kRocketTrackingMaximumAngleDegrees = 85.0F;
 constexpr float kRocketPlayerDangerRangeSquared = 1000000.0F;
 constexpr std::size_t kRocketPoolSize = 4;
 constexpr std::int16_t kRocketHitType = 104;
+constexpr float kRocketDamage = 200.0F;
 constexpr float kRocketVerticalHitForce = 600.0F;
+constexpr std::int32_t kRocketSenseTargetObjectIdBase = -2000000000;
 // CBoss::ResetBehavior (0x0032afdc) configures Rhino's CBehaviorDush with
 // 1200 cm/s and 45 degrees/s.  The dash behavior's target-contact branch
 // uses the two actors' physics shapes; these are the reconstructed player
@@ -871,6 +873,7 @@ Result LevelEnemyRuntime::initialize(
     gunLines_.clear();
     molotovs_.clear();
     rockets_.clear();
+    nextSpiderSenseQueueSequence_ = 1;
     boomerangs_.clear();
     playerWebPellets_.clear();
     thunderclaps_.clear();
@@ -1293,6 +1296,8 @@ void LevelEnemyRuntime::updateWallEnemy(
         enemy.behavior = EnemyBehaviorState::Idle;
         enemy.wallBehaviorState = 0;
         enemy.meleeAttackActive = false;
+        enemy.meleeSenseActive = false;
+        enemy.meleeSenseQueueSequence = 0;
         unregisterMeleeEngager(enemy.asset->objectId);
         if (enemy.activeAnimation != "wall_idle") {
             enemy.activeAnimation = "wall_idle";
@@ -3245,6 +3250,73 @@ const LevelEnemyState* LevelEnemyRuntime::findSpiderSenseAttacker(
     return nearest;
 }
 
+std::optional<EnemySpiderSenseThreat>
+LevelEnemyRuntime::findSpiderSenseThreat() const {
+    std::optional<EnemySpiderSenseThreat> selected;
+    const auto consider = [&selected](EnemySpiderSenseThreat threat) {
+        if (threat.queueSequence == 0) {
+            return;
+        }
+        if (!selected || threat.queueSequence < selected->queueSequence) {
+            selected = std::move(threat);
+        }
+    };
+    for (const LevelEnemyState& enemy : states_) {
+        if (enemy.asset == nullptr || !enemy.visible || enemy.health <= 0.0F ||
+            !enemy.meleeAttackActive || !enemy.meleeSenseActive) {
+            continue;
+        }
+        consider({EnemySpiderSenseThreatKind::Enemy,
+                  enemy.asset->objectId,
+                  enemy.asset->objectId,
+                  -1,
+                  enemy.position,
+                  enemy.collisionRadius,
+                  enemy.collisionHeight,
+                  isInAir(enemy),
+                  enemy.canBeTiedUp,
+                  enemy.canBeDraggedTo,
+                  enemy.onWall,
+                  canEnterWallWeb(enemy.asset->objectId),
+                  nodeWorldPosition(enemy.asset->objectId, "Bip01_Head"),
+                  isNearAttackKeyFrame(enemy.asset->objectId),
+                  spiderSenseReactionType(enemy.asset->objectId),
+                  enemy.canBeCounterHit,
+                  enemy.asset->enemyTypeId,
+                  spiderSenseSlowMotionDenominator(enemy.asset->objectId),
+                  enemy.meleeSenseQueueSequence});
+    }
+    for (const EnemyRocketState& rocket : rockets_) {
+        if (!rocket.active || !rocket.senseQueued) {
+            continue;
+        }
+        // IWeapon::NotifyEntityDanger(Unit*, int) at 0x0035a5d0 builds the
+        // exact default AISenseInfo {active, 3.0f, -1, true, -1, 0}. The
+        // sender queried by Player::onMessage is the rocket Unit itself, not
+        // the heavy who fired it, so it cannot be counter-hit or tied up.
+        consider({EnemySpiderSenseThreatKind::Rocket,
+                  kRocketSenseTargetObjectIdBase + rocket.poolIndex,
+                  rocket.sourceObjectId,
+                  rocket.poolIndex,
+                  rocket.position,
+                  0.0F,
+                  0.0F,
+                  true,
+                  false,
+                  false,
+                  false,
+                  false,
+                  std::nullopt,
+                  false,
+                  1,
+                  false,
+                  -1,
+                  3.0F,
+                  rocket.senseQueueSequence});
+    }
+    return selected;
+}
+
 bool LevelEnemyRuntime::consumeSpiderSenseAttacker(
     std::int32_t objectId) noexcept {
     LevelEnemyState* enemy = findMutable(objectId);
@@ -3257,6 +3329,29 @@ bool LevelEnemyRuntime::consumeSpiderSenseAttacker(
     // popAttack copies the selected AISenseInfo and then removeAttack erases
     // that attacker from the helper's pending list.
     enemy->meleeSenseActive = false;
+    enemy->meleeSenseQueueSequence = 0;
+    return true;
+}
+
+bool LevelEnemyRuntime::consumeSpiderSenseThreat(
+    const EnemySpiderSenseThreat& threat) noexcept {
+    if (threat.kind == EnemySpiderSenseThreatKind::Enemy) {
+        return consumeSpiderSenseAttacker(threat.targetObjectId);
+    }
+    const auto rocket = std::find_if(
+        rockets_.begin(), rockets_.end(), [&threat](const EnemyRocketState& value) {
+            return value.active && value.poolIndex == threat.projectilePoolIndex &&
+                   value.senseQueued &&
+                   value.senseQueueSequence == threat.queueSequence;
+        });
+    if (rocket == rockets_.end()) {
+        return false;
+    }
+    // CTargetHelper::popAttack removes only its queue record. CRocket keeps
+    // its internal in-range latch set, so it cannot register the same warning
+    // again until it first exits and later re-enters the danger radius.
+    rocket->senseQueued = false;
+    rocket->senseQueueSequence = 0;
     return true;
 }
 
@@ -3701,6 +3796,7 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
     gunLines_.clear();
     molotovs_.clear();
     rockets_.clear();
+    nextSpiderSenseQueueSequence_ = 1;
     boomerangs_.clear();
     playerWebPellets_.clear();
     thunderclaps_.clear();
@@ -3723,6 +3819,8 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
         enemy.cinematicActionActive = false;
         enemy.cinematicActionObjectId = -1;
         enemy.meleeAttackActive = false;
+        enemy.meleeSenseActive = false;
+        enemy.meleeSenseQueueSequence = 0;
         enemy.rangeAttackActive = false;
         enemy.rangeAttackAnimationSequence.clear();
         enemy.rangeAttackAnimationSequenceIndex = 0;
@@ -3890,9 +3988,16 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
                     ? nullptr
                     : level_->attackConfigs().find(
                           enemy.selectedMeleeAttackId);
+            const bool wasSenseActive = enemy.meleeSenseActive;
             enemy.meleeSenseActive =
                 selectedAttack != nullptr &&
                 attackIntersectsPlayer(*selectedAttack, eventTime);
+            if (enemy.meleeSenseActive && !wasSenseActive) {
+                enemy.meleeSenseQueueSequence =
+                    nextSpiderSenseQueueSequence_++;
+            } else if (!enemy.meleeSenseActive) {
+                enemy.meleeSenseQueueSequence = 0;
+            }
             continue;
         }
         if (isGunLineEnemy(enemy) && event->actionType == 0 &&
@@ -4144,6 +4249,8 @@ void LevelEnemyRuntime::updateRockets(
         rocket.position = position;
         rocket.active = false;
         rocket.dangerActive = false;
+        rocket.senseQueued = false;
+        rocket.senseQueueSequence = 0;
         pendingProjectileEvents_.push_back(
             {contactKind, rocket.sourceObjectId, position, rocket.velocity,
              0.0F});
@@ -4323,9 +4430,18 @@ void LevelEnemyRuntime::updateRockets(
         const float playerZ =
             rocket.position.z -
             (playerPosition.z + kPlayerCollisionHeightCentimeters * 0.5F);
-        rocket.dangerActive =
+        const bool insideDangerRange =
             playerX * playerX + playerY * playerY + playerZ * playerZ <
             kRocketPlayerDangerRangeSquared;
+        if (insideDangerRange && !rocket.dangerActive) {
+            rocket.dangerActive = true;
+            rocket.senseQueued = true;
+            rocket.senseQueueSequence = nextSpiderSenseQueueSequence_++;
+        } else if (!insideDangerRange && rocket.dangerActive) {
+            rocket.dangerActive = false;
+            rocket.senseQueued = false;
+            rocket.senseQueueSequence = 0;
+        }
     }
     std::erase_if(rockets_, [](const EnemyRocketState& rocket) {
         return !rocket.active;
@@ -4570,15 +4686,6 @@ void LevelEnemyRuntime::launchRocket(
         direction.x * kRocketSpeedCentimetersPerSecond,
         direction.y * kRocketSpeedCentimetersPerSecond,
         direction.z * kRocketSpeedCentimetersPerSecond};
-    const EnemyAttackIntervalDefinition* interval =
-        level_->enemyAttackIntervalConfigs().findForWeaponType(17);
-    const EnemyRangeAttackDefinition* attack =
-        interval == nullptr
-            ? nullptr
-            : level_->enemyRangeAttackConfigs().findByMapId(interval->id);
-    if (attack == nullptr) {
-        return;
-    }
     std::array<bool, kRocketPoolSize> used{};
     for (const EnemyRocketState& rocket : rockets_) {
         if (rocket.active && rocket.poolIndex >= 0 &&
@@ -4594,7 +4701,7 @@ void LevelEnemyRuntime::launchRocket(
         std::distance(used.begin(), freeSlot));
     rockets_.push_back({enemy.asset->objectId, enemy.asset->roomId,
                         poolIndex, origin, velocity, direction,
-                        attack->damage, 0, false, true});
+                        kRocketDamage, 0, false, false, 0, true});
     pendingProjectileEvents_.push_back(
         {EnemyProjectileEventKind::Spawned, enemy.asset->objectId,
          origin, velocity, 0.0F});
@@ -4848,6 +4955,7 @@ void LevelEnemyRuntime::startMeleeAttack(
     enemy.animationReversed = false;
     enemy.meleeAttackActive = true;
     enemy.meleeSenseActive = false;
+    enemy.meleeSenseQueueSequence = 0;
     enemy.meleeAttackAnimationSequence = std::move(selectedSequence);
     enemy.meleeAttackAnimationSequenceIndex = 0;
     enemy.selectedMeleeAttackId = selectedAttackId;

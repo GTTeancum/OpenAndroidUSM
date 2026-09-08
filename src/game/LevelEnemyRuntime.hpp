@@ -200,6 +200,7 @@ struct LevelEnemyState {
     // Spider-Sense attack at its authored key-frame percentage.  This is
     // intentionally distinct from merely entering the melee animation.
     bool meleeSenseActive{};
+    std::uint64_t meleeSenseQueueSequence{};
     // CAIEntityManager owns a bounded list distinct from the behavior state.
     // Normal difficulty permits one registered melee attacker at a time.
     bool meleeAttackRegistered{};
@@ -357,8 +358,47 @@ struct EnemyRocketState {
     assets::Vector3 facing{1.0F, 0.0F, 0.0F};
     float damage{};
     std::uint32_t ageMilliseconds{};
+    // UpdateRocketPos registers one target-helper warning on entry into the
+    // native danger radius. Popping that warning must not re-register it
+    // until the projectile first leaves and then re-enters the radius.
     bool dangerActive{};
+    bool senseQueued{};
+    std::uint64_t senseQueueSequence{};
     bool active{};
+};
+
+enum class EnemySpiderSenseThreatKind {
+    Enemy,
+    Rocket,
+};
+
+// Portable copy of the CTargetHelper attack entry selected by getAttack/
+// popAttack. Projectile weapons are Unit senders in the native message path,
+// so their live position and response metadata cannot be represented by an
+// owning LevelEnemyState alone.
+struct EnemySpiderSenseThreat {
+    EnemySpiderSenseThreatKind kind{EnemySpiderSenseThreatKind::Enemy};
+    // targetObjectId identifies the Unit stored by CTargetHelper. For a
+    // rocket this is a stable synthetic pool identity; sourceObjectId is the
+    // owning enemy retained for diagnostics.
+    std::int32_t targetObjectId{-1};
+    std::int32_t sourceObjectId{-1};
+    std::int32_t projectilePoolIndex{-1};
+    assets::Vector3 position;
+    float collisionRadius{};
+    float collisionHeight{};
+    bool airborne{};
+    bool canBeTiedUp{};
+    bool canBeDraggedTo{};
+    bool onWall{};
+    bool canEnterWallWeb{};
+    std::optional<assets::Vector3> headPosition;
+    bool nearAttackKeyFrame{};
+    std::int32_t senseReactionType{1};
+    bool canBeCounterHit{true};
+    std::int16_t enemySubType{-1};
+    float slowMotionDenominator{1.0F};
+    std::uint64_t queueSequence{};
 };
 
 // CBoomerang's native states are assigned by SetState (0x0035aefc) and
@@ -605,11 +645,15 @@ public:
     // engager to the spider-sense input path.
     [[nodiscard]] const LevelEnemyState* findSpiderSenseAttacker(
         const assets::Vector3& playerPosition) const noexcept;
+    [[nodiscard]] std::optional<EnemySpiderSenseThreat>
+    findSpiderSenseThreat() const;
     // CTargetHelper::popAttack (0x00353d98) removes the selected warning as
     // soon as UpdateSpiderSense accepts it. This prevents one enemy attack
     // from being consumed repeatedly during its remaining animation.
     [[nodiscard]] bool consumeSpiderSenseAttacker(
         std::int32_t objectId) noexcept;
+    [[nodiscard]] bool consumeSpiderSenseThreat(
+        const EnemySpiderSenseThreat& threat) noexcept;
     [[nodiscard]] float spiderSenseSlowMotionDenominator(
         std::int32_t objectId) const noexcept;
     [[nodiscard]] std::int32_t spiderSenseReactionType(
@@ -868,6 +912,7 @@ private:
     std::vector<EnemyGunLineState> gunLines_;
     std::vector<EnemyMolotovState> molotovs_;
     std::vector<EnemyRocketState> rockets_;
+    std::uint64_t nextSpiderSenseQueueSequence_{1};
     std::vector<EnemyBoomerangState> boomerangs_;
     std::vector<PlayerWebPelletState> playerWebPellets_;
     std::vector<EnemyThunderclapState> thunderclaps_;

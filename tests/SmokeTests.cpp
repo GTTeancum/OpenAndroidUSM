@@ -7948,7 +7948,10 @@ int main() {
         const auto spawnedRocket = rocketRuntime.rockets().front();
         assert(spawnedRocket.sourceObjectId == 30000);
         assert(spawnedRocket.poolIndex == 0);
-        assert(spawnedRocket.damage == 50.0F);
+        // CRocket::CRocket (0x00364158) stores hit type 104, damage 200,
+        // and vertical force 600 directly in its AIHitTargetInfo. It does
+        // not inherit the range behavior row's separate 50 damage value.
+        assert(spawnedRocket.damage == 200.0F);
         assert(spawnedRocket.ageMilliseconds == 0);
         assert(spawnedRocket.active);
         assert(std::abs(std::sqrt(
@@ -7996,6 +7999,23 @@ int main() {
         assert(rocketRuntime.rockets().size() == 1);
         const auto& trackedRocket = rocketRuntime.rockets().front();
         assert(trackedRocket.ageMilliseconds == 100);
+        assert(trackedRocket.dangerActive);
+        assert(trackedRocket.senseQueued);
+        const auto rocketSenseThreat =
+            rocketRuntime.findSpiderSenseThreat();
+        assert(rocketSenseThreat.has_value());
+        assert(rocketSenseThreat->kind ==
+               usm::game::EnemySpiderSenseThreatKind::Rocket);
+        assert(rocketSenseThreat->sourceObjectId == 30000);
+        assert(rocketSenseThreat->projectilePoolIndex == 0);
+        assert(rocketSenseThreat->senseReactionType == 1);
+        assert(rocketSenseThreat->slowMotionDenominator == 3.0F);
+        assert(!rocketSenseThreat->canBeCounterHit);
+        assert(rocketRuntime.consumeSpiderSenseThreat(
+            *rocketSenseThreat));
+        assert(!rocketRuntime.findSpiderSenseThreat().has_value());
+        assert(rocketRuntime.rockets().front().dangerActive);
+        assert(!rocketRuntime.rockets().front().senseQueued);
         const float trackedSpeed = std::sqrt(
             trackedRocket.velocity.x * trackedRocket.velocity.x +
             trackedRocket.velocity.y * trackedRocket.velocity.y +
@@ -8009,7 +8029,7 @@ int main() {
             180.0F / 3.14159265358979323846F;
         assert(std::abs(signedTurnDegrees - 9.0F) < 0.05F);
 
-        // CRocket::CheckCollisions (0x00363d60) delivers one 50-damage hit;
+        // CRocket::CheckCollisions (0x00363d60) delivers one 200-damage hit;
         // Explode (0x00363c5c) starts both cached effects and the exact
         // proximity shake recovered from 0x00363d16-0x00363d26.
         for (std::uint32_t tick = 0;
@@ -8022,7 +8042,7 @@ int main() {
         const auto rocketHits = rocketRuntime.consumePlayerHits();
         assert(rocketHits.size() == 1);
         assert(rocketHits.front().sourceObjectId == 30000);
-        assert(rocketHits.front().damage == 50.0F);
+        assert(rocketHits.front().damage == 200.0F);
         assert(rocketHits.front().hitType == 104);
         const auto rocketEffects = rocketRuntime.consumeEffectCues();
         assert(rocketEffects.size() == 2);
@@ -8987,6 +9007,12 @@ int main() {
         senseTimingRuntime.updateGameplay(2U, knifeVictim);
         assert(senseTimingRuntime.find(394)->meleeSenseActive);
         assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) != nullptr);
+        const auto meleeSenseThreat =
+            senseTimingRuntime.findSpiderSenseThreat();
+        assert(meleeSenseThreat.has_value());
+        assert(meleeSenseThreat->kind ==
+               usm::game::EnemySpiderSenseThreatKind::Enemy);
+        assert(meleeSenseThreat->targetObjectId == 394);
         // UpdateSpiderSense pops exactly one CTargetHelper warning before it
         // enters the response state. The live knife animation continues, but
         // the same warning cannot be accepted a second time.
@@ -11400,6 +11426,27 @@ int main() {
             assert(fixedSensePlayer.activeStateId() ==
                    fixedSenseStates[index]);
         }
+
+        usm::game::GameplayPlayer groundedSenseArcPlayer;
+        assert(groundedSenseArcPlayer.initialize(
+            bootstrap.player(), &levelCollision, &playerStateConfigs,
+            {}, {}, {}, nullptr,
+            &bootstrap.playerHitEffectConfigs(),
+            bootstrap.playerHitEffects()));
+        groundedSenseArcPlayer.restoreAt(
+            {-9155.0F, 10458.0F, 8.0F}, {1.0F, 0.0F, 0.0F});
+        auto groundedSenseArcTarget = airSenseTarget;
+        groundedSenseArcTarget.position = {-8455.0F, 10458.0F, 100.0F};
+        groundedSenseArcTarget.senseReactionType = 5;
+        assert(groundedSenseArcPlayer.requestSpiderSense(
+            groundedSenseArcTarget));
+        assert(groundedSenseArcPlayer.activeStateId() == 37);
+        groundedSenseArcPlayer.update({}, gameplayCameraPose, 383);
+        // Unit::UpdateDisplacement (0x00324df0) does not discard the
+        // sense-avoid root's Z component. At the midpoint of the shipped
+        // air_to_right_to_fall clip, the physical capsule follows its
+        // roughly 144 cm arc instead of remaining ground-projected.
+        assert(groundedSenseArcPlayer.position().z > 130.0F);
 
         usm::game::GameplayPlayer nonCounterableSensePlayer;
         assert(nonCounterableSensePlayer.initialize(

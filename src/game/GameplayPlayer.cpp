@@ -4402,7 +4402,20 @@ void GameplayPlayer::applyAttackRootMotion(
         desired.y -= wallNormal_.y * alongNormal;
         desired.z -= wallNormal_.z * alongNormal;
         position_ = desired;
-    } else if (collision_ != nullptr && activeAttackAirborne_) {
+    } else if (collision_ != nullptr &&
+               (activeAttackAirborne_ ||
+                (activeAttackState_ != nullptr &&
+                 activeAttackState_->stateClass == 6 &&
+                 activeAttackState_->motionType >= 501 &&
+                 activeAttackState_->motionType <= 504))) {
+        // Unit::UpdateDisplacement (0x00324df0) forwards all three authored
+        // Dummy_center axes to PhysicsEntity::setDisplacementByDirection
+        // unless GetAnimOffseted masks an axis. The four sense-avoid motions
+        // (501..504) are unmasked and their shipped roots contain an aerial
+        // arc (the right evade peaks about 144 cm above its start). Routing
+        // a grounded entry through resolveGroundMotion incorrectly projected
+        // that Z displacement back onto the road and let tracking weapons
+        // follow the flattened dodge.
         collision_->resolveAirMotion(
             position_, desired, position_, LevelPhysicsFlags::JumpWall,
             LevelCollisionDepenetration::TowardAuthoredNormal);

@@ -651,17 +651,37 @@ its speed.
 
 `CRocket::CheckCollisions` at `0x00363d60` walks the AI Unit array in reverse,
 skips the owner, tests each swept Unit AABB, and tests Spider-Man last. A
-contact sends hit type 104 with the ranged row's 50 damage; the projectile
+contact sends the constructor's hard-coded hit type 104, 200 damage, and 600
+vertical force from `CRocket+0x2c0/+0x2c4/+0x2d4`; the ranged behavior row's
+separate 50 damage value is not copied into the projectile. The projectile
 then restarts both impact effects. `CRocket::Explode` at
 `0x00363cd8`--`0x00363d26` also starts the literal 3-unit, 12-frame,
 `(1,1,1)` camera shake when Spider-Man is within 1000 cm. D3D11 renders the
 four packaged rocket instances with the BDAE's hidden collision scaffold
 omitted, while four persistent smoke emitters follow the corresponding pool
 slots. `room9-heavy-native-rocket.usmauto` proves the production behavior,
-action-frame spawn, flight, 50-damage player contact, both impact effects,
+action-frame spawn, flight, 200-damage player contact, both impact effects,
 and exact shake without screenshots or host input; core and WARP tests pin
 the config, animation sequence, homing cap, asset, pool renderer, and effect
 plumbing independently.
+
+`CRocket::UpdateRocketPos` at `0x003637b4` sends the default
+`AISenseInfo {active, 3.0, -1, true, -1, 0}` through
+`IWeapon::NotifyEntityDanger` (`0x0035a5d0`) on the first entry into the
+1000 cm danger radius, and clears it on exit or explosion. The source stored
+by `Player::onMessage` is the rocket Unit, not its owning heavy. Rocket and
+melee warnings now share the target helper's insertion-order queue and exact
+one-shot `popAttack` lifetime. `Player::UpdateSpiderSense` (`0x0034fb70`)
+therefore accepts LB against that synthetic projectile target, selects the
+normal directional evade, dismisses the cue, and applies denominator-three
+slow motion. Its reverse message 300 reaches CRocket's inherited
+`Unit::onMessage` (`0x00322b98`) and does not destroy the projectile: success
+remains a spatially timed dodge. `Unit::UpdateDisplacement` (`0x00324df0`)
+forwards all three unmasked root axes, so sense-avoid motions 501--504 follow
+their shipped aerial arcs instead of being projected onto the road. The
+headless `room9-heavy-native-rocket-sense.usmauto` route waits for an actual
+rocket warning, performs a close timed LB evade, proves the cue is consumed
+once and the 3x response starts, and completes without damage.
 
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation

@@ -1,0 +1,32 @@
+# Room 9's CRocket registers itself with the player's native target-helper
+# queue on first entry into the 1000 cm danger radius. LB must consume that
+# projectile warning once and select an evade; the warning cannot be
+# reinserted while the same rocket remains inside the radius.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+set_enemy_ai 488 0
+set_enemy_ai 489 0
+set_enemy_ai 505 0
+set_enemy_ai 506 0
+set_enemy_ai 30000 1 1
+unlock_skill 1
+teleport -9155 10458 8 1 0 0
+wait_enemy_projectile 6000 30000
+# The native warning begins at 1000 cm and remains queued. Exercise the
+# actual spatial evade close to impact rather than treating LB as immunity.
+wait 700
+assert_spider_sense_cue 1
+spider_sense
+assert_spider_sense_cue 0
+assert_slow_motion 3
+wait 100
+assert_spider_sense_cue 0
+wait 2500
+assert_health_above 999
+finish
