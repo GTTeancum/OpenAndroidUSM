@@ -10624,7 +10624,6 @@ int main() {
                                            bootstrap.playerHitEffects()));
         assert(targetedAirPlayer.requestJump());
         targetedAirPlayer.update({}, gameplayCameraPose, 100);
-        const auto targetedAirStart = targetedAirPlayer.position();
         const usm::assets::Vector3 targetedAirTarget{
             100.0F, 0.0F, 100.0F};
         assert(targetedAirPlayer.requestPunch(
@@ -10632,25 +10631,7 @@ int main() {
                 targetedAirTarget, 40.0F, 1239, true, 150.0F}));
         assert(targetedAirPlayer.activeStateId() == 86);
         assert(!targetedAirPlayer.canUpdateCombatTarget());
-        assert(targetedAirPlayer.hitEffects().size() == 1);
-        assert(targetedAirPlayer.hitEffects().front().effectId == 26);
-        const float targetedAirDx =
-            targetedAirTarget.x - targetedAirStart.x;
-        const float targetedAirDy =
-            targetedAirTarget.y - targetedAirStart.y;
-        const float targetedAirDz =
-            (targetedAirTarget.z + 150.0F) - targetedAirStart.z;
-        const auto targetedAirEffectLifetime =
-            static_cast<std::uint32_t>(
-                std::sqrt(targetedAirDx * targetedAirDx +
-                          targetedAirDy * targetedAirDy +
-                          targetedAirDz * targetedAirDz) /
-                1400.0F * 1000.0F) +
-            600U;
-        assert(targetedAirPlayer.hitEffects().front().lifetimeMilliseconds ==
-               targetedAirEffectLifetime);
-        assert(!targetedAirPlayer.hitEffects().front()
-                    .additiveModulateMaterial);
+        assert(targetedAirPlayer.hitEffects().empty());
 
         usm::game::GameplayPlayer sensePlayer;
         assert(sensePlayer.initialize(bootstrap.player(), nullptr,
@@ -11457,9 +11438,10 @@ int main() {
         assert(dragDownFinish->targetedEnemyObjectId == 1236);
 
         // State 86/motion 0x6c is a retained airborne-target dash, not an
-        // in-place kick. SetNextStateId aims at Bip01_Head at 1400 cm/s;
-        // UpdateAttackParam retries its contact test after frame 2 until the
-        // accepted-contact latch is set.
+        // in-place kick. Its dedicated SetNextStateId state-86 branch uses
+        // the target Unit position at 1400 cm/s; effect 26 belongs to the
+        // later motion-0x74 whirlwind branch. UpdateAttackParam retries its
+        // contact test after frame 2 until the accepted-contact latch is set.
         usm::game::GameplayPlayer diagonalKickPlayer;
         assert(diagonalKickPlayer.initialize(
             bootstrap.player(), nullptr, &playerStateConfigs, {}, {}, {},
@@ -11476,6 +11458,7 @@ int main() {
             usm::assets::Vector3{500.0F, 0.0F, 330.0F}};
         assert(diagonalKickPlayer.requestPunch(diagonalKickTarget));
         assert(diagonalKickPlayer.activeStateId() == 86);
+        assert(diagonalKickPlayer.hitEffects().empty());
         diagonalKickPlayer.update({}, gameplayCameraPose, 50);
         assert(diagonalKickPlayer.position().x > diagonalKickStartX);
         const auto diagonalKickFirstProbe =
@@ -11531,14 +11514,17 @@ int main() {
         assert(airWebTiePlayer.airborne());
 
         usm::game::GameplayPlayer airWebDragPlayer;
-        assert(airWebDragPlayer.initialize(bootstrap.player(), nullptr,
-                                           &playerStateConfigs));
+        assert(airWebDragPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs, {}, {}, {},
+            nullptr, &bootstrap.playerHitEffectConfigs(),
+            bootstrap.playerHitEffects()));
         airWebDragPlayer.restoreAt({0.0F, 0.0F, 0.0F},
                                    {1.0F, 0.0F, 0.0F});
         assert(airWebDragPlayer.requestJump());
         airWebDragPlayer.update({}, gameplayCameraPose, 150);
         const usm::game::PlayerAttackTarget dragTarget{
-            {500.0F, 0.0F, 0.0F}, 60.0F, 1238, true, 180.0F, false, true};
+            {500.0F, 0.0F, 0.0F}, 60.0F, 1238, true, 180.0F, false, true,
+            false, false, usm::assets::Vector3{500.0F, 0.0F, 180.0F}};
         assert(airWebDragPlayer.requestWeb(dragTarget));
         assert(airWebDragPlayer.activeStateId() == 115);
         airWebDragPlayer.update(
@@ -11548,6 +11534,34 @@ int main() {
                 1U);
         assert(airWebDragPlayer.activeStateId() == 116);
         assert(airWebDragPlayer.animationTimeMilliseconds() == 0);
+        const auto whirlwindStart = airWebDragPlayer.position();
+        const auto whirlwindVelocity =
+            airWebDragPlayer.attackPhysicsVelocity();
+        assert(std::abs(std::sqrt(
+                            whirlwindVelocity.x * whirlwindVelocity.x +
+                            whirlwindVelocity.y * whirlwindVelocity.y +
+                            whirlwindVelocity.z * whirlwindVelocity.z) -
+                        1400.0F) < 0.01F);
+        const float whirlwindDx = 500.0F - whirlwindStart.x;
+        const float whirlwindDy = -whirlwindStart.y;
+        const float whirlwindDz = 180.0F - whirlwindStart.z;
+        const auto expectedWhirlwindLifetime =
+            static_cast<std::uint32_t>(
+                std::sqrt(whirlwindDx * whirlwindDx +
+                          whirlwindDy * whirlwindDy +
+                          whirlwindDz * whirlwindDz) /
+                    1400.0F * 1000.0F +
+                600.0F);
+        const auto whirlwindEffect = std::find_if(
+            airWebDragPlayer.hitEffects().begin(),
+            airWebDragPlayer.hitEffects().end(),
+            [](const auto& effect) { return effect.effectId == 26; });
+        assert(whirlwindEffect != airWebDragPlayer.hitEffects().end());
+        assert(whirlwindEffect->lifetimeMilliseconds ==
+               expectedWhirlwindLifetime);
+        assert(whirlwindEffect->fadeDurationMilliseconds ==
+               expectedWhirlwindLifetime);
+        assert(!whirlwindEffect->additiveModulateMaterial);
         airWebDragPlayer.update({}, gameplayCameraPose, 1);
         const auto whirlwindImpact = airWebDragPlayer.consumeMeleeImpact();
         assert(whirlwindImpact.has_value());
@@ -11555,6 +11569,77 @@ int main() {
         assert(whirlwindImpact->damage == 15.0F);
         assert(!whirlwindImpact->targetedDelivery);
         assert(whirlwindImpact->webAttack);
+
+        // UpdateAttacks resamples the live head while travel time exceeds
+        // 150 ms and the Unit bases remain at least 150 cm apart.
+        auto movedDragTarget = dragTarget;
+        movedDragTarget.position.y = 240.0F;
+        movedDragTarget.headPosition =
+            usm::assets::Vector3{500.0F, 240.0F, 180.0F};
+        const auto beforeWhirlwindRetarget = airWebDragPlayer.position();
+        airWebDragPlayer.refreshTrackedAttackTarget(movedDragTarget);
+        airWebDragPlayer.update({}, gameplayCameraPose, 16);
+        const auto retargetedVelocity =
+            airWebDragPlayer.attackPhysicsVelocity();
+        const usm::assets::Vector3 retargetedDirection{
+            500.0F - beforeWhirlwindRetarget.x,
+            240.0F - beforeWhirlwindRetarget.y,
+            180.0F - beforeWhirlwindRetarget.z};
+        const float retargetedLength = std::sqrt(
+            retargetedDirection.x * retargetedDirection.x +
+            retargetedDirection.y * retargetedDirection.y +
+            retargetedDirection.z * retargetedDirection.z);
+        assert(std::abs(retargetedVelocity.x / 1400.0F -
+                        retargetedDirection.x / retargetedLength) < 0.001F);
+        assert(std::abs(retargetedVelocity.y / 1400.0F -
+                        retargetedDirection.y / retargetedLength) < 0.001F);
+        assert(std::abs(retargetedVelocity.z / 1400.0F -
+                        retargetedDirection.z / retargetedLength) < 0.001F);
+        airWebDragPlayer.update({}, gameplayCameraPose, 200);
+        assert(airWebDragPlayer.activeStateId() == 116);
+
+        bool sawWhirlwindRecovery = false;
+        for (std::uint32_t elapsed = 0;
+             elapsed < 2000 && airWebDragPlayer.activeStateId() == 116;
+             elapsed += 25) {
+            airWebDragPlayer.refreshTrackedAttackTarget(movedDragTarget);
+            airWebDragPlayer.update({}, gameplayCameraPose, 25);
+            const auto velocity = airWebDragPlayer.attackPhysicsVelocity();
+            if (!sawWhirlwindRecovery &&
+                std::sqrt(velocity.x * velocity.x +
+                          velocity.y * velocity.y +
+                          velocity.z * velocity.z) < 0.01F) {
+                sawWhirlwindRecovery = true;
+                airWebDragPlayer.update({}, gameplayCameraPose, 1);
+                const auto pinned = airWebDragPlayer.position();
+                assert(std::abs(pinned.x - 500.0F) < 0.01F);
+                assert(std::abs(pinned.y - 240.0F) < 0.01F);
+                assert(std::abs(pinned.z - 180.0F) < 0.01F);
+            }
+        }
+        assert(sawWhirlwindRecovery);
+        assert(airWebDragPlayer.activeStateId() == 117);
+
+        // SetNextStateId refuses motion 0x74 when the retained Unit has died
+        // during the preceding bind and redirects an airborne player to
+        // state 14 instead of running a targetless whirlwind.
+        usm::game::GameplayPlayer lostWhirlwindTargetPlayer;
+        assert(lostWhirlwindTargetPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        lostWhirlwindTargetPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                             {1.0F, 0.0F, 0.0F});
+        assert(lostWhirlwindTargetPlayer.requestJump());
+        lostWhirlwindTargetPlayer.update({}, gameplayCameraPose, 150);
+        assert(lostWhirlwindTargetPlayer.requestWeb(dragTarget));
+        assert(lostWhirlwindTargetPlayer.activeStateId() == 115);
+        lostWhirlwindTargetPlayer.refreshTrackedAttackTarget(std::nullopt);
+        lostWhirlwindTargetPlayer.update(
+            {}, gameplayCameraPose,
+            bootstrap.player().animationBank.clips()[5]
+                    .durationMilliseconds() +
+                1U);
+        assert(lostWhirlwindTargetPlayer.activeStateId() == 14);
+        assert(lostWhirlwindTargetPlayer.airborne());
 
         // GetAirWebSpecialState (0x00343de4) prioritizes CTargetHelper's
         // nearest non-airborne list over the general tie/drag capability

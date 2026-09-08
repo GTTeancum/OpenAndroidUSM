@@ -402,10 +402,23 @@ to the autoplay event log.
   support plane and performs that same early handoff. This prevents state 104
   from carrying Spider-Man below the street and restores the buffered
   state-105 heavy kick, its 80 damage, effect 20, and critical-hit cue.
-- Airborne target state 86 pursues `Bip01_Head` at the native 1400 cm/s,
-  retries its contact probe until the accepted-contact latch is set, deals 50
-  exactly once, and retains effect 26 for the travel duration plus effect 16
-  and the air-diagonal-kick/kick-impact audio at accepted contact.
+- Airborne target state 86's valid direct-target path pursues the retained
+  Unit base at 1400 cm/s, retries its contact probe until the accepted-contact
+  latch is set, and deals 50 exactly once. Effect 16 and the authored
+  air-diagonal-kick/kick-impact audio accompany the accepted contact; this
+  branch does not create effect 26 (`Player::SetNextStateId`,
+  `0x0034abf2`--`0x0034af42`).
+- The later states 114/115 route into state 116, whose motion `0x74` instead
+  samples the retained target's live `Bip01_Head`, pursues it at 1400 cm/s,
+  and creates effect 26 for the computed travel time plus 600 ms
+  (`Player::SetNextStateId`, `0x0034af44`--`0x0034b0b8`). While more than
+  150 ms of travel remains and the Unit bases are at least 150 cm apart,
+  `Player::UpdateAttacks` (`0x00352090`--`0x00352292`) resamples the live head
+  and recomputes both velocity and travel time. The state remains active past
+  its 200 ms clip, then stops velocity, pins Spider-Man to the live head for
+  the native 600 ms recovery, and enters state 117. A target lost before
+  entry redirects to falling state 14 or grounded state 0 instead of running
+  a targetless whirlwind.
 - State 64's motion-129 throw delivers 150 at primary-clip completion. State
   63's motion-127 attach is non-damaging and its primary completion delivers
   70 while the web line remains owned until state exit. States 101/102 retain

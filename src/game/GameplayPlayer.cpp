@@ -75,6 +75,13 @@ constexpr std::int16_t kAirborneBindableTargetTransition = 110;
 // (0x003906c8) as int(time / 50 + 0.5), rather than floored. Consequently
 // authored frame 7 first becomes runtime frame 4 at 175 ms, not 200 ms.
 constexpr std::uint32_t kRuntimeAnimationFrameMilliseconds = 50;
+// Player::SetNextStateId (0x0034af44-0x0034b080) and
+// Player::UpdateAttacks (0x00352090-0x00352292) own motion 0x74's explicit
+// pursuit and recovery rather than deriving them from the 200 ms animation.
+constexpr float kWebWhirlwindSpeedCentimetersPerSecond = 1400.0F;
+constexpr float kWebWhirlwindRetargetDistanceCentimeters = 150.0F;
+constexpr float kWebWhirlwindRetargetTimeMilliseconds = 150.0F;
+constexpr float kWebWhirlwindRecoveryMilliseconds = 600.0F;
 
 constexpr std::uint32_t runtimeAnimationFrame(
     std::uint64_t milliseconds) noexcept {
@@ -475,6 +482,9 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
         : &ownedNativeRandomizer_;
     activeHitEffects_.clear();
     attackPhysicsVelocity_ = {};
+    webWhirlwindTravelRemainingMilliseconds_ = 0.0F;
+    webWhirlwindRecoveryRemainingMilliseconds_ = 0.0F;
+    webWhirlwindTravelComplete_ = false;
     pendingHitEffectSpawnCount_ = 0;
     pendingCombatEffectCount_ = 0;
     pendingVoxStopEventCount_ = 0;
@@ -3820,6 +3830,9 @@ bool GameplayPlayer::enterAttackState(
         attackEnteredDuringPreparedInputFrame_ = true;
     }
     attackPhysicsVelocity_ = {};
+    webWhirlwindTravelRemainingMilliseconds_ = 0.0F;
+    webWhirlwindRecoveryRemainingMilliseconds_ = 0.0F;
+    webWhirlwindTravelComplete_ = false;
     nextUltimatePulseMilliseconds_ = 0;
     ultimatePhaseElapsedMilliseconds_ = 0;
     ultimatePhaseRemainingMilliseconds_ = 0;
@@ -3867,33 +3880,53 @@ bool GameplayPlayer::enterAttackState(
         queueHitEffect(30, 0, 0, {}, 1.0F, true);
     }
     if (state.motionType == 108 && activeAttackTarget_.has_value()) {
-        // The diagonal aerial kick creates fx_web_whirlwind for the dash
-        // travel time plus 600 ms (Player::SetNextStateId, 0x0034af66-
-        // 0x0034b0b8). The same native branch aims at Bip01_Head, installs
-        // its normalized direction at 1400 cm/s on both Player and the
-        // PhysicsEntity, and derives the trail lifetime from that distance.
-        // It snapshots Bip01 at entry and the retained callback is cleanup-
-        // only.
+        // State 86's dedicated SetNextStateId branch (0x0034abf2-
+        // 0x0034af42) uses the retained Unit position for its valid direct
+        // target path and installs 1400 cm/s. It does not create effect 26;
+        // that mesh belongs exclusively to motion 0x74 below.
+        const assets::Vector3 target = activeAttackTarget_->position;
+        const float dx = target.x - position_.x;
+        const float dy = target.y - position_.y;
+        const float dz = target.z - position_.z;
+        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (distance > std::numeric_limits<float>::epsilon()) {
+            attackPhysicsVelocity_ = {
+                dx / distance * kWebWhirlwindSpeedCentimetersPerSecond,
+                dy / distance * kWebWhirlwindSpeedCentimetersPerSecond,
+                dz / distance * kWebWhirlwindSpeedCentimetersPerSecond};
+        }
+    }
+    if (state.motionType == 116 && activeAttackTarget_.has_value()) {
+        // Motion 0x74 samples the retained target's Bip01_Head, installs
+        // 1400 cm/s on Player and PhysicsEntity, stores distance/speed in
+        // Player+0x154, and creates effect 26 for that travel time plus
+        // 600 ms (Player::SetNextStateId, 0x0034af44-0x0034b0b8).
         const assets::Vector3 target =
             activeAttackTarget_->headPosition.value_or(assets::Vector3{
                 activeAttackTarget_->position.x,
                 activeAttackTarget_->position.y,
                 activeAttackTarget_->position.z +
                     activeAttackTarget_->collisionHeight});
-        const float dx = target.x - position_.x;
-        const float dy = target.y - position_.y;
-        const float dz = target.z - position_.z;
-        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-        constexpr float kDiagonalKickSpeedCentimetersPerSecond = 1400.0F;
+        const assets::Vector3 direction{target.x - position_.x,
+                                        target.y - position_.y,
+                                        target.z - position_.z};
+        const float distance = length3D(direction);
         if (distance > std::numeric_limits<float>::epsilon()) {
             attackPhysicsVelocity_ = {
-                dx / distance * kDiagonalKickSpeedCentimetersPerSecond,
-                dy / distance * kDiagonalKickSpeedCentimetersPerSecond,
-                dz / distance * kDiagonalKickSpeedCentimetersPerSecond};
+                direction.x / distance *
+                    kWebWhirlwindSpeedCentimetersPerSecond,
+                direction.y / distance *
+                    kWebWhirlwindSpeedCentimetersPerSecond,
+                direction.z / distance *
+                    kWebWhirlwindSpeedCentimetersPerSecond};
         }
-        const auto travelMilliseconds = static_cast<std::uint32_t>(
-            distance / kDiagonalKickSpeedCentimetersPerSecond * 1000.0F);
-        queueHitEffect(26, 0, travelMilliseconds + 600U);
+        webWhirlwindTravelRemainingMilliseconds_ =
+            distance / kWebWhirlwindSpeedCentimetersPerSecond * 1000.0F;
+        queueHitEffect(
+            26, 0,
+            static_cast<std::uint32_t>(
+                webWhirlwindTravelRemainingMilliseconds_ +
+                kWebWhirlwindRecoveryMilliseconds));
     }
     const bool webPellet = state.motionType == 123;
     const bool immediateWebBindingHit =
@@ -4406,7 +4439,8 @@ void GameplayPlayer::applyAirAttackPursuitMotion(
     std::uint32_t elapsedMilliseconds) noexcept {
     if (activeAttackState_ == nullptr ||
         (activeAttackState_->motionType != 108 &&
-         activeAttackState_->motionType != 109) ||
+         activeAttackState_->motionType != 109 &&
+         activeAttackState_->motionType != 116) ||
         elapsedMilliseconds == 0) {
         return;
     }
@@ -4466,6 +4500,89 @@ void GameplayPlayer::applyAirAttackPursuitMotion(
     }
 }
 
+bool GameplayPlayer::updateWebWhirlwindMotion(
+    std::uint32_t elapsedMilliseconds) noexcept {
+    if (activeAttackState_ == nullptr ||
+        activeAttackState_->motionType != 116) {
+        return false;
+    }
+
+    // Player::PreUpdate (0x0034e08c) subtracts the frame delta from
+    // Player+0x158 before UpdateState (0x00353384-0x0035339c) does the same
+    // for Player+0x154. UpdateAttacks observes both already-advanced clocks.
+    if (webWhirlwindRecoveryRemainingMilliseconds_ > 0.0F) {
+        webWhirlwindRecoveryRemainingMilliseconds_ -=
+            static_cast<float>(elapsedMilliseconds);
+    }
+    if (webWhirlwindTravelRemainingMilliseconds_ > 0.0F) {
+        webWhirlwindTravelRemainingMilliseconds_ -=
+            static_cast<float>(elapsedMilliseconds);
+    }
+
+    if (webWhirlwindTravelRemainingMilliseconds_ >
+            kWebWhirlwindRetargetTimeMilliseconds &&
+        !webWhirlwindTravelComplete_ && activeAttackTarget_.has_value()) {
+        const PlayerAttackTarget& target = *activeAttackTarget_;
+        const assets::Vector3 baseDelta{
+            target.position.x - position_.x,
+            target.position.y - position_.y,
+            target.position.z - position_.z};
+        if (length3D(baseDelta) >=
+            kWebWhirlwindRetargetDistanceCentimeters) {
+            // UpdateAttacks 0x0035211a-0x003521fe resamples Bip01_Head and
+            // recomputes both velocity and travel time while the target is
+            // still at least 150 cm away.
+            const assets::Vector3 head =
+                target.headPosition.value_or(assets::Vector3{
+                    target.position.x,
+                    target.position.y,
+                    target.position.z + target.collisionHeight});
+            const assets::Vector3 direction{head.x - position_.x,
+                                            head.y - position_.y,
+                                            head.z - position_.z};
+            const float distance = length3D(direction);
+            if (distance > std::numeric_limits<float>::epsilon()) {
+                attackPhysicsVelocity_ = {
+                    direction.x / distance *
+                        kWebWhirlwindSpeedCentimetersPerSecond,
+                    direction.y / distance *
+                        kWebWhirlwindSpeedCentimetersPerSecond,
+                    direction.z / distance *
+                        kWebWhirlwindSpeedCentimetersPerSecond};
+                webWhirlwindTravelRemainingMilliseconds_ =
+                    distance / kWebWhirlwindSpeedCentimetersPerSecond *
+                    1000.0F;
+            }
+        }
+    } else if (webWhirlwindTravelComplete_ &&
+               activeAttackTarget_.has_value()) {
+        // Once Player+0x600 is set, UpdateAttacks 0x00352204-0x0035223a
+        // writes the live Bip01_Head position through Unit's +0x48 virtual
+        // SetPosition slot on every recovery tick. That pin places the
+        // following air-bounce state on the victim instead of near it.
+        const PlayerAttackTarget& target = *activeAttackTarget_;
+        position_ = target.headPosition.value_or(assets::Vector3{
+            target.position.x,
+            target.position.y,
+            target.position.z + target.collisionHeight});
+    }
+
+    if (webWhirlwindTravelRemainingMilliseconds_ > 0.0F ||
+        webWhirlwindTravelComplete_) {
+        return webWhirlwindTravelComplete_ &&
+               webWhirlwindRecoveryRemainingMilliseconds_ <= 0.0F;
+    }
+
+    // UpdateAttacks 0x0035223c-0x00352274 sets Player+0x600, starts the
+    // independent 600 ms recovery clock at +0x158, and stops physics before
+    // Unit::UpdateDisplacement runs later in Player::Update.
+    webWhirlwindTravelComplete_ = true;
+    webWhirlwindRecoveryRemainingMilliseconds_ =
+        kWebWhirlwindRecoveryMilliseconds;
+    attackPhysicsVelocity_ = {};
+    return false;
+}
+
 void GameplayPlayer::applyAirRootMotion(
     const assets::Vector3& physicalDisplacement,
     const assets::Vector3& renderOffset) noexcept {
@@ -4514,6 +4631,9 @@ void GameplayPlayer::cancelAttack() noexcept {
     attackRootTranslation_ = {};
     attackVisualRootTranslation_ = {};
     attackPhysicsVelocity_ = {};
+    webWhirlwindTravelRemainingMilliseconds_ = 0.0F;
+    webWhirlwindRecoveryRemainingMilliseconds_ = 0.0F;
+    webWhirlwindTravelComplete_ = false;
     renderPosition_ = position_;
     updateWorldTransform(facing_);
     nextAttackImpactFrameIndex_ = 0;
@@ -4585,11 +4705,19 @@ void GameplayPlayer::updateAttack(
         // for this tick.
         queueAttackFrameEvents(previousTimeline, currentTimeline);
 
+        const bool webWhirlwind =
+            activeAttackState_->motionType == 116;
+        const bool webWhirlwindFinished = webWhirlwind &&
+            updateWebWhirlwindMotion(elapsedMilliseconds);
+
         const assets::Vector3 beforeHoming = position_;
-        applyFlyKickHomingMotion(step);
-        applyAirKnockdownApproachMotion(step, duration);
-        applyAirAttackPursuitMotion(step);
-        if (step != 0) {
+        if (!webWhirlwindFinished) {
+            applyFlyKickHomingMotion(step);
+            applyAirKnockdownApproachMotion(step, duration);
+            applyAirAttackPursuitMotion(
+                webWhirlwind ? elapsedMilliseconds : step);
+        }
+        if (step != 0 && !webWhirlwind) {
             const float inverseSeconds = 1000.0F / static_cast<float>(step);
             const assets::Vector3 homingDelta{
                 position_.x - beforeHoming.x,
@@ -4618,7 +4746,9 @@ void GameplayPlayer::updateAttack(
                     localDelta.z * inverseSeconds};
             }
         }
-        applyAttackRootMotion(physicalDisplacement, renderOffset);
+        if (!webWhirlwindFinished) {
+            applyAttackRootMotion(physicalDisplacement, renderOffset);
+        }
         const bool ultimateWheelFinished =
             activeAttackState_->motionType == 136 &&
             ultimatePhaseRemainingMilliseconds_ == 0;
@@ -4639,6 +4769,9 @@ void GameplayPlayer::updateAttack(
         // consume a buffered transition (or the state's normal successor)
         // immediately; otherwise state 104 keeps its downward velocity and
         // carries both the player and its state-105 finisher below the road.
+        if (webWhirlwind && !webWhirlwindFinished) {
+            return;
+        }
         if (currentLocal < duration && !ultimateWheelFinished &&
             !fallingAttackStopped) {
             return;
@@ -4709,6 +4842,36 @@ void GameplayPlayer::updateAttack(
             } else {
                 jumpAnchorHeight_ = position_.z;
                 enterLocomotionState(LocomotionState::SustainedFall);
+            }
+            return;
+        }
+        if (nextState != nullptr && nextState->motionType == 116 &&
+            !activeAttackTarget_.has_value()) {
+            // SetNextStateId 0x0034af4a-0x0034af6a rejects motion 0x74
+            // before installing it when Player+0x594 is no longer alive.
+            // It redirects to state 14 while Unit::IsFalling, otherwise
+            // state 0. Preserve the attack clip's current root height when
+            // handing the airborne path back to jump locomotion.
+            const float attackRootHeight = currentRootHeight();
+            bool physicallyFalling = activeAttackAirborne_;
+            if (collision_ != nullptr) {
+                float supportHeight{};
+                if (collision_->groundHeight(
+                        position_, 1.0F, 1.0F, supportHeight,
+                        LevelPhysicsFlags::JumpWall) &&
+                    std::abs(position_.z - supportHeight) <= 1.0F) {
+                    physicallyFalling = false;
+                }
+            }
+            cancelAttack();
+            locomotionRootTranslation_ = {};
+            if (physicallyFalling && jumpFallState_ != nullptr) {
+                enterLocomotionState(LocomotionState::JumpFall);
+                jumpAnchorHeight_ = position_.z - attackRootHeight;
+                renderPosition_.z = jumpAnchorHeight_;
+                updateWorldTransform(facing_);
+            } else {
+                enterLocomotionState(LocomotionState::Grounded);
             }
             return;
         }

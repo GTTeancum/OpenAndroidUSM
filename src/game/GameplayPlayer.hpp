@@ -167,7 +167,7 @@ struct PlayerAttackTarget {
     bool canBeDraggedTo{};
     bool onWall{};
     bool canEnterWallWeb{};
-    // Player::SetNextStateId motion 0x6c aims at the target's live
+    // Player::SetNextStateId motion 0x74 aims at the target's live
     // Bip01_Head node rather than its physics-entity base.
     std::optional<assets::Vector3> headPosition;
     // CEnemy::IsNearAttackKeyFrame (0x00334dd0) gates the red/black
@@ -367,6 +367,9 @@ public:
     [[nodiscard]] const assets::Vector3& attackRootTranslation() const noexcept {
         return attackRootTranslation_;
     }
+    [[nodiscard]] const assets::Vector3& attackPhysicsVelocity() const noexcept {
+        return attackPhysicsVelocity_;
+    }
     [[nodiscard]] const assets::Vector3& facing() const noexcept {
         return facing_;
     }
@@ -530,6 +533,8 @@ private:
         std::uint32_t elapsedMilliseconds,
         std::uint32_t animationDurationMilliseconds) noexcept;
     void applyAirAttackPursuitMotion(
+        std::uint32_t elapsedMilliseconds) noexcept;
+    [[nodiscard]] bool updateWebWhirlwindMotion(
         std::uint32_t elapsedMilliseconds) noexcept;
     void applyAirRootMotion(
         const assets::Vector3& physicalDisplacement,
@@ -713,6 +718,9 @@ private:
     assets::Vector3 attackRootTranslation_;
     assets::Vector3 attackVisualRootTranslation_;
     assets::Vector3 attackPhysicsVelocity_;
+    float webWhirlwindTravelRemainingMilliseconds_{};
+    float webWhirlwindRecoveryRemainingMilliseconds_{};
+    bool webWhirlwindTravelComplete_{};
     assets::Vector3 wallAttackDirection_;
     assets::Vector3 locomotionRootTranslation_;
     std::size_t nextAttackImpactFrameIndex_{};
