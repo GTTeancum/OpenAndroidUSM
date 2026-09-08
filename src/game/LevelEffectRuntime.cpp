@@ -148,6 +148,7 @@ struct LevelEffectRuntime::Particle {
     bool spawnedThisUpdate{true};
     bool visible{true};
     std::int32_t roomId{-1};
+    assets::Vector3 emitterPosition;
 };
 
 LevelEffectRuntime::LevelEffectRuntime() = default;
@@ -790,6 +791,14 @@ void LevelEffectRuntime::spawnParticle(EmitterRuntimeState& emitter) noexcept {
         emitter.origin.z + preset.position.z + localOffset.z * preset.scale.z,
     };
     particle.previousPosition = particle.position;
+    // STransparentNodeEntry (0x00398570) measures the particle scene node's
+    // absolute transform against the camera. The node owns the serialized
+    // emitter Position; box-distributed particles are not separate entries.
+    particle.emitterPosition = {
+        emitter.origin.x + preset.position.x,
+        emitter.origin.y + preset.position.y,
+        emitter.origin.z + preset.position.z,
+    };
 
     const std::int32_t initialRotationDifference =
         preset.initialRotationMaximumDegrees -
@@ -908,7 +917,9 @@ void LevelEffectRuntime::rebuildRenderParticles() noexcept {
              particle.preset->directionalRotation,
              particle.preset->projectDirection,
              particle.preset->hasSpin,
-             particle.roomId});
+             particle.roomId,
+             particle.emitterId,
+             particle.emitterPosition});
     }
 }
 

@@ -19,6 +19,12 @@ struct EffectSpriteUvRect {
     bool valid{};
 };
 
+struct NativeTransparentNodeSortKey {
+    assets::Vector3 position;
+    float cameraOffset{};
+    std::int32_t renderingLayer{};
+};
+
 // Reconstructed from CFpsParticleSystemSceneNode::render at 0x0039ff5c.
 // Keeping the orientation result renderer-neutral also makes the recovered
 // native behavior independently testable.
@@ -34,5 +40,15 @@ struct EffectSpriteUvRect {
 [[nodiscard]] EffectSpriteUvRect effectSpriteUvRect(
     const assets::SpriteAtlas& atlas, std::uint32_t textureWidth,
     std::uint32_t textureHeight, std::int32_t frameId) noexcept;
+
+// STransparentNodeEntry construction/comparison at 0x00398570/0x003989b4.
+// A true result is the order produced by the native heapsort before drawing:
+// higher rendering layers first, then greater squared distance first.
+// Equal keys deliberately compare equivalent; native material/node tie-breaks
+// are applied by callers that possess those native objects.
+[[nodiscard]] bool nativeTransparentNodeBefore(
+    const NativeTransparentNodeSortKey& left,
+    const NativeTransparentNodeSortKey& right,
+    const assets::Vector3& cameraPosition) noexcept;
 
 }  // namespace usm::game

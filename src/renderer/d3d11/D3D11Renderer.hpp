@@ -182,6 +182,20 @@ private:
         assets::AxisAlignedBounds bounds;
     };
 
+    struct EffectParticleDrawBatch {
+        std::uint32_t startVertex{};
+        std::uint32_t vertexCount{};
+        std::uint64_t emitterId{};
+        assets::Vector3 emitterPosition;
+        bool additive{};
+    };
+
+    struct WebLineDrawBatch {
+        std::uint32_t startVertex{};
+        std::uint32_t vertexCount{};
+        assets::Vector3 nodePosition;
+    };
+
     enum class ConfirmationTexture : std::uint8_t {
         BackgroundSuit,
         MainMenu,
@@ -354,9 +368,11 @@ private:
     std::uint32_t deathConfirmationVertexCapacity_{};
     std::uint32_t hudVertexCapacity_{};
     std::uint32_t webLineVertexCount_{};
+    std::vector<WebLineDrawBatch> webLineDrawBatches_;
     std::uint32_t enemyGunLineVertexCount_{};
-    std::uint32_t effectAlphaVertexCount_{};
-    std::uint32_t effectAdditiveVertexCount_{};
+    std::vector<EffectParticleDrawBatch> effectParticleDrawBatches_;
+    std::uint32_t effectOrbVertexStart_{};
+    std::uint32_t effectOrbVertexCount_{};
     std::uint32_t effectVertexCapacity_{};
     std::uint32_t hintVertexCount_{};
     std::uint32_t hintVertexCapacity_{};

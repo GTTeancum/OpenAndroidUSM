@@ -2198,8 +2198,9 @@ Result D3D11Renderer::uploadLevelOneScene(
     }
     effectTexture_.Reset();
     effectVertexBuffer_.Reset();
-    effectAlphaVertexCount_ = 0;
-    effectAdditiveVertexCount_ = 0;
+    effectParticleDrawBatches_.clear();
+    effectOrbVertexStart_ = 0;
+    effectOrbVertexCount_ = 0;
     effectVertexCapacity_ = 0;
     const assets::RgbaImage& effectImage = levelOne.effects().texture.image();
     if (effectImage.width == 0 || effectImage.height == 0 ||
@@ -2887,6 +2888,7 @@ Result D3D11Renderer::updateWebLine(
     const assets::Vector3* secondAttachPosition,
     const assets::Vector3& orientation) {
     webLineVertexCount_ = 0;
+    webLineDrawBatches_.clear();
     if (!visible) {
         return Result::success();
     }
@@ -2897,8 +2899,10 @@ Result D3D11Renderer::updateWebLine(
     std::vector<GpuVertex> vertices;
     vertices.reserve((secondAttachPosition == nullptr ? 1U : 2U) *
                      game::kWebLineMaximumSegments * 6U);
-    const auto appendLine = [&vertices, &anchor, &orientation](
+    const auto appendLine = [this, &vertices, &anchor, &orientation](
                                 const assets::Vector3& attach) -> Result {
+        const std::uint32_t startVertex =
+            static_cast<std::uint32_t>(vertices.size());
         game::WebLineGeometry geometry;
         Result result = game::buildWebLineGeometry(
             attach, anchor, orientation, geometry);
@@ -2914,6 +2918,10 @@ Result D3D11Renderer::updateWebLine(
                 0xffffffffU,
             });
         }
+        webLineDrawBatches_.push_back(
+            {startVertex,
+             static_cast<std::uint32_t>(vertices.size()) - startVertex,
+             attach});
         return Result::success();
     };
     Result result = appendLine(attachPosition);
@@ -3492,8 +3500,9 @@ Result D3D11Renderer::updateLevelOneEffects(
     const game::LevelEffectAsset& assets,
     const game::LevelEffectRuntime& effects,
     const game::LevelBonusRuntime& bonuses) {
-    effectAlphaVertexCount_ = 0;
-    effectAdditiveVertexCount_ = 0;
+    effectParticleDrawBatches_.clear();
+    effectOrbVertexStart_ = 0;
+    effectOrbVertexCount_ = 0;
     if (!device_ || !context_ || !effectTexture_) {
         return Result::failure("Effect GPU resources are incomplete");
     }
@@ -3503,8 +3512,14 @@ Result D3D11Renderer::updateLevelOneEffects(
         return Result::failure("Effect atlas dimensions are invalid");
     }
 
-    std::vector<GpuVertex> alphaVertices;
-    std::vector<GpuVertex> additiveVertices;
+    struct ParticleBatchBuild {
+        std::uint64_t emitterId{};
+        assets::Vector3 emitterPosition;
+        bool additive{};
+        std::vector<GpuVertex> vertices;
+    };
+    std::vector<ParticleBatchBuild> particleBatches;
+    std::unordered_map<std::uint64_t, std::size_t> particleBatchIndices;
     const auto appendParticle = [&](const game::EffectParticleState& particle,
                                     std::vector<GpuVertex>& vertices,
                                     bool& valid) {
@@ -3556,10 +3571,53 @@ Result D3D11Renderer::updateLevelOneEffects(
             !roomVisibility_[static_cast<std::size_t>(particle.roomId - 1)]) {
             continue;
         }
-        appendParticle(particle,
-                       particle.additive ? additiveVertices : alphaVertices,
-                       valid);
+        const auto [entry, inserted] = particleBatchIndices.emplace(
+            particle.emitterId, particleBatches.size());
+        if (inserted) {
+            particleBatches.push_back({particle.emitterId,
+                                       particle.emitterPosition,
+                                       particle.additive,
+                                       {}});
+        }
+        ParticleBatchBuild& batch = particleBatches[entry->second];
+        if (batch.additive != particle.additive) {
+            valid = false;
+            continue;
+        }
+        appendParticle(particle, batch.vertices, valid);
     }
+
+    // STransparentNodeEntry (0x00398570) stores squared camera distance plus
+    // ISceneNode::CameraOffset. Its inverted operator< (0x003989b4), followed
+    // by Irrlicht heapsort at 0x00398ad0, produces far-to-near node order.
+    // Particle systems register one entry per emitter at 0x0039ef8c, so keep
+    // every emitter intact instead of globally regrouping alpha/additive
+    // particles. Equal-distance material ordering is retained by the current
+    // serialized traversal until its SMaterial key is exposed here.
+    std::stable_sort(
+        particleBatches.begin(), particleBatches.end(),
+        [this](const ParticleBatchBuild& left,
+               const ParticleBatchBuild& right) {
+            return game::nativeTransparentNodeBefore(
+                {left.emitterPosition, 0.0F, 0},
+                {right.emitterPosition, 0.0F, 0}, cameraPosition_);
+        });
+
+    std::vector<GpuVertex> effectVertices;
+    for (ParticleBatchBuild& batch : particleBatches) {
+        if (batch.vertices.empty()) {
+            continue;
+        }
+        effectParticleDrawBatches_.push_back(
+            {static_cast<std::uint32_t>(effectVertices.size()),
+             static_cast<std::uint32_t>(batch.vertices.size()),
+             batch.emitterId,
+             batch.emitterPosition,
+             batch.additive});
+        effectVertices.insert(effectVertices.end(), batch.vertices.begin(),
+                              batch.vertices.end());
+    }
+    std::vector<GpuVertex> orbVertices;
     const auto frameModule = [&](std::int32_t frameId,
                                  assets::SpriteModule& module) {
         const auto modules =
@@ -3600,9 +3658,9 @@ Result D3D11Renderer::updateLevelOneEffects(
                                    white};
         const GpuVertex bottomRight{point(half, -half), {}, {uv[2], uv[3]},
                                     white};
-        additiveVertices.insert(additiveVertices.end(),
-                                {topLeft, topRight, bottomLeft, topRight,
-                                 bottomRight, bottomLeft});
+        orbVertices.insert(orbVertices.end(),
+                           {topLeft, topRight, bottomLeft, topRight,
+                            bottomRight, bottomLeft});
     };
     const auto appendOrbRibbon = [&](const game::LevelBonusOrbRenderState& orb,
                                      const assets::SpriteModule& module) {
@@ -3656,8 +3714,8 @@ Result D3D11Renderer::updateLevelOneEffects(
                 static_cast<float>(orb.trailPositions.size() - 1);
             const float firstV = uv[3] + (uv[1] - uv[3]) * firstFraction;
             const float secondV = uv[3] + (uv[1] - uv[3]) * secondFraction;
-            additiveVertices.insert(
-                additiveVertices.end(),
+            orbVertices.insert(
+                orbVertices.end(),
                 {GpuVertex{firstLeft, {}, {uv[0], firstV}, color},
                  GpuVertex{firstRight, {}, {uv[2], firstV}, color},
                  GpuVertex{secondLeft, {}, {uv[0], secondV}, color},
@@ -3688,8 +3746,11 @@ Result D3D11Renderer::updateLevelOneEffects(
         return Result::failure(
             "Effect particle references an unsupported sprite frame");
     }
-    const std::size_t totalVertexCount =
-        alphaVertices.size() + additiveVertices.size();
+    effectOrbVertexStart_ = static_cast<std::uint32_t>(effectVertices.size());
+    effectOrbVertexCount_ = static_cast<std::uint32_t>(orbVertices.size());
+    effectVertices.insert(effectVertices.end(), orbVertices.begin(),
+                          orbVertices.end());
+    const std::size_t totalVertexCount = effectVertices.size();
     if (totalVertexCount > std::numeric_limits<std::uint32_t>::max()) {
         return Result::failure("Effect vertex count exceeds D3D11 limits");
     }
@@ -3711,10 +3772,6 @@ Result D3D11Renderer::updateLevelOneEffects(
                                   createResult);
         }
     }
-    effectAlphaVertexCount_ =
-        static_cast<std::uint32_t>(alphaVertices.size());
-    effectAdditiveVertexCount_ =
-        static_cast<std::uint32_t>(additiveVertices.size());
     if (totalVertexCount == 0) {
         return Result::success();
     }
@@ -3725,9 +3782,7 @@ Result D3D11Renderer::updateLevelOneEffects(
         return hresultFailure("ID3D11DeviceContext::Map(effects)", mapResult);
     }
     auto* destination = static_cast<GpuVertex*>(mapped.pData);
-    std::copy(alphaVertices.begin(), alphaVertices.end(), destination);
-    std::copy(additiveVertices.begin(), additiveVertices.end(),
-              destination + alphaVertices.size());
+    std::copy(effectVertices.begin(), effectVertices.end(), destination);
     context_->Unmap(effectVertexBuffer_.Get(), 0);
     return Result::success();
 }
@@ -6567,33 +6622,6 @@ void D3D11Renderer::renderFrame() {
                                     &identityTextureTransform, 0, 0);
     }
 
-    if (webLineVertexCount_ != 0 && webLineVertexBuffer_ && webLineTexture_) {
-        constexpr UINT stride = sizeof(GpuVertex);
-        constexpr UINT offset = 0;
-        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
-                                    &worldViewProjection_, 0, 0);
-        context_->IASetInputLayout(inputLayout_.Get());
-        context_->IASetVertexBuffers(0, 1,
-                                     webLineVertexBuffer_.GetAddressOf(),
-                                     &stride, &offset);
-        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
-        context_->IASetPrimitiveTopology(
-            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
-        const std::array<ID3D11Buffer*, 2> vertexBuffers{
-            transformBuffer_.Get(), viewRotationBuffer_.Get()};
-        context_->VSSetConstantBuffers(
-            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
-        context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
-        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
-        context_->PSSetShaderResources(0, 1, webLineTexture_.GetAddressOf());
-        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
-                                  0xffffffffU);
-        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
-        context_->RSSetState(rasterizerState_.Get());
-        context_->Draw(webLineVertexCount_, 0);
-    }
-
     if (enemyGunLineVertexCount_ != 0 && enemyGunLineVertexBuffer_) {
         constexpr UINT stride = sizeof(GpuVertex);
         constexpr UINT offset = 0;
@@ -6617,17 +6645,52 @@ void D3D11Renderer::renderFrame() {
         context_->Draw(enemyGunLineVertexCount_, 0);
     }
 
-    if ((effectAlphaVertexCount_ != 0 ||
-         effectAdditiveVertexCount_ != 0) &&
-        effectVertexBuffer_ && effectTexture_) {
+    enum class TransparentSpriteKind : std::uint8_t {
+        WebLine,
+        Particle,
+    };
+    struct TransparentSpriteEntry {
+        TransparentSpriteKind kind{};
+        std::size_t batchIndex{};
+        game::NativeTransparentNodeSortKey sortKey;
+    };
+    std::vector<TransparentSpriteEntry> transparentSprites;
+    if (webLineVertexBuffer_ && webLineTexture_) {
+        for (std::size_t index = 0; index < webLineDrawBatches_.size();
+             ++index) {
+            transparentSprites.push_back(
+                {TransparentSpriteKind::WebLine, index,
+                 {webLineDrawBatches_[index].nodePosition, 0.0F, 0}});
+        }
+    }
+    if (effectVertexBuffer_ && effectTexture_) {
+        for (std::size_t index = 0;
+             index < effectParticleDrawBatches_.size(); ++index) {
+            transparentSprites.push_back(
+                {TransparentSpriteKind::Particle, index,
+                 {effectParticleDrawBatches_[index].emitterPosition,
+                  0.0F, 0}});
+        }
+    }
+    std::stable_sort(
+        transparentSprites.begin(), transparentSprites.end(),
+        [this](const TransparentSpriteEntry& left,
+               const TransparentSpriteEntry& right) {
+            return game::nativeTransparentNodeBefore(
+                left.sortKey, right.sortKey, cameraPosition_);
+        });
+
+    // CTexLineSceneNode::OnRegisterSceneNode (0x0039ae28) places its
+    // transparent material in the same list as particle nodes registered at
+    // 0x0039ef8c. CTexLineSceneNode::setLineSegment (0x0039af00) makes the
+    // first attachment its node position, so web ribbons and complete emitter
+    // batches share the recovered scene-manager distance ordering here.
+    if (!transparentSprites.empty()) {
         constexpr UINT stride = sizeof(GpuVertex);
         constexpr UINT offset = 0;
         context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
                                     &worldViewProjection_, 0, 0);
         context_->IASetInputLayout(inputLayout_.Get());
-        context_->IASetVertexBuffers(0, 1,
-                                     effectVertexBuffer_.GetAddressOf(),
-                                     &stride, &offset);
         context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
@@ -6635,21 +6698,38 @@ void D3D11Renderer::renderFrame() {
             transformBuffer_.Get(), viewRotationBuffer_.Get()};
         context_->VSSetConstantBuffers(
             0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
-        context_->PSSetShader(effectPixelShader_.Get(), nullptr, 0);
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
-        context_->PSSetShaderResources(0, 1, effectTexture_.GetAddressOf());
         context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
-        context_->RSSetState(noCullRasterizerState_.Get());
-        if (effectAlphaVertexCount_ != 0) {
-            context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
-                                      0xffffffffU);
-            context_->Draw(effectAlphaVertexCount_, 0);
-        }
-        if (effectAdditiveVertexCount_ != 0) {
-            context_->OMSetBlendState(additiveBlendState_.Get(), nullptr,
-                                      0xffffffffU);
-            context_->Draw(effectAdditiveVertexCount_,
-                           effectAlphaVertexCount_);
+        for (const TransparentSpriteEntry& entry : transparentSprites) {
+            if (entry.kind == TransparentSpriteKind::WebLine) {
+                const WebLineDrawBatch& batch =
+                    webLineDrawBatches_[entry.batchIndex];
+                context_->IASetVertexBuffers(
+                    0, 1, webLineVertexBuffer_.GetAddressOf(), &stride,
+                    &offset);
+                context_->PSSetShader(pixelShader_.Get(), nullptr, 0);
+                context_->PSSetShaderResources(
+                    0, 1, webLineTexture_.GetAddressOf());
+                context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                          0xffffffffU);
+                context_->RSSetState(rasterizerState_.Get());
+                context_->Draw(batch.vertexCount, batch.startVertex);
+                continue;
+            }
+
+            const EffectParticleDrawBatch& batch =
+                effectParticleDrawBatches_[entry.batchIndex];
+            context_->IASetVertexBuffers(
+                0, 1, effectVertexBuffer_.GetAddressOf(), &stride, &offset);
+            context_->PSSetShader(effectPixelShader_.Get(), nullptr, 0);
+            context_->PSSetShaderResources(
+                0, 1, effectTexture_.GetAddressOf());
+            context_->OMSetBlendState(
+                batch.additive ? additiveBlendState_.Get()
+                               : alphaBlendState_.Get(),
+                nullptr, 0xffffffffU);
+            context_->RSSetState(noCullRasterizerState_.Get());
+            context_->Draw(batch.vertexCount, batch.startVertex);
         }
     }
 
@@ -6728,6 +6808,40 @@ void D3D11Renderer::renderFrame() {
             {0.0F, 1.0F, 0.0F, 0.0F}};
         context_->UpdateSubresource(textureTransformBuffer_.Get(), 0, nullptr,
                                     &identityTextureTransform, 0, 0);
+    }
+
+    // CHealthOrbs::getRenderingLayer (0x003a1100) returns layer 7, so
+    // CFpsSceneManager::registerNodeForRendering (0x00398bb8) appends each
+    // active orb to the same unsorted HitEffects pass instead of the
+    // transparent distance-sorted list. The pool constructs nodes lazily in
+    // GetFreeObject (0x00304e38), after Player::LoadHitEffects (0x00344ab4),
+    // which places active orb nodes after the preloaded player trail nodes.
+    if (effectOrbVertexCount_ != 0 && effectVertexBuffer_ && effectTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->UpdateSubresource(transformBuffer_.Get(), 0, nullptr,
+                                    &worldViewProjection_, 0, 0);
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(0, 1,
+                                     effectVertexBuffer_.GetAddressOf(),
+                                     &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
+        const std::array<ID3D11Buffer*, 2> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        context_->VSSetConstantBuffers(
+            0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
+        context_->PSSetShader(effectPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(0, 1,
+                                       effectTexture_.GetAddressOf());
+        context_->OMSetBlendState(additiveBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
+        context_->RSSetState(noCullRasterizerState_.Get());
+        context_->Draw(effectOrbVertexCount_, effectOrbVertexStart_);
     }
 
     if (hintVertexCount_ != 0 && hintVertexBuffer_ && hintTexture_) {

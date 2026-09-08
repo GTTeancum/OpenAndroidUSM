@@ -150,4 +150,21 @@ EffectSpriteUvRect effectSpriteUvRect(const assets::SpriteAtlas& atlas,
             true};
 }
 
+bool nativeTransparentNodeBefore(
+    const NativeTransparentNodeSortKey& left,
+    const NativeTransparentNodeSortKey& right,
+    const assets::Vector3& cameraPosition) noexcept {
+    if (left.renderingLayer != right.renderingLayer) {
+        return left.renderingLayer > right.renderingLayer;
+    }
+    const auto distanceSquared = [&cameraPosition](
+                                     const NativeTransparentNodeSortKey& key) {
+        const float x = key.position.x - cameraPosition.x;
+        const float y = key.position.y - cameraPosition.y;
+        const float z = key.position.z - cameraPosition.z;
+        return x * x + y * y + z * z + key.cameraOffset;
+    };
+    return distanceSquared(left) > distanceSquared(right);
+}
+
 }  // namespace usm::game

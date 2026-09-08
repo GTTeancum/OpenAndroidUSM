@@ -26,6 +26,10 @@ struct EffectParticleState {
     bool projectDirection{};
     bool hasSpinAffector{};
     std::int32_t roomId{-1};
+    // Native transparent sorting is per particle-system scene node, not per
+    // particle. Preserve the owning node identity and absolute position.
+    std::uint64_t emitterId{};
+    assets::Vector3 emitterPosition;
 };
 
 struct PersistentEffectCheckPointState {

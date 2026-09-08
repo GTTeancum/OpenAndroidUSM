@@ -5193,8 +5193,9 @@ int main() {
         assert(explosionRock->spinMinimumDegrees == 0);
         assert(explosionRock->spinMaximumDegrees == 360);
         assert(bootstrap.effects().presets.find("rock_splash") != nullptr);
-        assert(bootstrap.effects().presets.find("cartoon_hit_splash_big") !=
-               nullptr);
+        const auto* hitSplashPreset =
+            bootstrap.effects().presets.find("cartoon_hit_splash_big");
+        assert(hitSplashPreset != nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash") !=
                nullptr);
         const auto* blackWebSplashPreset =
@@ -5399,6 +5400,25 @@ int main() {
                                 255.0F) <
                    0.000001F);
         }
+        const usm::assets::Vector3 transparentCamera{0.0F, 0.0F, 0.0F};
+        const usm::game::NativeTransparentNodeSortKey nearTransparent{
+            {0.0F, 10.0F, 0.0F}, 0.0F, 0};
+        const usm::game::NativeTransparentNodeSortKey farTransparent{
+            {0.0F, 20.0F, 0.0F}, 0.0F, 0};
+        assert(usm::game::nativeTransparentNodeBefore(
+            farTransparent, nearTransparent, transparentCamera));
+        assert(!usm::game::nativeTransparentNodeBefore(
+            nearTransparent, farTransparent, transparentCamera));
+        auto offsetTransparent = nearTransparent;
+        offsetTransparent.cameraOffset = 400.0F;
+        assert(usm::game::nativeTransparentNodeBefore(
+            offsetTransparent, farTransparent, transparentCamera));
+        auto layerTransparent = nearTransparent;
+        layerTransparent.renderingLayer = 7;
+        assert(usm::game::nativeTransparentNodeBefore(
+            layerTransparent, farTransparent, transparentCamera));
+        assert(!usm::game::nativeTransparentNodeBefore(
+            nearTransparent, nearTransparent, transparentCamera));
         usm::game::NativeRandomizer effectRandomizer;
         usm::game::LevelEffectRuntime effectRuntime;
         assert(effectRuntime.initialize(bootstrap.effects().presets,
@@ -5506,6 +5526,27 @@ int main() {
         assert(effectRandomizer.state() == 66400094);
         assert(effectRuntime.particles().front().frameId == 2);
         assert(effectRuntime.particles().front().width > 0.0F);
+        assert(std::all_of(
+            effectRuntime.particles().begin(), effectRuntime.particles().end(),
+            [hitSplashPreset](const auto& particle) {
+                if (particle.emitterId == 0) {
+                    return false;
+                }
+                return std::any_of(
+                    hitSplashPreset->emitters.begin(),
+                    hitSplashPreset->emitters.end(),
+                    [&particle](const auto& emitter) {
+                        return std::abs(particle.emitterPosition.x -
+                                            (10.0F + emitter.position.x)) <
+                                   0.001F &&
+                               std::abs(particle.emitterPosition.y -
+                                            (20.0F + emitter.position.y)) <
+                                   0.001F &&
+                               std::abs(particle.emitterPosition.z -
+                                            (30.0F + emitter.position.z)) <
+                                   0.001F;
+                    });
+            }));
         assert(std::all_of(
             effectRuntime.particles().begin(), effectRuntime.particles().end(),
             [](const auto& particle) {

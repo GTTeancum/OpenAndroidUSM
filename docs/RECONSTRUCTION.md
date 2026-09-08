@@ -2011,6 +2011,26 @@ systems, before that list. The portable renderer therefore defers the shipped
 them into ordinary scene geometry. Automated WARP captures cover each strike
 of the first-encounter ground combo with this compositing order.
 
+The ordinary transparent pass is also ordered at scene-node granularity,
+not by particle blend mode. `STransparentNodeEntry` construction and
+comparison at `0x00398570`/`0x003989b4`, followed by Irrlicht heapsort at
+`0x00398ad0`, place higher rendering layers first and otherwise draw greater
+`distanceSquared + CameraOffset` values first. Particle registration at
+`0x0039ef8c` contributes one entry per emitter, so the portable renderer keeps
+each emitter's particles together and sorts complete emitter batches against
+the camera. `CTexLineSceneNode::OnRegisterSceneNode` at `0x0039ae28` puts web
+ribbons in that same pass. Its `setLineSegment` at `0x0039af00` makes the
+first endpoint the scene-node position; the web-swing ribbon is therefore
+sorted from its hand attachment alongside the particle emitters.
+
+Health and skill orbs do not participate in that distance sort.
+`CHealthOrbs::getRenderingLayer` at `0x003a1100` returns layer 7, and
+`CFpsSceneManager::registerNodeForRendering` at `0x00398bb8` redirects layer-7
+nodes into the dedicated `HitEffects` list. The renderer submits the additive
+orb quads after the preloaded player attack trails, matching the lazy orb-pool
+construction at `pool<CHealthOrbs>::GetFreeObject` (`0x00304e38`) and the
+earlier trail allocation in `Player::LoadHitEffects` (`0x00344ab4`).
+
 Particle width and height remain independent of the emitter scene-node scale.
 `CFpsParticleSystemSceneNode::render` at `0x0039ff5c` reads the two dimensions
 directly from `SFpsParticle` offsets `0x50/0x54` while submitting the billboard
