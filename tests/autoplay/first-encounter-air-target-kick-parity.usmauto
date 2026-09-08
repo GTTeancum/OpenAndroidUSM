@@ -1,8 +1,8 @@
 # Source-authored airborne Square/X target-special.  Jump states route a punch
 # against an airborne target through predicate 109 to state 86 rather than the
 # ordinary state-81 aerial punch chain.
-fixed_step_ms 10
-sample_interval_ms 10
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -34,10 +34,9 @@ move_until_state 1500 0 0 0
 # diagonal kick.  It owns both the source effect 26 travel trail and effect 16
 # strike trail; neither is a harness-generated visual.
 jump
-# State 13's authored input gate opens at runtime frame 2. This scenario uses
-# 10 ms fixed steps, so 80 ms of state residence makes the following input
-# sample the native 100 ms/frame-2 boundary.
-wait 80
+# State 13's authored input gate opens at runtime frame 2. A zero-duration
+# harness wait makes the following input land on the native 100 ms boundary.
+wait 0
 punch
 move_until_state 500 0 0 86
 assert_player_state 86

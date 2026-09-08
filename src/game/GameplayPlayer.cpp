@@ -547,6 +547,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     inputFrameAdvanceMilliseconds_ = 0;
     inputFramePrepared_ = false;
     attackEnteredDuringPreparedInputFrame_ = false;
+    locomotionEnteredDuringPreparedInputFrame_ = false;
     hitEffectUpdateInProgress_ = false;
     hitEffectFrameAdvanceMilliseconds_ = 0;
     ultimateActive_ = false;
@@ -1082,6 +1083,9 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
         wallStateStartPosition_ = position_;
         activeLocomotionState_ = jumpState;
         locomotionState_ = LocomotionState::WallJump;
+        if (inputFramePrepared_) {
+            locomotionEnteredDuringPreparedInputFrame_ = true;
+        }
         setAnimation(stateClip(animationBank_, jumpState)->name);
         queueEnteredState(jumpState->name);
         updateWorldTransform(facing_);
@@ -1172,6 +1176,9 @@ bool GameplayPlayer::requestWeb(
         activeAttackTarget_ = target;
         activeLocomotionState_ = state;
         locomotionState_ = LocomotionState::WallIdle;
+        if (inputFramePrepared_) {
+            locomotionEnteredDuringPreparedInputFrame_ = true;
+        }
         wallWebTargetAlive_ = true;
         wallWebActionPressed_ = false;
         setAnimation(wallWeb_.animation());
@@ -1351,6 +1358,9 @@ bool GameplayPlayer::requestWeb(
     jumpAnchorHeight_ = visualPosition.z;
     activeLocomotionState_ = swingThrowState_;
     locomotionState_ = LocomotionState::WebThrow;
+    if (inputFramePrepared_) {
+        locomotionEnteredDuringPreparedInputFrame_ = true;
+    }
     webReleaseRequested_ = false;
     const assets::ColladaAnimationClip* clip =
         clipById(animationBank_, swingUsesLeftHand_ ? 98 : 99);
@@ -2045,8 +2055,11 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     // that phase ordering while preserving this single public update call.
     const bool deferNewAttackAdvance =
         inputFramePrepared_ && attackEnteredDuringPreparedInputFrame_;
+    const bool deferNewLocomotionAdvance =
+        inputFramePrepared_ && locomotionEnteredDuringPreparedInputFrame_;
     inputFramePrepared_ = false;
     attackEnteredDuringPreparedInputFrame_ = false;
+    locomotionEnteredDuringPreparedInputFrame_ = false;
     inputFrameAdvanceMilliseconds_ = 0;
     const std::int32_t nextMovementVirtualKey = movementVirtualKey(input);
     const bool movementPressed = nextMovementVirtualKey >= 0 &&
@@ -2195,7 +2208,8 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
         return;
     }
     if (wallWeb_.active()) {
-        wallWeb_.update(elapsedMilliseconds, wallWebActionPressed_, wallWebTargetAlive_);
+        wallWeb_.update(deferNewLocomotionAdvance ? 0U : elapsedMilliseconds,
+                        wallWebActionPressed_, wallWebTargetAlive_);
         wallWebActionPressed_ = false;
         if (wallWeb_.active()) {
             setAnimation(wallWeb_.animation());
@@ -2246,17 +2260,21 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
         return;
     }
     if (onWall()) {
-        updateWallTraversal(input, elapsedMilliseconds);
+        updateWallTraversal(
+            input, deferNewLocomotionAdvance ? 0U : elapsedMilliseconds);
         return;
     }
     if (locomotionState_ == LocomotionState::WebThrow ||
         locomotionState_ == LocomotionState::SwingHang ||
         locomotionState_ == LocomotionState::SwingRelease) {
-        updateWebTraversal(input, camera, elapsedMilliseconds);
+        updateWebTraversal(
+            input, camera,
+            deferNewLocomotionAdvance ? 0U : elapsedMilliseconds);
         return;
     }
     if (locomotionState_ != LocomotionState::Grounded) {
-        updateJump(input, camera, elapsedMilliseconds);
+        updateJump(input, camera,
+                   deferNewLocomotionAdvance ? 0U : elapsedMilliseconds);
         return;
     }
     float inputMagnitude{};
@@ -2306,6 +2324,13 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
 }
 
 void GameplayPlayer::enterLocomotionState(LocomotionState state) noexcept {
+    // Native PreUpdate advances the old animated state before
+    // UpdateKeyTrigger can select this one. UpdateState then observes the new
+    // state, but CGameObject::Update is not run a second time, so its animation
+    // and root displacement remain at frame zero through this render.
+    if (inputFramePrepared_) {
+        locomotionEnteredDuringPreparedInputFrame_ = true;
+    }
     sustainedFallCarriesSwingVelocity_ = false;
     locomotionState_ = state;
     switch (state) {

@@ -1,8 +1,10 @@
 # Normal-flow enemy-offense gate for all attack variants authored by the
 # first three thugs. No damage or animation is injected: each hit is emitted
 # by the production AI, animation key, attack volume, and player hurt path.
-fixed_step_ms 25
-sample_interval_ms 25
+# Observe native AI attack choice, contact frames, and hurt reactions at the
+# same 20 Hz cadence as interactive combat.
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 85000
 start_time_ms 53033
@@ -29,9 +31,10 @@ assert_audio_played SFX_THUG_SWOOSH
 
 # Bat state 11 resolves its two equal +0x38 attack-distance values with the
 # shipped Irrlicht RNG. At this point in the covered encounter sequence,
-# this normal-flow command cadence observes standing attack 7 twice
-# (35 points at 47 percent), followed by jumping attack 11 (50 points at
-# 70 percent). Every selected branch below is pinned together with its
+# this normal-flow command cadence observes standing attack 7, jumping
+# attack 11, then standing attack 7 again (35, 50, and 35 points at their
+# authored 47, 70, and 47 percent contacts). Every selected branch below is
+# pinned together with its
 # resulting damage rather than inherited from the removed alternator.
 set_enemy_ai 394 0
 set_enemy_ai 395 1 1
@@ -45,16 +48,16 @@ assert_health_below 916
 wait_enemy_melee_inactive 10000 395
 teleport 13229 -6441 7 -1 0 0
 wait_enemy_melee_attack 10000 395
-wait_enemy_animation 1000 395 idle_at1_idle
-wait 925
+wait_enemy_animation 1000 395 idle_jump_at3_idle
+wait 1000
 assert_player_state 45
-assert_health_above 879
-assert_health_below 881
+assert_health_above 864
+assert_health_below 866
 wait_enemy_melee_inactive 10000 395
 teleport 13229 -6441 7 -1 0 0
 wait_enemy_melee_attack 10000 395
-wait_enemy_animation 1000 395 idle_jump_at3_idle
-wait 1000
+wait_enemy_animation 1000 395 idle_at1_idle
+wait 925
 assert_player_state 45
 assert_health_above 829
 assert_health_below 831

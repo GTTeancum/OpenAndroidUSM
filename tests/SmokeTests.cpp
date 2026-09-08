@@ -8269,6 +8269,39 @@ int main() {
         assert(chasingKnife->behavior ==
                usm::game::EnemyBehaviorState::AttackRange);
         assert(chasingKnife->activeAnimation == "idle_knife_at_idle");
+        // CBehaviorMeleeAttack owns its attack substate until the animation
+        // task ends. A target crossing back outside the entry radius must not
+        // replace the live clip with chase and discard its later action keys.
+        usm::game::LevelEnemyRuntime meleeLifetimeRuntime;
+        assert(meleeLifetimeRuntime.initialize(bootstrap));
+        assert(meleeLifetimeRuntime.setDiagnosticAiEnabled(395, false));
+        assert(meleeLifetimeRuntime.setDiagnosticAiEnabled(397, false));
+        assert(meleeLifetimeRuntime.setDiagnosticAiEnabled(394, true, true));
+        const auto* lifetimeKnife = meleeLifetimeRuntime.find(394);
+        assert(lifetimeKnife != nullptr);
+        const usm::assets::Vector3 lifetimeNearTarget{
+            lifetimeKnife->position.x + 100.0F,
+            lifetimeKnife->position.y,
+            lifetimeKnife->position.z};
+        meleeLifetimeRuntime.updateGameplay(1, lifetimeNearTarget);
+        lifetimeKnife = meleeLifetimeRuntime.find(394);
+        assert(lifetimeKnife->meleeAttackActive);
+        assert(lifetimeKnife->behavior ==
+               usm::game::EnemyBehaviorState::AttackRange);
+        const std::uint32_t lifetimeAnimationTime =
+            lifetimeKnife->animationTimeMilliseconds;
+        const usm::assets::Vector3 lifetimeFarTarget{
+            lifetimeKnife->position.x + 1000.0F,
+            lifetimeKnife->position.y,
+            lifetimeKnife->position.z};
+        meleeLifetimeRuntime.updateGameplay(50, lifetimeFarTarget);
+        lifetimeKnife = meleeLifetimeRuntime.find(394);
+        assert(lifetimeKnife->meleeAttackActive);
+        assert(lifetimeKnife->behavior ==
+               usm::game::EnemyBehaviorState::AttackRange);
+        assert(lifetimeKnife->activeAnimation == "idle_knife_at_idle");
+        assert(lifetimeKnife->animationTimeMilliseconds ==
+               lifetimeAnimationTime + 50U);
         usm::game::LevelEnemyRuntime enemyAttackRuntime;
         assert(enemyAttackRuntime.initialize(bootstrap));
         const auto* attackingKnife = enemyAttackRuntime.find(394);
@@ -9911,6 +9944,25 @@ int main() {
         assert(inputPhasePlayer.requestPunch());
         inputPhasePlayer.update({}, gameplayCameraPose, 25);
         assert(inputPhasePlayer.activeStateId() == 74);
+
+        // The same PreUpdate ordering applies to locomotion states selected
+        // by UpdateKeyTrigger. The old idle state consumes this 50 ms tick;
+        // the newly selected jump remains at frame zero with no root movement
+        // until the following native update.
+        usm::game::GameplayPlayer locomotionInputPhasePlayer;
+        assert(locomotionInputPhasePlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        locomotionInputPhasePlayer.restoreAt(
+            {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+        locomotionInputPhasePlayer.prepareInputFrame(50);
+        assert(locomotionInputPhasePlayer.requestJump());
+        locomotionInputPhasePlayer.update({}, gameplayCameraPose, 50);
+        assert(locomotionInputPhasePlayer.activeStateId() == 13);
+        assert(locomotionInputPhasePlayer.animationTimeMilliseconds() == 0);
+        assert(std::abs(locomotionInputPhasePlayer.position().z) < 0.001F);
+        locomotionInputPhasePlayer.update({}, gameplayCameraPose, 50);
+        assert(locomotionInputPhasePlayer.animationTimeMilliseconds() == 50);
+        assert(locomotionInputPhasePlayer.position().z > 100.0F);
 
         // UpdateKeyTrigger (0x0034d0a4) scans every serialized row without
         // breaking. Later qualifying rows replace Player+0x4d8, and the row

@@ -1790,6 +1790,50 @@ void LevelEnemyRuntime::updateGameplay(
             continue;
         }
 
+        // CBehaviorMeleeAttack::UpdateAttackMelee (0x003ba244) keeps the
+        // behavior in its authored attack substate (9/0xb and their follow-up
+        // states) until UpdateAttackMelee_DoAttack (0x003b9e44) observes the
+        // animation task ending.  In particular, it does not return to the
+        // range-selection behavior merely because an earlier contact pushed
+        // the player beyond the distance used to enter the attack.  Replacing
+        // the attack with chase here used to discard later action records in
+        // the same clip (knife attack 6 has contacts at both 45% and 75%).
+        if (enemy.meleeAttackActive) {
+            enemy.behavior = EnemyBehaviorState::AttackRange;
+            const float distance = std::sqrt(distanceSquared);
+            if (distance > std::numeric_limits<float>::epsilon()) {
+                setFacing(enemy, {toPlayerX / distance, toPlayerY / distance,
+                                  0.0F});
+            }
+            const EnemyArchetypeAsset& archetype =
+                level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+            const assets::ColladaAnimationClip* clip =
+                archetype.animationBank.findClip(enemy.activeAnimation);
+            if (clip != nullptr && !enemy.animationLoops &&
+                enemy.animationTimeMilliseconds >=
+                    clip->durationMilliseconds()) {
+                enemy.meleeAttackActive = false;
+                enemy.activeAnimation =
+                    std::string(idleAnimation(*enemy.asset));
+                enemy.animationTimeMilliseconds = 0;
+                enemy.animationSpeed = 1.0F;
+                enemy.animationLoops = true;
+                enemy.animationReversed = false;
+                const auto* interval =
+                    level_->enemyAttackIntervalConfigs()
+                        .findByWeaponTypeMapIndex(100);
+                enemy.meleeAttackCooldownMilliseconds =
+                    interval == nullptr
+                        ? 0U
+                        : static_cast<std::uint32_t>(std::max(
+                              interval->intervalMilliseconds
+                                  [enemy.asset->enemyTypeId],
+                              0.0F));
+                unregisterMeleeEngager(enemy.asset->objectId);
+            }
+            continue;
+        }
+
         const float attackRange = maximumAttackReach(enemy);
         const assets::Vector3 enemyAttackOrigin{
             enemy.position.x, enemy.position.y,

@@ -1,8 +1,8 @@
 # Holding B/Circle through the native state-58 web shot must consume its
 # predicate-103 transition and continue into the target-retaining bind/drag
 # chain. A fresh second press is not required.
-fixed_step_ms 10
-sample_interval_ms 10
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033

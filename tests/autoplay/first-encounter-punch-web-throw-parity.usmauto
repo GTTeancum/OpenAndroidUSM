@@ -1,8 +1,8 @@
 # Source-authored punch -> air-bind -> backward throw -> 540 throw branch.
 # Room-1 thugs expose CBehaviorTiedUp, so state 94 remains valid rather than
 # falling back to state 95's kick for an untieable target.
-fixed_step_ms 10
-sample_interval_ms 10
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033

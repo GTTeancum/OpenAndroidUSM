@@ -1,8 +1,9 @@
 # Source-authored launcher-to-air-bind kick-down continuation. This takes the
 # no-Web state-100 -> 104 path and presses Square/X inside state 104's native
 # input window to reach the state-105 heavy-kick finisher.
-fixed_step_ms 10
-sample_interval_ms 10
+# Run the complete input branch at GS_Loading's shipped 20 Hz cadence.
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -20,10 +21,10 @@ teleport 13399 -6484 7 0 1 0
 
 jump
 # Player::UpdateInput only accepts the airborne web branch once jump state's
-# authored aux0 frame gate reaches 2. At this 10 ms fixed step, 60 ms here
-# makes the following press sample the first legal frame while target 394 is
-# still inside GetAirWebSpecialState's exact 40,000 cm^2 threshold.
-wait 60
+# authored aux0 frame gate reaches 2. The harness advances one command per
+# native tick, so this boundary step places Web on the first legal 100 ms
+# sample while target 394 is still inside the exact 40,000 cm^2 threshold.
+wait 0
 web_on
 move_until_state 500 0 0 99
 web_off
@@ -49,9 +50,11 @@ assert_enemy_health_near 394 400 0.01
 # resulting state-105 frame-11 contact delivers 80 and effect 20.
 move_until_state 2000 0 0 105
 assert_player_state 105
-wait 400
-assert_enemy_health_near 394 320 0.01
+# The frame-11 contact/effect is crossed 350 ms after entry at 20 Hz. Stop
+# while the shipped 300 ms snapshot effect is still alive.
+wait 200
 assert_player_effect 20 1
+assert_enemy_health_near 394 320 0.01
 assert_audio_played SFX_CRITICAL_HIT_2
 assert_health_above 0
 finish

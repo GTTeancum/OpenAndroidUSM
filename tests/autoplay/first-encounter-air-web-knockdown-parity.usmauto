@@ -1,8 +1,10 @@
 # Source-authored Level 1 launcher-to-air-web knockdown chain. All combat
 # selection, targeting, damage, animation, effects, and enemy physics remain on
 # the production application path; only unrelated enemy decisions are frozen.
-fixed_step_ms 10
-sample_interval_ms 10
+# GS_Loading::Update selects Application::SetTargetFPS(20); exercise this
+# complete production-input branch at the shipped 50 ms gameplay cadence.
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -23,7 +25,10 @@ teleport 13399 -6484 7 0 1 0
 # keeps enemy 394 inside the exact 40,000 cm^2 branch threshold.
 set_enemy_physics 394 1
 jump
-wait 60
+# State 13 opens its authored input window at runtime frame 2. The harness
+# advances one command per native tick, so this zero-duration boundary step
+# places the following Web edge on that first legal 100 ms sample.
+wait 0
 web_on
 move_until_state 500 0 0 99
 web_off

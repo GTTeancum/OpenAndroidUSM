@@ -2,8 +2,10 @@
 # branches. Enemy decisions are frozen only after normal encounter activation;
 # state selection, targeting, animation, hit timing, damage, FX, and sound all
 # remain on the application path.
-fixed_step_ms 25
-sample_interval_ms 25
+# Exercise the alternate ground/aerial branches at GS_Loading's shipped 20 Hz
+# gameplay cadence; sub-tick probes cannot substitute for player-visible flow.
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 80000
 start_time_ms 53033
@@ -77,7 +79,9 @@ wait 375
 assert_player_effect 15 1
 # The shared native Randomizer stream selects Vox record 92 for this route
 # after the restored room-particle traversal consumes its authored draws.
-assert_audio_played SFX_CRITICAL_HIT_2
+# This native-cadence route reaches record 93 in sound config 36's shared
+# selection-mode-1 random stream.
+assert_audio_played SFX_CRITICAL_HIT_3
 assert_enemy_health_near 394 56 0.01
 capture alternate-air-heavy-punch
 move_until_state 3000 0 0 0

@@ -276,11 +276,12 @@ public:
     // UpdateKeyTrigger (0x0034d0a4) examines controller edges. The portable
     // application dispatches input before update(), so expose the pending
     // game delta to transition predicates without advancing a newly entered
-    // attack on the same tick.
+    // attack or locomotion state on the same tick.
     void prepareInputFrame(std::uint32_t elapsedMilliseconds) noexcept {
         inputFrameAdvanceMilliseconds_ = elapsedMilliseconds;
         inputFramePrepared_ = true;
         attackEnteredDuringPreparedInputFrame_ = false;
+        locomotionEnteredDuringPreparedInputFrame_ = false;
     }
     // Native Player retains a live Unit* at +0x594 throughout linked attack
     // states. Refresh the portable value from the enemy runtime each frame so
@@ -655,6 +656,7 @@ private:
     std::uint32_t inputFrameAdvanceMilliseconds_{};
     bool inputFramePrepared_{};
     bool attackEnteredDuringPreparedInputFrame_{};
+    bool locomotionEnteredDuringPreparedInputFrame_{};
     bool hitEffectUpdateInProgress_{};
     std::uint32_t hitEffectFrameAdvanceMilliseconds_{};
     bool ultimateActive_{};

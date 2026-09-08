@@ -1,7 +1,7 @@
 # Source-authored launcher-to-air-bind 720-degree web throw. This complements
 # the no-input state-104 kick-down gate by taking state 100's B/Circle branch.
-fixed_step_ms 10
-sample_interval_ms 10
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -18,7 +18,9 @@ set_enemy_physics 394 1
 teleport 13399 -6484 7 0 1 0
 
 jump
-wait 60
+# The state-13 frame-2 gate is sampled on the second native 50 ms update.
+# A zero-duration harness wait advances command dispatch to that boundary.
+wait 0
 web_on
 move_until_state 500 0 0 99
 web_off
@@ -32,9 +34,12 @@ assert_enemy_health_near 394 500 0.01
 
 # Motion 0x82 delivers at authored frame 33 (1100 ms on the native 20-Hz
 # combat event clock), not on entry. The retained target receives all 280.
-wait 900
+# Command dispatch has already advanced 200 ms of state 103's 1100 ms
+# authored event clock. Stop one native tick before the frame-33 crossing;
+# the assertion tick itself then crosses and dispatches the retained hit.
+wait 850
 assert_enemy_health_near 394 500 0.01
-wait 250
+wait 50
 assert_enemy_health_near 394 220 0.01
 assert_health_above 0
 finish

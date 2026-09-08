@@ -1,8 +1,8 @@
 # First-fight combat gate: prove the shipped uppercut force launches the live
 # enemy PhysicsEntity, advances through the authored airborne hurt graph, and
 # leaves it eligible for Spider-Man's target-special aerial follow-up.
-fixed_step_ms 10
-sample_interval_ms 10
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -33,7 +33,8 @@ move_until_state 1500 0 0 14
 punch
 move_until_state 500 0 0 86
 assert_player_effect 26 1
-wait 200
+# Effect 16 begins at authored frame 2 and is deliberately short-lived.
+wait 100
 assert_player_effect 16 1
 assert_enemy_health_below 394 465
 assert_health_above 0

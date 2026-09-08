@@ -100,6 +100,14 @@ its 1500 ms clip. The runtime now uses the shipped Irrlicht generator and the
 native `random(0,100) <= 49` tie branch rather than alternating the winner.
 Focused core and normal-flow autoplay coverage observe both authored outcomes.
 
+`CBehaviorMeleeAttack::UpdateAttackMelee` (`0x003ba244`) retains its active
+attack substate until `UpdateAttackMelee_DoAttack` (`0x003b9e44`) observes the
+animation task ending. It does not return to chase merely because an earlier
+contact moved Spider-Man outside the distance used to enter the attack. The
+portable runtime now preserves that ownership. This is essential for knife
+attack 6: its first 25-point contact can create separation, but its second
+25-point contact at 75 percent remains scheduled by the still-active clip.
+
 The original AI manager permits one ordinary melee engager on difficulty one
 (`0x003744a4`). On unregister, `0x00375560` samples a half-open 1000--1999 ms
 global gate; `0x00375654` blocks the final free slot while that float remains
@@ -140,6 +148,15 @@ makes a premature counter available.
 
 ## Contact, trail, and audio timing
 
+- `GS_Loading::Update` selects `Application::SetTargetFPS(20)` at
+  `0x002c05ce`. `Application::SetTargetFPS` (`0x003de618`) stores a 50 ms
+  target interval. `Application::Update` (`0x003e1624`) compares consecutive
+  real-time interval buckets, performs at most two **separate** fixed updates,
+  draws once after them, and records the current bucket so older backlog is
+  dropped. Interactive play now uses that same scheduler. It no longer runs
+  combat at the display's 60 Hz cadence or combines a two-tick catch-up into
+  one 100 ms state update, either of which changes input-edge lifetime,
+  animation-frame crossings, and effect/contact ordering.
 - `CKeyPad::keyPressed`/`update`/`wasKeyPressed`
   (`0x002f96e8`/`0x002f9434`/`0x002f964c`) expose a new physical press as
   keypad states 1 and 2 on two consecutive gameplay updates; state 3 is no
@@ -177,6 +194,15 @@ makes a premature counter available.
   completed predecessor is not applied to it. The portable attack runner now
   preserves this tick boundary, including under deliberately oversized test
   deltas.
+- The frame-zero rule is not attack-only. `Player::PreUpdate`
+  (`0x0034dfd8`) advances `CGameObject` and calls `UpdateStateFrame` before
+  `UpdateTriggers` invokes `UpdateKeyTrigger`; `Player::UpdateState`
+  (`0x00353368`) runs afterward. A jump, wall action, or web-traversal state
+  selected by that input can execute its state handler, but its newly selected
+  animation has not received the current 50 ms advance. The portable player
+  now defers locomotion animation and root displacement on that entry tick as
+  well. This restores the first legal close-range air-Web sample instead of
+  moving Spider-Man one tick beyond the native branch threshold.
 - `CLevel::Update` (`0x003820bc`) updates Player before EffectManager.
   `Player::AddHitEffect` (`0x00348dc4`) therefore captures the current animated
   bone pose, then `EffectManager::Update`/`CAnimObjEffect::Update`
@@ -372,15 +398,16 @@ Android executable and Level 1 scene.
 
 ## Automated acceptance
 
-The coherent Release run in
-`analysis/generated/first-encounter-thug-atlas-transform/suite-manifest.json`
-completed all 33 selected scenarios with 33 passes and zero failures. The
-current retained gates are:
+The coherent native-cadence Release run in
+`analysis/generated/combat-native-cadence-final/suite-manifest.json`
+completed all 33 selected scenarios with 33 passes and zero failures. The run
+used one executable hash for every scenario and removed 23 generated BMP
+captures after their assertions. The current retained gates are:
 
 - `OpenAndroidUSM.CoreTests.exe`
 - `OpenAndroidUSM.RenderTests.exe`
 - `first-encounter-health-damage-audit.usmauto` (53/53)
-- `first-encounter-full-combo-effects.usmauto` (47/47)
+- `first-encounter-full-combo-effects.usmauto` (46/46)
 - `first-encounter-simultaneous-input-order.usmauto` (20/20)
 - `first-encounter-alternate-combat-effects.usmauto` (82/82)
 - `combat-effects-parity-gate.usmauto` (43/43)

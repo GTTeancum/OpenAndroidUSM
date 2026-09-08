@@ -2,8 +2,8 @@
 # through the authored trigger path, freezes only enemy decision-making, and
 # then exercises the production player input, attack, damage, projectile,
 # special-attack mesh, particle, and audio paths.
-fixed_step_ms 25
-sample_interval_ms 25
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 80000
 start_time_ms 53033

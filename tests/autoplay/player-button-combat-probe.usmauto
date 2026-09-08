@@ -2,8 +2,8 @@
 # production input path and reduce live first-encounter enemy health. Unlike
 # the goal-directed `attack` step, these commands do not steer, retry, or
 # repeatedly inject input on later combo windows.
-fixed_step_ms 10
-sample_interval_ms 25
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 70000
 start_time_ms 53033
@@ -47,9 +47,9 @@ set_enemy_physics 397 1
 wait_enemies_grounded 1000 397
 jump
 # State 13's recovered aux0=2 input gate must open before Circle/B is sampled.
-# The 60 ms wait reaches the first legal native frame without rising beyond
-# GetAirWebSpecialState's close-target threshold.
-wait 60
+# A zero-duration harness wait presents Circle/B on the second native update,
+# exactly when frame 2 opens, without rising beyond the close-target threshold.
+wait 0
 web_on
 move_until_state 250 0 0 99
 web_off

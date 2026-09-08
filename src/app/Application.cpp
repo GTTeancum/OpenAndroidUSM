@@ -17,6 +17,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace usm {
@@ -24,6 +25,15 @@ namespace {
 
 bool gShowErrorDialogs = true;
 diagnostics::AutoplayHarness* gAutoplayDiagnostics = nullptr;
+
+// GS_Loading::Update calls Application::SetTargetFPS(20) at 0x002c05ce.
+// SetTargetFPS (0x003de618) stores 1000 / 20 = 50 ms, and Application::Update
+// (0x003e1624) advances gameplay only when that fixed interval is crossed,
+// with at most two catch-up updates. Keeping interactive gameplay on the
+// display's 60 Hz Present cadence shortened CKeyPad's two-update press state
+// from two native combat ticks to roughly 33 ms and made valid combo inputs
+// disappear before UpdateKeyTrigger could sample them.
+constexpr std::uint32_t kNativeGameplayTickMilliseconds = 50;
 
 int fail(std::string_view message) {
     if (gAutoplayDiagnostics != nullptr) {
@@ -2337,7 +2347,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     };
 
     const auto introStart = std::chrono::steady_clock::now();
-    auto previousFrame = introStart;
+    const auto nativeTickBucket = [](std::chrono::steady_clock::time_point time) {
+        return static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                time.time_since_epoch())
+                .count()) /
+            kNativeGameplayTickMilliseconds;
+    };
+    std::uint64_t previousNativeTickBucket = nativeTickBucket(introStart);
+    std::uint64_t pendingNativeTickBucket = previousNativeTickBucket;
+    std::uint32_t pendingNativeUpdates = 0;
     const auto playGameplaySound =
         [&playAudio](std::int16_t, std::string_view eventName,
                      const audio::PcmAudio& clip, bool loop) {
@@ -2496,24 +2515,49 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         : window_.pumpMessages();
     };
     while (shouldRunFrame()) {
-        const auto frameTime = std::chrono::steady_clock::now();
         std::uint32_t realDeltaMilliseconds = 0;
+        bool presentThisFrame = true;
         if (autoplay) {
             realDeltaMilliseconds = autoplay->fixedStepMilliseconds();
             syntheticElapsedMilliseconds += realDeltaMilliseconds;
         } else {
-            const auto frameElapsed =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    frameTime - previousFrame);
-            realDeltaMilliseconds = static_cast<std::uint32_t>(
-                std::clamp<std::int64_t>(frameElapsed.count(), 0, 100));
-            syntheticElapsedMilliseconds = static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    frameTime - introStart)
-                    .count());
+            if (pendingNativeUpdates == 0) {
+                auto frameTime = std::chrono::steady_clock::now();
+                std::uint64_t currentTickBucket = nativeTickBucket(frameTime);
+                if (currentTickBucket == previousNativeTickBucket) {
+                    const auto nextNativeTick =
+                        std::chrono::steady_clock::time_point(
+                            std::chrono::milliseconds(
+                                (previousNativeTickBucket + 1U) *
+                                kNativeGameplayTickMilliseconds));
+                    std::this_thread::sleep_until(nextNativeTick);
+                    frameTime = std::chrono::steady_clock::now();
+                    currentTickBucket = nativeTickBucket(frameTime);
+                }
+
+                // Application::Update (0x003e1624) computes the number of
+                // crossed target-frame buckets, caps it at two, performs that
+                // many distinct 50 ms updates, draws once, and then records
+                // the current real-time bucket. Keep the updates distinct so
+                // keypad press lifetimes, hit frames, and combo transitions
+                // are never collapsed into one oversized simulation step.
+                pendingNativeUpdates = static_cast<std::uint32_t>(
+                    std::min<std::uint64_t>(
+                        currentTickBucket - previousNativeTickBucket, 2U));
+                pendingNativeTickBucket = currentTickBucket;
+            }
+
+            --pendingNativeUpdates;
+            realDeltaMilliseconds = kNativeGameplayTickMilliseconds;
+            syntheticElapsedMilliseconds += realDeltaMilliseconds;
+            presentThisFrame = pendingNativeUpdates == 0;
+            if (presentThisFrame) {
+                // The native stores the sampled real time after its draw,
+                // intentionally dropping backlog beyond its two-update cap.
+                previousNativeTickBucket = pendingNativeTickBucket;
+            }
         }
         traceTimeMilliseconds = syntheticElapsedMilliseconds;
-        previousFrame = frameTime;
         scaledDeltaRemainderMilliseconds +=
             levelCinematicRuntime_.updateSlowMotion(
                 static_cast<float>(realDeltaMilliseconds));
@@ -5481,7 +5525,12 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         if (!result) {
             return fail(result.message());
         }
-        renderer_.renderFrame();
+        if (exitAfterPresent) {
+            presentThisFrame = true;
+        }
+        if (presentThisFrame) {
+            renderer_.renderFrame();
+        }
         if (autoplay) {
             const bool finalControlsEnabled =
                 gameplayActive && levelCinematicRuntime_.controlsEnabled() &&

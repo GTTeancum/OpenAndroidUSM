@@ -1,8 +1,8 @@
 # Exercise the production input router with multiple face buttons in one
 # fixed frame. Player::UpdateKeyTrigger (0x0034d0a4) scans the current
 # state's serialized transition rows and retains the last qualifying row.
-fixed_step_ms 25
-sample_interval_ms 25
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 70000
 start_time_ms 53033

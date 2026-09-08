@@ -3,7 +3,7 @@
 # Unlike the focused combat probe, this does not teleport between targets or
 # directly start the post-fight cinematic.
 fixed_step_ms 50
-sample_interval_ms 25
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 180000
 start_time_ms 53033

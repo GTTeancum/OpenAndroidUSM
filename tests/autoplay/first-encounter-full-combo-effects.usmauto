@@ -1,8 +1,12 @@
 # Deterministic production-input gate for the normal-suit six-button ground
 # combo. Enemy decisions are frozen after the authored first-encounter
 # activation so their attacks cannot make combo windows flaky.
-fixed_step_ms 25
-sample_interval_ms 25
+# GS_Loading::Update selects Application::SetTargetFPS(20), so the production
+# combat gate must exercise the same 50 ms simulation cadence as interactive
+# play. Smaller diagnostic steps are useful for isolated event boundaries but
+# cannot stand in for this end-to-end input/transition test.
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -15,11 +19,9 @@ wait_enemies_active 5000 394 395 397
 set_enemy_ai 394 0
 set_enemy_ai 395 0
 set_enemy_ai 397 0
-# Leave exactly the first five states' native 295 damage. State 91 therefore
-# defeats the retained victim immediately before the ordinary state-78 combo
-# transition. Player::UpdateKeyTrigger (0x0034d0a4) does not run a new target
-# search for that transition; state 78's sector contacts may hit another actor.
-damage_enemy 394 205
+# Keep the retained victim alive for the complete native 375-damage ground
+# chain. This gate proves both state-78 contact/effect pairs against the same
+# target and keeps the effect/contact audit independent of an earlier death.
 teleport 13399 -6360 7 0 -1 0
 
 punch
@@ -52,10 +54,10 @@ assert_player_state 78
 # The retained state-91 trail is still alive when state 78 begins.
 assert_player_effect 5 1
 capture combo-double-kick-entry
-wait 300
+wait 100
 assert_player_effect 12 1
 capture combo-double-kick-first-impact
-wait 200
+wait 50
 assert_player_effect 13 1
 capture combo-double-kick-second-impact
 move_until_state 1500 0 0 0

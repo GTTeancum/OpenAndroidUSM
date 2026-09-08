@@ -1,8 +1,8 @@
 # Source-authored held shot -> bind -> direction-plus-target throw branch.
 # Native GameEventKeyWrap maps a new WASD/left-stick direction to virtual
 # button 0; state 60 maps button-0 predicate 101 to state 64.
-fixed_step_ms 10
-sample_interval_ms 10
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -32,9 +32,11 @@ assert_enemy_health_near 394 480 0.01
 
 # Motion 129 delivers its 150 damage only when the 634 ms primary throw clip
 # finishes. State 64 has no ordinary impact-frame/effect list.
-wait 500
+# State-entry/assertion commands have already advanced 200 ms of the 634 ms
+# clip. Stay below completion on the native 50 ms grid, then cross it once.
+wait 350
 assert_enemy_health_near 394 480 0.01
-wait 150
+wait 100
 assert_enemy_health_near 394 330 0.01
 assert_health_above 0
 finish

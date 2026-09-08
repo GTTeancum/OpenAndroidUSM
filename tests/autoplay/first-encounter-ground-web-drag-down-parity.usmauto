@@ -2,8 +2,9 @@
 # than 160 cm above Spider-Man.  Player::GetAirWebSpecialState selects state
 # 63, whose motion-127 attach event is non-damaging and whose 70 damage is
 # delivered only when the 534 ms web_drag primary clip finishes.
-fixed_step_ms 10
-sample_interval_ms 10
+# Run the complete input branch at GS_Loading's shipped 20 Hz cadence.
+fixed_step_ms 50
+sample_interval_ms 50
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -27,7 +28,9 @@ move_until_state 1000 0 0 97
 wait 350
 assert_enemy_health_near 394 405 0.01
 assert_player_effect 7 1
-assert_audio_played SFX_CRITICAL_HIT_1
+# This native-cadence route reaches record 92 in the shared shipped random
+# stream (sound config 36's three-entry selection-mode-1 range).
+assert_audio_played SFX_CRITICAL_HIT_2
 
 # Wait for Spider-Man to recover while the launched victim is still above the
 # native 160 cm split, then issue a fresh grounded web press.
@@ -41,9 +44,11 @@ assert_audio_played SFX_HORIZONTAL_SWING
 
 # Motion 127 attaches at 200 ms without damage.  The retained target receives
 # all 70 only when the 534 ms primary clip completes.
-wait 300
+wait 100
 assert_enemy_health_near 394 405 0.01
-wait 260
+# Cross the 534 ms primary-clip completion while leaving the short authored
+# drag_enemy_to_idle link alive for its web-line ownership assertion.
+wait 60
 assert_enemy_health_near 394 335 0.01
 # The native CobWeb remains owned during drag_enemy_to_idle and is released
 # only when state 63 itself exits, not at the damage event.
