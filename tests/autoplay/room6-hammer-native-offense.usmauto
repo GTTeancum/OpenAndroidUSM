@@ -1,0 +1,32 @@
+# Focused Room 6 production-AI gate for the type-5 hammer thug. The native
+# selection metric chooses attack 20 at 50 cm, retains behavior animation list
+# 9, plays its ready clip and warning action, advances into the rush contact
+# clip, applies authored root displacement, and deals the shipped 85 damage.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+set_enemy_ai 481 0
+set_enemy_ai 482 0
+set_enemy_ai 483 0
+set_enemy_ai 10344 0
+set_enemy_ai 1139 1 1
+teleport 7801.094 6927.294 3579.145 -1 0 0
+wait_enemy_animation 2000 1139 idle_attack_hammer_rush_ready
+assert_enemy_melee_attack_active 1139 1
+# Place the player at the authored rush endpoint before the 50% warning. This
+# is harness setup; all attack selection, animation, sound, motion, and contact
+# still run through the normal production enemy behavior.
+teleport 8201.094 6927.294 3579.145 -1 0 0
+wait_enemy_animation 2500 1139 attack_hammer_rush_to_idle
+wait 200
+assert_audio_played SFX_SLEDGER_ATTACK_1
+assert_audio_played SFX_SLEDGER_ATTACK_2
+assert_health_below 1000
+assert_health_above 0
+wait_enemy_melee_inactive 4000 1139
+finish

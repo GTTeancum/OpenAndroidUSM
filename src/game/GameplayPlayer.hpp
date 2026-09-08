@@ -376,6 +376,8 @@ public:
     [[nodiscard]] const std::array<float, 16>& worldTransform() const noexcept {
         return worldTransform_;
     }
+    [[nodiscard]] std::optional<assets::Vector3> nodeWorldPosition(
+        std::string_view nodeName) const noexcept;
     [[nodiscard]] std::string_view activeAnimation() const noexcept {
         return activeAnimation_;
     }

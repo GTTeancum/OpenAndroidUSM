@@ -6601,6 +6601,12 @@ int main() {
         // interruption; treating their wind-up as an implicit block makes
         // the first encounter feel artificially unresponsive.
         assert(normalAttack->interruptibleDuringExecution);
+        assert(normalAttack->startupMilliseconds == 1000.0F);
+        assert(normalAttack->turnTowardTargetDuringStartup);
+        assert(!normalAttack->quickTimeEnabled);
+        assert(!normalAttack->usesTargetRelativeMovement);
+        assert(!normalAttack->movementEndsAtSpecialAction);
+        assert(!normalAttack->permitsSpecialAnimationSuccessor);
         assert(normalAttack->senseSlowMotionDenominator == 3.0F);
         assert(normalAttack->senseReactionType == 1);
         assert(normalAttack->forceSenseActionId == -1);
@@ -6615,6 +6621,12 @@ int main() {
         assert(knifeAttack->verticalForce == 0.0F);
         assert(knifeAttack->maximumReach() == 200.0F);
         assert(knifeAttack->interruptibleDuringExecution);
+        assert(knifeAttack->startupMilliseconds == 1000.0F);
+        assert(knifeAttack->turnTowardTargetDuringStartup);
+        assert(!knifeAttack->quickTimeEnabled);
+        assert(!knifeAttack->usesTargetRelativeMovement);
+        assert(!knifeAttack->movementEndsAtSpecialAction);
+        assert(!knifeAttack->permitsSpecialAnimationSuccessor);
         assert(knifeAttack->senseSlowMotionDenominator == 3.0F);
         assert(knifeAttack->senseReactionType == 1);
         assert(knifeAttack->forceSenseActionId == -1);
@@ -6629,6 +6641,12 @@ int main() {
         assert(batJumpAttack->verticalForce == 0.0F);
         assert(batJumpAttack->maximumReach() == 300.0F);
         assert(batJumpAttack->interruptibleDuringExecution);
+        assert(batJumpAttack->startupMilliseconds == 1000.0F);
+        assert(batJumpAttack->turnTowardTargetDuringStartup);
+        assert(!batJumpAttack->quickTimeEnabled);
+        assert(!batJumpAttack->usesTargetRelativeMovement);
+        assert(!batJumpAttack->movementEndsAtSpecialAction);
+        assert(!batJumpAttack->permitsSpecialAnimationSuccessor);
         assert(batJumpAttack->senseSlowMotionDenominator == 3.0F);
         assert(batJumpAttack->senseReactionType == 1);
         assert(batJumpAttack->forceSenseActionId == -1);
@@ -6638,6 +6656,23 @@ int main() {
         const auto* sandmanAttack = bootstrap.attackConfigs().find(69);
         assert(hammerAttack != nullptr && hammerAttack->damage == 50.0F &&
                hammerAttack->maximumReach() == 300.0F);
+        assert(hammerAttack->startupMilliseconds == 0.0F);
+        assert(hammerAttack->turnTowardTargetDuringStartup);
+        assert(!hammerAttack->quickTimeEnabled);
+        assert(!hammerAttack->usesTargetRelativeMovement);
+        assert(!hammerAttack->movementEndsAtSpecialAction);
+        assert(!hammerAttack->permitsSpecialAnimationSuccessor);
+        const auto* hammerRushAttack = bootstrap.attackConfigs().find(20);
+        assert(hammerRushAttack != nullptr &&
+               hammerRushAttack->damage == 85.0F &&
+               hammerRushAttack->maximumReach() == 500.0F &&
+               hammerRushAttack->verticalForce == 300.0F);
+        assert(hammerRushAttack->startupMilliseconds == 0.0F);
+        assert(!hammerRushAttack->turnTowardTargetDuringStartup);
+        assert(!hammerRushAttack->quickTimeEnabled);
+        assert(!hammerRushAttack->usesTargetRelativeMovement);
+        assert(!hammerRushAttack->movementEndsAtSpecialAction);
+        assert(!hammerRushAttack->permitsSpecialAnimationSuccessor);
         assert(bigThugAttack != nullptr && bigThugAttack->damage == 70.0F &&
                bigThugAttack->maximumReach() == 500.0F);
         assert(sandmanAttack != nullptr && sandmanAttack->damage == 75.0F &&
@@ -6784,6 +6819,10 @@ int main() {
                    meleeAttackState->name, 1) ==
                (std::vector<std::string_view>{"idle_at1_idle",
                                                "idle_jump_at3_idle"}));
+        assert(behaviorConfigs.resolveAnimationListNames(9, 5) ==
+               (std::vector<std::string_view>{
+                   "idle_attack_hammer_rush_ready",
+                   "attack_hammer_rush_to_idle"}));
         const auto knifeAttackEvents =
             bootstrap.enemySpecialActions().findAttackEvents(
                 0, "idle_knife_at_idle");
@@ -6814,6 +6853,23 @@ int main() {
         assert(hammerAttackEvents.size() == 1);
         assert(hammerAttackEvents.front()->keyFramePercent == 60);
         assert(hammerAttackEvents.front()->attackId == 19);
+        const auto hammerRushReadyEvents =
+            bootstrap.enemySpecialActions().findEvents(
+                5, "idle_attack_hammer_rush_ready");
+        assert(hammerRushReadyEvents.size() == 1);
+        assert(hammerRushReadyEvents.front()->actionType == 2);
+        assert(hammerRushReadyEvents.front()->keyFramePercent == 50);
+        assert(hammerRushReadyEvents.front()->attackId == -1);
+        assert(hammerRushReadyEvents.front()->soundMapIds ==
+               std::vector<std::int16_t>{17});
+        const auto hammerRushAttackEvents =
+            bootstrap.enemySpecialActions().findAttackEvents(
+                5, "attack_hammer_rush_to_idle");
+        assert(hammerRushAttackEvents.size() == 1);
+        assert(hammerRushAttackEvents.front()->keyFramePercent == 4);
+        assert(hammerRushAttackEvents.front()->attackId == 20);
+        assert(hammerRushAttackEvents.front()->soundMapIds ==
+               std::vector<std::int16_t>{28});
         const auto sandmanAttackEvents =
             bootstrap.enemySpecialActions().findAttackEvents(
                 16, "ground_attack1");
@@ -7795,6 +7851,12 @@ int main() {
                std::vector<std::int16_t>{18});
         usm::game::LevelEnemyRuntime gunAttackRuntime;
         assert(gunAttackRuntime.initialize(bootstrap));
+        for (const auto& state : gunAttackRuntime.states()) {
+            if (state.asset != nullptr && state.asset->objectId != 10344) {
+                assert(gunAttackRuntime.setDiagnosticAiEnabled(
+                    state.asset->objectId, false));
+            }
+        }
         usm::game::CinematicThread enableGunThread;
         enableGunThread.objectId = 10344;
         assert(gunAttackRuntime.applyCinematicCommand(
@@ -7814,13 +7876,37 @@ int main() {
             attackingGunThug->position.x + 1000.0F,
             attackingGunThug->position.y,
             attackingGunThug->position.z};
+        const usm::assets::Vector3 gunVictimSpine{
+            gunVictim.x, gunVictim.y, gunVictim.z + 118.0F};
         gunAttackRuntime.updateGameplay(
-            gunFireClip->durationMilliseconds() / 2, gunVictim);
+            gunFireClip->durationMilliseconds() / 2, gunVictim, nullptr,
+            false, {1.0F, 0.0F, 0.0F}, false, 0, gunVictimSpine);
         assert(gunAttackRuntime.find(10344)->activeAnimation ==
                "idle_shoot_left_idle");
         assert(gunAttackRuntime.gunLines().size() == 1);
-        assert(gunAttackRuntime.gunLines().front().sourceObjectId == 10344);
-        assert(gunAttackRuntime.gunLines().front().damage == 30.0F);
+        const auto& leftGunLine = gunAttackRuntime.gunLines().front();
+        assert(leftGunLine.sourceObjectId == 10344);
+        assert(leftGunLine.damage == 30.0F);
+        const auto leftMuzzle = gunAttackRuntime.nodeWorldPosition(
+            10344, "L_Hand_Dummy", {27.0F, 0.0F, 0.0F});
+        assert(leftMuzzle.has_value());
+        assert(std::abs(leftGunLine.position.x - leftMuzzle->x) < 0.001F);
+        assert(std::abs(leftGunLine.position.y - leftMuzzle->y) < 0.001F);
+        assert(std::abs(leftGunLine.position.z - leftMuzzle->z) < 0.001F);
+        const usm::assets::Vector3 leftDelta{
+            gunVictimSpine.x - leftMuzzle->x,
+            gunVictimSpine.y - leftMuzzle->y,
+            gunVictimSpine.z - leftMuzzle->z};
+        const float leftLength = std::sqrt(
+            leftDelta.x * leftDelta.x + leftDelta.y * leftDelta.y +
+            leftDelta.z * leftDelta.z);
+        assert(std::abs(leftGunLine.direction.x -
+                        leftDelta.x / leftLength) < 0.0001F);
+        assert(std::abs(leftGunLine.direction.y -
+                        leftDelta.y / leftLength) < 0.0001F);
+        assert(std::abs(leftGunLine.direction.z -
+                        leftDelta.z / leftLength) < 0.0001F);
+        assert(std::abs(leftGunLine.direction.z) > 0.001F);
         const auto gunCues = gunAttackRuntime.consumeSoundCues();
         assert(gunCues.size() == 1);
         assert(gunCues.front().sourceObjectId == 10344);
@@ -7831,6 +7917,185 @@ int main() {
         assert(gunHits.front().attackId == -1);
         assert(gunHits.front().damage == 30.0F);
         assert(gunAttackRuntime.gunLines().empty());
+
+        // The third native random result is 64, selecting the right-hand
+        // state at CBehaviorRangeAttack::StartAttack_DoAttack 0x003c0f80.
+        // Aim this tracer above the player's 3D Unit box: the old XY-only
+        // approximation would report a false hit.
+        usm::game::NativeRandomizer rightGunRandomizer;
+        (void)rightGunRandomizer.next();
+        (void)rightGunRandomizer.next();
+        usm::game::LevelEnemyRuntime rightGunRuntime;
+        assert(rightGunRuntime.initialize(bootstrap, &rightGunRandomizer));
+        for (const auto& state : rightGunRuntime.states()) {
+            if (state.asset != nullptr && state.asset->objectId != 10344) {
+                assert(rightGunRuntime.setDiagnosticAiEnabled(
+                    state.asset->objectId, false));
+            }
+        }
+        assert(rightGunRuntime.applyCinematicCommand(
+            bootstrap, enableGunThread,
+            usm::game::CinematicCommand{0, -1, "SetVisible", {}}));
+        assert(rightGunRuntime.applyCinematicCommand(
+            bootstrap, enableGunThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        const usm::assets::Vector3 highTarget{
+            gunVictim.x, gunVictim.y, gunVictim.z + 1000.0F};
+        rightGunRuntime.updateGameplay(
+            gunFireClip->durationMilliseconds() / 2, gunVictim, nullptr,
+            false, {1.0F, 0.0F, 0.0F}, false, 0, highTarget);
+        assert(rightGunRuntime.find(10344)->activeAnimation ==
+               "idle_shoot_right_idle");
+        assert(rightGunRuntime.gunLines().size() == 1);
+        const auto rightMuzzle = rightGunRuntime.nodeWorldPosition(
+            10344, "R_Hand_Dummy", {27.0F, 0.0F, 0.0F});
+        assert(rightMuzzle.has_value());
+        assert(std::abs(rightGunRuntime.gunLines().front().position.x -
+                        rightMuzzle->x) < 0.001F);
+        assert(rightGunRuntime.setDiagnosticAiEnabled(10344, false));
+        rightGunRuntime.updateGameplay(2000, gunVictim);
+        assert(rightGunRuntime.consumePlayerHits().empty());
+        assert(rightGunRuntime.gunLines().empty());
+
+        // CBehaviorMeleeAttack::StateEnter (0x003baef8) selects the attack
+        // whose EnemyAttackInfo+0x38 is nearest the current 3D distance. At
+        // 100 cm, attack 19's value 90 wins and list 5 contains only the
+        // ordinary hammer swing.
+        usm::game::LevelEnemyRuntime hammerNormalRuntime;
+        assert(hammerNormalRuntime.initialize(bootstrap));
+        for (const auto& state : hammerNormalRuntime.states()) {
+            if (state.asset != nullptr && state.asset->objectId != 1139) {
+                assert(hammerNormalRuntime.setDiagnosticAiEnabled(
+                    state.asset->objectId, false));
+            }
+        }
+        usm::game::CinematicThread enableHammerThread;
+        enableHammerThread.objectId = 1139;
+        assert(hammerNormalRuntime.applyCinematicCommand(
+            bootstrap, enableHammerThread,
+            usm::game::CinematicCommand{0, -1, "SetVisible", {}}));
+        assert(hammerNormalRuntime.applyCinematicCommand(
+            bootstrap, enableHammerThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        const auto* attackingHammer = hammerNormalRuntime.find(1139);
+        assert(attackingHammer != nullptr);
+        const auto& hammerArchetype =
+            bootstrap.enemyArchetypes()
+                [attackingHammer->asset->archetypeIndex];
+        const auto* hammerNormalClip =
+            hammerArchetype.animationBank.findClip(
+                "idle_attack_hammer_idle");
+        const auto* hammerRushReadyClip =
+            hammerArchetype.animationBank.findClip(
+                "idle_attack_hammer_rush_ready");
+        const auto* hammerRushClip =
+            hammerArchetype.animationBank.findClip(
+                "attack_hammer_rush_to_idle");
+        assert(hammerNormalClip != nullptr && hammerRushReadyClip != nullptr &&
+               hammerRushClip != nullptr);
+        const usm::assets::Vector3 hammerStart = attackingHammer->position;
+        const usm::assets::Vector3 hammerNormalVictim{
+            hammerStart.x + 100.0F, hammerStart.y, hammerStart.z};
+        hammerNormalRuntime.updateGameplay(
+            hammerNormalClip->durationMilliseconds() * 60U / 100U,
+            hammerNormalVictim);
+        attackingHammer = hammerNormalRuntime.find(1139);
+        assert(attackingHammer->activeAnimation ==
+               "idle_attack_hammer_idle");
+        assert(attackingHammer->meleeAttackAnimationSequence ==
+               std::vector<std::string>{"idle_attack_hammer_idle"});
+        assert(attackingHammer->selectedMeleeAttackId == 19);
+        const auto hammerNormalHits =
+            hammerNormalRuntime.consumePlayerHits();
+        assert(hammerNormalHits.size() == 1);
+        assert(hammerNormalHits.front().sourceObjectId == 1139);
+        assert(hammerNormalHits.front().attackId == 19);
+        assert(hammerNormalHits.front().damage == 50.0F);
+
+        // At 50 cm, attack 20's +0x38 value 45 wins. Native
+        // FindMatchAnimListConfigedInState (0x003a7af4) returns all of list
+        // 9, and StartAttackMelee_DoAttack (0x003b9ac8, 0x003b9b42-
+        // 0x003b9b60) queues its ready and rush clips in order. The warning
+        // at 50% of ready retains attack 20 even though that clip has no
+        // attack action; the 85-damage contact occurs at 4% of the successor.
+        usm::game::LevelEnemyRuntime hammerRushRuntime;
+        assert(hammerRushRuntime.initialize(bootstrap));
+        for (const auto& state : hammerRushRuntime.states()) {
+            if (state.asset != nullptr && state.asset->objectId != 1139) {
+                assert(hammerRushRuntime.setDiagnosticAiEnabled(
+                    state.asset->objectId, false));
+            }
+        }
+        assert(hammerRushRuntime.applyCinematicCommand(
+            bootstrap, enableHammerThread,
+            usm::game::CinematicCommand{0, -1, "SetVisible", {}}));
+        assert(hammerRushRuntime.applyCinematicCommand(
+            bootstrap, enableHammerThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        attackingHammer = hammerRushRuntime.find(1139);
+        const usm::assets::Vector3 hammerRushStart = attackingHammer->position;
+        const usm::assets::Vector3 hammerRushSelectionTarget{
+            hammerRushStart.x + 50.0F, hammerRushStart.y,
+            hammerRushStart.z};
+        hammerRushRuntime.updateGameplay(1, hammerRushSelectionTarget);
+        attackingHammer = hammerRushRuntime.find(1139);
+        assert(attackingHammer->activeAnimation ==
+               "idle_attack_hammer_rush_ready");
+        assert(attackingHammer->meleeAttackAnimationSequence ==
+               (std::vector<std::string>{
+                   "idle_attack_hammer_rush_ready",
+                   "attack_hammer_rush_to_idle"}));
+        assert(attackingHammer->meleeAttackAnimationSequenceIndex == 0);
+        assert(attackingHammer->selectedMeleeAttackId == 20);
+        const usm::assets::Vector3 hammerRushWarningTarget{
+            hammerRushStart.x + 450.0F, hammerRushStart.y,
+            hammerRushStart.z};
+        const std::uint32_t readyWarningTime =
+            hammerRushReadyClip->durationMilliseconds() * 50U / 100U;
+        hammerRushRuntime.updateGameplay(readyWarningTime - 1U,
+                                         hammerRushWarningTarget);
+        attackingHammer = hammerRushRuntime.find(1139);
+        const auto expectedReadyDisplacement =
+            hammerArchetype.animationDisplacement.physicalAt(
+                hammerRushReadyClip->startMilliseconds + readyWarningTime);
+        const auto readyStartDisplacement =
+            hammerArchetype.animationDisplacement.physicalAt(
+                hammerRushReadyClip->startMilliseconds);
+        assert(std::abs((attackingHammer->position.x - hammerRushStart.x) -
+                        (expectedReadyDisplacement.x -
+                         readyStartDisplacement.x)) < 0.01F);
+        assert(attackingHammer->meleeSenseActive);
+        const auto hammerReadyCues = hammerRushRuntime.consumeSoundCues();
+        assert(hammerReadyCues.size() == 1);
+        assert(hammerReadyCues.front().sourceObjectId == 1139);
+        assert(hammerReadyCues.front().voxSoundId ==
+               bootstrap.enemyBehaviorConfigs().resolveSoundMap(17, 5));
+        hammerRushRuntime.updateGameplay(
+            hammerRushReadyClip->durationMilliseconds() - readyWarningTime,
+            hammerRushWarningTarget);
+        attackingHammer = hammerRushRuntime.find(1139);
+        assert(attackingHammer->activeAnimation ==
+               "idle_attack_hammer_rush_ready");
+        hammerRushRuntime.updateGameplay(1, hammerRushWarningTarget);
+        attackingHammer = hammerRushRuntime.find(1139);
+        assert(attackingHammer->activeAnimation ==
+               "attack_hammer_rush_to_idle");
+        assert(attackingHammer->meleeAttackAnimationSequenceIndex == 1);
+        const std::uint32_t rushImpactTime =
+            hammerRushClip->durationMilliseconds() * 4U / 100U;
+        hammerRushRuntime.updateGameplay(rushImpactTime - 1U,
+                                         hammerRushWarningTarget);
+        const auto hammerRushHits = hammerRushRuntime.consumePlayerHits();
+        assert(hammerRushHits.size() == 1);
+        assert(hammerRushHits.front().sourceObjectId == 1139);
+        assert(hammerRushHits.front().attackId == 20);
+        assert(hammerRushHits.front().damage == 85.0F);
+        assert(hammerRushHits.front().hitType == 104);
+        const auto hammerRushCues = hammerRushRuntime.consumeSoundCues();
+        assert(hammerRushCues.size() == 1);
+        assert(hammerRushCues.front().sourceObjectId == 1139);
+        assert(hammerRushCues.front().voxSoundId ==
+               bootstrap.enemyBehaviorConfigs().resolveSoundMap(28, 5));
 
         usm::game::LevelEnemyRuntime molotovAttackRuntime;
         assert(molotovAttackRuntime.initialize(levelTwo));
@@ -8400,6 +8665,19 @@ int main() {
                usm::game::EnemyBehaviorState::AttackRange);
         const std::uint32_t lifetimeAnimationTime =
             lifetimeKnife->animationTimeMilliseconds;
+        const double lifetimeAnimationFraction =
+            lifetimeKnife->animationFractionalMilliseconds;
+        const auto* lifetimeAttack = bootstrap.attackConfigs().find(6);
+        const auto* lifetimeClip =
+            bootstrap.enemyArchetypes()
+                [lifetimeKnife->asset->archetypeIndex]
+                    .animationBank.findClip("idle_knife_at_idle");
+        assert(lifetimeAttack != nullptr && lifetimeClip != nullptr);
+        const float expectedKnifeSpeed =
+            static_cast<float>(lifetimeClip->durationMilliseconds()) /
+            lifetimeAttack->startupMilliseconds;
+        assert(std::abs(lifetimeKnife->animationSpeed -
+                        expectedKnifeSpeed) < 0.001F);
         const usm::assets::Vector3 lifetimeFarTarget{
             lifetimeKnife->position.x + 1000.0F,
             lifetimeKnife->position.y,
@@ -8411,7 +8689,10 @@ int main() {
                usm::game::EnemyBehaviorState::AttackRange);
         assert(lifetimeKnife->activeAnimation == "idle_knife_at_idle");
         assert(lifetimeKnife->animationTimeMilliseconds ==
-               lifetimeAnimationTime + 50U);
+               lifetimeAnimationTime +
+                   static_cast<std::uint32_t>(std::floor(
+                       50.0 * expectedKnifeSpeed +
+                       lifetimeAnimationFraction)));
         usm::game::LevelEnemyRuntime enemyAttackRuntime;
         assert(enemyAttackRuntime.initialize(bootstrap));
         const auto* attackingKnife = enemyAttackRuntime.find(394);
@@ -8426,6 +8707,24 @@ int main() {
             knifeAttackClip->durationMilliseconds() * 75U / 100U;
         const std::uint32_t knifeSenseFrame =
             knifeAttackClip->durationMilliseconds() * 2U / 100U;
+        const auto* timedKnifeAttack = bootstrap.attackConfigs().find(6);
+        assert(timedKnifeAttack != nullptr &&
+               timedKnifeAttack->startupMilliseconds == 1000.0F &&
+               timedKnifeAttack->turnTowardTargetDuringStartup);
+        const auto wallTimeForKnifeSourceFrame =
+            [&](std::uint32_t sourceMilliseconds) {
+                return static_cast<std::uint32_t>(std::ceil(
+                    static_cast<double>(sourceMilliseconds) /
+                    (static_cast<double>(
+                         knifeAttackClip->durationMilliseconds()) /
+                     timedKnifeAttack->startupMilliseconds)));
+            };
+        const std::uint32_t firstKnifeImpactWallTime =
+            wallTimeForKnifeSourceFrame(firstKnifeImpact);
+        const std::uint32_t secondKnifeImpactWallTime =
+            wallTimeForKnifeSourceFrame(secondKnifeImpact);
+        const std::uint32_t knifeSenseWallTime =
+            wallTimeForKnifeSourceFrame(knifeSenseFrame);
         assert(firstKnifeImpact > 0);
         assert(secondKnifeImpact > firstKnifeImpact);
         const usm::assets::Vector3 knifeVictim{
@@ -8437,11 +8736,12 @@ int main() {
         assert(senseTimingRuntime.setDiagnosticAiEnabled(395, false));
         assert(senseTimingRuntime.setDiagnosticAiEnabled(397, false));
         assert(senseTimingRuntime.setDiagnosticAiEnabled(394, true, true));
-        senseTimingRuntime.updateGameplay(knifeSenseFrame - 1U, knifeVictim);
+        senseTimingRuntime.updateGameplay(knifeSenseWallTime - 1U,
+                                          knifeVictim);
         assert(senseTimingRuntime.find(394)->meleeAttackActive);
         assert(!senseTimingRuntime.find(394)->meleeSenseActive);
         assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) == nullptr);
-        senseTimingRuntime.updateGameplay(1U, knifeVictim);
+        senseTimingRuntime.updateGameplay(2U, knifeVictim);
         assert(senseTimingRuntime.find(394)->meleeSenseActive);
         assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) != nullptr);
         // UpdateSpiderSense pops exactly one CTargetHelper warning before it
@@ -8452,10 +8752,12 @@ int main() {
         assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) == nullptr);
         assert(!senseTimingRuntime.consumeSpiderSenseAttacker(394));
         senseTimingRuntime.updateGameplay(
-            firstKnifeImpact - knifeSenseFrame, knifeVictim, nullptr, false,
+            firstKnifeImpactWallTime - knifeSenseWallTime - 1U,
+            knifeVictim, nullptr, false,
             {1.0F, 0.0F, 0.0F}, false, 5);
         assert(senseTimingRuntime.consumePlayerHits().empty());
-        enemyAttackRuntime.updateGameplay(firstKnifeImpact, knifeVictim);
+        enemyAttackRuntime.updateGameplay(firstKnifeImpactWallTime,
+                                           knifeVictim);
         auto enemyHits = enemyAttackRuntime.consumePlayerHits();
         const auto firstKnifeHit = std::find_if(
             enemyHits.begin(), enemyHits.end(),
@@ -8470,8 +8772,9 @@ int main() {
         assert(enemySoundCues.size() == 1);
         assert(enemySoundCues.front().sourceObjectId == 394);
         assert(enemySoundCues.front().voxSoundId == 178);
-        enemyAttackRuntime.updateGameplay(secondKnifeImpact - firstKnifeImpact,
-                                          knifeVictim);
+        enemyAttackRuntime.updateGameplay(
+            secondKnifeImpactWallTime - firstKnifeImpactWallTime,
+            knifeVictim);
         enemyHits = enemyAttackRuntime.consumePlayerHits();
         const auto secondKnifeHit = std::find_if(
             enemyHits.begin(), enemyHits.end(),
@@ -8487,7 +8790,9 @@ int main() {
         assert(enemyAttackRuntime.find(394)->meleeAttackActive);
         assert(!enemyAttackRuntime.find(394)->animationLoops);
         enemyAttackRuntime.updateGameplay(
-            knifeAttackClip->durationMilliseconds() - secondKnifeImpact,
+            static_cast<std::uint32_t>(
+                timedKnifeAttack->startupMilliseconds) -
+                secondKnifeImpactWallTime + 1U,
             knifeVictim);
         assert(enemyAttackRuntime.find(394)->meleeAttackActive);
         enemyAttackRuntime.updateGameplay(1, knifeVictim);
@@ -8541,6 +8846,16 @@ int main() {
             bootstrap.enemyArchetypes()[attackingBat->asset->archetypeIndex]
                 .animationBank.findClip("idle_jump_at3_idle");
         assert(standingBatClip != nullptr && jumpingBatClip != nullptr);
+        const auto* standingBatAttack = bootstrap.attackConfigs().find(7);
+        const auto* jumpingBatAttack = bootstrap.attackConfigs().find(11);
+        assert(standingBatAttack != nullptr && jumpingBatAttack != nullptr);
+        assert(standingBatAttack->startupMilliseconds == 1000.0F);
+        assert(jumpingBatAttack->startupMilliseconds == 1000.0F);
+        assert(std::abs(
+                   attackingBat->animationSpeed -
+                   static_cast<float>(
+                       jumpingBatClip->durationMilliseconds()) /
+                       jumpingBatAttack->startupMilliseconds) < 0.001F);
         const auto advanceBatKeepingVictimNear =
             [&](std::uint32_t milliseconds) {
                 std::vector<usm::game::EnemyPlayerHit> hits;
@@ -8560,15 +8875,23 @@ int main() {
             };
         const std::uint32_t jumpingBatImpact =
             jumpingBatClip->durationMilliseconds() * 70U / 100U;
+        const std::uint32_t jumpingBatImpactWallTime =
+            static_cast<std::uint32_t>(std::ceil(
+                static_cast<double>(jumpingBatImpact) /
+                (static_cast<double>(
+                     jumpingBatClip->durationMilliseconds()) /
+                 jumpingBatAttack->startupMilliseconds)));
         auto batHits = advanceBatKeepingVictimNear(
-            jumpingBatImpact - attackingBat->animationTimeMilliseconds);
+            jumpingBatImpactWallTime - 1U);
         assert(batHits.size() == 1);
         assert(batHits.front().sourceObjectId == 395);
         assert(batHits.front().attackId == 11);
         assert(batHits.front().damage == 50.0F);
         assert(batHits.front().hitType == 101);
         (void)advanceBatKeepingVictimNear(
-            jumpingBatClip->durationMilliseconds() - jumpingBatImpact + 1U);
+            static_cast<std::uint32_t>(
+                jumpingBatAttack->startupMilliseconds) -
+                jumpingBatImpactWallTime + 1U);
         attackingBat = batAttackRuntime.find(395);
         batVictim = {attackingBat->position.x + attackingBat->facing.x * 100.0F,
                      attackingBat->position.y + attackingBat->facing.y * 100.0F,
@@ -8585,11 +8908,21 @@ int main() {
         attackingBat = batAttackRuntime.find(395);
         assert(attackingBat->activeAnimation == "idle_at1_idle");
         assert(attackingBat->meleeRegistrationTimerMilliseconds == 8087.0F);
+        assert(std::abs(
+                   attackingBat->animationSpeed -
+                   static_cast<float>(
+                       standingBatClip->durationMilliseconds()) /
+                       standingBatAttack->startupMilliseconds) < 0.001F);
         const std::uint32_t standingBatImpact =
             standingBatClip->durationMilliseconds() * 47U / 100U;
-        assert(attackingBat->animationTimeMilliseconds <= standingBatImpact);
+        const std::uint32_t standingBatImpactWallTime =
+            static_cast<std::uint32_t>(std::ceil(
+                static_cast<double>(standingBatImpact) /
+                (static_cast<double>(
+                     standingBatClip->durationMilliseconds()) /
+                 standingBatAttack->startupMilliseconds)));
         batHits = advanceBatKeepingVictimNear(
-            standingBatImpact - attackingBat->animationTimeMilliseconds);
+            standingBatImpactWallTime - 1U);
         assert(batHits.size() == 1);
         assert(batHits.front().sourceObjectId == 395);
         assert(batHits.front().attackId == 7);
@@ -10040,6 +10373,10 @@ int main() {
                                          &playerStateConfigs, {}, {}, {},
                                          nullptr,
                                          &bootstrap.playerHitEffectConfigs()));
+        const auto initialPlayerSpine =
+            gameplayPlayer.nodeWorldPosition("Bip01_Spine2");
+        assert(initialPlayerSpine.has_value());
+        assert(initialPlayerSpine->z > gameplayPlayer.position().z);
         assert(gameplayPlayer.canUpdateCombatTarget());
         usm::game::GameplayPlayer checkPointPlayer;
         assert(checkPointPlayer.initialize(bootstrap.player(), nullptr,

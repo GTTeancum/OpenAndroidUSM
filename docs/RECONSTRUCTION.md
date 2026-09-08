@@ -518,11 +518,26 @@ at 70% of `idle_jump_at3_idle`. `CBehaviorMeleeAttack::StateEnter` at
 and `EnemyAttackInfo+0x38`; its tie branch at `0x003bb244`-`0x003bb28c`
 replaces the current winner only when `random(0,100) <= 49`. The portable
 runtime now performs that comparison and uses the original Irrlicht integer
-generator instead of an invented alternating selector. Those IDs resolve through
-`EnemysAttackConfigs.bin` to the authored damage, hit-box reach, angular
-sector, hit type, protection interval, and force fields. Core regressions pin
-the knife's two 25-point contacts, the bat's 35-point standing contact, and
-its 50-point jumping contact.
+generator instead of an invented alternating selector. The typed attack
+record now also exposes the native startup duration, startup-turn flag, QTE
+flag/action, target-relative movement flag, action-limited movement flag, and
+special-successor flag consumed by `StateEnter`, `StartAttackMelee_DoAttack`
+(`0x003b9ac8`), and `UpdateAttackMelee_DoAttack` (`0x003b9e44`). Those IDs
+resolve through `EnemysAttackConfigs.bin` to the authored damage, hit-box
+reach, angular sector, hit type, protection interval, and force fields. Core
+regressions pin the knife's two 25-point contacts, the bat's 35-point standing
+contact, and its 50-point jumping contact.
+
+`StateEnter` also supplies the chosen clip to `SetAnimWithSpeed` at
+`0x003bb3f4`--`0x003bb478` using current-animation length divided by
+`EnemyAttackInfo+8` after the difficulty multiplier. The normal-difficulty
+rows in shipped `EnemyDifficultControlNormal.bin` store a 1.0 multiplier;
+knife attacks 6, bat attack 7, and jumping bat attack 11 each author 1000 ms.
+The portable clock therefore scales those clips into the same one-second
+window, preserves fractional source-animation milliseconds across fixed
+updates, and applies the `+0xc` target turn during that window. This places
+their special-action percentages against native wall-clock timing rather than
+the unscaled Collada duration.
 
 The melee-engagement handoff is likewise native-backed. Difficulty one sets
 one melee and one ranged slot plus a 1000 ms base at
@@ -549,10 +564,22 @@ does not expose a counter merely because a wind-up animation has begun.
 The same special-action path now drives the heavier level-one actors rather
 than making them harmless chase targets. Type 4 selects
 `idlebaz_rush_attack_idlebaz` and four attack-21 impacts (70 damage, 500 cm
-reach); type 5 selects `idle_attack_hammer_idle` and attack 19 (50 damage,
-300 cm); Sandman type 16 selects `ground_attack1` and attack 69 (75 damage,
-400 cm). Their key percentages, sectors, damage, and reach come from the same
-typed binary tables as the knife/bat attacks.
+reach). Type 5 has two authored choices: attack 19 is the single
+`idle_attack_hammer_idle` clip (50 damage, 300 cm), while attack 20 is behavior
+animation list 9, ordered as `idle_attack_hammer_rush_ready` followed by
+`attack_hammer_rush_to_idle` (85 damage, 500 cm). `StateEnter` retains that
+complete `BehaviorAnimInfo` vector at behavior offset `+0xbc`;
+`StartAttackMelee_DoAttack` passes it to the vector overload of
+`IBehaviorBase::SetState` (`0x003a89fc`), and `UpdateAnimTask` (`0x003a88b8`)
+advances it. The ready clip's action-type-2 key at 50% checks the retained
+attack-20 volume and plays `SFX_SLEDGER_ATTACK_1`; the successor's action-0
+key at 4% deals 85 damage and plays `SFX_SLEDGER_ATTACK_2`. Root displacement
+comes from the two shipped hammer clips, and facing is updated at the queue
+transition as `UpdateAttackMelee_DoAttack` does rather than continuously
+homing during the charge. Sandman type 16 selects `ground_attack1` and attack
+69 (75 damage, 400 cm). Their key percentages, sectors, damage, reach, ordered
+clips, and sound maps come from the same typed binary tables as the knife/bat
+attacks.
 
 `EnemyRangeAttackConfigDatabase` follows
 `EnemyAttributeFile::ReadEnemyRangeAttackInfo` at `0x0033b820` and decodes all
@@ -572,14 +599,25 @@ the 24 rows and 25 enemy-type columns in `AttackIntervalTimeConfigs.bin`.
 Weapon type 13 selects row 8, `ENEMY_RANGE_ATTACK_GUN_LINE`, with a 2000 ms
 type-3 interval and ranged-config map 8 (1000 ms animation, 30 damage).
 
-`LevelEnemyRuntime` uses that chain to alternate the authored
-`idle_shoot_left_idle` and `idle_shoot_right_idle` clips. Their 50% special
-action emits sound map 18 and creates a portable `EnemyGunLineState` rather
-than an ARM object. Motion and lifetime use the recovered `CGunLine::Update`
-constants (1500 cm/s and two seconds); each swept segment checks level
-occlusion and the player before applying the configured damage. D3D11 draws a
-depth-tested translucent tracer from this backend-independent state, and WARP
-exercises the dynamic gun-line buffer.
+`CBehaviorRangeAttack::StartAttack_DoAttack` (`0x003c0f80`) calls the native
+global RNG and selects left-ready state 25 for results below 50 or right-ready
+state 27 otherwise. Their authored successors play
+`idle_shoot_left_idle`/`idle_shoot_right_idle`; the 50% special action emits
+sound map 18 and creates a portable `EnemyGunLineState` rather than an ARM
+object. `CEnemy::AddWeapon` (`0x003312e8`) attaches the two gun models to
+`L_Hand_Dummy`/`R_Hand_Dummy`, and the weapon-13 branch at
+`CBehaviorRangeAttack::ThrowMolotov` (`0x003c01dc`) transforms the exact local
+`{27,0,0}` muzzle point through the selected animated attachment. It caches
+the target's animated `Bip01_Spine2` position and `CGunLine::Shoot`
+(`0x00362000`) normalizes the complete 3D vector between those points.
+
+Motion and lifetime use the recovered `CGunLine::Update` constants at
+`0x00361ec8`/`0x00362340` (1500 cm/s and two seconds). Each swept segment is
+tested against the player's native 50 x 50 x 185 cm Unit AABB exactly as
+`CGunLine::CheckCollisions` does at `0x003621f0`; the original gun line has no
+room-mesh collision test. D3D11 draws a depth-tested translucent tracer from
+this backend-independent state, and WARP exercises the dynamic gun-line
+buffer.
 
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation

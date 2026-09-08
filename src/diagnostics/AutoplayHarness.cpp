@@ -172,6 +172,8 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
                  "cinematic_motion_ms,cinematic_motion_duration_ms,"
                  "cinematic_action,cinematic_action_object,"
                  "melee_attack_active,melee_attack_registered,"
+                 "melee_sense_active,selected_melee_attack_id,"
+                 "melee_sequence_index,melee_sequence_size,"
                  "melee_cooldown_ms,range_cooldown_ms,"
                  "sandman_task,sandman_jump_ms,sandman_jump_duration_ms,"
                  "rhino_task,rhino_task_ms,rhino_melee_remaining,"
@@ -1757,6 +1759,12 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         break;
     }
     case StepKind::WaitEnemyProjectile: {
+        const bool gunLinePresent = std::any_of(
+            snapshot.gunLines.begin(), snapshot.gunLines.end(),
+            [&step](const game::EnemyGunLineState& gunLine) {
+                return gunLine.active && !step.objectIds.empty() &&
+                       gunLine.sourceObjectId == step.objectIds.front();
+            });
         const bool molotovPresent = std::any_of(
             snapshot.molotovs.begin(), snapshot.molotovs.end(),
             [&step](const game::EnemyMolotovState& molotov) {
@@ -1781,8 +1789,8 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                 return post.active && !step.objectIds.empty() &&
                        post.sourceObjectId == step.objectIds.front();
             });
-        if (molotovPresent || boomerangPresent || thunderclapPresent ||
-            electricPostPresent) {
+        if (gunLinePresent || molotovPresent || boomerangPresent ||
+            thunderclapPresent || electricPostPresent) {
             completeStep(snapshot, step);
         } else if (timedOut()) {
             failStep(snapshot, step,
@@ -3198,8 +3206,13 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                                 enemy.physicsActive,
                                 enemy.playerDetected,
                                 enemy.behavior,
-                                 enemy.activeAnimation,
-                                 enemy.grounded,
+                                enemy.activeAnimation,
+                                enemy.meleeAttackActive,
+                                enemy.meleeSenseActive,
+                                enemy.selectedMeleeAttackId,
+                                enemy.meleeAttackAnimationSequenceIndex,
+                                enemy.meleeAttackAnimationSequence.size(),
+                                enemy.grounded,
                                  enemy.cinematicMotion.active,
                                  enemy.cinematicActionActive,
                                  enemy.cinematicActionObjectId,
@@ -3223,6 +3236,14 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
              entry->second.playerDetected != current.playerDetected ||
              entry->second.behavior != current.behavior ||
              entry->second.animation != current.animation ||
+             entry->second.meleeAttackActive != current.meleeAttackActive ||
+             entry->second.meleeSenseActive != current.meleeSenseActive ||
+             entry->second.selectedMeleeAttackId !=
+                 current.selectedMeleeAttackId ||
+             entry->second.meleeAttackAnimationSequenceIndex !=
+                 current.meleeAttackAnimationSequenceIndex ||
+             entry->second.meleeAttackAnimationSequenceSize !=
+                 current.meleeAttackAnimationSequenceSize ||
              entry->second.grounded != current.grounded ||
               entry->second.rhinoTask != current.rhinoTask ||
               entry->second.rhinoPhase != current.rhinoPhase ||
@@ -3257,6 +3278,21 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                            std::to_string(current.playerDetected) +
                            ";behavior=" + behaviorName(current.behavior) +
                            ";animation=" + current.animation +
+                           ";animation_ms=" +
+                           std::to_string(
+                               enemy.animationTimeMilliseconds) +
+                           ";melee_attack=" +
+                           std::to_string(current.meleeAttackActive) +
+                           ";melee_sense=" +
+                           std::to_string(current.meleeSenseActive) +
+                           ";melee_attack_id=" +
+                           std::to_string(current.selectedMeleeAttackId) +
+                           ";melee_sequence_index=" +
+                           std::to_string(
+                               current.meleeAttackAnimationSequenceIndex) +
+                           ";melee_sequence_size=" +
+                           std::to_string(
+                               current.meleeAttackAnimationSequenceSize) +
                            ";grounded=" +
                            std::to_string(current.grounded) +
                            ";z=" + std::to_string(enemy.position.z) +
@@ -3635,6 +3671,10 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << enemy.cinematicActionObjectId << ','
                   << enemy.meleeAttackActive << ','
                   << enemy.meleeAttackRegistered << ','
+                  << enemy.meleeSenseActive << ','
+                  << enemy.selectedMeleeAttackId << ','
+                  << enemy.meleeAttackAnimationSequenceIndex << ','
+                  << enemy.meleeAttackAnimationSequence.size() << ','
                   << enemy.meleeAttackCooldownMilliseconds << ','
                   << enemy.rangeAttackCooldownMilliseconds << ','
                   << static_cast<int>(enemy.sandmanTask) << ','
@@ -3664,6 +3704,36 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << enemy.wallNormal.z << ',' << enemy.wallBehaviorState << ','
                   << enemy.wallMoveTarget.x << ',' << enemy.wallMoveTarget.y
                   << ',' << enemy.wallMoveTarget.z << ',' << enemy.wallWebCaptured << '\n';
+    }
+    for (const game::EnemyGunLineState& gunLine : snapshot.gunLines) {
+        const auto source = std::find_if(
+            snapshot.enemies.begin(), snapshot.enemies.end(),
+            [&gunLine](const game::LevelEnemyState& enemy) {
+                return enemy.asset != nullptr &&
+                       enemy.asset->objectId == gunLine.sourceObjectId;
+            });
+        const std::int32_t roomId =
+            source == snapshot.enemies.end() || source->asset == nullptr
+                ? -1
+                : source->asset->roomId;
+        // CBehaviorRangeAttack::onMessage action 0 at 0x003c153c seeds the
+        // fireline velocity with 1500 cm/s; the runtime stores its normalized
+        // direction because travel is integrated from that same native speed.
+        constexpr float kNativeGunLineSpeedCentimetersPerSecond = 1500.0F;
+        projectileLog_ << snapshot.frameIndex << ','
+                       << snapshot.realTimeMilliseconds << ",gun_line,"
+                       << gunLine.sourceObjectId << ',' << roomId << ','
+                       << gunLine.position.x << ',' << gunLine.position.y
+                       << ',' << gunLine.position.z << ','
+                       << gunLine.direction.x *
+                              kNativeGunLineSpeedCentimetersPerSecond
+                       << ',' << gunLine.direction.y *
+                              kNativeGunLineSpeedCentimetersPerSecond
+                       << ',' << gunLine.direction.z *
+                              kNativeGunLineSpeedCentimetersPerSecond
+                       << ",1,"
+                       << gunLine.ageMilliseconds << ',' << gunLine.damage
+                       << ',' << gunLine.active << ",1\n";
     }
     for (const game::EnemyMolotovState& molotov : snapshot.molotovs) {
         projectileLog_ << snapshot.frameIndex << ','

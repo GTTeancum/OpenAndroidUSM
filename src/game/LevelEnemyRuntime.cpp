@@ -24,7 +24,6 @@ constexpr float kEnemyGravityCentimetersPerSecondSquared = 1000.0F;
 constexpr float kPlayerHitVerticalForceDispatchScale = 0.85F;
 constexpr float kGunLineSpeedCentimetersPerSecond = 1500.0F;
 constexpr std::uint32_t kGunLineLifetimeMilliseconds = 2000;
-constexpr float kGunLinePlayerRadiusCentimeters = 60.0F;
 constexpr float kGunLineMaximumRangeCentimeters =
     kGunLineSpeedCentimetersPerSecond *
     (static_cast<float>(kGunLineLifetimeMilliseconds) / 1000.0F);
@@ -546,6 +545,45 @@ bool segmentTouchesPlayer(const assets::Vector3& start,
     return x * x + y * y + z * z <= radius * radius;
 }
 
+bool segmentIntersectsPlayerAabb(
+    const assets::Vector3& start, const assets::Vector3& end,
+    const assets::Vector3& playerPosition) noexcept {
+    // CGunLine::CheckCollisions (0x003621f0) constructs a line from the
+    // projectile's current position to this update's candidate position and
+    // passes it to aabbox3d<float>::intersectsWithLine. Unit's player bounds
+    // are the native 50 x 50 x 185 cm extents recovered in
+    // PlayerPhysicsConstants.hpp, with position_ at the feet.
+    const assets::Vector3 minimum{
+        playerPosition.x - kPlayerCollisionRadiusCentimeters,
+        playerPosition.y - kPlayerCollisionRadiusCentimeters,
+        playerPosition.z};
+    const assets::Vector3 maximum{
+        playerPosition.x + kPlayerCollisionRadiusCentimeters,
+        playerPosition.y + kPlayerCollisionRadiusCentimeters,
+        playerPosition.z + kPlayerCollisionHeightCentimeters};
+    const assets::Vector3 delta{end.x - start.x, end.y - start.y,
+                                end.z - start.z};
+    float minimumTime = 0.0F;
+    float maximumTime = 1.0F;
+    const auto clipAxis = [&](float origin, float direction, float lower,
+                              float upper) noexcept {
+        if (std::abs(direction) <= std::numeric_limits<float>::epsilon()) {
+            return origin >= lower && origin <= upper;
+        }
+        float entry = (lower - origin) / direction;
+        float exit = (upper - origin) / direction;
+        if (entry > exit) {
+            std::swap(entry, exit);
+        }
+        minimumTime = std::max(minimumTime, entry);
+        maximumTime = std::min(maximumTime, exit);
+        return minimumTime <= maximumTime;
+    };
+    return clipAxis(start.x, delta.x, minimum.x, maximum.x) &&
+           clipAxis(start.y, delta.y, minimum.y, maximum.y) &&
+           clipAxis(start.z, delta.z, minimum.z, maximum.z);
+}
+
 bool segmentTouchesCircle2D(const assets::Vector3& start,
                             const assets::Vector3& end,
                             const assets::Vector3& center,
@@ -985,10 +1023,19 @@ void LevelEnemyRuntime::advanceAnimations(
         const std::uint32_t duration =
             clip == nullptr ? 0U : clip->durationMilliseconds();
         const std::uint64_t previousTime = enemy.animationTimeMilliseconds;
+        if (previousTime == 0U) {
+            // Every SetAnim/SetState transition starts a new native animation
+            // clock. Discard any sub-millisecond fraction left by the prior
+            // speed-scaled clip at that boundary.
+            enemy.animationFractionalMilliseconds = 0.0;
+        }
         const double advanced =
-            static_cast<double>(elapsedMilliseconds) * enemy.animationSpeed;
+            static_cast<double>(elapsedMilliseconds) * enemy.animationSpeed +
+            enemy.animationFractionalMilliseconds;
         const std::uint64_t step = static_cast<std::uint64_t>(
             std::max(advanced, 0.0));
+        enemy.animationFractionalMilliseconds =
+            std::max(advanced, 0.0) - static_cast<double>(step);
         if (enemy.animationReversed) {
             if (enemy.animationLoops) {
                 if (duration != 0) {
@@ -1430,7 +1477,8 @@ void LevelEnemyRuntime::updateGameplay(
     bool quickTimeActionPressed,
     const assets::Vector3& playerFacing,
     bool playerOnWall,
-    std::int32_t playerSenseReactState) noexcept {
+    std::int32_t playerSenseReactState,
+    std::optional<assets::Vector3> playerRangeTargetPosition) noexcept {
     updatePlayerWebPellets(elapsedMilliseconds, collision);
     updateGunLines(elapsedMilliseconds, playerPosition, collision);
     updateMolotovs(elapsedMilliseconds, playerPosition, collision);
@@ -1837,10 +1885,29 @@ void LevelEnemyRuntime::updateGameplay(
         // the same clip (knife attack 6 has contacts at both 45% and 75%).
         if (enemy.meleeAttackActive) {
             enemy.behavior = EnemyBehaviorState::AttackRange;
-            const float distance = std::sqrt(distanceSquared);
-            if (distance > std::numeric_limits<float>::epsilon()) {
-                setFacing(enemy, {toPlayerX / distance, toPlayerY / distance,
-                                  0.0F});
+            const AttackDefinition* selectedAttack =
+                enemy.selectedMeleeAttackId < 0
+                    ? nullptr
+                    : level_->attackConfigs().find(
+                          enemy.selectedMeleeAttackId);
+            // StateEnter/UpdateAttackMelee states 9/10 at
+            // 0x003baef8/0x003ba244 call NeedTurning while the selected
+            // EnemyAttackInfo+8 timer remains positive and +0xc is set. The
+            // initial clip is simultaneously scaled to that timer, so the
+            // whole first clip is the native startup window. Later queued
+            // clips do not continuously home toward the player.
+            if (selectedAttack != nullptr &&
+                selectedAttack->turnTowardTargetDuringStartup &&
+                selectedAttack->startupMilliseconds > 0.0F &&
+                enemy.meleeAttackAnimationSequenceIndex == 0U) {
+                const float startupTurnDistance =
+                    std::sqrt(distanceSquared);
+                if (startupTurnDistance >
+                    std::numeric_limits<float>::epsilon()) {
+                    setFacing(enemy,
+                              {toPlayerX / startupTurnDistance,
+                               toPlayerY / startupTurnDistance, 0.0F});
+                }
             }
             const EnemyArchetypeAsset& archetype =
                 level_->enemyArchetypes()[enemy.asset->archetypeIndex];
@@ -1849,7 +1916,40 @@ void LevelEnemyRuntime::updateGameplay(
             if (clip != nullptr && !enemy.animationLoops &&
                 enemy.animationTimeMilliseconds >=
                     clip->durationMilliseconds()) {
+                // IBehaviorBase::SetState(vector) (0x003a89fc) retains every
+                // animation from the selected BehaviorAnimInfo list, and
+                // UpdateAnimTask (0x003a88b8) advances that queue.  Hammer
+                // rush list 9 therefore plays its action-2 ready clip before
+                // the action-0 contact clip instead of ending the behavior at
+                // the first clip boundary.
+                if (enemy.meleeAttackAnimationSequenceIndex + 1U <
+                    enemy.meleeAttackAnimationSequence.size()) {
+                    ++enemy.meleeAttackAnimationSequenceIndex;
+                    enemy.activeAnimation =
+                        enemy.meleeAttackAnimationSequence
+                            [enemy.meleeAttackAnimationSequenceIndex];
+                    enemy.animationTimeMilliseconds = 0;
+                    enemy.animationSpeed = 1.0F;
+                    enemy.animationLoops = false;
+                    enemy.animationReversed = false;
+                    // UpdateAttackMelee_DoAttack (0x003b9e44) calls
+                    // UpdateAnimTask and then SetLookAt(target) only when a
+                    // queued clip advances. It does not continuously home an
+                    // active attack toward a moving player.
+                    const float transitionDistance =
+                        std::sqrt(distanceSquared);
+                    if (transitionDistance >
+                        std::numeric_limits<float>::epsilon()) {
+                        setFacing(enemy,
+                                  {toPlayerX / transitionDistance,
+                                   toPlayerY / transitionDistance, 0.0F});
+                    }
+                    continue;
+                }
                 enemy.meleeAttackActive = false;
+                enemy.meleeAttackAnimationSequence.clear();
+                enemy.meleeAttackAnimationSequenceIndex = 0;
+                enemy.selectedMeleeAttackId = -1;
                 enemy.activeAnimation =
                     std::string(idleAnimation(*enemy.asset));
                 enemy.animationTimeMilliseconds = 0;
@@ -1991,38 +2091,6 @@ void LevelEnemyRuntime::updateGameplay(
             if (previousBehavior != EnemyBehaviorState::AttackRange) {
                 enemy.meleeAttackCooldownMilliseconds = 0;
                 startMeleeAttack(enemy, playerPosition);
-            } else if (enemy.meleeAttackActive) {
-                const EnemyArchetypeAsset& archetype =
-                    level_->enemyArchetypes()[enemy.asset->archetypeIndex];
-                const assets::ColladaAnimationClip* clip =
-                    archetype.animationBank.findClip(enemy.activeAnimation);
-                if (clip != nullptr && !enemy.animationLoops &&
-                    enemy.animationTimeMilliseconds >=
-                        clip->durationMilliseconds()) {
-                    enemy.meleeAttackActive = false;
-                    enemy.activeAnimation =
-                        std::string(idleAnimation(*enemy.asset));
-                    enemy.animationTimeMilliseconds = 0;
-                    enemy.animationSpeed = 1.0F;
-                    enemy.animationLoops = true;
-                    enemy.animationReversed = false;
-                    // GetAttackType/GetAttackIntervalTime at
-                    // 0x0033ae04/0x0033ade0 resolve the authored common melee
-                    // map (100). All first-level melee variants carry the same
-                    // interval values, while Sandman intentionally uses zero.
-                    const auto* interval =
-                        level_->enemyAttackIntervalConfigs()
-                            .findByWeaponTypeMapIndex(100);
-                    enemy.meleeAttackCooldownMilliseconds =
-                        interval == nullptr
-                            ? 0U
-                            : static_cast<std::uint32_t>(std::max(
-                                  interval->intervalMilliseconds
-                                      [enemy.asset->enemyTypeId],
-                                  0.0F));
-                    unregisterMeleeEngager(enemy.asset->objectId);
-                    continue;
-                }
             }
             if (!enemy.meleeAttackActive) {
                 if (enemy.meleeAttackCooldownMilliseconds <=
@@ -2134,6 +2202,8 @@ void LevelEnemyRuntime::updateGameplay(
                                           ? previousAnimationTimes[index]
                                           : 0U,
                                       playerPosition,
+                                      playerRangeTargetPosition.value_or(
+                                          playerPosition),
                                       playerSenseReactState);
         }
     }
@@ -2957,7 +3027,8 @@ bool LevelEnemyRuntime::applyWallWebEvent(const WallWebEvent& event) {
 }
 
 std::optional<assets::Vector3> LevelEnemyRuntime::nodeWorldPosition(
-    std::int32_t objectId, std::string_view nodeName) const {
+    std::int32_t objectId, std::string_view nodeName,
+    const assets::Vector3& localPoint) const {
     const auto* enemy = find(objectId);
     if (enemy == nullptr || enemy->asset == nullptr || level_ == nullptr) {
         return std::nullopt;
@@ -2972,7 +3043,8 @@ std::optional<assets::Vector3> LevelEnemyRuntime::nodeWorldPosition(
             nodeName, node)) {
         return std::nullopt;
     }
-    return transformPoint(enemy->worldTransform, transformPoint(node));
+    return transformPoint(enemy->worldTransform,
+                          transformPoint(node, localPoint));
 }
 
 assets::Vector3 LevelEnemyRuntime::playerHitEffectOrigin(
@@ -3583,6 +3655,7 @@ float LevelEnemyRuntime::maximumAttackReach(
 void LevelEnemyRuntime::queueAuthoredAttackEvents(
     LevelEnemyState& enemy, std::uint32_t previousTimeMilliseconds,
     const assets::Vector3& playerPosition,
+    const assets::Vector3& playerRangeTargetPosition,
     std::int32_t playerSenseReactState) {
     if (level_ == nullptr || enemy.asset == nullptr ||
         enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
@@ -3661,23 +3734,18 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
             // SpecialAnimActionCheck sends behavior message 0x66 here.
             // CBehaviorMeleeAttack::onMessage registers AISenseInfo only when
             // the selected attack volume currently intersects the player.
-            const auto attackEvents =
-                level_->enemySpecialActions().findAttackEvents(
-                    enemy.asset->enemyTypeId, enemy.activeAnimation);
-            const auto selected = std::find_if(
-                attackEvents.begin(), attackEvents.end(),
-                [&](const EnemyAnimationSpecialAction* candidate) {
-                    if (candidate == nullptr || candidate->attackId < 0 ||
-                        candidate->attackId >
-                            std::numeric_limits<std::int16_t>::max()) {
-                        return false;
-                    }
-                    const auto* attack = level_->attackConfigs().find(
-                        static_cast<std::int16_t>(candidate->attackId));
-                    return attack != nullptr &&
-                           attackIntersectsPlayer(*attack, eventTime);
-                });
-            enemy.meleeSenseActive = selected != attackEvents.end();
+            // The selected EnemyAttackInfo remains at behavior+0x90 across
+            // every clip in the chosen animation list. Hammer's ready clip
+            // has no attack action of its own; its action-type-2 message at
+            // 50% therefore tests the retained rush attack (ID 20).
+            const AttackDefinition* selectedAttack =
+                enemy.selectedMeleeAttackId < 0
+                    ? nullptr
+                    : level_->attackConfigs().find(
+                          enemy.selectedMeleeAttackId);
+            enemy.meleeSenseActive =
+                selectedAttack != nullptr &&
+                attackIntersectsPlayer(*selectedAttack, eventTime);
             continue;
         }
         if (isGunLineEnemy(enemy) && event->actionType == 0 &&
@@ -3689,17 +3757,30 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
                     ? nullptr
                     : level_->enemyRangeAttackConfigs().findByMapId(
                           interval->id);
-            const float length = std::hypot(
-                playerPosition.x - enemy.position.x,
-                playerPosition.y - enemy.position.y);
-            if (attack != nullptr &&
+            // CEnemy::AddWeapon (0x003312e8) parents the type-3 weapon pair
+            // to R_Hand_Dummy/L_Hand_Dummy. ThrowMolotov's gun-line branch
+            // (0x003c01dc-0x003c04f0) picks the matching weapon for range
+            // states 0x1a/0x1c and transforms local {27,0,0} through that
+            // weapon node before calling CGunLine::Shoot.
+            const std::string_view handNode =
+                enemy.activeAnimation == "idle_shoot_left_idle"
+                    ? "L_Hand_Dummy"
+                    : "R_Hand_Dummy";
+            const auto muzzle = nodeWorldPosition(
+                enemy.asset->objectId, handNode, {27.0F, 0.0F, 0.0F});
+            const assets::Vector3 origin = muzzle.value_or(enemy.position);
+            const assets::Vector3 delta{
+                playerRangeTargetPosition.x - origin.x,
+                playerRangeTargetPosition.y - origin.y,
+                playerRangeTargetPosition.z - origin.z};
+            const float length = std::sqrt(
+                delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+            if (attack != nullptr && muzzle.has_value() &&
                 length > std::numeric_limits<float>::epsilon()) {
                 gunLines_.push_back(
                     {enemy.asset->objectId,
-                     {enemy.position.x, enemy.position.y,
-                      enemy.position.z + 100.0F},
-                     {(playerPosition.x - enemy.position.x) / length,
-                      (playerPosition.y - enemy.position.y) / length, 0.0F},
+                     origin,
+                     {delta.x / length, delta.y / length, delta.z / length},
                      attack->damage,
                      0,
                      true});
@@ -3742,6 +3823,10 @@ void LevelEnemyRuntime::updateGunLines(
     std::uint32_t elapsedMilliseconds,
     const assets::Vector3& playerPosition,
     const LevelCollision* collision) noexcept {
+    // CGunLine has no world-collision body. Update (0x00361ec8) invokes only
+    // its virtual CheckCollisions before moving, and CheckCollisions
+    // (0x003621f0) tests the swept 3D segment against the player's Unit AABB.
+    (void)collision;
     for (EnemyGunLineState& line : gunLines_) {
         if (!line.active) {
             continue;
@@ -3755,30 +3840,8 @@ void LevelEnemyRuntime::updateGunLines(
         line.ageMilliseconds = std::min<std::uint32_t>(
             line.ageMilliseconds + elapsedMilliseconds,
             kGunLineLifetimeMilliseconds);
-        if (collision != nullptr &&
-            collision->segmentBlocked(previous, line.position)) {
-            line.active = false;
-            continue;
-        }
-        const float segmentX = line.position.x - previous.x;
-        const float segmentY = line.position.y - previous.y;
-        const float segmentLengthSquared =
-            segmentX * segmentX + segmentY * segmentY;
-        float time = 0.0F;
-        if (segmentLengthSquared > std::numeric_limits<float>::epsilon()) {
-            time = std::clamp(
-                ((playerPosition.x - previous.x) * segmentX +
-                 (playerPosition.y - previous.y) * segmentY) /
-                    segmentLengthSquared,
-                0.0F, 1.0F);
-        }
-        const float closestX = previous.x + segmentX * time;
-        const float closestY = previous.y + segmentY * time;
-        const float playerX = playerPosition.x - closestX;
-        const float playerY = playerPosition.y - closestY;
-        if (playerX * playerX + playerY * playerY <=
-            kGunLinePlayerRadiusCentimeters *
-                kGunLinePlayerRadiusCentimeters) {
+        if (segmentIntersectsPlayerAabb(previous, line.position,
+                                        playerPosition)) {
             pendingPlayerHits_.push_back(
                 {line.sourceObjectId, -1, line.damage});
             line.active = false;
@@ -4169,12 +4232,14 @@ void LevelEnemyRuntime::startGunLineAttack(LevelEnemyState& enemy) {
     if (level_ == nullptr || enemy.asset == nullptr) {
         return;
     }
-    constexpr std::array<std::string_view, 2> kGunAnimations{
-        "idle_shoot_left_idle", "idle_shoot_right_idle"};
+    // CBehaviorRangeAttack::StartAttack_DoAttack (0x003c0f80) calls the
+    // global native random() wrapper once and enters left-ready state 0x19
+    // when the [0,100) result is below 50; otherwise it enters right-ready
+    // state 0x1b. Their authored successors are the fire clips below.
     const std::string_view animation =
-        kGunAnimations[enemy.rangeAttackVariantCursor % kGunAnimations.size()];
-    enemy.rangeAttackVariantCursor = static_cast<std::uint32_t>(
-        (enemy.rangeAttackVariantCursor + 1) % kGunAnimations.size());
+        nativeRandomizer_->range(0, 100) < 50
+            ? "idle_shoot_left_idle"
+            : "idle_shoot_right_idle";
     const EnemyArchetypeAsset& archetype =
         level_->enemyArchetypes()[enemy.asset->archetypeIndex];
     if (archetype.animationBank.findClip(animation) == nullptr) {
@@ -4196,23 +4261,9 @@ void LevelEnemyRuntime::startMeleeAttack(
     }
     const EnemyArchetypeAsset& archetype =
         level_->enemyArchetypes()[enemy.asset->archetypeIndex];
-    std::vector<std::string_view> attackAnimations =
-        level_->enemyBehaviorConfigs().resolveStateAnimationNames(
-            "ENEMY_BEHAVIOR_MELEE_ATTACK_STATE_DO_ATTACK",
-            enemy.asset->enemyTypeId);
-    std::erase_if(attackAnimations, [&](std::string_view candidate) {
-        return archetype.animationBank.findClip(candidate) == nullptr ||
-               level_->enemySpecialActions()
-                   .findAttackEvents(enemy.asset->enemyTypeId, candidate)
-                   .empty();
-    });
-    if (attackAnimations.empty()) {
-        const std::string_view fallback = attackAnimation(*enemy.asset);
-        if (archetype.animationBank.findClip(fallback) == nullptr) {
-            return;
-        }
-        attackAnimations.push_back(fallback);
-    }
+    const EnemyBehaviorStateDefinition* attackState =
+        level_->enemyBehaviorConfigs().findState(
+            "ENEMY_BEHAVIOR_MELEE_ATTACK_STATE_DO_ATTACK");
     // CBehaviorMeleeAttack::StateEnter (0x003baef8; selection loop
     // 0x003bb204-0x003bb290) compares the absolute delta between target
     // distance and EnemyAttackInfo+0x38 for every resolved attack. A smaller
@@ -4223,48 +4274,106 @@ void LevelEnemyRuntime::startMeleeAttack(
     const float dy = playerPosition.y - enemy.position.y;
     const float dz = playerPosition.z - enemy.position.z;
     const float targetDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
-    std::size_t selectedAnimation = 0;
     float selectedDelta = std::numeric_limits<float>::infinity();
     bool foundAttack = false;
-    for (std::size_t candidate = 0; candidate < attackAnimations.size();
-         ++candidate) {
-        std::int32_t previousAttackId = -1;
-        for (const EnemyAnimationSpecialAction* event :
-             level_->enemySpecialActions().findAttackEvents(
-                 enemy.asset->enemyTypeId, attackAnimations[candidate])) {
-            if (event == nullptr || event->attackId < 0 ||
-                event->attackId == previousAttackId ||
-                event->attackId > std::numeric_limits<std::int16_t>::max()) {
+    std::vector<std::string> selectedSequence;
+    std::int16_t selectedAttackId = -1;
+    if (attackState != nullptr) {
+        for (const std::int16_t animationListId :
+             attackState->animationListIds) {
+            const auto sequence =
+                level_->enemyBehaviorConfigs().resolveAnimationListNames(
+                    animationListId, enemy.asset->enemyTypeId);
+            if (sequence.empty() ||
+                std::any_of(sequence.begin(), sequence.end(),
+                            [&](std::string_view animation) {
+                                return archetype.animationBank.findClip(
+                                           animation) == nullptr;
+                            })) {
                 continue;
             }
-            previousAttackId = event->attackId;
-            const AttackDefinition* attack = level_->attackConfigs().find(
-                static_cast<std::int16_t>(event->attackId));
-            if (attack == nullptr) {
-                continue;
-            }
-            const float delta = std::abs(
-                attack->maximumAngleDegrees - targetDistance);
-            if (!foundAttack || delta < selectedDelta ||
-                (delta == selectedDelta &&
-                 nativeRandomizer_->range(0, 100) <= 49)) {
-                selectedAnimation = candidate;
-                selectedDelta = delta;
-                foundAttack = true;
+            for (const std::string_view animation : sequence) {
+                std::int32_t previousAttackId = -1;
+                for (const EnemyAnimationSpecialAction* event :
+                     level_->enemySpecialActions().findAttackEvents(
+                         enemy.asset->enemyTypeId, animation)) {
+                    if (event == nullptr || event->attackId < 0 ||
+                        event->attackId == previousAttackId ||
+                        event->attackId >
+                            std::numeric_limits<std::int16_t>::max()) {
+                        continue;
+                    }
+                    previousAttackId = event->attackId;
+                    const auto attackId =
+                        static_cast<std::int16_t>(event->attackId);
+                    const AttackDefinition* attack =
+                        level_->attackConfigs().find(attackId);
+                    if (attack == nullptr) {
+                        continue;
+                    }
+                    const float delta = std::abs(
+                        attack->maximumAngleDegrees - targetDistance);
+                    if (!foundAttack || delta < selectedDelta ||
+                        (delta == selectedDelta &&
+                         nativeRandomizer_->range(0, 100) <= 49)) {
+                        selectedSequence.clear();
+                        selectedSequence.reserve(sequence.size());
+                        for (const std::string_view member : sequence) {
+                            selectedSequence.emplace_back(member);
+                        }
+                        selectedAttackId = attackId;
+                        selectedDelta = delta;
+                        foundAttack = true;
+                    }
+                }
             }
         }
     }
-    const std::string_view animation = attackAnimations[selectedAnimation];
-    if (archetype.animationBank.findClip(animation) == nullptr) {
+    if (!foundAttack) {
+        const std::string_view fallback = attackAnimation(*enemy.asset);
+        if (archetype.animationBank.findClip(fallback) == nullptr) {
+            return;
+        }
+        selectedSequence.emplace_back(fallback);
+        const auto events = level_->enemySpecialActions().findAttackEvents(
+            enemy.asset->enemyTypeId, fallback);
+        if (!events.empty() && events.front() != nullptr &&
+            events.front()->attackId >= 0 &&
+            events.front()->attackId <=
+                std::numeric_limits<std::int16_t>::max()) {
+            selectedAttackId =
+                static_cast<std::int16_t>(events.front()->attackId);
+        }
+    }
+    const std::string_view animation = selectedSequence.front();
+    const assets::ColladaAnimationClip* clip =
+        archetype.animationBank.findClip(animation);
+    if (clip == nullptr) {
         return;
     }
     enemy.activeAnimation = animation;
     enemy.animationTimeMilliseconds = 0;
-    enemy.animationSpeed = 1.0F;
+    const AttackDefinition* selectedAttack =
+        selectedAttackId < 0
+            ? nullptr
+            : level_->attackConfigs().find(selectedAttackId);
+    // StateEnter (0x003bb3f4-0x003bb478) divides the current authored
+    // animation length by EnemyAttackInfo+8 (after difficulty scaling) and
+    // passes that ratio to SetAnimWithSpeed. Normal difficulty's shipped
+    // EnemyDifficultControlNormal.bin attack-time multiplier is 1.0.
+    enemy.animationSpeed =
+        selectedAttack != nullptr &&
+                selectedAttack->startupMilliseconds > 0.0F
+            ? static_cast<float>(clip->durationMilliseconds()) /
+                  selectedAttack->startupMilliseconds
+            : 1.0F;
     enemy.animationLoops = false;
     enemy.animationReversed = false;
     enemy.meleeAttackActive = true;
     enemy.meleeSenseActive = false;
+    enemy.meleeAttackAnimationSequence = std::move(selectedSequence);
+    enemy.meleeAttackAnimationSequenceIndex = 0;
+    enemy.selectedMeleeAttackId = selectedAttackId;
 }
 
 void LevelEnemyRuntime::startSandmanGroundAttack(LevelEnemyState& enemy) {

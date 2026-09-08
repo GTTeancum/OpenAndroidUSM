@@ -125,6 +125,7 @@ struct LevelEnemyState {
     std::array<float, 16> worldTransform{};
     std::string activeAnimation;
     std::uint32_t animationTimeMilliseconds{};
+    double animationFractionalMilliseconds{};
     float animationSpeed{1.0F};
     bool animationLoops{true};
     bool animationReversed{};
@@ -179,10 +180,16 @@ struct LevelEnemyState {
     // its related object separately from the ordinary AI task queue.
     bool cinematicActionActive{};
     std::int32_t cinematicActionObjectId{-1};
-    std::uint32_t rangeAttackVariantCursor{};
     std::uint32_t rangeAttackCooldownMilliseconds{};
     std::uint32_t meleeAttackCooldownMilliseconds{};
     bool meleeAttackActive{};
+    // CBehaviorMeleeAttack::StateEnter (0x003baef8) retains the complete
+    // BehaviorAnimInfo list selected for an attack. The hammer rush list is
+    // [idle_attack_hammer_rush_ready, attack_hammer_rush_to_idle], so its
+    // warning/charge clip must finish before the damaging clip begins.
+    std::vector<std::string> meleeAttackAnimationSequence;
+    std::size_t meleeAttackAnimationSequenceIndex{};
+    std::int16_t selectedMeleeAttackId{-1};
     // Action type 2 in EnemysSpecialAnimConfigs registers the native
     // Spider-Sense attack at its authored key-frame percentage.  This is
     // intentionally distinct from merely entering the melee animation.
@@ -299,8 +306,8 @@ struct EnemyCameraShakeCue {
 };
 
 // Portable counterpart of CGunLine. The original advances a short tracer at
-// 1500 cm/s, checks each swept segment against the player and level, and
-// retires it after two seconds.
+// 1500 cm/s, checks each swept segment against the player's Unit AABB, and
+// retires it after two seconds. It has no room-mesh collision body.
 struct EnemyGunLineState {
     std::int32_t sourceObjectId{-1};
     assets::Vector3 position;
@@ -478,7 +485,9 @@ public:
                         const assets::Vector3& playerFacing =
                             assets::Vector3{1.0F, 0.0F, 0.0F},
                         bool playerOnWall = false,
-                        std::int32_t playerSenseReactState = 0) noexcept;
+                        std::int32_t playerSenseReactState = 0,
+                        std::optional<assets::Vector3>
+                            playerRangeTargetPosition = std::nullopt) noexcept;
     [[nodiscard]] std::optional<std::int32_t> applyPlayerMeleeHit(
         const assets::Vector3& attackPosition,
         const assets::Vector3& attackDirection, float radius, float damage,
@@ -590,7 +599,8 @@ public:
     [[nodiscard]] bool canEnterWallWeb(std::int32_t objectId) const noexcept;
     [[nodiscard]] bool applyWallWebEvent(const WallWebEvent& event);
     [[nodiscard]] std::optional<assets::Vector3> nodeWorldPosition(
-        std::int32_t objectId, std::string_view nodeName) const;
+        std::int32_t objectId, std::string_view nodeName,
+        const assets::Vector3& localPoint = {}) const;
     [[nodiscard]] std::vector<EnemyPlayerHit> consumePlayerHits() noexcept;
     [[nodiscard]] std::vector<EnemySoundCue> consumeSoundCues() noexcept;
     [[nodiscard]] std::vector<EnemyCameraShakeCue>
@@ -700,6 +710,8 @@ private:
     void queueAuthoredAttackEvents(LevelEnemyState& enemy,
                                    std::uint32_t previousTimeMilliseconds,
                                    const assets::Vector3& playerPosition,
+                                   const assets::Vector3&
+                                       playerRangeTargetPosition,
                                    std::int32_t playerSenseReactState);
     void updateGunLines(std::uint32_t elapsedMilliseconds,
                         const assets::Vector3& playerPosition,

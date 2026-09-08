@@ -80,6 +80,7 @@ struct AutoplaySnapshot {
     std::int32_t meleeEngagerObjectId{-1};
     float meleeEngagementCooldownMilliseconds{};
     std::int32_t nativeRandomState{};
+    std::span<const game::EnemyGunLineState> gunLines;
     std::span<const game::EnemyMolotovState> molotovs;
     std::span<const game::EnemyBoomerangState> boomerangs;
     std::span<const game::EnemyThunderclapState> thunderclaps;
@@ -358,6 +359,11 @@ private:
         bool playerDetected{};
         game::EnemyBehaviorState behavior{game::EnemyBehaviorState::Disabled};
         std::string animation;
+        bool meleeAttackActive{};
+        bool meleeSenseActive{};
+        std::int16_t selectedMeleeAttackId{-1};
+        std::size_t meleeAttackAnimationSequenceIndex{};
+        std::size_t meleeAttackAnimationSequenceSize{};
         bool grounded{};
         bool cinematicMotionActive{};
         bool cinematicActionActive{};

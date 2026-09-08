@@ -17,6 +17,15 @@ struct AttackDefinition {
     // EnemyAttackInfo+4, copied to AIHitTargetInfo+0 by
     // IBehaviorBase::SpecialAnimActionCheck (0x003a8c60).
     std::int32_t hitType{100};
+    // EnemyAttackInfo+8 is multiplied by the difficulty attack-time scale in
+    // CBehaviorMeleeAttack::StateEnter (0x003baef8) before the selected
+    // animation begins.
+    float startupMilliseconds{};
+    // EnemyAttackInfo+0xc controls startup turning in StateEnter/Update, and
+    // +0xd/+0x10 gate and identify the paired QTE action.
+    bool turnTowardTargetDuringStartup{};
+    bool quickTimeEnabled{};
+    std::int32_t quickTimeActionId{-1};
     float damage{};
     // EnemyAttackInfo+0x18 is copied to AIHitTargetInfo+0x24 and retained by
     // Player::OnHit as the post-hit protection interval when positive.
@@ -33,6 +42,12 @@ struct AttackDefinition {
     // angles. CBehaviorMeleeAttack::CanBeInterrupt (0x003b9644) returns this
     // while its native state is 9/11 (the live attack phase).
     bool interruptibleDuringExecution{};
+    // EnemyAttackInfo+0x44 enables InitAttackMove's target-relative velocity;
+    // +0x45 chooses the special-action key time instead of the full clip as
+    // its duration; +0x46 permits an authored SpecialAnim successor.
+    bool usesTargetRelativeMovement{};
+    bool movementEndsAtSpecialAction{};
+    bool permitsSpecialAnimationSuccessor{};
     // EnemyAttackInfo+0x48, copied by AISenseInfo into its first field and
     // then repacked at Player+0x514+4. Player::DoNormalSenseAction
     // (0x0034f630) uses values 1/6 for ordinary melee selection and values

@@ -6264,6 +6264,38 @@ assets::Vector3 GameplayPlayer::webLineAnchor() const noexcept {
     return {};
 }
 
+std::optional<assets::Vector3> GameplayPlayer::nodeWorldPosition(
+    std::string_view nodeName) const noexcept {
+    if (mesh_ == nullptr || animationBank_ == nullptr) {
+        return std::nullopt;
+    }
+    const assets::ColladaAnimationClip* clip =
+        animationBank_->findClip(activeAnimation_);
+    if (clip == nullptr) {
+        return std::nullopt;
+    }
+    const std::uint32_t localTime =
+        std::min(animationTimeMilliseconds(), clip->durationMilliseconds());
+    std::array<float, 16> nodeTransform{};
+    if (!assets::evaluateColladaSceneNodeTransform(
+            *mesh_, *animationBank_, clip->startMilliseconds + localTime,
+            nodeName, nodeTransform)) {
+        return std::nullopt;
+    }
+    const assets::Vector3 localNode{nodeTransform[12], nodeTransform[13],
+                                    nodeTransform[14]};
+    return assets::Vector3{
+        localNode.x * worldTransform_[0] +
+            localNode.y * worldTransform_[4] +
+            localNode.z * worldTransform_[8] + worldTransform_[12],
+        localNode.x * worldTransform_[1] +
+            localNode.y * worldTransform_[5] +
+            localNode.z * worldTransform_[9] + worldTransform_[13],
+        localNode.x * worldTransform_[2] +
+            localNode.y * worldTransform_[6] +
+            localNode.z * worldTransform_[10] + worldTransform_[14]};
+}
+
 assets::Vector3 GameplayPlayer::webLineAttachPosition(
     std::size_t lineIndex) const noexcept {
     assets::Vector3 attach = renderPosition_;

@@ -126,12 +126,21 @@ Result AttackConfigDatabase::load(std::span<const std::byte> bytes) {
         AttackDefinition attack;
         std::string exportedName;
         std::int32_t ignoredInteger{};
+        std::int32_t turnTowardTargetDuringStartup{};
+        std::int32_t quickTimeEnabled{};
         std::int32_t interruptibleDuringExecution{};
+        std::int32_t usesTargetRelativeMovement{};
+        std::int32_t movementEndsAtSpecialAction{};
+        std::int32_t permitsSpecialAnimationSuccessor{};
+        std::int32_t ignoredBoolean{};
         float ignoredFloat{};
         if (!reader.readS16(attack.id) || !reader.readString(exportedName) ||
             !reader.readS32(ignoredInteger) ||
             !reader.readS32(attack.hitType) ||
-            !reader.readF32(ignoredFloat) || !skipS32(reader, 3) ||
+            !reader.readF32(attack.startupMilliseconds) ||
+            !reader.readS32(turnTowardTargetDuringStartup) ||
+            !reader.readS32(quickTimeEnabled) ||
+            !reader.readS32(attack.quickTimeActionId) ||
             !reader.readF32(attack.damage) ||
             !reader.readF32(attack.hitProtectionMilliseconds) ||
             !reader.readF32(attack.horizontalForce) ||
@@ -150,9 +159,13 @@ Result AttackConfigDatabase::load(std::span<const std::byte> bytes) {
             !reader.readF32(attack.maximumAngleDegrees) ||
             !reader.readS32(ignoredInteger) ||
             !reader.readS32(interruptibleDuringExecution) ||
-            !skipS32(reader, 5) ||
+            !reader.readS32(ignoredBoolean) ||
+            !reader.readS32(ignoredInteger) ||
+            !reader.readS32(usesTargetRelativeMovement) ||
+            !reader.readS32(movementEndsAtSpecialAction) ||
+            !reader.readS32(permitsSpecialAnimationSuccessor) ||
             !reader.readS32(attack.senseReactionType) ||
-            !skipS32(reader, 1) ||
+            !reader.readS32(ignoredBoolean) ||
             !reader.readF32(attack.senseSlowMotionDenominator) ||
             !reader.readS32(attack.forceSenseActionId) ||
             !reader.readS32(attack.sensePhotoTargetId)) {
@@ -161,6 +174,15 @@ Result AttackConfigDatabase::load(std::span<const std::byte> bytes) {
         }
         attack.interruptibleDuringExecution =
             interruptibleDuringExecution > 0;
+        attack.turnTowardTargetDuringStartup =
+            turnTowardTargetDuringStartup > 0;
+        attack.quickTimeEnabled = quickTimeEnabled > 0;
+        attack.usesTargetRelativeMovement =
+            usesTargetRelativeMovement > 0;
+        attack.movementEndsAtSpecialAction =
+            movementEndsAtSpecialAction > 0;
+        attack.permitsSpecialAnimationSuccessor =
+            permitsSpecialAnimationSuccessor > 0;
         std::string ignoredString;
         if (!reader.readString(ignoredString) ||
             !reader.readString(ignoredString) || !skipS32(reader, 1) ||

@@ -691,8 +691,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         }
         for (const auto& attack : levelOne_.attackConfigs().attacks()) {
             autoplay->recordEvent(0, "enemy_attack_config",
-                "id=" + std::to_string(attack.id) + ";name=" + attack.name +
+                 "id=" + std::to_string(attack.id) + ";name=" + attack.name +
                  ";hit_type=" + std::to_string(attack.hitType) +
+                 ";startup_ms=" +
+                 std::to_string(attack.startupMilliseconds) +
+                 ";turn_during_startup=" +
+                 std::to_string(attack.turnTowardTargetDuringStartup ? 1 : 0) +
+                 ";qte_enabled=" +
+                 std::to_string(attack.quickTimeEnabled ? 1 : 0) +
+                 ";qte_action=" +
+                 std::to_string(attack.quickTimeActionId) +
                  ";damage=" + std::to_string(attack.damage) +
                  ";hit_protection_ms=" +
                  std::to_string(attack.hitProtectionMilliseconds) +
@@ -705,9 +713,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 std::to_string(attack.minimumAngleDegrees) +
                 ";angle_max=" +
                 std::to_string(attack.maximumAngleDegrees) +
-                ";interruptible=" +
-                std::to_string(attack.interruptibleDuringExecution ? 1 : 0) +
-                ";sense_denominator=" +
+                 ";interruptible=" +
+                 std::to_string(attack.interruptibleDuringExecution ? 1 : 0) +
+                 ";target_relative_movement=" +
+                 std::to_string(attack.usesTargetRelativeMovement ? 1 : 0) +
+                 ";movement_to_special_action=" +
+                 std::to_string(attack.movementEndsAtSpecialAction ? 1 : 0) +
+                 ";special_animation_successor=" +
+                 std::to_string(
+                     attack.permitsSpecialAnimationSuccessor ? 1 : 0) +
+                 ";sense_denominator=" +
                 std::to_string(attack.senseSlowMotionDenominator) +
                 ";sense_reaction=" +
                 std::to_string(attack.senseReactionType) +
@@ -1253,6 +1268,33 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                               interval.intervalMilliseconds[enemyType]);
             }
             autoplay->recordEvent(0, "enemy_attack_interval_asset", detail);
+        }
+        for (const game::EnemyBehaviorAnimationList& animationList :
+             levelOne_.enemyBehaviorConfigs().animationLists()) {
+            std::string detail =
+                "id=" + std::to_string(animationList.id) +
+                ";name=" + animationList.name +
+                ";selection_mode=" +
+                std::to_string(animationList.selectionMode);
+            for (const std::int32_t animationMapId :
+                 animationList.animationMapIds) {
+                detail += ";animation_map=" +
+                          std::to_string(animationMapId);
+            }
+            for (const std::int16_t enemyType : levelEnemyTypes) {
+                const auto animations =
+                    levelOne_.enemyBehaviorConfigs()
+                        .resolveAnimationListNames(animationList.id,
+                                                   enemyType);
+                for (std::size_t index = 0; index < animations.size();
+                     ++index) {
+                    detail += ";type" + std::to_string(enemyType) +
+                              "_animation" + std::to_string(index) + "=" +
+                              std::string(animations[index]);
+                }
+            }
+            autoplay->recordEvent(0, "enemy_behavior_animation_list_asset",
+                                  detail);
         }
         for (const game::EnemyBehaviorStateDefinition& state :
              levelOne_.enemyBehaviorConfigs().states()) {
@@ -2764,6 +2806,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  enemyRuntime_.meleeEngagerObjectId(),
                  enemyRuntime_.meleeEngagementCooldownMilliseconds(),
                  enemyRuntime_.nativeRandomState(),
+                 enemyRuntime_.gunLines(),
                  enemyRuntime_.molotovs(),
                  enemyRuntime_.boomerangs(),
                  enemyRuntime_.thunderclaps(),
@@ -4958,7 +5001,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                                        .quickTimeEvent.pressed,
                                               gameplayPlayer_.facing(),
                                               gameplayPlayer_.onWall(),
-                                              gameplayPlayer_.senseReactState());
+                                              gameplayPlayer_.senseReactState(),
+                                              gameplayPlayer_.nodeWorldPosition(
+                                                  "Bip01_Spine2"));
             }
             const game::BossProgressState& bossProgress =
                 levelCinematicRuntime_.bossProgress();
@@ -5875,6 +5920,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                   enemyRuntime_.meleeEngagerObjectId(),
                   enemyRuntime_.meleeEngagementCooldownMilliseconds(),
                   enemyRuntime_.nativeRandomState(),
+                  enemyRuntime_.gunLines(),
                   enemyRuntime_.molotovs(),
                    enemyRuntime_.boomerangs(),
                    enemyRuntime_.thunderclaps(),
