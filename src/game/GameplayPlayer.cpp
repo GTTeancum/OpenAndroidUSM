@@ -82,6 +82,13 @@ constexpr float kWebWhirlwindSpeedCentimetersPerSecond = 1400.0F;
 constexpr float kWebWhirlwindRetargetDistanceCentimeters = 150.0F;
 constexpr float kWebWhirlwindRetargetTimeMilliseconds = 150.0F;
 constexpr float kWebWhirlwindRecoveryMilliseconds = 600.0F;
+// State 86's separate motion-0x6c branch at 0x0034ab32-0x0034ae24.
+constexpr float kAirTargetKickSpeedCentimetersPerSecond = 1400.0F;
+constexpr float kAirTargetKickMinimumHeightDeltaCentimeters = 40.0F;
+constexpr float kAirTargetKickMaximumTargetDistanceCentimeters = 600.0F;
+constexpr float kAirTargetKickLandingDistanceCentimeters = 30.0F;
+constexpr float kAirTargetKickFallbackForwardCentimeters = 200.0F;
+constexpr float kNativeMissingGroundDistanceCentimeters = 1000.0F;
 
 constexpr std::uint32_t runtimeAnimationFrame(
     std::uint64_t milliseconds) noexcept {
@@ -3794,6 +3801,109 @@ bool GameplayPlayer::enterAttackState(
         lastActionRejectionReason_ = "insufficient_web_power";
         return false;
     }
+    std::optional<assets::Vector3> airTargetKickAim;
+    if (state.motionType == 108) {
+        // Player::SetNextStateId 0x0034ab44-0x0034abdc accepts the retained
+        // state-86 target only when Spider-Man is strictly more than 40 cm
+        // above its Unit base and their complete 3D separation is strictly
+        // below 600 cm. SendNotifyMessage(..., 8, 0) then restores gravity on
+        // float-capable enemies; the portable enemy body already applies
+        // gravity continuously.
+        bool directTarget = false;
+        if (activeAttackTarget_.has_value()) {
+            const assets::Vector3 delta{
+                activeAttackTarget_->position.x - position_.x,
+                activeAttackTarget_->position.y - position_.y,
+                activeAttackTarget_->position.z - position_.z};
+            directTarget =
+                position_.z - activeAttackTarget_->position.z >
+                    kAirTargetKickMinimumHeightDeltaCentimeters &&
+                delta.x * delta.x + delta.y * delta.y + delta.z * delta.z <
+                    kAirTargetKickMaximumTargetDistanceCentimeters *
+                        kAirTargetKickMaximumTargetDistanceCentimeters;
+            if (directTarget) {
+                airTargetKickAim = activeAttackTarget_->position;
+            }
+        }
+
+        if (!directTarget) {
+            // Unit::UpdateGroundDistance (0x00323b2c) stores zero for an
+            // active flag-1 ground manifold, otherwise casts from 5 cm above
+            // the Unit origin to 1010 cm below it and stores 1000 when no
+            // floor is found. SetNextStateId consumes that field at
+            // 0x0034b9c4-0x0034b9dc.
+            float groundDistance = kNativeMissingGroundDistanceCentimeters;
+            if (collision_ != nullptr) {
+                float supportHeight{};
+                if (collision_->groundHeight(position_, 1.0F, 1.0F,
+                                             supportHeight)) {
+                    groundDistance = 0.0F;
+                } else {
+                    const assets::Vector3 rayStart{
+                        position_.x, position_.y, position_.z + 5.0F};
+                    const assets::Vector3 rayEnd{
+                        position_.x, position_.y, position_.z - 1010.0F};
+                    if (const auto hit =
+                            collision_->segmentFirstHit(rayStart, rayEnd)) {
+                        groundDistance = position_.z - hit->position.z;
+                    }
+                }
+            }
+            if (std::abs(groundDistance) <
+                kAirTargetKickLandingDistanceCentimeters) {
+                // The recursive state change at 0x0034abfe-0x0034ac04
+                // enters authored landing state 16 instead of state 86.
+                cancelAttack();
+                activeAttackTarget_.reset();
+                activeAttackAirborne_ = false;
+                jumpAnchorHeight_ = position_.z;
+                enterLocomotionState(LocomotionState::JumpLand);
+                return true;
+            }
+
+            // The fallback begins at the ground point directly beneath the
+            // player. An existing ordinary-wall manifold whose contact lies
+            // within the forward 0.7 cone keeps that point. Otherwise the
+            // native CLevel::SegmentCollision at 0x0034acca-0x0034ad80 casts
+            // 200 cm forward and below the floor by half the 185 cm player
+            // height, replacing the aim with the first authored hit.
+            airTargetKickAim = assets::Vector3{
+                position_.x, position_.y, position_.z - groundDistance};
+            bool forwardWallContact = false;
+            LevelWallContact wallContact;
+            if (collision_ != nullptr &&
+                collision_->ordinaryWallContact(position_, wallContact)) {
+                const assets::Vector3 contactDirection{
+                    wallContact.position.x - position_.x,
+                    wallContact.position.y - position_.y,
+                    wallContact.position.z - position_.z};
+                const float contactLength = length3D(contactDirection);
+                if (contactLength > std::numeric_limits<float>::epsilon()) {
+                    forwardWallContact =
+                        (contactDirection.x * facing_.x +
+                         contactDirection.y * facing_.y +
+                         contactDirection.z * facing_.z) /
+                            contactLength >
+                        0.7F;
+                }
+            }
+            if (!forwardWallContact && collision_ != nullptr) {
+                const assets::Vector3 segmentEnd{
+                    position_.x + facing_.x *
+                        kAirTargetKickFallbackForwardCentimeters,
+                    position_.y + facing_.y *
+                        kAirTargetKickFallbackForwardCentimeters,
+                    position_.z + facing_.z *
+                            kAirTargetKickFallbackForwardCentimeters -
+                        (groundDistance +
+                         kPlayerCollisionHalfHeightCentimeters)};
+                if (const auto hit =
+                        collision_->segmentFirstHit(position_, segmentEnd)) {
+                    airTargetKickAim = hit->position;
+                }
+            }
+        }
+    }
     // Every displacement clip owns its own center-node track. The previous
     // clip's final displacement has already been committed to position_, so a
     // combo transition must begin from a fresh local origin instead of
@@ -3879,21 +3989,28 @@ bool GameplayPlayer::enterAttackState(
         // The black-suit branch selects effect 30 at the same native site.
         queueHitEffect(30, 0, 0, {}, 1.0F, true);
     }
-    if (state.motionType == 108 && activeAttackTarget_.has_value()) {
-        // State 86's dedicated SetNextStateId branch (0x0034abf2-
-        // 0x0034af42) uses the retained Unit position for its valid direct
-        // target path and installs 1400 cm/s. It does not create effect 26;
-        // that mesh belongs exclusively to motion 0x74 below.
-        const assets::Vector3 target = activeAttackTarget_->position;
-        const float dx = target.x - position_.x;
-        const float dy = target.y - position_.y;
-        const float dz = target.z - position_.z;
-        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (state.motionType == 108 && airTargetKickAim.has_value()) {
+        // SetLookAt and the 700*2 constant at image address 0x004c6a7c are
+        // shared by the direct and fallback destinations at
+        // 0x0034ad9a-0x0034ae24.
+        const assets::Vector3 direction{
+            airTargetKickAim->x - position_.x,
+            airTargetKickAim->y - position_.y,
+            airTargetKickAim->z - position_.z};
+        const float horizontal = std::hypot(direction.x, direction.y);
+        if (horizontal > std::numeric_limits<float>::epsilon()) {
+            facing_ = {direction.x / horizontal, direction.y / horizontal,
+                       0.0F};
+        }
+        const float distance = length3D(direction);
         if (distance > std::numeric_limits<float>::epsilon()) {
             attackPhysicsVelocity_ = {
-                dx / distance * kWebWhirlwindSpeedCentimetersPerSecond,
-                dy / distance * kWebWhirlwindSpeedCentimetersPerSecond,
-                dz / distance * kWebWhirlwindSpeedCentimetersPerSecond};
+                direction.x / distance *
+                    kAirTargetKickSpeedCentimetersPerSecond,
+                direction.y / distance *
+                    kAirTargetKickSpeedCentimetersPerSecond,
+                direction.z / distance *
+                    kAirTargetKickSpeedCentimetersPerSecond};
         }
     }
     if (state.motionType == 116 && activeAttackTarget_.has_value()) {

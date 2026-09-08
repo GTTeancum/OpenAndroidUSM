@@ -402,12 +402,17 @@ to the autoplay event log.
   support plane and performs that same early handoff. This prevents state 104
   from carrying Spider-Man below the street and restores the buffered
   state-105 heavy kick, its 80 damage, effect 20, and critical-hit cue.
-- Airborne target state 86's valid direct-target path pursues the retained
-  Unit base at 1400 cm/s, retries its contact probe until the accepted-contact
-  latch is set, and deals 50 exactly once. Effect 16 and the authored
-  air-diagonal-kick/kick-impact audio accompany the accepted contact; this
-  branch does not create effect 26 (`Player::SetNextStateId`,
-  `0x0034abf2`--`0x0034af42`).
+- Airborne target state 86's valid direct-target path requires Spider-Man to
+  be strictly more than 40 cm above the retained Unit and their complete 3D
+  separation to be strictly below 600 cm. It aims once at that Unit base and
+  installs 1400 cm/s (`Player::SetNextStateId`, `0x0034ab32`--`0x0034ae24`).
+  Invalid geometry uses the authored ground/contact fallback, including the
+  below-30-cm redirect to landing state 16. `Player::UpdateAttackParam` then
+  retries the ordinary animated-`Bip01` sector until the accepted-contact
+  latch is set. The 25 ms normal-flow regression preserves the narrow
+  native-valid launch/jump sample and proves exactly one 50-damage contact.
+  Effect 16 and the authored air-diagonal-kick/kick-impact audio accompany the
+  accepted contact; this branch does not create effect 26.
 - The later states 114/115 route into state 116, whose motion `0x74` instead
   samples the retained target's live `Bip01_Head`, pursues it at 1400 cm/s,
   and creates effect 26 for the computed travel time plus 600 ms
@@ -612,7 +617,7 @@ two rendered captures. The current retained gates are:
 - `first-encounter-air-web-throw-parity.usmauto` (26/26)
 - `first-encounter-air-kick-down-combo-parity.usmauto` (30/30)
 - `first-encounter-jump-release-parity.usmauto` (37/37)
-- `first-encounter-launcher-parity.usmauto` (23/23)
+- `first-encounter-launcher-parity.usmauto` (22/22)
 - `first-encounter-crowd-separation.usmauto` (11/11)
 - `first-encounter-spider-sense-counter.usmauto` (25/25)
 - `first-encounter-spider-sense-back-counter.usmauto` (18/18)
@@ -623,7 +628,7 @@ two rendered captures. The current retained gates are:
 - `first-encounter-skill-lock-parity.usmauto` (15/15)
 - `first-encounter-ground-web-directional-throw-parity.usmauto` (23/23)
 - `first-encounter-ground-web-drag-down-parity.usmauto` (32/32)
-- `first-encounter-air-target-kick-parity.usmauto` (32/32)
+- `first-encounter-air-target-kick-parity.usmauto` (31/31)
 - `first-encounter-air-web-grab-parity.usmauto` (33/33)
 - `first-encounter-melee-miss-parity.usmauto` (18/18)
 - `first-encounter-enemy-interruption-parity.usmauto` (18/18)

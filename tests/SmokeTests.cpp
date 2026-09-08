@@ -818,6 +818,26 @@ int main() {
     assert(!collisionFixtureWorld.climbableWallContact(
         {100.0F, 500.0F, 70.0F}, {300.0F, 500.0F, 70.0F},
         wallContact));
+    // State 86 reads the current native flag-2 manifold point. A geometry
+    // without the authored "wall" prefix is an ordinary wall, whereas the
+    // otherwise-identical prefixed fixture above is flag 0x20 and must not
+    // satisfy this query.
+    assert(!collisionFixtureWorld.ordinaryWallContact(
+        {450.0F, 500.0F, 0.0F}, wallContact));
+    auto ordinaryCollisionFixture = collisionFixture;
+    ordinaryCollisionFixture.name = "ordinary_collision_fixture";
+    const std::array ordinaryCollisionFixtureSet{ordinaryCollisionFixture};
+    usm::game::LevelCollision ordinaryCollisionFixtureWorld;
+    assert(ordinaryCollisionFixtureWorld.build(ordinaryCollisionFixtureSet));
+    assert(ordinaryCollisionFixtureWorld.ordinaryWallContact(
+        {450.0F, 500.0F, 0.0F}, wallContact));
+    assert(std::abs(wallContact.position.x - 500.0F) < 0.001F);
+    assert(std::abs(wallContact.position.z - 50.0F) < 0.001F);
+    assert(wallContact.normal.x < -0.99F);
+    assert(wallContact.physicsFlags ==
+           usm::game::LevelPhysicsFlags::Wall);
+    assert(!ordinaryCollisionFixtureWorld.ordinaryWallContact(
+        {300.0F, 500.0F, 0.0F}, wallContact));
 
     usm::assets::ColladaGeometry stepFixture;
     stepFixture.name = "step_fixture";
@@ -11438,8 +11458,9 @@ int main() {
         assert(dragDownFinish->targetedEnemyObjectId == 1236);
 
         // State 86/motion 0x6c is a retained airborne-target dash, not an
-        // in-place kick. Its dedicated SetNextStateId state-86 branch uses
-        // the target Unit position at 1400 cm/s; effect 26 belongs to the
+        // in-place kick. Its dedicated SetNextStateId state-86 branch accepts
+        // the target Unit base only inside strict >40 cm vertical and <600 cm
+        // 3D bounds, then uses exactly 1400 cm/s. Effect 26 belongs to the
         // later motion-0x74 whirlwind branch. UpdateAttackParam retries its
         // contact test after frame 2 until the accepted-contact latch is set.
         usm::game::GameplayPlayer diagonalKickPlayer;
@@ -11459,6 +11480,14 @@ int main() {
         assert(diagonalKickPlayer.requestPunch(diagonalKickTarget));
         assert(diagonalKickPlayer.activeStateId() == 86);
         assert(diagonalKickPlayer.hitEffects().empty());
+        const auto directKickVelocity =
+            diagonalKickPlayer.attackPhysicsVelocity();
+        assert(std::abs(std::sqrt(
+                            directKickVelocity.x * directKickVelocity.x +
+                            directKickVelocity.y * directKickVelocity.y +
+                            directKickVelocity.z * directKickVelocity.z) -
+                        1400.0F) < 0.01F);
+        assert(directKickVelocity.x > 0.0F);
         diagonalKickPlayer.update({}, gameplayCameraPose, 50);
         assert(diagonalKickPlayer.position().x > diagonalKickStartX);
         const auto diagonalKickFirstProbe =
@@ -11474,6 +11503,100 @@ int main() {
         diagonalKickPlayer.notifyMeleeImpactAccepted(86);
         diagonalKickPlayer.update({}, gameplayCameraPose, 50);
         assert(!diagonalKickPlayer.consumeMeleeImpact().has_value());
+
+        // The comparisons at 0x0034ab50-0x0034abdc are strict. Exactly 40 cm
+        // of height difference and exactly 600 cm of complete distance both
+        // reject the retained target. With no collision world, native
+        // ground-distance fallback is 1000 cm and therefore points straight
+        // down at the same 1400 cm/s.
+        usm::game::GameplayPlayer fortyCentimeterKickPlayer;
+        assert(fortyCentimeterKickPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        fortyCentimeterKickPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                            {1.0F, 0.0F, 0.0F});
+        assert(fortyCentimeterKickPlayer.requestJump());
+        fortyCentimeterKickPlayer.update({}, gameplayCameraPose, 150);
+        const auto fortyCentimeterPosition =
+            fortyCentimeterKickPlayer.position();
+        const usm::game::PlayerAttackTarget fortyCentimeterTarget{
+            {fortyCentimeterPosition.x + 100.0F,
+             fortyCentimeterPosition.y,
+             fortyCentimeterPosition.z - 40.0F},
+            40.0F, 12361, true, 150.0F, true, true, false, false};
+        assert(fortyCentimeterKickPlayer.requestPunch(
+            fortyCentimeterTarget));
+        assert(fortyCentimeterKickPlayer.activeStateId() == 86);
+        const auto fortyCentimeterVelocity =
+            fortyCentimeterKickPlayer.attackPhysicsVelocity();
+        assert(std::abs(fortyCentimeterVelocity.x) < 0.001F);
+        assert(std::abs(fortyCentimeterVelocity.y) < 0.001F);
+        assert(std::abs(fortyCentimeterVelocity.z + 1400.0F) < 0.01F);
+
+        usm::game::GameplayPlayer sixMeterKickPlayer;
+        assert(sixMeterKickPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        sixMeterKickPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                     {1.0F, 0.0F, 0.0F});
+        assert(sixMeterKickPlayer.requestJump());
+        sixMeterKickPlayer.update({}, gameplayCameraPose, 150);
+        const auto sixMeterPosition = sixMeterKickPlayer.position();
+        const usm::game::PlayerAttackTarget sixMeterTarget{
+            {sixMeterPosition.x + 360.0F, sixMeterPosition.y,
+             sixMeterPosition.z - 480.0F},
+            40.0F, 12362, true, 150.0F, true, true, false, false};
+        assert(sixMeterKickPlayer.requestPunch(sixMeterTarget));
+        assert(sixMeterKickPlayer.activeStateId() == 86);
+        const auto sixMeterVelocity =
+            sixMeterKickPlayer.attackPhysicsVelocity();
+        assert(std::abs(sixMeterVelocity.x) < 0.001F);
+        assert(std::abs(sixMeterVelocity.y) < 0.001F);
+        assert(std::abs(sixMeterVelocity.z + 1400.0F) < 0.01F);
+
+        // The invalid-target path recursively selects native landing state 16
+        // when Unit+0x21c reports less than 30 cm. Put a second authored floor
+        // ten centimeters below the same jump pose to exercise that branch.
+        usm::assets::ColladaGeometry kickLandingFixture;
+        kickLandingFixture.name = "kick_landing_fixture";
+        const float kickLandingHeight =
+            fortyCentimeterPosition.z - 10.0F;
+        kickLandingFixture.vertices = {
+            {{-1000.0F, -1000.0F, 0.0F}},
+            {{1000.0F, -1000.0F, 0.0F}},
+            {{1000.0F, 1000.0F, 0.0F}},
+            {{-1000.0F, 1000.0F, 0.0F}},
+            {{-1000.0F, -1000.0F, kickLandingHeight}},
+            {{1000.0F, -1000.0F, kickLandingHeight}},
+            {{1000.0F, 1000.0F, kickLandingHeight}},
+            {{-1000.0F, 1000.0F, kickLandingHeight}},
+        };
+        usm::assets::ColladaMeshBuffer kickLandingBuffer;
+        kickLandingBuffer.indices = {
+            0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7,
+        };
+        kickLandingFixture.meshBuffers.push_back(kickLandingBuffer);
+        const std::array kickLandingFixtureSet{kickLandingFixture};
+        usm::game::LevelCollision kickLandingCollision;
+        assert(kickLandingCollision.build(kickLandingFixtureSet));
+        usm::game::GameplayPlayer landingRedirectKickPlayer;
+        assert(landingRedirectKickPlayer.initialize(
+            bootstrap.player(), &kickLandingCollision, &playerStateConfigs));
+        landingRedirectKickPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                            {1.0F, 0.0F, 0.0F});
+        assert(landingRedirectKickPlayer.requestJump());
+        landingRedirectKickPlayer.update({}, gameplayCameraPose, 150);
+        const auto landingRedirectPosition =
+            landingRedirectKickPlayer.position();
+        const usm::game::PlayerAttackTarget landingRedirectTarget{
+            {landingRedirectPosition.x + 100.0F,
+             landingRedirectPosition.y,
+             landingRedirectPosition.z - 40.0F},
+            40.0F, 12363, true, 150.0F, true, true, false, false};
+        assert(landingRedirectKickPlayer.requestPunch(
+            landingRedirectTarget));
+        assert(landingRedirectKickPlayer.activeStateId() == 16);
+        assert(landingRedirectKickPlayer.attackPhysicsVelocity().x == 0.0F);
+        assert(landingRedirectKickPlayer.attackPhysicsVelocity().y == 0.0F);
+        assert(landingRedirectKickPlayer.attackPhysicsVelocity().z == 0.0F);
 
         usm::game::GameplayPlayer airWebTiePlayer;
         assert(airWebTiePlayer.initialize(bootstrap.player(), nullptr,

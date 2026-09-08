@@ -1,8 +1,12 @@
 # Source-authored airborne Square/X target-special.  Jump states route a punch
 # against an airborne target through predicate 109 to state 86 rather than the
 # ordinary state-81 aerial punch chain.
-fixed_step_ms 50
-sample_interval_ms 50
+# The state-86 input window is narrower than one 50 ms authored animation
+# frame: 100 ms is still below the strict height gate in this setup, while
+# 150 ms lets the falling target pass beneath the fixed entry-time pursuit
+# vector. A 25 ms physics step preserves the native-valid 125 ms sample.
+fixed_step_ms 25
+sample_interval_ms 25
 capture_interval_ms 0
 max_time_ms 75000
 start_time_ms 53033
@@ -21,7 +25,10 @@ set_enemy_physics 394 1
 # select the launched knife thug.  The tested victim retains authored health.
 damage_enemy 395 100000
 damage_enemy 397 100000
-teleport 13399 -6360 7 0 -1 0
+# Approach object 394 from its authored front. CBehaviorHurt::BehaviorStart
+# routes a front hit-type-121 launch to airborne state 53; hitting from behind
+# instead selects non-air helper state 52 even though the force still lifts it.
+teleport 13454 -6591 7 -0.454 0.891 0
 
 punch
 jump_release_attack_when_ready 1000
@@ -31,16 +38,17 @@ assert_enemy_health_near 394 405 0.01
 move_until_state 1500 0 0 0
 
 # A fresh jump plus Square/X sees the airborne target and enters the 50-damage
-# diagonal kick.  It owns both the source effect 26 travel trail and effect 16
-# strike trail; neither is a harness-generated visual.
+# diagonal kick. Effect 16 is its authored strike trail; effect 26 belongs to
+# the later state-116 web whirlwind and must not be attributed to this move.
 jump
-# State 13's authored input gate opens at runtime frame 2. A zero-duration
-# harness wait makes the following input land on the native 100 ms boundary.
-wait 0
+# State 13's authored input gate is open here, but state 86 additionally
+# requires Spider-Man's Unit base to be strictly more than 40 cm above the
+# launched target (Player::SetNextStateId, 0x0034ab50-0x0034ab82). Advance the
+# jump to that native-valid geometry before pressing Square/X.
+wait 125
 punch
 move_until_state 500 0 0 86
 assert_player_state 86
-assert_player_effect 26 1
 wait 80
 assert_player_effect 16 1
 assert_enemy_health_near 394 355 0.01

@@ -32,7 +32,6 @@ assert_enemy_health_below 394 500
 move_until_state 1500 0 0 14
 punch
 move_until_state 500 0 0 86
-assert_player_effect 26 1
 # Effect 16 begins at authored frame 2 and is deliberately short-lived.
 wait 100
 assert_player_effect 16 1

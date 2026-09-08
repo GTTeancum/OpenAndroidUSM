@@ -101,7 +101,11 @@ Vector3 closestPointOnTriangle(const Vector3& point, const Vector3& first,
     const float denominator =
         1.0F / (firstRegion + secondRegion + thirdRegion);
     const float secondWeight = secondRegion * denominator;
-    const float thirdWeight = thirdRegion * denominator;
+    // The final face-region barycentrics are v=vb/(va+vb+vc) and
+    // w=vc/(va+vb+vc). firstRegion is vc; thirdRegion is va. Using va for w
+    // displaced interior contacts toward the BC edge and did not match
+    // processSphereTriangle's projected face contact (0x003d23cc).
+    const float thirdWeight = firstRegion * denominator;
     return {first.x + firstEdge.x * secondWeight +
                 secondEdge.x * thirdWeight,
             first.y + firstEdge.y * secondWeight +
@@ -941,6 +945,67 @@ bool LevelCollision::jumpWallContact(
     const Vector3& capsuleBase, LevelWallContact& contact) const noexcept {
     return horizontalSurfaceContact(capsuleBase, LevelPhysicsFlags::JumpWall,
                                     contact);
+}
+
+bool LevelCollision::ordinaryWallContact(
+    const Vector3& capsuleBase, LevelWallContact& contact) const noexcept {
+    // PhysicsTriangleMeshShape::constructMesh (0x003d95d8) assigns flag 2
+    // to ordinary non-ground faces. The dynamic Spider-Man body is created
+    // as a 50 cm lower sphere plus a cylinder (createSpridemanPhysics,
+    // 0x003d8a34); PhysicsEntity::getContextContactPoint (0x003485f0)
+    // exposes the persistent flag-2 manifold point consumed by
+    // Player::SetNextStateId at 0x0034ac3e-0x0034acc8. Recover the same
+    // lower-sphere contact from the portable authored triangle world.
+    const Vector3 sphereCenter{
+        capsuleBase.x, capsuleBase.y,
+        capsuleBase.z + kGroundSupportRadius};
+    constexpr float kContactTolerance = 0.01F;
+    const float maximumDistance = kGroundSupportRadius + kContactTolerance;
+    const float maximumDistanceSquared = maximumDistance * maximumDistance;
+    float nearestDistanceSquared = std::numeric_limits<float>::infinity();
+    bool found = false;
+    for (const Triangle& triangle : triangles_) {
+        if ((triangle.physicsFlags & LevelPhysicsFlags::Wall) == 0U ||
+            triangle.normal.z >=
+                LevelCollisionConstants::MinimumGroundNormalZ ||
+            sphereCenter.x + maximumDistance < triangle.minimumX ||
+            sphereCenter.x - maximumDistance > triangle.maximumX ||
+            sphereCenter.y + maximumDistance < triangle.minimumY ||
+            sphereCenter.y - maximumDistance > triangle.maximumY ||
+            sphereCenter.z + maximumDistance < triangle.minimumZ ||
+            sphereCenter.z - maximumDistance > triangle.maximumZ) {
+            continue;
+        }
+        const bool doubleSided =
+            (triangle.physicsFlags & LevelPhysicsFlags::DoubleSided) != 0U;
+        const float authoredSide =
+            dot(subtract(sphereCenter, triangle.first), triangle.normal);
+        if (!doubleSided && authoredSide < -kContactTolerance) {
+            continue;
+        }
+        const Vector3 closest = closestPointOnTriangle(
+            sphereCenter, triangle.first, triangle.second, triangle.third);
+        const Vector3 separation = subtract(sphereCenter, closest);
+        const float distanceSquared = dot(separation, separation);
+        if (distanceSquared > maximumDistanceSquared ||
+            distanceSquared >= nearestDistanceSquared) {
+            continue;
+        }
+        nearestDistanceSquared = distanceSquared;
+        contact.position = closest;
+        contact.normal = triangle.normal;
+        if (dot(contact.normal, separation) < 0.0F) {
+            contact.normal.x = -contact.normal.x;
+            contact.normal.y = -contact.normal.y;
+            contact.normal.z = -contact.normal.z;
+        }
+        contact.segmentFraction = 0.0F;
+        contact.physicsFlags = triangle.physicsFlags;
+        contact.geometryName = triangle.geometryName;
+        contact.materialName = triangle.materialName;
+        found = true;
+    }
+    return found;
 }
 
 bool LevelCollision::horizontalSurfaceContact(

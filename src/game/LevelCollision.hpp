@@ -114,6 +114,9 @@ public:
     [[nodiscard]] bool jumpWallContact(
         const assets::Vector3& capsuleBase,
         LevelWallContact& contact) const noexcept;
+    [[nodiscard]] bool ordinaryWallContact(
+        const assets::Vector3& capsuleBase,
+        LevelWallContact& contact) const noexcept;
 
     [[nodiscard]] std::size_t triangleCount() const noexcept {
         return triangles_.size();

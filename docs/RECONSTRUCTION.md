@@ -702,14 +702,19 @@ binding flag, requested damage, actual health delta, and resulting enemy
 behavior/animation.
 
 The airborne target-special punch is state 86, motion `0x6c`.
-`Player::SetNextStateId` aims its explicit 1400 cm/s velocity at the live
-target's `Bip01_Head`, and `Player::UpdateAttackParam` retries the contact test
-after frame 2 until `CheckAttackTarget` sets the accepted-contact latch. The
-runtime follows that target, delivers 50 exactly once, retains effect 26 for
-the travel interval, and emits effect 16 plus the authored air-diagonal-kick
-and kick-impact audio on accepted contact. Air-web states 101/102 separately
-retain the target and visible line while delivering only their authored
-zero-damage grab contact.
+`Player::SetNextStateId` (`0x0034ab32`--`0x0034af42`) accepts the retained
+target only when Spider-Man is more than 40 cm above it and their Unit bases
+are less than 600 cm apart. That direct path aims an explicit 1400 cm/s
+velocity at the target Unit position, not `Bip01_Head`. Invalid geometry uses
+the native ground-distance/contact fallback, or redirects to landing state 16
+when the absolute ground distance is below 30 cm. `Player::UpdateAttackParam`
+retries the contact test after frame 2 until `CheckAttackTarget` sets the
+accepted-contact latch. The runtime delivers 50 exactly once and emits effect
+16 plus the authored air-diagonal-kick and kick-impact audio on accepted
+contact. It does not create effect 26; that effect belongs to state 116's
+motion `0x74` path at `0x0034af44`--`0x0034b0b8`. Air-web states 101/102
+separately retain the target and visible line while delivering only their
+authored zero-damage grab contact.
 
 Web-binding damage follows the dedicated cases in `Player::UpdateAttacks`
 (`0x00351204`), not the ordinary MC_STATE hit-frame loop. Motion `0x7f`
