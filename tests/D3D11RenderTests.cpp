@@ -241,6 +241,21 @@ int main() {
             std::cerr << uploadLevelResult.message() << '\n';
             return 1;
         }
+        assert(gameRenderer.updateEnemyRockets(levelOne, {}));
+        usm::game::EnemyRocketState renderRocket;
+        renderRocket.sourceObjectId = 30000;
+        renderRocket.roomId = 9;
+        renderRocket.poolIndex = 0;
+        renderRocket.position = levelOne.player().position;
+        renderRocket.position.z += 150.0F;
+        renderRocket.velocity = {500.0F, 0.0F, 0.0F};
+        renderRocket.facing = {1.0F, 0.0F, 0.0F};
+        renderRocket.damage = 50.0F;
+        renderRocket.active = true;
+        const std::array<usm::game::EnemyRocketState, 1> renderRockets{
+            renderRocket};
+        assert(gameRenderer.updateEnemyRockets(levelOne, renderRockets));
+        assert(gameRenderer.updateEnemyRockets(levelOne, {}));
         usm::game::CinematicUiFrame deathBlackFrame;
         deathBlackFrame.blackOverlayAlpha = 1.0F;
         assert(gameRenderer.updateCinematicUi(levelOne.hud(), deathBlackFrame));

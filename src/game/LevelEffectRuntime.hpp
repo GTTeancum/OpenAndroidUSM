@@ -77,7 +77,12 @@ public:
                                              bool visible = true,
                                              std::int32_t sourceObjectId = -1);
     [[nodiscard]] Result setPersistentEffectVisible(std::int32_t sourceObjectId,
-                                                    bool visible) noexcept;
+                                                    bool visible,
+                                                    bool restartWhenShown =
+                                                        false) noexcept;
+    [[nodiscard]] Result setPersistentEffectPosition(
+        std::int32_t sourceObjectId,
+        const assets::Vector3& origin) noexcept;
     [[nodiscard]] LevelEffectCheckPointState saveCheckPointState() const;
     [[nodiscard]] Result loadCheckPointState(
         const LevelEffectCheckPointState& state);

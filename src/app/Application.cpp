@@ -34,6 +34,11 @@ diagnostics::AutoplayHarness* gAutoplayDiagnostics = nullptr;
 // from two native combat ticks to roughly 33 ms and made valid combo inputs
 // disappear before UpdateKeyTrigger could sample them.
 constexpr std::uint32_t kNativeGameplayTickMilliseconds = 50;
+// CLevel::GetRocketPool creates four CRocket instances. Each owns one
+// rocket_smoke CEffect for its entire lifetime, so reserve four stable source
+// IDs beside the scene-authored persistent emitters.
+constexpr std::int32_t kRocketSmokeEffectSourceBase = -2000000000;
+constexpr std::int32_t kRocketPoolSize = 4;
 
 int fail(std::string_view message) {
     if (gAutoplayDiagnostics != nullptr) {
@@ -1894,6 +1899,15 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             return fail(result.message());
         }
     }
+    for (std::int32_t poolIndex = 0; poolIndex < kRocketPoolSize;
+         ++poolIndex) {
+        result = effectRuntime_.addPersistentEffect(
+            "rocket_smoke", {}, -1, false,
+            kRocketSmokeEffectSourceBase + poolIndex);
+        if (!result) {
+            return fail(result.message());
+        }
+    }
     result = levelBonusRuntime_.initialize(levelOne_.bonuses());
     if (!result) {
         return fail(result.message());
@@ -2807,6 +2821,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  enemyRuntime_.meleeEngagementCooldownMilliseconds(),
                  enemyRuntime_.nativeRandomState(),
                  enemyRuntime_.gunLines(),
+                 enemyRuntime_.rockets(),
                  enemyRuntime_.molotovs(),
                  enemyRuntime_.boomerangs(),
                  enemyRuntime_.thunderclaps(),
@@ -5044,6 +5059,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 case game::EnemyProjectileEventKind::PlayerContact:
                     kind = "player_contact";
                     break;
+                case game::EnemyProjectileEventKind::EnemyContact:
+                    kind = "enemy_contact";
+                    break;
                 case game::EnemyProjectileEventKind::Grounded:
                     kind = "grounded";
                     break;
@@ -5644,6 +5662,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     levelOne_, enemyRuntime_.molotovs());
             }
             if (result) {
+                result = renderer_.updateEnemyRockets(
+                    levelOne_, enemyRuntime_.rockets());
+            }
+            if (result) {
                 result = renderer_.updateEnemyBoomerangs(
                     levelOne_, enemyRuntime_.boomerangs());
             }
@@ -5733,6 +5755,33 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             });
         if (result) {
             result = renderer_.updateLevelOneHints(hintRuntime_);
+        }
+        if (result) {
+            for (std::int32_t poolIndex = 0;
+                 poolIndex < kRocketPoolSize; ++poolIndex) {
+                const auto rocket = std::find_if(
+                    enemyRuntime_.rockets().begin(),
+                    enemyRuntime_.rockets().end(),
+                    [poolIndex](const game::EnemyRocketState& state) {
+                        return state.active && state.poolIndex == poolIndex;
+                    });
+                const std::int32_t sourceId =
+                    kRocketSmokeEffectSourceBase + poolIndex;
+                if (rocket != enemyRuntime_.rockets().end()) {
+                    result = effectRuntime_.setPersistentEffectPosition(
+                        sourceId, rocket->position);
+                    if (result) {
+                        result = effectRuntime_.setPersistentEffectVisible(
+                            sourceId, true, true);
+                    }
+                } else {
+                    result = effectRuntime_.setPersistentEffectVisible(
+                        sourceId, false);
+                }
+                if (!result) {
+                    break;
+                }
+            }
         }
         if (result) {
             // CFpsParticleSystemSceneNode::OnAnimate (0x0039f7c8) runs from
@@ -5921,6 +5970,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                   enemyRuntime_.meleeEngagementCooldownMilliseconds(),
                   enemyRuntime_.nativeRandomState(),
                   enemyRuntime_.gunLines(),
+                  enemyRuntime_.rockets(),
                   enemyRuntime_.molotovs(),
                    enemyRuntime_.boomerangs(),
                    enemyRuntime_.thunderclaps(),

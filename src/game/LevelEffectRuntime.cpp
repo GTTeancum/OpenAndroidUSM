@@ -237,11 +237,18 @@ Result LevelEffectRuntime::addPersistentEffect(std::string_view effectType,
 }
 
 Result LevelEffectRuntime::setPersistentEffectVisible(
-    std::int32_t sourceObjectId, bool visible) noexcept {
+    std::int32_t sourceObjectId, bool visible,
+    bool restartWhenShown) noexcept {
     bool found = false;
     for (PersistentEmitter& emitter : persistentEmitters_) {
         if (emitter.sourceObjectId != sourceObjectId) {
             continue;
+        }
+        if (visible && !emitter.visible && restartWhenShown) {
+            // CRocket::Fire (0x00363bfe-0x00363c10) both shows and restarts
+            // its cached rocket_smoke CEffect before attaching it to the
+            // projectile scene node.
+            restartEmitter(emitter.runtime);
         }
         emitter.visible = visible;
         for (Particle& particle : particles_) {
@@ -249,6 +256,21 @@ Result LevelEffectRuntime::setPersistentEffectVisible(
                 particle.visible = visible;
             }
         }
+        found = true;
+    }
+    return found ? Result::success()
+                 : Result::failure("Persistent effect source was not found");
+}
+
+Result LevelEffectRuntime::setPersistentEffectPosition(
+    std::int32_t sourceObjectId,
+    const assets::Vector3& origin) noexcept {
+    bool found = false;
+    for (PersistentEmitter& emitter : persistentEmitters_) {
+        if (emitter.sourceObjectId != sourceObjectId) {
+            continue;
+        }
+        emitter.runtime.origin = origin;
         found = true;
     }
     return found ? Result::success()

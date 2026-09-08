@@ -242,6 +242,16 @@ struct MolotovProjectileAsset {
     assets::ColladaAnimationFile animationBank;
 };
 
+// CRocket::CRocket (0x00364158) loads this exact BDAE and hides its `bbox`
+// child after using that node to construct the native spherical body. The
+// projectile has no selected animation; its authored scene geometry is drawn
+// directly while CRocket::UpdateRocketPos changes the world transform.
+struct RocketProjectileAsset {
+    std::string meshFile;
+    assets::ColladaMeshFile mesh;
+    std::vector<assets::BtexTexture> textures;
+};
+
 // CBullet::setType(0) (0x0035c444) loads this exact BDAE for Spider-Man's
 // ordinary motion-123 web shot. Unlike the tentacle variant it does not
 // select an animation, so the authored scene geometry is rendered directly.
@@ -729,6 +739,10 @@ public:
         noexcept {
         return molotovProjectile_;
     }
+    [[nodiscard]] const RocketProjectileAsset& rocketProjectile() const
+        noexcept {
+        return rocketProjectile_;
+    }
     [[nodiscard]] const WebPelletProjectileAsset& webPelletProjectile() const
         noexcept {
         return webPelletProjectile_;
@@ -866,6 +880,7 @@ private:
     WebPelletProjectileAsset webPelletProjectile_;
     WebLineAsset webLine_;
     MolotovProjectileAsset molotovProjectile_;
+    RocketProjectileAsset rocketProjectile_;
     BoomerangProjectileAsset boomerangProjectile_;
     ElectroEffectAsset electroEffects_;
     EnemyLandingEffectAsset enemyLandingEffects_;

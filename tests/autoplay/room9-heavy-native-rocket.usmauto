@@ -1,0 +1,25 @@
+# Focused Room 9 production-AI gate for object 30000, the first type-4
+# bazooka heavy in normal player order. The projectile must originate from
+# the shipped range behavior and action-type-6 animation key, not a harness
+# spawn or direct damage shortcut.
+fixed_step_ms 50
+sample_interval_ms 50
+capture_interval_ms 0
+max_time_ms 70000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+set_enemy_ai 488 0
+set_enemy_ai 489 0
+set_enemy_ai 505 0
+set_enemy_ai 506 0
+set_enemy_ai 30000 1 1
+teleport -9155 10458 8 1 0 0
+wait_enemy_animation 3000 30000 aim_to_idlebaz
+wait_enemy_animation 3000 30000 idlebaz_to_aim
+wait_enemy_projectile 3000 30000
+wait 2500
+assert_health_below 1000
+assert_health_above 0
+finish

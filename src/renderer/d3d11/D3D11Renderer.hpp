@@ -91,6 +91,9 @@ public:
     [[nodiscard]] Result updateEnemyMolotovs(
         const game::LevelOneBootstrap& levelOne,
         std::span<const game::EnemyMolotovState> molotovs);
+    [[nodiscard]] Result updateEnemyRockets(
+        const game::LevelOneBootstrap& levelOne,
+        std::span<const game::EnemyRocketState> rockets);
     [[nodiscard]] Result updateEnemyBoomerangs(
         const game::LevelOneBootstrap& levelOne,
         std::span<const game::EnemyBoomerangState> boomerangs);
@@ -341,6 +344,8 @@ private:
     std::size_t webPelletProjectileMeshCount_{};
     std::size_t molotovProjectileMeshStart_{};
     std::size_t molotovProjectileMeshCount_{};
+    std::size_t rocketProjectileMeshStart_{};
+    std::size_t rocketProjectileMeshCount_{};
     std::size_t boomerangProjectileMeshStart_{};
     std::size_t boomerangProjectileMeshCount_{};
     std::size_t thunderclapWaveMeshStart_{};

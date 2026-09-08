@@ -81,6 +81,7 @@ struct AutoplaySnapshot {
     float meleeEngagementCooldownMilliseconds{};
     std::int32_t nativeRandomState{};
     std::span<const game::EnemyGunLineState> gunLines;
+    std::span<const game::EnemyRocketState> rockets;
     std::span<const game::EnemyMolotovState> molotovs;
     std::span<const game::EnemyBoomerangState> boomerangs;
     std::span<const game::EnemyThunderclapState> thunderclaps;

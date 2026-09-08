@@ -569,6 +569,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
     enemyArchetypes_.clear();
     enemies_.clear();
     molotovProjectile_ = {};
+    rocketProjectile_ = {};
     boomerangProjectile_ = {};
     objectArchetypes_.clear();
     objects_.clear();
@@ -883,6 +884,20 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
         return Result::failure(
             "Could not load molotov projectile animation bank: " +
             result.message());
+    }
+
+    // CRocket's constructor at 0x00364158 passes this basename to
+    // IAnimatedObject before deriving its collision sphere from `bbox`.
+    rocketProjectile_.meshFile = "meshes_bin/w_quadrpg_rocket.bdae";
+    result = entityArchive.read(rocketProjectile_.meshFile, resource);
+    if (!result || !(result = rocketProjectile_.mesh.load(resource))) {
+        return Result::failure("Could not load rocket projectile mesh: " +
+                               result.message());
+    }
+    result = loadTextures(entityArchive, nullptr, rocketProjectile_.mesh,
+                          rocketProjectile_.textures, "rocket projectile");
+    if (!result) {
+        return result;
     }
 
     // Both preserved CBoomerang constructors (0x0035b3fc and 0x0035b604)

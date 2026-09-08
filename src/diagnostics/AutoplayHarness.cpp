@@ -174,7 +174,8 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
                  "melee_attack_active,melee_attack_registered,"
                  "melee_sense_active,selected_melee_attack_id,"
                  "melee_sequence_index,melee_sequence_size,"
-                 "melee_cooldown_ms,range_cooldown_ms,"
+                 "melee_cooldown_ms,range_attack_active,"
+                 "range_sequence_index,range_sequence_size,range_cooldown_ms,"
                  "sandman_task,sandman_jump_ms,sandman_jump_duration_ms,"
                  "rhino_task,rhino_task_ms,rhino_melee_remaining,"
                  "rhino_dash_x,rhino_dash_y,rhino_phase,"
@@ -1765,6 +1766,12 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                 return gunLine.active && !step.objectIds.empty() &&
                        gunLine.sourceObjectId == step.objectIds.front();
             });
+        const bool rocketPresent = std::any_of(
+            snapshot.rockets.begin(), snapshot.rockets.end(),
+            [&step](const game::EnemyRocketState& rocket) {
+                return rocket.active && !step.objectIds.empty() &&
+                       rocket.sourceObjectId == step.objectIds.front();
+            });
         const bool molotovPresent = std::any_of(
             snapshot.molotovs.begin(), snapshot.molotovs.end(),
             [&step](const game::EnemyMolotovState& molotov) {
@@ -1789,8 +1796,8 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                 return post.active && !step.objectIds.empty() &&
                        post.sourceObjectId == step.objectIds.front();
             });
-        if (gunLinePresent || molotovPresent || boomerangPresent ||
-            thunderclapPresent || electricPostPresent) {
+        if (gunLinePresent || rocketPresent || molotovPresent ||
+            boomerangPresent || thunderclapPresent || electricPostPresent) {
             completeStep(snapshot, step);
         } else if (timedOut()) {
             failStep(snapshot, step,
@@ -3676,6 +3683,9 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << enemy.meleeAttackAnimationSequenceIndex << ','
                   << enemy.meleeAttackAnimationSequence.size() << ','
                   << enemy.meleeAttackCooldownMilliseconds << ','
+                  << enemy.rangeAttackActive << ','
+                  << enemy.rangeAttackAnimationSequenceIndex << ','
+                  << enemy.rangeAttackAnimationSequence.size() << ','
                   << enemy.rangeAttackCooldownMilliseconds << ','
                   << static_cast<int>(enemy.sandmanTask) << ','
                   << enemy.sandmanJumpElapsedMilliseconds << ','
@@ -3734,6 +3744,16 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                        << ",1,"
                        << gunLine.ageMilliseconds << ',' << gunLine.damage
                        << ',' << gunLine.active << ",1\n";
+    }
+    for (const game::EnemyRocketState& rocket : snapshot.rockets) {
+        projectileLog_ << snapshot.frameIndex << ','
+                       << snapshot.realTimeMilliseconds << ",rocket,"
+                       << rocket.sourceObjectId << ',' << rocket.roomId
+                       << ',' << rocket.position.x << ',' << rocket.position.y
+                       << ',' << rocket.position.z << ',' << rocket.velocity.x
+                       << ',' << rocket.velocity.y << ',' << rocket.velocity.z
+                       << ",0," << rocket.ageMilliseconds << ','
+                       << rocket.damage << ',' << rocket.active << ",1\n";
     }
     for (const game::EnemyMolotovState& molotov : snapshot.molotovs) {
         projectileLog_ << snapshot.frameIndex << ','

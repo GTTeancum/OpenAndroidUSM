@@ -619,6 +619,50 @@ room-mesh collision test. D3D11 draws a depth-tested translucent tracer from
 this backend-independent state, and WARP exercises the dynamic gun-line
 buffer.
 
+Room 9 object 30000 is the first type-4 bazooka heavy in normal player order.
+Its shipped `THUG_BIG` attributes author a 500--1200 cm range band and ranged
+map 6; the native weapon table resolves that map to weapon type 17. Attack
+interval row 9, `ENEMY_RANGE_ATTACK_ROCKET`, supplies a 2000 ms type-4 wait,
+and ranged row 2, `RANGE_ATTACK_03`, supplies a 1000 ms action window and 50
+damage. `CBehaviorRangeAttack::StartAttack_DoAttack` at `0x003c0f80` enters
+state 22, whose type-4 ready clip is `aim_to_idlebaz`; `BeginAttack` at
+`0x003c0d84` then enters state 24 and drains animation list 21 as
+`idlebaz_to_aim`, `aim_reload_aim`. The first clip of each state is scaled to
+the one-second range window at `0x003c143c`, while `UpdateAnimTask` at
+`0x003a88b8` restores scale one for the reload. Type-4 special-action record
+14 sends action 6 and sound map 18 at 50 percent of `idlebaz_to_aim`, which
+`UpdateAttack_DoAttack` at `0x003c1e64` consumes exactly once to fire.
+
+`CRocket::CRocket` at `0x00364158` loads the packaged
+`w_quadrpg_rocket.bdae`, derives its spherical physics body from the hidden
+`bbox` node, and creates the cached `molotov_bomb`, `cartoon_hit_splash`, and
+`rocket_smoke` effects. `CLevel::GetRocketPool` at `0x003831a8` fixes the pool
+at four. `CEnemy::InitBazooka` at `0x00332b56`--`0x00332b98` first resolves
+the animated `bazooka` bone and then its `fx_quad_front` child launch node;
+both alternating native slots deliberately use that same child-name literal.
+The front/back helper scene roots parented there are explicitly hidden and do
+not constitute a muzzle-flash render pass. `CRocket::Fire` at `0x00363b44`
+samples that child node, aims at the player's animated Spine2, advances the
+launch point 50 cm, and starts the attached smoke. The recovered constructor
+and update constants are 500 cm/s, 5000 ms lifetime, a 90-degree/second
+steering limit, and an 85-degree tracking cone. The common helper at
+`0x003a3c60` rotates that velocity toward the live target without changing
+its speed.
+
+`CRocket::CheckCollisions` at `0x00363d60` walks the AI Unit array in reverse,
+skips the owner, tests each swept Unit AABB, and tests Spider-Man last. A
+contact sends hit type 104 with the ranged row's 50 damage; the projectile
+then restarts both impact effects. `CRocket::Explode` at
+`0x00363cd8`--`0x00363d26` also starts the literal 3-unit, 12-frame,
+`(1,1,1)` camera shake when Spider-Man is within 1000 cm. D3D11 renders the
+four packaged rocket instances with the BDAE's hidden collision scaffold
+omitted, while four persistent smoke emitters follow the corresponding pool
+slots. `room9-heavy-native-rocket.usmauto` proves the production behavior,
+action-frame spawn, flight, 50-damage player contact, both impact effects,
+and exact shake without screenshots or host input; core and WARP tests pin
+the config, animation sequence, homing cap, asset, pool renderer, and effect
+plumbing independently.
+
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation
 lists from `BehaviorAnimList.bin`, 63 sound maps from

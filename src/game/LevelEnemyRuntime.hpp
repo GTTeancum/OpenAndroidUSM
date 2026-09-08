@@ -181,6 +181,12 @@ struct LevelEnemyState {
     bool cinematicActionActive{};
     std::int32_t cinematicActionObjectId{-1};
     std::uint32_t rangeAttackCooldownMilliseconds{};
+    // CBehaviorRangeAttack states 22 and 24 retain the complete authored
+    // ready/fire/reload task queue. Keep it separate from melee so the
+    // Room 9 bazooka thug can be traced at each native boundary.
+    bool rangeAttackActive{};
+    std::vector<std::string> rangeAttackAnimationSequence;
+    std::size_t rangeAttackAnimationSequenceIndex{};
     std::uint32_t meleeAttackCooldownMilliseconds{};
     bool meleeAttackActive{};
     // CBehaviorMeleeAttack::StateEnter (0x003baef8) retains the complete
@@ -338,6 +344,23 @@ struct EnemyMolotovState {
     bool active{};
 };
 
+// CRocket, weapon type 17. Native FireRocket (0x00363a04) launches the
+// spherical projectile at 500 cm/s, UpdateRocketPos (0x003637b4) turns its
+// XY velocity toward the player's Spine2 node, and the 5000 ms lifetime is
+// retired by CRocket::Update (0x003636ac).
+struct EnemyRocketState {
+    std::int32_t sourceObjectId{-1};
+    std::int32_t roomId{-1};
+    std::int32_t poolIndex{-1};
+    assets::Vector3 position;
+    assets::Vector3 velocity;
+    assets::Vector3 facing{1.0F, 0.0F, 0.0F};
+    float damage{};
+    std::uint32_t ageMilliseconds{};
+    bool dangerActive{};
+    bool active{};
+};
+
 // CBoomerang's native states are assigned by SetState (0x0035aefc) and
 // advanced by Update (0x0035b7f8). The numeric ordering is intentionally
 // retained because CBehaviorRangeAttack tests IsReady/WillReturnHand through
@@ -447,6 +470,7 @@ struct EnemyLandingAnimatedEffectSpawnEvent {
 enum class EnemyProjectileEventKind {
     Spawned,
     PlayerContact,
+    EnemyContact,
     Grounded,
     Exploded,
     StaticContact,
@@ -653,6 +677,9 @@ public:
     [[nodiscard]] std::span<const EnemyMolotovState> molotovs() const noexcept {
         return molotovs_;
     }
+    [[nodiscard]] std::span<const EnemyRocketState> rockets() const noexcept {
+        return rockets_;
+    }
     [[nodiscard]] std::span<const EnemyBoomerangState> boomerangs() const
         noexcept {
         return boomerangs_;
@@ -719,6 +746,10 @@ private:
     void updateMolotovs(std::uint32_t elapsedMilliseconds,
                         const assets::Vector3& playerPosition,
                         const LevelCollision* collision) noexcept;
+    void updateRockets(std::uint32_t elapsedMilliseconds,
+                       const assets::Vector3& playerPosition,
+                       const assets::Vector3& playerTargetPosition,
+                       const LevelCollision* collision) noexcept;
     void updateBoomerangs(std::uint32_t elapsedMilliseconds,
                           const assets::Vector3& playerPosition,
                           const LevelCollision* collision) noexcept;
@@ -727,6 +758,10 @@ private:
     void resolveEnemyContacts(const LevelCollision* collision) noexcept;
     void startGunLineAttack(LevelEnemyState& enemy);
     void startMolotovAttack(LevelEnemyState& enemy);
+    void startRocketAttack(LevelEnemyState& enemy);
+    void launchRocket(LevelEnemyState& enemy,
+                      const assets::Vector3& playerPosition,
+                      std::uint32_t authoredEventTimeMilliseconds);
     void throwMolotov(LevelEnemyState& enemy,
                       const assets::Vector3& playerPosition,
                       std::uint32_t authoredEventTimeMilliseconds);
@@ -810,6 +845,8 @@ private:
         const LevelEnemyState& enemy) const noexcept;
     [[nodiscard]] bool isMolotovEnemy(
         const LevelEnemyState& enemy) const noexcept;
+    [[nodiscard]] bool isRocketEnemy(
+        const LevelEnemyState& enemy) const noexcept;
     void queueStateSound(LevelEnemyState& enemy,
                          std::string_view behaviorStateName);
     void selectStateAnimation(LevelEnemyState& enemy,
@@ -830,6 +867,7 @@ private:
     std::vector<EnemyCameraShakeCue> pendingCameraShakeCues_;
     std::vector<EnemyGunLineState> gunLines_;
     std::vector<EnemyMolotovState> molotovs_;
+    std::vector<EnemyRocketState> rockets_;
     std::vector<EnemyBoomerangState> boomerangs_;
     std::vector<PlayerWebPelletState> playerWebPellets_;
     std::vector<EnemyThunderclapState> thunderclaps_;

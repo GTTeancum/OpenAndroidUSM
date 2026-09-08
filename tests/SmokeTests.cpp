@@ -33,6 +33,7 @@
 #include "game/DeathConfirmationRuntime.hpp"
 #include "game/ExitMenuRuntime.hpp"
 #include "game/LevelEnemyRuntime.hpp"
+
 #include "game/LevelEffectRuntime.hpp"
 #include "game/LevelDropRuntime.hpp"
 #include "game/LevelHintRuntime.hpp"
@@ -5307,6 +5308,7 @@ int main() {
         assert(hitSplashPreset != nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash") !=
                nullptr);
+        assert(bootstrap.effects().presets.find("rocket_smoke") != nullptr);
         assert(bootstrap.effects().presets.find("web_splash") != nullptr);
         const auto* blackWebSplashPreset =
             bootstrap.effects().presets.find("super_web_splash_black");
@@ -5399,6 +5401,20 @@ int main() {
         assert(std::abs(roomVisibilityRuntime.particles().front().position.x -
                         beforeRoomHide) >
                1.0F);
+        usm::game::LevelEffectRuntime rocketSmokeRuntime;
+        assert(rocketSmokeRuntime.initialize(bootstrap.effects().presets));
+        assert(rocketSmokeRuntime.addPersistentEffect(
+            "rocket_smoke", {}, -1, false, -2000000000));
+        assert(!rocketSmokeRuntime.saveCheckPointState()
+                    .persistentEffects.front().visible);
+        assert(rocketSmokeRuntime.setPersistentEffectPosition(
+            -2000000000, {10.0F, 20.0F, 30.0F}));
+        assert(rocketSmokeRuntime.setPersistentEffectVisible(
+            -2000000000, true, true));
+        assert(rocketSmokeRuntime.saveCheckPointState()
+                   .persistentEffects.front().visible);
+        assert(rocketSmokeRuntime.setPersistentEffectVisible(
+            -2000000000, false));
         assert(bootstrap.effects().presets.find("bonus_green") != nullptr);
         assert(bootstrap.effects().presets.find("bonus_red") != nullptr);
         const auto* ambientFirePreset =
@@ -7827,6 +7843,233 @@ int main() {
         assert(bigThugHits.size() == 1);
         assert(bigThugHits.front().attackId == 21);
         assert(bigThugHits.front().damage == 70.0F);
+
+        // Room 9's object 30000 is the first heavy rocket enemy in normal
+        // player order. These values are serialized in the shipped config;
+        // CRocket's remaining flight constants come from 0x00364158.
+        const auto* rocketAttributes =
+            bootstrap.enemyAttributeConfigs().find(4);
+        assert(rocketAttributes != nullptr);
+        assert(rocketAttributes->minimumRangeAttackDistance == 500.0F);
+        assert(rocketAttributes->maximumRangeAttackDistance == 1200.0F);
+        assert(rocketAttributes->rangedAttackTypeMapIndices ==
+               std::vector<std::int32_t>{6});
+        assert(usm::game::resolveEnemyRangeWeaponType(6) == 17);
+        const auto* rocketInterval =
+            bootstrap.enemyAttackIntervalConfigs().findForWeaponType(17);
+        assert(rocketInterval != nullptr);
+        assert(rocketInterval->id == 9);
+        assert(rocketInterval->name == "ENEMY_RANGE_ATTACK_ROCKET");
+        assert(rocketInterval->intervalMilliseconds[4] == 2000.0F);
+        const auto* rocketAttack =
+            bootstrap.enemyRangeAttackConfigs().findByMapId(
+                rocketInterval->id);
+        assert(rocketAttack != nullptr);
+        assert(rocketAttack->id == 2);
+        assert(rocketAttack->name == "RANGE_ATTACK_03");
+        assert(rocketAttack->animationDurationMilliseconds == 1000.0F);
+        assert(rocketAttack->damage == 50.0F);
+        const auto rocketActions =
+            bootstrap.enemySpecialActions().findEvents(
+                4, "idlebaz_to_aim");
+        assert(rocketActions.size() == 1);
+        assert(rocketActions.front()->actionType == 6);
+        assert(rocketActions.front()->keyFramePercent == 50);
+        assert(rocketActions.front()->attackId == 1);
+        assert(rocketActions.front()->soundMapIds ==
+               std::vector<std::int16_t>{18});
+        assert(bootstrap.rocketProjectile().meshFile ==
+               "meshes_bin/w_quadrpg_rocket.bdae");
+        assert(!bootstrap.rocketProjectile().mesh.sceneGeometries().empty());
+        assert(!bootstrap.rocketProjectile().textures.empty());
+
+        usm::game::LevelEnemyRuntime rocketRuntime;
+        assert(rocketRuntime.initialize(bootstrap));
+        for (const auto& state : rocketRuntime.states()) {
+            if (state.asset != nullptr && state.asset->objectId != 30000) {
+                assert(rocketRuntime.setDiagnosticAiEnabled(
+                    state.asset->objectId, false));
+            }
+        }
+        usm::game::CinematicThread enableRocketThread;
+        enableRocketThread.objectId = 30000;
+        assert(rocketRuntime.applyCinematicCommand(
+            bootstrap, enableRocketThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        const auto* rocketHeavy = rocketRuntime.find(30000);
+        assert(rocketHeavy != nullptr);
+        const usm::assets::Vector3 rocketVictim{
+            rocketHeavy->position.x + 800.0F,
+            rocketHeavy->position.y,
+            rocketHeavy->position.z};
+        const usm::assets::Vector3 rocketVictimSpine{
+            rocketVictim.x, rocketVictim.y, rocketVictim.z + 75.0F};
+        rocketRuntime.updateGameplay(
+            1, rocketVictim, nullptr, false, {1.0F, 0.0F, 0.0F}, false,
+            0, rocketVictimSpine);
+        rocketHeavy = rocketRuntime.find(30000);
+        assert(rocketHeavy->rangeAttackActive);
+        assert((rocketHeavy->rangeAttackAnimationSequence ==
+                std::vector<std::string>{"aim_to_idlebaz",
+                                         "idlebaz_to_aim",
+                                         "aim_reload_aim"}));
+        assert(rocketHeavy->rangeAttackAnimationSequenceIndex == 0);
+        assert(rocketHeavy->activeAnimation == "aim_to_idlebaz");
+        const auto& rocketHeavyArchetype =
+            bootstrap.enemyArchetypes()[rocketHeavy->asset->archetypeIndex];
+        assert(rocketHeavyArchetype.mesh.findSceneNodeById(
+                   "fx_quad_front-node") != nullptr);
+        const auto* rocketReadyClip =
+            rocketHeavyArchetype.animationBank.findClip("aim_to_idlebaz");
+        const auto* rocketFireClip =
+            rocketHeavyArchetype.animationBank.findClip("idlebaz_to_aim");
+        assert(rocketReadyClip != nullptr && rocketFireClip != nullptr);
+        assert(std::abs(rocketHeavy->animationSpeed -
+                        static_cast<float>(
+                            rocketReadyClip->durationMilliseconds()) /
+                            1000.0F) < 0.0001F);
+        rocketRuntime.updateGameplay(
+            1010, rocketVictim, nullptr, false, {1.0F, 0.0F, 0.0F}, false,
+            0, rocketVictimSpine);
+        rocketRuntime.updateGameplay(
+            1, rocketVictim, nullptr, false, {1.0F, 0.0F, 0.0F}, false,
+            0, rocketVictimSpine);
+        rocketHeavy = rocketRuntime.find(30000);
+        assert(rocketHeavy->rangeAttackAnimationSequenceIndex == 1);
+        assert(rocketHeavy->activeAnimation == "idlebaz_to_aim");
+        assert(std::abs(rocketHeavy->animationSpeed -
+                        static_cast<float>(
+                            rocketFireClip->durationMilliseconds()) /
+                            1000.0F) < 0.0001F);
+        rocketRuntime.updateGameplay(
+            500, rocketVictim, nullptr, false, {1.0F, 0.0F, 0.0F}, false,
+            0, rocketVictimSpine);
+        assert(rocketRuntime.rockets().size() == 1);
+        const auto spawnedRocket = rocketRuntime.rockets().front();
+        assert(spawnedRocket.sourceObjectId == 30000);
+        assert(spawnedRocket.poolIndex == 0);
+        assert(spawnedRocket.damage == 50.0F);
+        assert(spawnedRocket.ageMilliseconds == 0);
+        assert(spawnedRocket.active);
+        assert(std::abs(std::sqrt(
+                            spawnedRocket.velocity.x * spawnedRocket.velocity.x +
+                            spawnedRocket.velocity.y * spawnedRocket.velocity.y +
+                            spawnedRocket.velocity.z * spawnedRocket.velocity.z) -
+                        500.0F) < 0.001F);
+        const auto rocketSpawnEvents =
+            rocketRuntime.consumeProjectileEvents();
+        assert(rocketSpawnEvents.size() == 1);
+        assert(rocketSpawnEvents.front().kind ==
+               usm::game::EnemyProjectileEventKind::Spawned);
+        const auto rocketFireSounds = rocketRuntime.consumeSoundCues();
+        assert(rocketFireSounds.size() == 1);
+        assert(rocketFireSounds.front().sourceObjectId == 30000);
+
+        // GetVelocity2TargetUseingTrackingCurve3D (0x003a3c60) turns the
+        // rocket by at most 90 degrees/second only while the target remains
+        // inside its 85-degree tracking cone.
+        constexpr float kThirtyDegreesRadians =
+            30.0F * 3.14159265358979323846F / 180.0F;
+        const float initialSpeed = std::sqrt(
+            spawnedRocket.velocity.x * spawnedRocket.velocity.x +
+            spawnedRocket.velocity.y * spawnedRocket.velocity.y +
+            spawnedRocket.velocity.z * spawnedRocket.velocity.z);
+        const usm::assets::Vector3 initialDirection{
+            spawnedRocket.velocity.x / initialSpeed,
+            spawnedRocket.velocity.y / initialSpeed,
+            spawnedRocket.velocity.z / initialSpeed};
+        const usm::assets::Vector3 trackingDirection{
+            initialDirection.x * std::cos(kThirtyDegreesRadians) -
+                initialDirection.y * std::sin(kThirtyDegreesRadians),
+            initialDirection.x * std::sin(kThirtyDegreesRadians) +
+                initialDirection.y * std::cos(kThirtyDegreesRadians),
+            initialDirection.z};
+        const usm::assets::Vector3 trackingTarget{
+            spawnedRocket.position.x + trackingDirection.x * 800.0F,
+            spawnedRocket.position.y + trackingDirection.y * 800.0F,
+            spawnedRocket.position.z + trackingDirection.z * 800.0F};
+        const usm::assets::Vector3 trackingVictim{
+            trackingTarget.x, trackingTarget.y, trackingTarget.z - 75.0F};
+        rocketRuntime.updateGameplay(
+            100, trackingVictim, nullptr, false,
+            {1.0F, 0.0F, 0.0F}, false, 0, trackingTarget);
+        assert(rocketRuntime.rockets().size() == 1);
+        const auto& trackedRocket = rocketRuntime.rockets().front();
+        assert(trackedRocket.ageMilliseconds == 100);
+        const float trackedSpeed = std::sqrt(
+            trackedRocket.velocity.x * trackedRocket.velocity.x +
+            trackedRocket.velocity.y * trackedRocket.velocity.y +
+            trackedRocket.velocity.z * trackedRocket.velocity.z);
+        assert(std::abs(trackedSpeed - 500.0F) < 0.001F);
+        const float signedTurnDegrees = std::atan2(
+            initialDirection.x * trackedRocket.facing.y -
+                initialDirection.y * trackedRocket.facing.x,
+            initialDirection.x * trackedRocket.facing.x +
+                initialDirection.y * trackedRocket.facing.y) *
+            180.0F / 3.14159265358979323846F;
+        assert(std::abs(signedTurnDegrees - 9.0F) < 0.05F);
+
+        // CRocket::CheckCollisions (0x00363d60) delivers one 50-damage hit;
+        // Explode (0x00363c5c) starts both cached effects and the exact
+        // proximity shake recovered from 0x00363d16-0x00363d26.
+        for (std::uint32_t tick = 0;
+             tick < 20 && !rocketRuntime.rockets().empty(); ++tick) {
+            rocketRuntime.updateGameplay(
+                100, trackingVictim, nullptr, false,
+                {1.0F, 0.0F, 0.0F}, false, 0, trackingTarget);
+        }
+        assert(rocketRuntime.rockets().empty());
+        const auto rocketHits = rocketRuntime.consumePlayerHits();
+        assert(rocketHits.size() == 1);
+        assert(rocketHits.front().sourceObjectId == 30000);
+        assert(rocketHits.front().damage == 50.0F);
+        assert(rocketHits.front().hitType == 104);
+        const auto rocketEffects = rocketRuntime.consumeEffectCues();
+        assert(rocketEffects.size() == 2);
+        assert(rocketEffects[0].effectType == "molotov_bomb");
+        assert(rocketEffects[1].effectType == "cartoon_hit_splash");
+        const auto rocketShakes = rocketRuntime.consumeCameraShakeCues();
+        assert(rocketShakes.size() == 1);
+        assert(rocketShakes.front().maximumOffset == 3.0F);
+        assert(rocketShakes.front().frameCount == 12);
+        assert(rocketShakes.front().axisRates.x == 1.0F);
+        assert(rocketShakes.front().axisRates.y == 1.0F);
+        assert(rocketShakes.front().axisRates.z == 1.0F);
+        const auto rocketContactEvents =
+            rocketRuntime.consumeProjectileEvents();
+        assert(rocketContactEvents.size() == 2);
+        assert(rocketContactEvents[0].kind ==
+               usm::game::EnemyProjectileEventKind::PlayerContact);
+        assert(rocketContactEvents[1].kind ==
+               usm::game::EnemyProjectileEventKind::Exploded);
+        bool sawRocketReload = false;
+        for (std::uint32_t tick = 0; tick < 100; ++tick) {
+            rocketHeavy = rocketRuntime.find(30000);
+            if (!rocketHeavy->rangeAttackActive) {
+                break;
+            }
+            rocketRuntime.updateGameplay(
+                50, trackingVictim, nullptr, false,
+                {1.0F, 0.0F, 0.0F}, false, 0, trackingTarget);
+            rocketHeavy = rocketRuntime.find(30000);
+            if (rocketHeavy->rangeAttackActive &&
+                rocketHeavy->rangeAttackAnimationSequenceIndex == 2) {
+                sawRocketReload = true;
+                assert(rocketHeavy->activeAnimation == "aim_reload_aim");
+                assert(rocketHeavy->animationSpeed == 1.0F);
+            }
+        }
+        rocketHeavy = rocketRuntime.find(30000);
+        assert(sawRocketReload);
+        assert(!rocketHeavy->rangeAttackActive);
+        assert(rocketHeavy->activeAnimation == "idlebaz");
+        assert(rocketHeavy->rangeAttackCooldownMilliseconds == 2000);
+        rocketRuntime.updateGameplay(
+            50, trackingVictim, nullptr, false,
+            {1.0F, 0.0F, 0.0F}, false, 0, trackingTarget);
+        assert(rocketRuntime.find(30000)
+                   ->rangeAttackCooldownMilliseconds == 1950);
+
         const auto findEnemyAsset = [&bootstrap](std::int32_t objectId) {
             return std::find_if(
                 bootstrap.enemies().begin(), bootstrap.enemies().end(),

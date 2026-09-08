@@ -1568,6 +1568,8 @@ Result D3D11Renderer::uploadLevelOneScene(
     webPelletProjectileMeshCount_ = 0;
     molotovProjectileMeshStart_ = 0;
     molotovProjectileMeshCount_ = 0;
+    rocketProjectileMeshStart_ = 0;
+    rocketProjectileMeshCount_ = 0;
     boomerangProjectileMeshStart_ = 0;
     boomerangProjectileMeshCount_ = 0;
     thunderclapWaveMeshStart_ = 0;
@@ -1992,6 +1994,34 @@ Result D3D11Renderer::uploadLevelOneScene(
             setMeshVisible(gpuMeshes_.back(), false);
         }
     }
+    rocketProjectileMeshStart_ = gpuMeshes_.size();
+    // CLevel::GetRocketPool (0x003831a8) initializes MAX_POOL_ROCKETS to
+    // exactly four objects, independently of how many bazooka enemies are in
+    // the loaded scene.
+    rocketProjectileMeshCount_ = 4;
+    {
+        const game::RocketProjectileAsset& projectile =
+            levelOne.rocketProjectile();
+        if (projectile.mesh.images().size() != projectile.textures.size()) {
+            gpuMeshes_.clear();
+            return Result::failure(
+                "Rocket texture count does not match its BDAE image library");
+        }
+        for (std::size_t index = 0;
+             index < rocketProjectileMeshCount_; ++index) {
+            // The untextured bbox child is native collision scaffolding and
+            // CRocket's constructor hides it immediately after measuring it.
+            result = uploadGeometrySet(
+                projectile.mesh.sceneGeometries(), &projectile.mesh,
+                projectile.textures, {}, nullptr, true, true);
+            if (!result) {
+                gpuMeshes_.clear();
+                return Result::failure("Could not upload rocket projectile: " +
+                                       result.message());
+            }
+            setMeshVisible(gpuMeshes_.back(), false);
+        }
+    }
     boomerangProjectileMeshStart_ = gpuMeshes_.size();
     boomerangProjectileMeshCount_ = static_cast<std::size_t>(std::count_if(
         levelOne.enemies().begin(), levelOne.enemies().end(),
@@ -2325,6 +2355,7 @@ Result D3D11Renderer::updateLevelOneActors(
                                   playerHitEffectMeshCount_ +
                                   webPelletProjectileMeshCount_ +
                                   molotovProjectileMeshCount_ +
+                                  rocketProjectileMeshCount_ +
                                   boomerangProjectileMeshCount_ +
                                   thunderclapWaveMeshCount_ +
                                   thunderclapBeamMeshCount_ +
@@ -3064,6 +3095,71 @@ Result D3D11Renderer::updateEnemyMolotovs(
         }
         updateMaterialAnimation(gpuMesh, projectile.animationBank,
                                 clip->startMilliseconds + localTime);
+    }
+    return Result::success();
+}
+
+Result D3D11Renderer::updateEnemyRockets(
+    const game::LevelOneBootstrap& levelOne,
+    std::span<const game::EnemyRocketState> rockets) {
+    if (rocketProjectileMeshStart_ + rocketProjectileMeshCount_ >
+        gpuMeshes_.size()) {
+        return Result::failure(
+            "Rocket projectile GPU resources are incomplete");
+    }
+    for (std::size_t index = 0; index < rocketProjectileMeshCount_; ++index) {
+        setMeshVisible(gpuMeshes_[rocketProjectileMeshStart_ + index], false);
+    }
+    const game::RocketProjectileAsset& projectile =
+        levelOne.rocketProjectile();
+    for (const game::EnemyRocketState& state : rockets) {
+        if (!state.active || state.poolIndex < 0 ||
+            static_cast<std::size_t>(state.poolIndex) >=
+                rocketProjectileMeshCount_) {
+            continue;
+        }
+        assets::Vector3 forward = state.facing;
+        const float forwardLength = std::sqrt(
+            forward.x * forward.x + forward.y * forward.y +
+            forward.z * forward.z);
+        if (forwardLength > std::numeric_limits<float>::epsilon()) {
+            forward.x /= forwardLength;
+            forward.y /= forwardLength;
+            forward.z /= forwardLength;
+        } else {
+            forward = {1.0F, 0.0F, 0.0F};
+        }
+        assets::Vector3 right{-forward.y, forward.x, 0.0F};
+        float rightLength = std::hypot(right.x, right.y);
+        if (rightLength <= std::numeric_limits<float>::epsilon()) {
+            right = {1.0F, 0.0F, 0.0F};
+            rightLength = 1.0F;
+        }
+        right.x /= rightLength;
+        right.y /= rightLength;
+        const assets::Vector3 up{
+            -right.y * forward.z,
+            right.x * forward.z,
+            right.y * forward.x - right.x * forward.y};
+        // Unit::SetFaceDir3D receives the normalized velocity in
+        // UpdateRocketPos (0x003638e0-0x003638e8). The packaged projectile's
+        // authored forward axis is local -Y, matching other native flying
+        // weapon scene nodes.
+        const std::array<float, 16> worldTransform{
+            right.x, right.y, right.z, 0.0F,
+            -forward.x, -forward.y, -forward.z, 0.0F,
+            up.x, up.y, up.z, 0.0F,
+            state.position.x, state.position.y, state.position.z, 1.0F};
+        GpuMesh& gpuMesh = gpuMeshes_[
+            rocketProjectileMeshStart_ +
+            static_cast<std::size_t>(state.poolIndex)];
+        setMeshVisible(gpuMesh, true);
+        const Result result = updateDynamicMesh(
+            gpuMesh, projectile.mesh.sceneGeometries(), &worldTransform);
+        if (!result) {
+            return Result::failure("Could not update rocket projectile: " +
+                                   result.message());
+        }
     }
     return Result::success();
 }

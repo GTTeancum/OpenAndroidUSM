@@ -86,6 +86,17 @@ constexpr float kMolotovCollisionRadiusCentimeters = 20.0F;
 constexpr float kMolotovExplosionRadiusCentimeters = 250.0F;
 constexpr float kMolotovStoppedFallSpeedCentimetersPerSecond = -200.0F;
 constexpr float kThrowObjectWorldLimitCentimeters = 100000.0F;
+// CRocket constructor/FireRocket/UpdateRocketPos at
+// 0x00364158/0x00363a04/0x003637b4. The tracking helper receives 90 degrees
+// per second and only steers while the current-to-target angle is below 85.
+constexpr float kRocketSpeedCentimetersPerSecond = 500.0F;
+constexpr std::uint32_t kRocketLifetimeMilliseconds = 5000;
+constexpr float kRocketTrackingDegreesPerSecond = 90.0F;
+constexpr float kRocketTrackingMaximumAngleDegrees = 85.0F;
+constexpr float kRocketPlayerDangerRangeSquared = 1000000.0F;
+constexpr std::size_t kRocketPoolSize = 4;
+constexpr std::int16_t kRocketHitType = 104;
+constexpr float kRocketVerticalHitForce = 600.0F;
 // CBoss::ResetBehavior (0x0032afdc) configures Rhino's CBehaviorDush with
 // 1200 cm/s and 45 degrees/s.  The dash behavior's target-contact branch
 // uses the two actors' physics shapes; these are the reconstructed player
@@ -545,22 +556,10 @@ bool segmentTouchesPlayer(const assets::Vector3& start,
     return x * x + y * y + z * z <= radius * radius;
 }
 
-bool segmentIntersectsPlayerAabb(
+std::optional<float> segmentAabbHitFraction(
     const assets::Vector3& start, const assets::Vector3& end,
-    const assets::Vector3& playerPosition) noexcept {
-    // CGunLine::CheckCollisions (0x003621f0) constructs a line from the
-    // projectile's current position to this update's candidate position and
-    // passes it to aabbox3d<float>::intersectsWithLine. Unit's player bounds
-    // are the native 50 x 50 x 185 cm extents recovered in
-    // PlayerPhysicsConstants.hpp, with position_ at the feet.
-    const assets::Vector3 minimum{
-        playerPosition.x - kPlayerCollisionRadiusCentimeters,
-        playerPosition.y - kPlayerCollisionRadiusCentimeters,
-        playerPosition.z};
-    const assets::Vector3 maximum{
-        playerPosition.x + kPlayerCollisionRadiusCentimeters,
-        playerPosition.y + kPlayerCollisionRadiusCentimeters,
-        playerPosition.z + kPlayerCollisionHeightCentimeters};
+    const assets::Vector3& minimum,
+    const assets::Vector3& maximum) noexcept {
     const assets::Vector3 delta{end.x - start.x, end.y - start.y,
                                 end.z - start.z};
     float minimumTime = 0.0F;
@@ -579,9 +578,31 @@ bool segmentIntersectsPlayerAabb(
         maximumTime = std::min(maximumTime, exit);
         return minimumTime <= maximumTime;
     };
-    return clipAxis(start.x, delta.x, minimum.x, maximum.x) &&
-           clipAxis(start.y, delta.y, minimum.y, maximum.y) &&
-           clipAxis(start.z, delta.z, minimum.z, maximum.z);
+    if (!clipAxis(start.x, delta.x, minimum.x, maximum.x) ||
+        !clipAxis(start.y, delta.y, minimum.y, maximum.y) ||
+        !clipAxis(start.z, delta.z, minimum.z, maximum.z)) {
+        return std::nullopt;
+    }
+    return minimumTime;
+}
+
+bool segmentIntersectsPlayerAabb(
+    const assets::Vector3& start, const assets::Vector3& end,
+    const assets::Vector3& playerPosition) noexcept {
+    // CGunLine::CheckCollisions (0x003621f0) constructs a line from the
+    // projectile's current position to this update's candidate position and
+    // passes it to aabbox3d<float>::intersectsWithLine. Unit's player bounds
+    // are the native 50 x 50 x 185 cm extents recovered in
+    // PlayerPhysicsConstants.hpp, with position_ at the feet.
+    return segmentAabbHitFraction(
+               start, end,
+               {playerPosition.x - kPlayerCollisionRadiusCentimeters,
+                playerPosition.y - kPlayerCollisionRadiusCentimeters,
+                playerPosition.z},
+               {playerPosition.x + kPlayerCollisionRadiusCentimeters,
+                playerPosition.y + kPlayerCollisionRadiusCentimeters,
+                playerPosition.z + kPlayerCollisionHeightCentimeters})
+        .has_value();
 }
 
 bool segmentTouchesCircle2D(const assets::Vector3& start,
@@ -849,6 +870,7 @@ Result LevelEnemyRuntime::initialize(
     pendingCameraShakeCues_.clear();
     gunLines_.clear();
     molotovs_.clear();
+    rockets_.clear();
     boomerangs_.clear();
     playerWebPellets_.clear();
     thunderclaps_.clear();
@@ -1482,6 +1504,12 @@ void LevelEnemyRuntime::updateGameplay(
     updatePlayerWebPellets(elapsedMilliseconds, collision);
     updateGunLines(elapsedMilliseconds, playerPosition, collision);
     updateMolotovs(elapsedMilliseconds, playerPosition, collision);
+    updateRockets(
+        elapsedMilliseconds, playerPosition,
+        playerRangeTargetPosition.value_or(assets::Vector3{
+            playerPosition.x, playerPosition.y,
+            playerPosition.z + kPlayerCollisionHeightCentimeters * 0.5F}),
+        collision);
     updateBoomerangs(elapsedMilliseconds, playerPosition, collision);
     updateThunderclaps(elapsedMilliseconds, playerPosition);
     updateElectroBursts(elapsedMilliseconds);
@@ -1875,6 +1903,82 @@ void LevelEnemyRuntime::updateGameplay(
             continue;
         }
 
+        // CBehaviorRangeAttack owns its animation tasks until the selected
+        // weapon finishes. For weapon 17, StartAttack_DoAttack enters state
+        // 22, BeginAttack advances it to state 24, and UpdateAnimTask drains
+        // that state's two-clip list before the behavior starts its interval.
+        if (enemy.rangeAttackActive) {
+            enemy.behavior = EnemyBehaviorState::AttackRange;
+            if (enemy.rangeAttackAnimationSequenceIndex == 0U) {
+                const float distance = std::sqrt(distanceSquared);
+                if (distance > std::numeric_limits<float>::epsilon()) {
+                    setFacing(enemy, {toPlayerX / distance,
+                                      toPlayerY / distance, 0.0F});
+                }
+            }
+            const EnemyArchetypeAsset& archetype =
+                level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+            const assets::ColladaAnimationClip* clip =
+                archetype.animationBank.findClip(enemy.activeAnimation);
+            if (clip != nullptr && !enemy.animationLoops &&
+                enemy.animationTimeMilliseconds >=
+                    clip->durationMilliseconds()) {
+                if (enemy.rangeAttackAnimationSequenceIndex + 1U <
+                    enemy.rangeAttackAnimationSequence.size()) {
+                    ++enemy.rangeAttackAnimationSequenceIndex;
+                    enemy.activeAnimation =
+                        enemy.rangeAttackAnimationSequence
+                            [enemy.rangeAttackAnimationSequenceIndex];
+                    enemy.animationTimeMilliseconds = 0;
+                    enemy.animationLoops = false;
+                    enemy.animationReversed = false;
+                    const assets::ColladaAnimationClip* nextClip =
+                        archetype.animationBank.findClip(
+                            enemy.activeAnimation);
+                    // StateEnter(22/24) at 0x003c143c scales the first clip
+                    // of each state to RANGE_ATTACK_03's 1000 ms duration.
+                    // UpdateAnimTask (0x003a88b8) restores scale 1 before
+                    // advancing to aim_reload_aim.
+                    enemy.animationSpeed =
+                        enemy.rangeAttackAnimationSequenceIndex <= 1U &&
+                                nextClip != nullptr
+                            ? static_cast<float>(
+                                  nextClip->durationMilliseconds()) /
+                                  1000.0F
+                            : 1.0F;
+                    const float transitionDistance =
+                        std::sqrt(distanceSquared);
+                    if (transitionDistance >
+                        std::numeric_limits<float>::epsilon()) {
+                        setFacing(enemy,
+                                  {toPlayerX / transitionDistance,
+                                   toPlayerY / transitionDistance, 0.0F});
+                    }
+                    continue;
+                }
+                enemy.rangeAttackActive = false;
+                enemy.rangeAttackAnimationSequence.clear();
+                enemy.rangeAttackAnimationSequenceIndex = 0;
+                enemy.activeAnimation =
+                    std::string(idleAnimation(*enemy.asset));
+                enemy.animationTimeMilliseconds = 0;
+                enemy.animationSpeed = 1.0F;
+                enemy.animationLoops = true;
+                enemy.animationReversed = false;
+                const auto* interval =
+                    level_->enemyAttackIntervalConfigs()
+                        .findForWeaponType(17);
+                enemy.rangeAttackCooldownMilliseconds =
+                    interval == nullptr
+                        ? 0U
+                        : static_cast<std::uint32_t>(std::max(
+                              interval->intervalMilliseconds
+                                  [enemy.asset->enemyTypeId],
+                              0.0F));
+            }
+            continue;
+        }
+
         // CBehaviorMeleeAttack::UpdateAttackMelee (0x003ba244) keeps the
         // behavior in its authored attack substate (9/0xb and their follow-up
         // states) until UpdateAttackMelee_DoAttack (0x003b9e44) observes the
@@ -2074,6 +2178,25 @@ void LevelEnemyRuntime::updateGameplay(
                 }
                 continue;
             }
+            if (isRocketEnemy(enemy)) {
+                const EnemyAttributeDefinition* attributes =
+                    level_->enemyAttributeConfigs().find(
+                        enemy.asset->enemyTypeId);
+                const bool inNativeRangeBand =
+                    attributes != nullptr &&
+                    distance >= attributes->minimumRangeAttackDistance;
+                if (inNativeRangeBand) {
+                    if (enemy.rangeAttackCooldownMilliseconds <=
+                        elapsedMilliseconds) {
+                        enemy.rangeAttackCooldownMilliseconds = 0;
+                        startRocketAttack(enemy);
+                    } else {
+                        enemy.rangeAttackCooldownMilliseconds -=
+                            elapsedMilliseconds;
+                    }
+                    continue;
+                }
+            }
             (void)registerMeleeEngager(enemy);
             if (meleeEngagerObjectId_ != enemy.asset->objectId) {
                 enemy.meleeAttackRegistered = false;
@@ -2193,6 +2316,7 @@ void LevelEnemyRuntime::updateGameplay(
             (states_[index].meleeAttackActive ||
              isGunLineEnemy(states_[index]) ||
              isMolotovEnemy(states_[index]) ||
+             isRocketEnemy(states_[index]) ||
              states_[index].rhinoTask != RhinoBossTaskState::None ||
              states_[index].robotPhantomTask !=
                  RobotPhantomTaskState::None)) {
@@ -2713,6 +2837,9 @@ LevelEnemyRuntime::applyPlayerWebBindingDetailed(
         enemy->meleeAttackActive = false;
         enemy->meleeAttackCooldownMilliseconds = 0;
         enemy->rangeAttackCooldownMilliseconds = 0;
+        enemy->rangeAttackActive = false;
+        enemy->rangeAttackAnimationSequence.clear();
+        enemy->rangeAttackAnimationSequenceIndex = 0;
         selectStateAnimation(
             *enemy, "ENEMY_BEHAVIOR_TIDE_UP_STATE_TIED", true);
     }
@@ -2740,6 +2867,9 @@ bool LevelEnemyRuntime::applyPlayerAirKnockdownBinding(
     enemy->meleeAttackActive = false;
     enemy->meleeAttackCooldownMilliseconds = 0;
     enemy->rangeAttackCooldownMilliseconds = 0;
+    enemy->rangeAttackActive = false;
+    enemy->rangeAttackAnimationSequence.clear();
+    enemy->rangeAttackAnimationSequenceIndex = 0;
     selectStateAnimation(
         *enemy, "ENEMY_BEHAVIOR_TIDE_UP_STATE_TIED_LIE", true);
     return true;
@@ -2831,6 +2961,9 @@ void LevelEnemyRuntime::applyCombatDamage(
         removeElectroPosts(enemy.asset->objectId);
     }
     enemy.meleeAttackActive = false;
+    enemy.rangeAttackActive = false;
+    enemy.rangeAttackAnimationSequence.clear();
+    enemy.rangeAttackAnimationSequenceIndex = 0;
     if (enemy.health == 0.0F) {
         enterDeadState(enemy);
     } else {
@@ -3444,6 +3577,9 @@ bool LevelEnemyRuntime::setDiagnosticAiEnabled(
     enemy->behavior = enabled ? EnemyBehaviorState::Idle
                               : EnemyBehaviorState::Disabled;
     enemy->meleeAttackActive = false;
+    enemy->rangeAttackActive = false;
+    enemy->rangeAttackAnimationSequence.clear();
+    enemy->rangeAttackAnimationSequenceIndex = 0;
     unregisterMeleeEngager(objectId);
     enemy->meleeAttackCooldownMilliseconds = 0;
     enemy->rangeAttackCooldownMilliseconds = 0;
@@ -3564,6 +3700,7 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
     pendingCameraShakeCues_.clear();
     gunLines_.clear();
     molotovs_.clear();
+    rockets_.clear();
     boomerangs_.clear();
     playerWebPellets_.clear();
     thunderclaps_.clear();
@@ -3586,6 +3723,9 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
         enemy.cinematicActionActive = false;
         enemy.cinematicActionObjectId = -1;
         enemy.meleeAttackActive = false;
+        enemy.rangeAttackActive = false;
+        enemy.rangeAttackAnimationSequence.clear();
+        enemy.rangeAttackAnimationSequenceIndex = 0;
         enemy.meleeAttackRegistered = false;
         enemy.meleeRegistrationTimerMilliseconds = 0.0F;
         enemy.tiedUpStateId = -1;
@@ -3619,6 +3759,13 @@ float LevelEnemyRuntime::maximumAttackReach(
         return kGunLineMaximumRangeCentimeters;
     }
     if (isMolotovEnemy(enemy)) {
+        const EnemyAttributeDefinition* attributes =
+            level_->enemyAttributeConfigs().find(enemy.asset->enemyTypeId);
+        return attributes == nullptr
+                   ? 0.0F
+                   : attributes->maximumRangeAttackDistance;
+    }
+    if (isRocketEnemy(enemy)) {
         const EnemyAttributeDefinition* attributes =
             level_->enemyAttributeConfigs().find(enemy.asset->enemyTypeId);
         return attributes == nullptr
@@ -3790,6 +3937,14 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
         if (isMolotovEnemy(enemy) && event->actionType == 0 &&
             event->attackId < 0) {
             throwMolotov(enemy, playerPosition, eventTime);
+            continue;
+        }
+        if (isRocketEnemy(enemy) && event->actionType == 6) {
+            // SpecialAnimActionCheck sends message 0x65 for action type 6.
+            // CBehaviorRangeAttack::onMessage (0x003c0dbc) raises its one-shot
+            // throw flag and UpdateAttack_DoAttack (0x003c1e64) consumes it
+            // in the same behavior update.
+            launchRocket(enemy, playerRangeTargetPosition, eventTime);
             continue;
         }
         if (event->attackId < 0 ||
@@ -3978,6 +4133,205 @@ void LevelEnemyRuntime::updateMolotovs(
     });
 }
 
+void LevelEnemyRuntime::updateRockets(
+    std::uint32_t elapsedMilliseconds,
+    const assets::Vector3& playerPosition,
+    const assets::Vector3& playerTargetPosition,
+    const LevelCollision* collision) noexcept {
+    const auto explode = [&](EnemyRocketState& rocket,
+                             const assets::Vector3& position,
+                             EnemyProjectileEventKind contactKind) {
+        rocket.position = position;
+        rocket.active = false;
+        rocket.dangerActive = false;
+        pendingProjectileEvents_.push_back(
+            {contactKind, rocket.sourceObjectId, position, rocket.velocity,
+             0.0F});
+        if (contactKind != EnemyProjectileEventKind::Exploded) {
+            pendingProjectileEvents_.push_back(
+                {EnemyProjectileEventKind::Exploded,
+                 rocket.sourceObjectId, position, rocket.velocity, 0.0F});
+        }
+        // CRocket::Explode (0x00363c5c) restarts both cached native effects
+        // at the exact contact position. Its explosion is visual; damage is
+        // dispatched only to the Unit contacted by CheckCollisions.
+        pendingEffectCues_.push_back(
+            {rocket.sourceObjectId, rocket.roomId, position,
+             "molotov_bomb"});
+        pendingEffectCues_.push_back(
+            {rocket.sourceObjectId, rocket.roomId, position,
+             "cartoon_hit_splash"});
+        const assets::Vector3 toPlayer{
+            playerPosition.x - position.x, playerPosition.y - position.y,
+            playerPosition.z - position.z};
+        if (toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y +
+                toPlayer.z * toPlayer.z <
+            kRocketPlayerDangerRangeSquared) {
+            // CRocket::Explode 0x00363cd8-0x00363d26: when the player is
+            // within 1000 cm, StartShake receives the literal 3.0f, 12
+            // frames, and axis rates (1, 1, 1).
+            pendingCameraShakeCues_.push_back(
+                {3.0F, 12U, {1.0F, 1.0F, 1.0F}});
+        }
+    };
+
+    const float seconds =
+        static_cast<float>(elapsedMilliseconds) / 1000.0F;
+    for (EnemyRocketState& rocket : rockets_) {
+        if (!rocket.active) {
+            continue;
+        }
+        if (rocket.ageMilliseconds >= kRocketLifetimeMilliseconds ||
+            elapsedMilliseconds >=
+                kRocketLifetimeMilliseconds - rocket.ageMilliseconds) {
+            rocket.ageMilliseconds = kRocketLifetimeMilliseconds;
+            explode(rocket, rocket.position,
+                    EnemyProjectileEventKind::Exploded);
+            continue;
+        }
+
+        const assets::Vector3 toTarget{
+            playerTargetPosition.x - rocket.position.x,
+            playerTargetPosition.y - rocket.position.y,
+            playerTargetPosition.z - rocket.position.z};
+        const float targetLength = std::sqrt(
+            toTarget.x * toTarget.x + toTarget.y * toTarget.y +
+            toTarget.z * toTarget.z);
+        const float velocityLength = std::sqrt(
+            rocket.velocity.x * rocket.velocity.x +
+            rocket.velocity.y * rocket.velocity.y +
+            rocket.velocity.z * rocket.velocity.z);
+        if (targetLength > std::numeric_limits<float>::epsilon() &&
+            velocityLength > std::numeric_limits<float>::epsilon()) {
+            const assets::Vector3 targetDirection{
+                toTarget.x / targetLength, toTarget.y / targetLength,
+                toTarget.z / targetLength};
+            const assets::Vector3 velocityDirection{
+                rocket.velocity.x / velocityLength,
+                rocket.velocity.y / velocityLength,
+                rocket.velocity.z / velocityLength};
+            const float dot = std::clamp(
+                targetDirection.x * velocityDirection.x +
+                    targetDirection.y * velocityDirection.y +
+                    targetDirection.z * velocityDirection.z,
+                -1.0F, 1.0F);
+            const float angle = std::acos(dot) * kRadiansToDegrees;
+            if (angle > 0.0F &&
+                angle < kRocketTrackingMaximumAngleDegrees) {
+                float turn = std::min(
+                    angle, kRocketTrackingDegreesPerSecond * seconds);
+                const float crossZ =
+                    velocityDirection.x * targetDirection.y -
+                    velocityDirection.y * targetDirection.x;
+                if (crossZ < 0.0F) {
+                    turn = -turn;
+                }
+                const float radians = turn / kRadiansToDegrees;
+                const float cosine = std::cos(radians);
+                const float sine = std::sin(radians);
+                const float x = rocket.velocity.x * cosine -
+                                rocket.velocity.y * sine;
+                const float y = rocket.velocity.x * sine +
+                                rocket.velocity.y * cosine;
+                rocket.velocity.x = x;
+                rocket.velocity.y = y;
+            }
+        }
+
+        const assets::Vector3 previous = rocket.position;
+        const assets::Vector3 desired{
+            previous.x + rocket.velocity.x * seconds,
+            previous.y + rocket.velocity.y * seconds,
+            previous.z + rocket.velocity.z * seconds};
+        rocket.ageMilliseconds += elapsedMilliseconds;
+        const float facingLength = std::sqrt(
+            rocket.velocity.x * rocket.velocity.x +
+            rocket.velocity.y * rocket.velocity.y +
+            rocket.velocity.z * rocket.velocity.z);
+        if (facingLength > std::numeric_limits<float>::epsilon()) {
+            rocket.facing = {rocket.velocity.x / facingLength,
+                             rocket.velocity.y / facingLength,
+                             rocket.velocity.z / facingLength};
+        }
+
+        // CRocket::CheckCollisions (0x00363d60) walks the AI entity array in
+        // reverse order, excludes the owner, and stops on its first swept
+        // Unit AABB contact before testing the explicit player target.
+        bool contactedUnit = false;
+        for (auto enemy = states_.rbegin(); enemy != states_.rend(); ++enemy) {
+            if (enemy->asset == nullptr ||
+                enemy->asset->objectId == rocket.sourceObjectId ||
+                !enemy->visible || !enemy->physicsActive ||
+                enemy->health <= 0.0F) {
+                continue;
+            }
+            const auto fraction = segmentAabbHitFraction(
+                previous, desired,
+                {enemy->position.x - enemy->collisionRadius,
+                 enemy->position.y - enemy->collisionRadius,
+                 enemy->position.z},
+                {enemy->position.x + enemy->collisionRadius,
+                 enemy->position.y + enemy->collisionRadius,
+                 enemy->position.z + enemy->collisionHeight});
+            if (!fraction) {
+                continue;
+            }
+            const assets::Vector3 contact{
+                previous.x + (desired.x - previous.x) * *fraction,
+                previous.y + (desired.y - previous.y) * *fraction,
+                previous.z + (desired.z - previous.z) * *fraction};
+            applyCombatDamage(*enemy, rocket.damage, kRocketHitType,
+                              &previous, 0.0F,
+                              kRocketVerticalHitForce);
+            explode(rocket, contact,
+                    EnemyProjectileEventKind::EnemyContact);
+            contactedUnit = true;
+            break;
+        }
+        if (contactedUnit) {
+            continue;
+        }
+        if (const auto playerFraction = segmentAabbHitFraction(
+                previous, desired,
+                {playerPosition.x - kPlayerCollisionRadiusCentimeters,
+                 playerPosition.y - kPlayerCollisionRadiusCentimeters,
+                 playerPosition.z},
+                {playerPosition.x + kPlayerCollisionRadiusCentimeters,
+                 playerPosition.y + kPlayerCollisionRadiusCentimeters,
+                 playerPosition.z + kPlayerCollisionHeightCentimeters})) {
+            const assets::Vector3 contact{
+                previous.x + (desired.x - previous.x) * *playerFraction,
+                previous.y + (desired.y - previous.y) * *playerFraction,
+                previous.z + (desired.z - previous.z) * *playerFraction};
+            pendingPlayerHits_.push_back(
+                {rocket.sourceObjectId, -1, rocket.damage, kRocketHitType});
+            explode(rocket, contact,
+                    EnemyProjectileEventKind::PlayerContact);
+            continue;
+        }
+        if (collision != nullptr) {
+            const auto staticHit = collision->segmentFirstHit(previous, desired);
+            if (staticHit) {
+                explode(rocket, staticHit->position,
+                        EnemyProjectileEventKind::StaticContact);
+                continue;
+            }
+        }
+        rocket.position = desired;
+        const float playerX = rocket.position.x - playerPosition.x;
+        const float playerY = rocket.position.y - playerPosition.y;
+        const float playerZ =
+            rocket.position.z -
+            (playerPosition.z + kPlayerCollisionHeightCentimeters * 0.5F);
+        rocket.dangerActive =
+            playerX * playerX + playerY * playerY + playerZ * playerZ <
+            kRocketPlayerDangerRangeSquared;
+    }
+    std::erase_if(rockets_, [](const EnemyRocketState& rocket) {
+        return !rocket.active;
+    });
+}
+
 void LevelEnemyRuntime::updateBoomerangs(
     std::uint32_t elapsedMilliseconds,
     const assets::Vector3& playerPosition,
@@ -4121,6 +4475,129 @@ void LevelEnemyRuntime::updateBoomerangs(
     std::erase_if(boomerangs_, [](const EnemyBoomerangState& boomerang) {
         return !boomerang.active;
     });
+}
+
+void LevelEnemyRuntime::startRocketAttack(LevelEnemyState& enemy) {
+    if (level_ == nullptr || enemy.asset == nullptr ||
+        enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
+        return;
+    }
+    constexpr std::array<std::string_view, 3> kNativeSequence{
+        "aim_to_idlebaz", "idlebaz_to_aim", "aim_reload_aim"};
+    const EnemyArchetypeAsset& archetype =
+        level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+    if (std::any_of(kNativeSequence.begin(), kNativeSequence.end(),
+                    [&](std::string_view animation) {
+                        return archetype.animationBank.findClip(animation) ==
+                               nullptr;
+                    })) {
+        return;
+    }
+    const EnemyAttackIntervalDefinition* interval =
+        level_->enemyAttackIntervalConfigs().findForWeaponType(17);
+    const EnemyRangeAttackDefinition* attack =
+        interval == nullptr
+            ? nullptr
+            : level_->enemyRangeAttackConfigs().findByMapId(interval->id);
+    const assets::ColladaAnimationClip* ready =
+        archetype.animationBank.findClip(kNativeSequence.front());
+    if (attack == nullptr || ready == nullptr ||
+        attack->animationDurationMilliseconds <= 0.0F) {
+        return;
+    }
+    enemy.rangeAttackAnimationSequence.assign(kNativeSequence.begin(),
+                                               kNativeSequence.end());
+    enemy.rangeAttackAnimationSequenceIndex = 0;
+    enemy.rangeAttackActive = true;
+    enemy.activeAnimation = kNativeSequence.front();
+    enemy.animationTimeMilliseconds = 0;
+    enemy.animationSpeed =
+        static_cast<float>(ready->durationMilliseconds()) /
+        attack->animationDurationMilliseconds;
+    enemy.animationLoops = false;
+    enemy.animationReversed = false;
+}
+
+void LevelEnemyRuntime::launchRocket(
+    LevelEnemyState& enemy,
+    const assets::Vector3& playerTargetPosition,
+    std::uint32_t authoredEventTimeMilliseconds) {
+    if (level_ == nullptr || enemy.asset == nullptr ||
+        enemy.asset->archetypeIndex >= level_->enemyArchetypes().size() ||
+        rockets_.size() >= kRocketPoolSize) {
+        return;
+    }
+    const EnemyArchetypeAsset& archetype =
+        level_->enemyArchetypes()[enemy.asset->archetypeIndex];
+    const assets::ColladaAnimationClip* clip =
+        archetype.animationBank.findClip(enemy.activeAnimation);
+    if (clip == nullptr) {
+        return;
+    }
+    std::array<float, 16> launchNodeTransform{};
+    const Result launchNodeResult = assets::evaluateColladaSceneNodeTransform(
+        archetype.mesh, archetype.animationBank,
+        clip->startMilliseconds + authoredEventTimeMilliseconds,
+        "fx_quad_front", launchNodeTransform);
+    if (!launchNodeResult) {
+        return;
+    }
+    // CEnemy::InitBazooka (0x00332b56-0x00332b98) finds bazooka and then
+    // resolves the child launch node using the same fx_quad_front string for
+    // both alternating slots. ThrowMolotov's weapon-17 branch
+    // (0x003c03ee-0x003c044c) passes one of those slots to FireRocket. The
+    // attached fx_quad_front/back scene roots are explicitly hidden; only
+    // this authored child transform supplies the launch point.
+    assets::Vector3 origin = transformPoint(
+        enemy.worldTransform, transformPoint(launchNodeTransform));
+    const assets::Vector3 delta{
+        playerTargetPosition.x - origin.x,
+        playerTargetPosition.y - origin.y,
+        playerTargetPosition.z - origin.z};
+    const float length = std::sqrt(
+        delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+    if (length <= std::numeric_limits<float>::epsilon()) {
+        return;
+    }
+    const assets::Vector3 direction{
+        delta.x / length, delta.y / length, delta.z / length};
+    // CRocket::Fire (0x00363b44) advances the visible projectile 50 cm from
+    // the launch node before starting rocket_smoke and enabling its body.
+    origin.x += direction.x * 50.0F;
+    origin.y += direction.y * 50.0F;
+    origin.z += direction.z * 50.0F;
+    const assets::Vector3 velocity{
+        direction.x * kRocketSpeedCentimetersPerSecond,
+        direction.y * kRocketSpeedCentimetersPerSecond,
+        direction.z * kRocketSpeedCentimetersPerSecond};
+    const EnemyAttackIntervalDefinition* interval =
+        level_->enemyAttackIntervalConfigs().findForWeaponType(17);
+    const EnemyRangeAttackDefinition* attack =
+        interval == nullptr
+            ? nullptr
+            : level_->enemyRangeAttackConfigs().findByMapId(interval->id);
+    if (attack == nullptr) {
+        return;
+    }
+    std::array<bool, kRocketPoolSize> used{};
+    for (const EnemyRocketState& rocket : rockets_) {
+        if (rocket.active && rocket.poolIndex >= 0 &&
+            static_cast<std::size_t>(rocket.poolIndex) < used.size()) {
+            used[static_cast<std::size_t>(rocket.poolIndex)] = true;
+        }
+    }
+    const auto freeSlot = std::find(used.begin(), used.end(), false);
+    if (freeSlot == used.end()) {
+        return;
+    }
+    const std::int32_t poolIndex = static_cast<std::int32_t>(
+        std::distance(used.begin(), freeSlot));
+    rockets_.push_back({enemy.asset->objectId, enemy.asset->roomId,
+                        poolIndex, origin, velocity, direction,
+                        attack->damage, 0, false, true});
+    pendingProjectileEvents_.push_back(
+        {EnemyProjectileEventKind::Spawned, enemy.asset->objectId,
+         origin, velocity, 0.0F});
 }
 
 void LevelEnemyRuntime::startMolotovAttack(LevelEnemyState& enemy) {
@@ -6172,6 +6649,21 @@ bool LevelEnemyRuntime::isMolotovEnemy(
                attributes->rangedAttackTypeMapIndices.front()) == 5;
 }
 
+bool LevelEnemyRuntime::isRocketEnemy(
+    const LevelEnemyState& enemy) const noexcept {
+    if (level_ == nullptr || enemy.asset == nullptr) {
+        return false;
+    }
+    const EnemyAttributeDefinition* attributes =
+        level_->enemyAttributeConfigs().find(enemy.asset->enemyTypeId);
+    if (attributes == nullptr ||
+        attributes->rangedAttackTypeMapIndices.empty()) {
+        return false;
+    }
+    return resolveEnemyRangeWeaponType(
+               attributes->rangedAttackTypeMapIndices.front()) == 17;
+}
+
 void LevelEnemyRuntime::queueStateSound(
     LevelEnemyState& enemy, std::string_view behaviorStateName) {
     if (level_ == nullptr || enemy.asset == nullptr) {
@@ -6324,6 +6816,9 @@ void LevelEnemyRuntime::enterDeadState(LevelEnemyState& enemy) {
     enemy.behavior = EnemyBehaviorState::Dead;
     enemy.meleeAttackActive = false;
     enemy.meleeAttackCooldownMilliseconds = 0;
+    enemy.rangeAttackActive = false;
+    enemy.rangeAttackAnimationSequence.clear();
+    enemy.rangeAttackAnimationSequenceIndex = 0;
     enemy.hurtStateId = -1;
     enemy.hurtVelocity = {};
     enemy.hurtStartedGrounded = false;
@@ -6490,6 +6985,9 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         enemy->physicsActive = false;
         enemy->behavior = EnemyBehaviorState::Disabled;
         enemy->meleeAttackActive = false;
+        enemy->rangeAttackActive = false;
+        enemy->rangeAttackAnimationSequence.clear();
+        enemy->rangeAttackAnimationSequenceIndex = 0;
         unregisterMeleeEngager(objectId);
         return Result::success();
     }
@@ -6503,6 +7001,9 @@ Result LevelEnemyRuntime::applyCinematicCommand(
         enemy->physicsActive = false;
         enemy->behavior = EnemyBehaviorState::Disabled;
         enemy->meleeAttackActive = false;
+        enemy->rangeAttackActive = false;
+        enemy->rangeAttackAnimationSequence.clear();
+        enemy->rangeAttackAnimationSequenceIndex = 0;
         unregisterMeleeEngager(objectId);
         enemy->meleeAttackCooldownMilliseconds = 0;
         enemy->sandmanTask = SandmanBossTaskState::None;
@@ -6601,6 +7102,9 @@ Result LevelEnemyRuntime::applyCinematicCommand(
                 ? clip->durationMilliseconds()
                 : 0;
         enemy->meleeAttackActive = false;
+        enemy->rangeAttackActive = false;
+        enemy->rangeAttackAnimationSequence.clear();
+        enemy->rangeAttackAnimationSequenceIndex = 0;
         enemy->meleeAttackCooldownMilliseconds = 0;
         enemy->sandmanTask = SandmanBossTaskState::None;
         enemy->sandmanJumpElapsedMilliseconds = 0;
