@@ -11991,6 +11991,18 @@ int main() {
         const auto followedPose = followCamera.sample({5.0F, 5.0F, 40.0F});
         assert(std::abs(followedPose.target.z - 130.0F) < 0.001F);
         assert(bootstrap.rooms().size() == 13);
+        for (const usm::game::LevelRoomAsset& room : bootstrap.rooms()) {
+            std::size_t sceneGeometryInstanceCount = 0;
+            for (const usm::assets::ColladaSceneNode& node :
+                 room.geometry.sceneNodes()) {
+                sceneGeometryInstanceCount += node.geometryIndices.size();
+            }
+            // CColladaMeshSceneNode registers each instantiated mesh buffer
+            // independently at 0x0041dc84. Preserve the one-to-one mapping
+            // needed to carry its authored absolute position into sorting.
+            assert(sceneGeometryInstanceCount ==
+                   room.geometry.sceneGeometries().size());
+        }
         assert(bootstrap.mainScene().linkedSceneFiles().size() == 13);
         assert(bootstrap.mainScene().linkedSceneFiles().front() ==
                "levelnew_01_0_Room1.irr");

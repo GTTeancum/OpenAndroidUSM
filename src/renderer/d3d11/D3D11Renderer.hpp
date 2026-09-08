@@ -160,6 +160,8 @@ private:
         bool frontFaceCulling{};
         bool reflectionTwoLayer{};
         bool lightmapTwoLayer{};
+        assets::Vector3 transparentSortPosition;
+        bool hasTransparentSortPosition{};
         std::string materialAnimationTarget;
         std::array<float, 6> baseTextureTransform{1.0F, 0.0F, 0.0F,
                                                   1.0F, 0.0F, 0.0F};

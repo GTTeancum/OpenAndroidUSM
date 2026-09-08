@@ -2023,6 +2023,16 @@ ribbons in that same pass. Its `setLineSegment` at `0x0039af00` makes the
 first endpoint the scene-node position; the web-swing ribbon is therefore
 sorted from its hand attachment alongside the particle emitters.
 
+`CColladaMeshSceneNode::OnRegisterSceneNode` at `0x0041dc84` contributes one
+entry for every transparent material/mesh-buffer pair. Static room geometry
+retains the exact `ColladaSceneNode::worldPosition` produced by the serialized
+visual-scene hierarchy, so Level 1's `12_shadows.tga` road and building shadow
+quads now leave the solid pass and sort with web ribbons and particles from
+their authored node transforms. Dynamic object/actor entries are deliberately
+left on their existing path until their animated absolute-node transforms are
+carried through the renderer; using geometry centers would not match native
+sorting.
+
 Health and skill orbs do not participate in that distance sort.
 `CHealthOrbs::getRenderingLayer` at `0x003a1100` returns layer 7, and
 `CFpsSceneManager::registerNodeForRendering` at `0x00398bb8` redirects layer-7

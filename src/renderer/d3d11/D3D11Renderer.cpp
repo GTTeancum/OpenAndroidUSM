@@ -6184,7 +6184,30 @@ Result D3D11Renderer::uploadGeometrySet(
         }
     }
     std::vector<std::uint16_t> indices;
+    std::vector<assets::Vector3> sceneGeometryNodePositions;
+    if (materialLibrary != nullptr) {
+        for (const assets::ColladaSceneNode& node :
+             materialLibrary->sceneNodes()) {
+            for (std::size_t instanceIndex = 0;
+                 instanceIndex < node.geometryIndices.size();
+                 ++instanceIndex) {
+                DirectX::XMVECTOR position = DirectX::XMVectorSet(
+                    node.worldPosition.x, node.worldPosition.y,
+                    node.worldPosition.z, 1.0F);
+                position = DirectX::XMVector3TransformCoord(position,
+                                                            meshTransform);
+                sceneGeometryNodePositions.push_back(
+                    {DirectX::XMVectorGetX(position),
+                     DirectX::XMVectorGetY(position),
+                     DirectX::XMVectorGetZ(position)});
+            }
+        }
+        if (sceneGeometryNodePositions.size() != geometries.size()) {
+            sceneGeometryNodePositions.clear();
+        }
+    }
     std::uint32_t baseVertex = 0;
+    std::size_t geometryIndex = 0;
     for (const assets::ColladaGeometry& geometry : geometries) {
         if (renderTraceEnabled()) {
             std::cerr << "mesh_geometry name=" << geometry.name
@@ -6203,6 +6226,11 @@ Result D3D11Renderer::uploadGeometrySet(
         }
         for (const assets::ColladaMeshBuffer& source : geometry.meshBuffers) {
             DrawBatch batch;
+            if (geometryIndex < sceneGeometryNodePositions.size()) {
+                batch.transparentSortPosition =
+                    sceneGeometryNodePositions[geometryIndex];
+                batch.hasTransparentSortPosition = true;
+            }
             batch.topology = topologyFor(source.primitive);
             batch.indexCount = static_cast<std::uint32_t>(source.indices.size());
             batch.startIndex = static_cast<std::uint32_t>(indices.size());
@@ -6306,6 +6334,7 @@ Result D3D11Renderer::uploadGeometrySet(
             gpuMesh.drawBatches.push_back(batch);
         }
         baseVertex += static_cast<std::uint32_t>(geometry.vertices.size());
+        ++geometryIndex;
     }
     if (indices.empty()) {
         return Result::failure("Geometry set contains no indices");
@@ -6514,6 +6543,17 @@ void D3D11Renderer::renderFrame() {
                         if (batch.renderingLayer != renderingLayer) {
                             continue;
                         }
+                        if (!gpuMesh.cameraRelative &&
+                            gpuMeshIndex < roomMeshCount_ &&
+                            renderingLayer == 0 &&
+                            (batch.alphaBlend || batch.additiveBlend) &&
+                            batch.hasTransparentSortPosition) {
+                            // CColladaMeshSceneNode registers each transparent
+                            // room mesh buffer in pass 6 at 0x0041dc84. It is
+                            // drawn later through STransparentNodeEntry, not
+                            // inline with this solid-node traversal.
+                            continue;
+                        }
                         if (batch.backFaceCulling && batch.frontFaceCulling) {
                             // The original selects GL_FRONT_AND_BACK when both
                             // material flags are set, which rejects every
@@ -6633,8 +6673,9 @@ void D3D11Renderer::renderFrame() {
         context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
         context_->VSSetShader(vertexShader_.Get(), nullptr, 0);
-        const std::array<ID3D11Buffer*, 2> vertexBuffers{
-            transformBuffer_.Get(), viewRotationBuffer_.Get()};
+        const std::array<ID3D11Buffer*, 3> vertexBuffers{
+            transformBuffer_.Get(), viewRotationBuffer_.Get(),
+            textureTransformBuffer_.Get()};
         context_->VSSetConstantBuffers(
             0, static_cast<UINT>(vertexBuffers.size()), vertexBuffers.data());
         context_->PSSetShader(colorPixelShader_.Get(), nullptr, 0);
@@ -6646,20 +6687,43 @@ void D3D11Renderer::renderFrame() {
     }
 
     enum class TransparentSpriteKind : std::uint8_t {
+        RoomMeshBatch,
         WebLine,
         Particle,
     };
     struct TransparentSpriteEntry {
         TransparentSpriteKind kind{};
+        std::size_t meshIndex{};
         std::size_t batchIndex{};
         game::NativeTransparentNodeSortKey sortKey;
     };
     std::vector<TransparentSpriteEntry> transparentSprites;
+    for (std::size_t meshIndex = 0;
+         meshIndex < roomMeshCount_ && meshIndex < gpuMeshes_.size();
+         ++meshIndex) {
+        const GpuMesh& gpuMesh = gpuMeshes_[meshIndex];
+        if (!gpuMesh.visible || !gpuMesh.vertexBuffer ||
+            !gpuMesh.indexBuffer || gpuMesh.textures.empty()) {
+            continue;
+        }
+        for (std::size_t batchIndex = 0;
+             batchIndex < gpuMesh.drawBatches.size(); ++batchIndex) {
+            const DrawBatch& batch = gpuMesh.drawBatches[batchIndex];
+            if (batch.renderingLayer != 0 ||
+                (!batch.alphaBlend && !batch.additiveBlend) ||
+                !batch.hasTransparentSortPosition) {
+                continue;
+            }
+            transparentSprites.push_back(
+                {TransparentSpriteKind::RoomMeshBatch, meshIndex, batchIndex,
+                 {batch.transparentSortPosition, 0.0F, 0}});
+        }
+    }
     if (webLineVertexBuffer_ && webLineTexture_) {
         for (std::size_t index = 0; index < webLineDrawBatches_.size();
              ++index) {
             transparentSprites.push_back(
-                {TransparentSpriteKind::WebLine, index,
+                {TransparentSpriteKind::WebLine, 0, index,
                  {webLineDrawBatches_[index].nodePosition, 0.0F, 0}});
         }
     }
@@ -6667,7 +6731,7 @@ void D3D11Renderer::renderFrame() {
         for (std::size_t index = 0;
              index < effectParticleDrawBatches_.size(); ++index) {
             transparentSprites.push_back(
-                {TransparentSpriteKind::Particle, index,
+                {TransparentSpriteKind::Particle, 0, index,
                  {effectParticleDrawBatches_[index].emitterPosition,
                   0.0F, 0}});
         }
@@ -6701,6 +6765,62 @@ void D3D11Renderer::renderFrame() {
         context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
         context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
         for (const TransparentSpriteEntry& entry : transparentSprites) {
+            if (entry.kind == TransparentSpriteKind::RoomMeshBatch) {
+                const GpuMesh& gpuMesh = gpuMeshes_[entry.meshIndex];
+                const DrawBatch& batch =
+                    gpuMesh.drawBatches[entry.batchIndex];
+                const TextureTransformConstants textureTransform{
+                    {batch.textureTransform[0], batch.textureTransform[2],
+                     batch.textureTransform[4], 0.0F},
+                    {batch.textureTransform[1], batch.textureTransform[3],
+                     batch.textureTransform[5], 0.0F}};
+                context_->UpdateSubresource(
+                    textureTransformBuffer_.Get(), 0, nullptr,
+                    &textureTransform, 0, 0);
+                const std::array<ID3D11Buffer*, 3> meshVertexBuffers{
+                    transformBuffer_.Get(), viewRotationBuffer_.Get(),
+                    textureTransformBuffer_.Get()};
+                context_->VSSetConstantBuffers(
+                    0, static_cast<UINT>(meshVertexBuffers.size()),
+                    meshVertexBuffers.data());
+                context_->IASetVertexBuffers(
+                    0, 1, gpuMesh.vertexBuffer.GetAddressOf(), &stride,
+                    &offset);
+                context_->IASetIndexBuffer(gpuMesh.indexBuffer.Get(),
+                                           DXGI_FORMAT_R16_UINT, 0);
+                context_->PSSetShader(
+                    batch.reflectionTwoLayer ? reflectionPixelShader_.Get()
+                                             : pixelShader_.Get(),
+                    nullptr, 0);
+                const std::array<ID3D11ShaderResourceView*, 2> textureViews{
+                    gpuMesh.textures[batch.textureIndex].Get(),
+                    batch.reflectionTwoLayer
+                        ? gpuMesh.textures[batch.secondaryTextureIndex].Get()
+                        : nullptr};
+                context_->PSSetShaderResources(
+                    0, static_cast<UINT>(textureViews.size()),
+                    textureViews.data());
+                context_->OMSetBlendState(
+                    batch.additiveBlend ? additiveBlendState_.Get()
+                                        : alphaBlendState_.Get(),
+                    nullptr, 0xffffffffU);
+                context_->RSSetState(
+                    batch.frontFaceCulling
+                        ? frontCullRasterizerState_.Get()
+                        : batch.backFaceCulling
+                              ? rasterizerState_.Get()
+                              : noCullRasterizerState_.Get());
+                context_->IASetPrimitiveTopology(batch.topology);
+                context_->DrawIndexed(batch.indexCount, batch.startIndex,
+                                      batch.baseVertex);
+                continue;
+            }
+            const TextureTransformConstants identityTextureTransform{
+                {1.0F, 0.0F, 0.0F, 0.0F},
+                {0.0F, 1.0F, 0.0F, 0.0F}};
+            context_->UpdateSubresource(textureTransformBuffer_.Get(), 0,
+                                        nullptr, &identityTextureTransform, 0,
+                                        0);
             if (entry.kind == TransparentSpriteKind::WebLine) {
                 const WebLineDrawBatch& batch =
                     webLineDrawBatches_[entry.batchIndex];
