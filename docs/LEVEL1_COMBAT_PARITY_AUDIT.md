@@ -379,6 +379,17 @@ to the autoplay event log.
   another thug can steal. Its accepted contact deals 80 damage, launches with the authored
   400/700 force pair, spawns effect 16 (`fx_in_air_diagonal_kick`) on frame 2,
   and dispatches the state-95 kick-impact configuration.
+- An idle Ground Web press first passes through transient state 57 and
+  `Player::GetGroundWebSpecialState` (`0x00343f48`). That selector performs a
+  strict 1000 cm `SearchTargetByEyeHorizon`, rejects a winning non-`CEnemy`
+  candidate, and substitutes state 84 for an airborne enemy no more than 160
+  cm above Spider-Man or state 63 above that boundary. If it returns normal
+  pellet state 58, `Player::SetNextStateId` (`0x00349c54`--`0x00349ce8`) then
+  performs a separate 3000 cm directional / 2000 cm neutral target search.
+  The runtime now preserves both searches instead of incorrectly allowing a
+  distant airborne pellet target to select a close-range special. Authored
+  state 61 has no inbound transition in the shipped state graph and is not
+  inserted as a substitute route.
 - The alternate aerial branch retains the live knocked-back target through
   states 84 and 85. The fly kick and linked headbutt each deal 120 damage and
   pair their accepted contacts with the authored kick-impact audio. Enemy
@@ -552,7 +563,10 @@ The target-marker integration run in
 `analysis/generated/combat-target-hint-suite/suite-manifest.json` passes all
 five selected combat scenarios under one executable hash; its health ledger
 records the 4/5/6 animation changes and hide-on-death event while cleaning all
-ten generated captures. The current retained gates are:
+ten generated captures. The post-selector run in
+`analysis/generated/ground-web-dual-search-suite/suite-manifest.json` passes
+all five opening ground-web scenarios under one executable hash and cleans its
+two rendered captures. The current retained gates are:
 
 - `OpenAndroidUSM.CoreTests.exe`
 - `OpenAndroidUSM.RenderTests.exe`

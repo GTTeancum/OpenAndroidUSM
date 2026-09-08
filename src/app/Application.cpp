@@ -3466,6 +3466,17 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 const auto candidates = autoplay && traversalRequest
                     ? gameplayPlayer_.webGrabCandidateDiagnostics()
                     : std::vector<game::WebGrabCandidateDiagnostics>{};
+                std::optional<PlayerTargetSelection> groundWebSpecialTarget;
+                if (!traversalRequest) {
+                    // UpdateKeyTrigger resolves state 57 through
+                    // GetGroundWebSpecialState (0x00343f48) before state 58
+                    // performs its wider target search. The selector is a
+                    // strict 1000 cm eye-horizon search; if an appended
+                    // destroyable wins, its non-CEnemy type rejects the
+                    // special entirely.
+                    groundWebSpecialTarget = selectEnemyTarget(
+                        acquireCombatPointerEnemy());
+                }
                 std::optional<PlayerTargetSelection> webTarget;
                 const std::int32_t retainedWebTargetId =
                     gameplayPlayer_.webAttackTransitionReady()
@@ -3515,10 +3526,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                               }
                               return selected;
                           }()};
+                const game::PlayerGroundWebSpecialSearch groundSpecialSearch{
+                    !groundWebSpecialTarget.has_value()
+                        ? std::nullopt
+                        : std::optional<game::PlayerAttackTarget>{
+                              groundWebSpecialTarget->target}};
                 const bool accepted = gameplayPlayer_.requestWeb(
                     playerWebTarget, attackDirection,
                     game::PlayerButtonPhase::Pressed,
-                    &cameraBeforeMovement);
+                    &cameraBeforeMovement,
+                    traversalRequest ? nullptr : &groundSpecialSearch);
                 if (autoplay) {
                     const bool traversalAccepted =
                         accepted && gameplayPlayer_.activeStateId() == 17;
@@ -3538,6 +3555,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         (!webTarget.has_value()
                              ? std::string{"none"}
                              : std::to_string(webTarget->target.objectId)) +
+                        ";special_target=" +
+                        (!groundWebSpecialTarget.has_value()
+                             ? std::string{"none"}
+                             : std::to_string(
+                                   groundWebSpecialTarget->target.objectId)) +
                         ";state=" +
                         std::to_string(gameplayPlayer_.activeStateId()) +
                         ";rejection=" +

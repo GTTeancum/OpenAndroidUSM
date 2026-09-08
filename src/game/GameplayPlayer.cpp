@@ -1134,7 +1134,8 @@ bool GameplayPlayer::requestJump(const PlayerMotionInput& input,
 bool GameplayPlayer::requestWeb(
     const std::optional<PlayerAttackTarget>& target,
     const std::optional<assets::Vector3>& directionalInput,
-    PlayerButtonPhase phase, const CameraPose* camera) noexcept {
+    PlayerButtonPhase phase, const CameraPose* camera,
+    const PlayerGroundWebSpecialSearch* groundSpecialSearch) noexcept {
     lastActionRejectionReason_ = {};
     if (camera != nullptr) {
         // Every native web-line allocation immediately follows
@@ -1219,27 +1220,47 @@ bool GameplayPlayer::requestWeb(
                 return false;
             }
             requested = webTransition(phase);
-        } else if (target.has_value() && target->airborne) {
-            // Player::GetGroundWebSpecialState (0x00343f48) keeps the normal
-            // web pellet for a grounded target. Its CEnemy::IsInAir virtual
-            // redirects an airborne enemy to state 84 when its base is no
-            // more than 160 cm above Spider-Man, or state 63 when higher.
-            requested = target->position.z - position_.z <= 160.0F
+        } else {
+            // UpdateKeyTrigger (0x0034d3f6) first resolves state 57 through
+            // Player::GetGroundWebSpecialState (0x00343f48). That function
+            // runs its own 1000 cm SearchTargetByEyeHorizon and rejects a
+            // non-CEnemy winner before state 58's SetNextStateId path runs a
+            // second 3000/2000 cm search. Tests that call GameplayPlayer
+            // directly retain the historical one-target shorthand; the app
+            // supplies the explicit result of the short native search.
+            const std::optional<PlayerAttackTarget>& specialTarget =
+                groundSpecialSearch != nullptr
+                    ? groundSpecialSearch->target
+                    : target;
+            if (specialTarget.has_value() && specialTarget->airborne) {
+                // CEnemy::IsInAir redirects to state 84 when its base is no
+                // more than 160 cm above Spider-Man, or state 63 when higher.
+                requested = specialTarget->position.z - position_.z <= 160.0F
                             ? groundWebFlyKickState_
                             : groundWebDragDownState_;
-        } else {
-            if (phase != PlayerButtonPhase::Pressed) {
-                lastActionRejectionReason_ = "web_transition_unavailable";
-                return false;
+            } else {
+                if (phase != PlayerButtonPhase::Pressed) {
+                    lastActionRejectionReason_ =
+                        "web_transition_unavailable";
+                    return false;
+                }
+                requested = groundWebShotState_;
             }
-            requested = groundWebShotState_;
         }
         if (requested == nullptr) {
             lastActionRejectionReason_ = "missing_transition";
             return false;
         }
+        const bool selectedGroundSpecial =
+            activeAttackState_ == nullptr &&
+            (requested == groundWebFlyKickState_ ||
+             requested == groundWebDragDownState_);
         const std::optional<PlayerAttackTarget>& selectedTarget =
-            activeAttackState_ != nullptr ? activeAttackTarget_ : target;
+            activeAttackState_ != nullptr
+                ? activeAttackTarget_
+                : selectedGroundSpecial && groundSpecialSearch != nullptr
+                      ? groundSpecialSearch->target
+                      : target;
         if (activeAttackState_ == nullptr && selectedTarget.has_value()) {
             const float x = selectedTarget->position.x - position_.x;
             const float y = selectedTarget->position.y - position_.y;
@@ -1265,7 +1286,7 @@ bool GameplayPlayer::requestWeb(
                                          requestedAirborne, target,
                                          directionalInput);
         }
-        activeAttackTarget_ = target;
+        activeAttackTarget_ = selectedTarget;
         activeAttackAirborne_ = requestedAirborne;
         if (!enterAttackState(*requested)) {
             activeAttackTarget_.reset();

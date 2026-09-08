@@ -178,6 +178,14 @@ struct PlayerAttackTarget {
     std::int16_t enemySubType{-1};
 };
 
+// Player::GetGroundWebSpecialState (0x00343f48) performs a separate,
+// short-range eye search before SetNextStateId performs state 58's wider
+// projectile-target search. A present wrapper with an empty target preserves
+// the fact that the first search ran and rejected every candidate.
+struct PlayerGroundWebSpecialSearch {
+    std::optional<PlayerAttackTarget> target;
+};
+
 // Portable, renderer-independent reconstruction of the normal ground movement
 // path in Player::GetJoyStickDirToGameDir (0x00343a64), Player::moveForward
 // (0x00341524), and Player::UpdateMCSpeed (0x00346f50).
@@ -222,7 +230,9 @@ public:
         const std::optional<assets::Vector3>& directionalInput =
             std::nullopt,
         PlayerButtonPhase phase = PlayerButtonPhase::Pressed,
-        const CameraPose* camera = nullptr) noexcept;
+        const CameraPose* camera = nullptr,
+        const PlayerGroundWebSpecialSearch* groundSpecialSearch =
+            nullptr) noexcept;
     [[nodiscard]] bool requestUltimate() noexcept;
     [[nodiscard]] bool requestSpiderSense(
         const PlayerAttackTarget& attacker) noexcept;

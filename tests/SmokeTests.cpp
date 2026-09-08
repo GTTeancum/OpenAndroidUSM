@@ -10731,6 +10731,53 @@ int main() {
         assert(airSensePlayer.activeStateId() == 36);
         assert(senseRandomizer.state() == 632802407);
 
+        // The third value in the exact native stream is 64 after modulo 100,
+        // proving the other half of DoNormalSenseAction's inclusive <= 50
+        // split for an attacker in front.
+        usm::game::NativeRandomizer alternateSenseRandomizer;
+        (void)alternateSenseRandomizer.next();
+        (void)alternateSenseRandomizer.next();
+        usm::game::GameplayPlayer alternateAirSensePlayer;
+        assert(alternateAirSensePlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs, {}, {}, {},
+            nullptr, &bootstrap.playerHitEffectConfigs(),
+            bootstrap.playerHitEffects(), &alternateSenseRandomizer));
+        assert(alternateAirSensePlayer.requestJump());
+        assert(alternateAirSensePlayer.requestSpiderSense(airSenseTarget));
+        assert(alternateAirSensePlayer.activeStateId() == 37);
+        assert(alternateSenseRandomizer.state() == 1237959964);
+
+        // A side attacker selects the perpendicular front/back pair using
+        // that same random split: <= 50 chooses state 34 and > 50 state 35.
+        usm::game::NativeRandomizer sideSenseRandomizer;
+        usm::game::GameplayPlayer sideAirSensePlayer;
+        assert(sideAirSensePlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs, {}, {}, {},
+            nullptr, &bootstrap.playerHitEffectConfigs(),
+            bootstrap.playerHitEffects(), &sideSenseRandomizer));
+        sideAirSensePlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                     {1.0F, 0.0F, 0.0F});
+        assert(sideAirSensePlayer.requestJump());
+        auto sideSenseTarget = airSenseTarget;
+        sideSenseTarget.position = {0.0F, 150.0F, 0.0F};
+        assert(sideAirSensePlayer.requestSpiderSense(sideSenseTarget));
+        assert(sideAirSensePlayer.activeStateId() == 34);
+
+        usm::game::NativeRandomizer alternateSideSenseRandomizer;
+        (void)alternateSideSenseRandomizer.next();
+        (void)alternateSideSenseRandomizer.next();
+        usm::game::GameplayPlayer alternateSideAirSensePlayer;
+        assert(alternateSideAirSensePlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs, {}, {}, {},
+            nullptr, &bootstrap.playerHitEffectConfigs(),
+            bootstrap.playerHitEffects(), &alternateSideSenseRandomizer));
+        alternateSideAirSensePlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                              {1.0F, 0.0F, 0.0F});
+        assert(alternateSideAirSensePlayer.requestJump());
+        assert(alternateSideAirSensePlayer.requestSpiderSense(
+            sideSenseTarget));
+        assert(alternateSideAirSensePlayer.activeStateId() == 35);
+
         constexpr std::array<std::uint16_t, 4> fixedSenseStates{
             35, 34, 36, 37};
         for (std::size_t index = 0; index < fixedSenseStates.size(); ++index) {
@@ -11308,6 +11355,50 @@ int main() {
         assert(movingGroundWebPlayer.activeStateId() == 84);
         assert(movingGroundWebPlayer.activeAnimation() ==
                bootstrap.player().animationBank.clips()[87].name);
+
+        // GetGroundWebSpecialState (0x00343f48) and state 58's
+        // SetNextStateId target relocation (0x00349c54-0x00349ce8) are two
+        // distinct searches. An airborne enemy found only by state 58's
+        // wider 3000/2000 cm pass must receive a pellet, not substitute the
+        // short-range state-84 fly kick.
+        usm::game::GameplayPlayer farAirbornePelletPlayer;
+        assert(farAirbornePelletPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        farAirbornePelletPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                          {1.0F, 0.0F, 0.0F});
+        const usm::game::PlayerAttackTarget farAirbornePelletTarget{
+            {1500.0F, 0.0F, 100.0F}, 50.0F, 1237, true, 180.0F};
+        const usm::game::PlayerGroundWebSpecialSearch noShortWebTarget{};
+        assert(farAirbornePelletPlayer.requestWeb(
+            farAirbornePelletTarget, {},
+            usm::game::PlayerButtonPhase::Pressed, nullptr,
+            &noShortWebTarget));
+        assert(farAirbornePelletPlayer.activeStateId() == 58);
+        assert(farAirbornePelletPlayer.trackedAttackTargetObjectId() == 1237);
+        const auto farAirbornePellet =
+            farAirbornePelletPlayer.consumeWebPelletLaunch();
+        assert(farAirbornePellet.has_value());
+        assert(farAirbornePellet->targetedEnemyObjectId == 1237);
+
+        // Conversely, a valid airborne winner from the short eye search is
+        // retained by the special state even when state 58's hypothetical
+        // wider search selected a different Unit.
+        usm::game::GameplayPlayer splitGroundWebSearchPlayer;
+        assert(splitGroundWebSearchPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        splitGroundWebSearchPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                             {1.0F, 0.0F, 0.0F});
+        const usm::game::PlayerAttackTarget widerWebTarget{
+            {1400.0F, 0.0F, 0.0F}, 50.0F, 1238, false, 180.0F};
+        const usm::game::PlayerGroundWebSpecialSearch shortAirborneWebTarget{
+            usm::game::PlayerAttackTarget{
+                {600.0F, 0.0F, 100.0F}, 50.0F, 1239, true, 180.0F}};
+        assert(splitGroundWebSearchPlayer.requestWeb(
+            widerWebTarget, {}, usm::game::PlayerButtonPhase::Pressed,
+            nullptr, &shortAirborneWebTarget));
+        assert(splitGroundWebSearchPlayer.activeStateId() == 84);
+        assert(splitGroundWebSearchPlayer.trackedAttackTargetObjectId() ==
+               1239);
 
         usm::game::GameplayPlayer highGroundWebPlayer;
         assert(highGroundWebPlayer.initialize(bootstrap.player(), nullptr,
