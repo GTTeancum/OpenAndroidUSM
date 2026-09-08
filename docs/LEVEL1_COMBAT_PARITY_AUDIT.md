@@ -324,20 +324,26 @@ to the autoplay event log.
   rotation. Live attachments retain the complete bone transform.
 - `CEnemy::ProcessHitInfo` (`0x00330fe4`) creates
   `cartoon_hit_splash` for ordinary accepted hits and the big variant for
-  heavy/special types. `Unit::AddPlayerHitEffect` (`0x00324234`) attaches this
-  target feedback to `Bip01_Spine1`. Native code creates it before health is
-  subtracted and before hurt behavior replaces the enemy animation. The
+  heavy/special types. `Unit::AddPlayerHitEffect` (`0x00324234`) samples
+  `Bip01_Spine1`, then calls the scene-node overload of
+  `EffectManager::ThrowEffect` (`0x00391f8c`) with `false`; that overload clears
+  the parent before initialization, so the effect is a world-space snapshot,
+  not a live attachment. Native code creates it before health is subtracted
+  and before hurt behavior replaces the enemy animation. The
   runtime now carries that pre-reaction bone sample with the hit result;
   deferred application dispatch no longer samples the newly entered hurt
   pose and shifts the splash away from the actual contact.
-- `CBullet::CheckCollisions` (`0x0035cba0`) does not reuse that cartoon
-  splash for the ground web pellet. Its post-message path constructs the
-  literal `web_splash` at `0x0035cae8`, attaches it to the struck Unit, and
-  awards combo from the measured health delta. The portable pellet now
-  carries the pre-reaction spine sample into application dispatch and emits
-  exactly that preset. Its later zero-damage retained bind message remains a
-  contact but creates no second effect, matching `CEnemy::ProcessHitInfo`'s
-  incoming-damage gate.
+- `CBullet::CheckCollisions` (`0x0035cba0`) sends message `0x12d` with its
+  positive pellet damage. `CEnemy::ParseLocalAiMessage` (`0x00331eb0`) then
+  reaches `CEnemy::ProcessHitInfo` through object-vtable slot `+0x1b4`
+  (table entry `+0x1c4`, `0x00330fe4`), producing the ordinary cartoon hit
+  splash at the pre-reaction spine. After that message and its synchronous
+  tied/death transition return, the bullet path constructs the literal
+  `web_splash` at `0x0035cae8`, samples the Unit spine again, and awards combo
+  from the measured health delta. The portable pellet now preserves this
+  two-effect order and the two separate pose samples. Its later
+  zero-damage retained bind message remains a contact but creates no third
+  effect, matching `CEnemy::ProcessHitInfo`'s incoming-damage gate.
 - `CBehaviorHurt::BehaviorStart` (`0x003b8890`) rewrites hit type 105 to the
   ordinary type-100 reaction while its victim is still grounded, before hit
   force launches the body. Its state update (`0x003b89f8`) preserves the

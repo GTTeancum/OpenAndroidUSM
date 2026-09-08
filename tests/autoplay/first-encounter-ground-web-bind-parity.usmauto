@@ -30,9 +30,10 @@ wait 100
 # Native state 62 copies state 60's zero damage on entry. The pellet is the
 # only damaging contact in this no-input branch.
 assert_enemy_health_near 394 480 0.01
-# CBullet::CheckCollisions adds exactly one target-attached web_splash for the
-# damaging pellet. State 62's later zero-damage retained-target message must
-# not create a second splash (CEnemy::ProcessHitInfo 0x00330fe4).
-assert_event_count player_hit_effect 1
+# Native message 0x12d first reaches CEnemy::ProcessHitInfo and creates the
+# ordinary damaging-contact splash. CBullet::CheckCollisions then adds its
+# target-attached web_splash. State 62's later zero-damage retained-target
+# message must not create a third effect (CEnemy::ProcessHitInfo 0x00330fe4).
+assert_event_count player_hit_effect 2
 assert_health_above 0
 finish

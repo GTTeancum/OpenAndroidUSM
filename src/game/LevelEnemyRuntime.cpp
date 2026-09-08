@@ -2175,7 +2175,7 @@ bool LevelEnemyRuntime::launchPlayerWebPellet(
          true});
     pendingPlayerWebPelletEvents_.push_back(
         {PlayerWebPelletEventKind::Spawned, targetedEnemyObjectId, -1,
-         position, damage, 0.0F, {}});
+         position, damage, 0.0F, {}, {}});
     return true;
 }
 
@@ -2235,6 +2235,13 @@ void LevelEnemyRuntime::updatePlayerWebPellets(
         if (hitEnemy != nullptr) {
             const auto result = applyPlayerWebBindingDetailed(
                 hitEnemy->asset->objectId, pellet.damage);
+            // CBullet sends the damaging 0x12d message before calling
+            // Unit::AddPlayerHitEffect("web_splash") (0x0035cdb4-
+            // 0x0035cdfe). CEnemy::ProcessHitInfo samples the old spine for
+            // the cartoon splash, while the later Unit call samples the pose
+            // after the synchronous tied/death state transition.
+            const assets::Vector3 webSplashOrigin =
+                result ? playerHitEffectOrigin(*hitEnemy) : assets::Vector3{};
             pendingPlayerWebPelletEvents_.push_back(
                 {PlayerWebPelletEventKind::EnemyContact,
                  pellet.targetedEnemyObjectId,
@@ -2242,19 +2249,20 @@ void LevelEnemyRuntime::updatePlayerWebPellets(
                  pellet.position,
                  pellet.damage,
                  result ? result->actualDamage : 0.0F,
-                 result ? result->hitEffectOrigin : assets::Vector3{}});
+                 result ? result->hitEffectOrigin : assets::Vector3{},
+                 webSplashOrigin});
             pellet.active = false;
         } else if (staticContact) {
             pendingPlayerWebPelletEvents_.push_back(
                 {PlayerWebPelletEventKind::StaticContact,
                  pellet.targetedEnemyObjectId, -1, pellet.position,
-                 pellet.damage, 0.0F, {}});
+                 pellet.damage, 0.0F, {}, {}});
             pellet.active = false;
         } else if (travel >= remaining) {
             pendingPlayerWebPelletEvents_.push_back(
                 {PlayerWebPelletEventKind::Expired,
                  pellet.targetedEnemyObjectId, -1, pellet.position,
-                 pellet.damage, 0.0F, {}});
+                 pellet.damage, 0.0F, {}, {}});
             pellet.active = false;
         }
     }

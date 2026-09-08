@@ -4873,12 +4873,24 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 }
                 if (event.kind ==
                     game::PlayerWebPelletEventKind::EnemyContact) {
-                    // CBullet::CheckCollisions (0x0035cba0, call at
-                    // 0x0035cdfe) constructs the literal `web_splash` at
-                    // 0x0035cae8 and attaches it to the struck Unit after the
-                    // 0x12d damage message.
+                    // SendLocalAiMessage(message 0x12d) reaches
+                    // CEnemy::ProcessHitInfo through the CEnemy vtable slot
+                    // at object offset +0x1b4 (table entry +0x1c4,
+                    // 0x00330fe4). A damaging pellet therefore creates the
+                    // ordinary target splash before CBullet adds its own
+                    // target-attached web effect below.
                     result = playPlayerHitEffect(
                         event.hitEnemyObjectId, event.hitEffectOrigin,
+                        123, event.requestedDamage);
+                    if (!result) {
+                        return fail(result.message());
+                    }
+                    // CBullet::CheckCollisions (0x0035cba0, call at
+                    // 0x0035cdfe) constructs the literal `web_splash` at
+                    // 0x0035cae8 and asks Unit::AddPlayerHitEffect to sample
+                    // the struck Unit after the 0x12d damage message.
+                    result = playPlayerHitEffect(
+                        event.hitEnemyObjectId, event.webSplashOrigin,
                         123, event.requestedDamage, "web_splash");
                     if (!result) {
                         return fail(result.message());

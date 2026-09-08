@@ -11165,6 +11165,19 @@ int main() {
         assert(std::isfinite(expectedWebPelletEffectOrigin.y));
         assert(std::isfinite(expectedWebPelletEffectOrigin.z));
         assert(expectedWebPelletEffectOrigin.z > webPelletEnemy->position.z);
+        const auto postReactionWebSplashOrigin =
+            webPelletContact->webSplashOrigin;
+        assert(std::isfinite(postReactionWebSplashOrigin.x));
+        assert(std::isfinite(postReactionWebSplashOrigin.y));
+        assert(std::isfinite(postReactionWebSplashOrigin.z));
+        const float webSplashPoseDelta =
+            std::abs(postReactionWebSplashOrigin.x -
+                     expectedWebPelletEffectOrigin.x) +
+            std::abs(postReactionWebSplashOrigin.y -
+                     expectedWebPelletEffectOrigin.y) +
+            std::abs(postReactionWebSplashOrigin.z -
+                     expectedWebPelletEffectOrigin.z);
+        assert(webSplashPoseDelta > 0.01F);
         assert(std::abs(webPelletRuntime.find(394)->health -
                         (webPelletHealthBefore - 20.0F)) < 0.01F);
         assert(webPelletRuntime.playerWebPellets().empty());
