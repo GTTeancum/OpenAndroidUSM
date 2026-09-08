@@ -1386,6 +1386,27 @@ int main() {
                     cinematicMessageFrame.pixels[component + 2];
         }
         assert(pageChangedPixels > 100);
+        usm::game::CinematicUiFrame senseEffectUi;
+        senseEffectUi.interfaceEffectFrame = 13;
+        senseEffectUi.interfaceEffectAlpha = 160;
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), senseEffectUi));
+        gameRenderer.renderFrame();
+        RgbaImage senseEffectFrame;
+        assert(gameRenderer.readBackImage(senseEffectFrame));
+        captureIfRequested(senseEffectFrame,
+                           "gameplay-spider-sense-interface-effect.bmp");
+        std::size_t senseEffectChangedPixels = 0;
+        for (std::size_t component = 0;
+             component < senseEffectFrame.pixels.size(); component += 4) {
+            senseEffectChangedPixels +=
+                senseEffectFrame.pixels[component] !=
+                    gameplayHudFrame.pixels[component] ||
+                senseEffectFrame.pixels[component + 1] !=
+                    gameplayHudFrame.pixels[component + 1] ||
+                senseEffectFrame.pixels[component + 2] !=
+                    gameplayHudFrame.pixels[component + 2];
+        }
+        assert(senseEffectChangedPixels > 100);
         usm::game::CinematicUiFrame restoreFadeUi;
         restoreFadeUi.blackOverlayAlpha = 1.0F;
         assert(gameRenderer.updateCinematicUi(levelOne.hud(), restoreFadeUi));

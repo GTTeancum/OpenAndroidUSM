@@ -4038,6 +4038,8 @@ Result D3D11Renderer::uploadHudTexture(const game::LevelHudAsset& hud) {
     deathConfirmationOutlineFontTexture_.Reset();
     deathConfirmationOutlineBigFontTexture_.Reset();
     cinematicUiTutorialTexture_.Reset();
+    cinematicUiInterfaceEffectVertexBuffer_.Reset();
+    cinematicUiInterfaceEffectVertexCount_ = 0;
     transportTexture_.Reset();
     transportSpriteVertexBuffer_.Reset();
     transportColorVertexBuffer_.Reset();
@@ -4455,8 +4457,104 @@ Result D3D11Renderer::updateCinematicUi(
     const game::CinematicUiFrame& frame) {
     cinematicUiColorVertexBuffer_.Reset();
     cinematicUiColorVertexCount_ = 0;
+    cinematicUiInterfaceEffectVertexBuffer_.Reset();
+    cinematicUiInterfaceEffectVertexCount_ = 0;
     if (!device_) {
         return Result::failure("Cinematic UI has no D3D11 device");
+    }
+
+    if (frame.interfaceEffectAlpha != 0 &&
+        frame.interfaceEffectFrame >= 0 && width_ != 0 && height_ != 0) {
+        const assets::SpriteAtlas& atlas = hud.interfaceAtlas;
+        const assets::RgbaImage& texture = hud.interfaceTexture.image();
+        constexpr float virtualWidth = 480.0F;
+        constexpr float virtualHeight = 320.0F;
+        const float screenScale =
+            std::min(static_cast<float>(width_) / virtualWidth,
+                     static_cast<float>(height_) / virtualHeight);
+        const float screenOffsetX =
+            (static_cast<float>(width_) - virtualWidth * screenScale) * 0.5F;
+        const float screenOffsetY =
+            (static_cast<float>(height_) - virtualHeight * screenScale) * 0.5F;
+        std::vector<GpuVertex> effectVertices;
+        bool valid = true;
+        for (const assets::SpriteFrameModule& frameModule :
+             atlas.modulesForFrame(
+                 static_cast<std::size_t>(frame.interfaceEffectFrame))) {
+            if (frameModule.moduleIndex >= atlas.modules().size()) {
+                valid = false;
+                continue;
+            }
+            const assets::SpriteModule& module =
+                atlas.modules()[frameModule.moduleIndex];
+            constexpr std::uint8_t horizontalFlip = 0x01;
+            constexpr std::uint8_t verticalFlip = 0x02;
+            if (module.imageIndex != 0 || module.width == 0 ||
+                module.height == 0 ||
+                (frameModule.flags & ~(horizontalFlip | verticalFlip)) != 0) {
+                valid = false;
+                continue;
+            }
+            const float left = screenOffsetX +
+                static_cast<float>(frameModule.x) * screenScale;
+            const float top = screenOffsetY +
+                static_cast<float>(frameModule.y) * screenScale;
+            const float right = left + module.width * screenScale;
+            const float bottom = top + module.height * screenScale;
+            const float x0 = left / static_cast<float>(width_) * 2.0F - 1.0F;
+            const float x1 = right / static_cast<float>(width_) * 2.0F - 1.0F;
+            const float y0 = 1.0F - top / static_cast<float>(height_) * 2.0F;
+            const float y1 =
+                1.0F - bottom / static_cast<float>(height_) * 2.0F;
+            float u0 = static_cast<float>(module.x) / texture.width;
+            float u1 = static_cast<float>(module.x + module.width) /
+                texture.width;
+            if ((frameModule.flags & horizontalFlip) != 0) {
+                std::swap(u0, u1);
+            }
+            const float v0 = static_cast<float>(module.y) / texture.height;
+            float flippedV0 = v0;
+            float v1 = static_cast<float>(module.y + module.height) /
+                texture.height;
+            if ((frameModule.flags & verticalFlip) != 0) {
+                std::swap(flippedV0, v1);
+            }
+            const std::uint32_t color = rgbaVertexColor(
+                (static_cast<std::uint32_t>(frame.interfaceEffectAlpha)
+                 << 24U) |
+                0x00ffffffU);
+            const GpuVertex topLeft{
+                {x0, y0, 0.0F}, {}, {u0, flippedV0}, color};
+            const GpuVertex topRight{
+                {x1, y0, 0.0F}, {}, {u1, flippedV0}, color};
+            const GpuVertex bottomLeft{{x0, y1, 0.0F}, {}, {u0, v1}, color};
+            const GpuVertex bottomRight{{x1, y1, 0.0F}, {}, {u1, v1}, color};
+            effectVertices.insert(effectVertices.end(),
+                                  {topLeft, topRight, bottomLeft, topRight,
+                                   bottomRight, bottomLeft});
+        }
+        if (!valid) {
+            return Result::failure(
+                "Native interface effect frame contains unsupported modules");
+        }
+        if (!effectVertices.empty()) {
+            D3D11_BUFFER_DESC description{};
+            description.ByteWidth = static_cast<UINT>(
+                effectVertices.size() * sizeof(GpuVertex));
+            description.Usage = D3D11_USAGE_IMMUTABLE;
+            description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            D3D11_SUBRESOURCE_DATA data{effectVertices.data(), 0, 0};
+            const HRESULT createResult = device_->CreateBuffer(
+                &description, &data,
+                &cinematicUiInterfaceEffectVertexBuffer_);
+            if (FAILED(createResult)) {
+                return hresultFailure(
+                    "ID3D11Device::CreateBuffer(interface effect)",
+                    createResult);
+            }
+            cinematicUiInterfaceEffectVertexCount_ =
+                static_cast<std::uint32_t>(effectVertices.size());
+        }
     }
 
     const bool informationPanelVisible =
@@ -6988,6 +7086,28 @@ void D3D11Renderer::renderFrame() {
         context_->OMSetDepthStencilState(depthReadState_.Get(), 0);
         context_->RSSetState(noCullRasterizerState_.Get());
         context_->Draw(hintVertexCount_, 0);
+    }
+
+    if (cinematicUiInterfaceEffectVertexCount_ != 0 &&
+        cinematicUiInterfaceEffectVertexBuffer_ && hudTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(
+            0, 1, cinematicUiInterfaceEffectVertexBuffer_.GetAddressOf(),
+            &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
+        context_->PSSetShader(hudPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(0, 1, hudTexture_.GetAddressOf());
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
+        context_->RSSetState(noCullRasterizerState_.Get());
+        context_->Draw(cinematicUiInterfaceEffectVertexCount_, 0);
     }
 
     if (hudVertexCount_ != 0 && hudVertexBuffer_ && hudTexture_) {

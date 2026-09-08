@@ -243,6 +243,10 @@ struct EnemyPlayerHit {
 struct PlayerMeleeHitResult {
     std::int32_t objectId{-1};
     float actualDamage{};
+    // CEnemy::ProcessHitInfo creates the contact splash before the hurt
+    // behavior replaces the enemy's animation. Preserve that pre-reaction
+    // Bip01_Spine1 position through the portable dispatch boundary.
+    assets::Vector3 hitEffectOrigin;
 };
 
 // CBullet type zero, created by Player::ShootWebPellet. The native physics
@@ -470,7 +474,8 @@ public:
                         bool quickTimeActionPressed = false,
                         const assets::Vector3& playerFacing =
                             assets::Vector3{1.0F, 0.0F, 0.0F},
-                        bool playerOnWall = false) noexcept;
+                        bool playerOnWall = false,
+                        std::int32_t playerSenseReactState = 0) noexcept;
     [[nodiscard]] std::optional<std::int32_t> applyPlayerMeleeHit(
         const assets::Vector3& attackPosition,
         const assets::Vector3& attackDirection, float radius, float damage,
@@ -678,13 +683,16 @@ public:
 
 private:
     [[nodiscard]] LevelEnemyState* findMutable(std::int32_t objectId) noexcept;
+    [[nodiscard]] assets::Vector3 playerHitEffectOrigin(
+        const LevelEnemyState& enemy) const;
     [[nodiscard]] bool registerMeleeEngager(LevelEnemyState& enemy) noexcept;
     void unregisterMeleeEngager(std::int32_t objectId) noexcept;
     [[nodiscard]] float maximumAttackReach(
         const LevelEnemyState& enemy) const noexcept;
     void queueAuthoredAttackEvents(LevelEnemyState& enemy,
                                    std::uint32_t previousTimeMilliseconds,
-                                   const assets::Vector3& playerPosition);
+                                   const assets::Vector3& playerPosition,
+                                   std::int32_t playerSenseReactState);
     void updateGunLines(std::uint32_t elapsedMilliseconds,
                         const assets::Vector3& playerPosition,
                         const LevelCollision* collision) noexcept;

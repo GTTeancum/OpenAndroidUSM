@@ -193,6 +193,15 @@ the light/heavy player hurt animation, and state-enter hurt audio. Action type
 volume confirms the player is in range; merely entering the wind-up no longer
 makes a premature counter available.
 
+Accepted Spider-Sense does not make the player generically invulnerable.
+`Player::GetSenseReactState` (`0x00340518`) reports 5 for class-six motions
+below 505 and 6 for the counter/blink family. At each melee attack action,
+`CBehaviorMeleeAttack::onMessage` (`0x003ba670`) checks that value and skips
+its own `CheckAttack`/damage dispatch when the result is nonzero. The portable
+runtime now suppresses the opening knife/bat contact at that enemy-behavior
+boundary. `Player::IsCanBeHit` (`0x003413dc`) contains no class-six immunity,
+so independent damage sources remain capable of reaching `Player::OnHit`.
+
 When LB is accepted, `Player::UpdateSpiderSense` calls
 `CTargetHelper::popAttack` (`0x0034fc40`--`0x0034fc48`) before entering the
 response. `CTargetHelper::popAttack` (`0x00353d98`) copies the selected
@@ -212,6 +221,16 @@ cinematic 974's authored tutorial Hint, so a cinematic `SetVisible` command
 cannot erase a live attack warning. Core, D3D11, and autoplay coverage prove
 its independent visibility and same-frame dismissal after an accepted LB
 edge.
+
+The accepted action also starts the missing native full-screen response.
+`Player::DoNormalSenseAction` (`0x0034f650`) calls
+`CLevel::StartInterfaceEffect(160, 0, -1)`. That function selects
+`interface.bsprite` frame 13 and divides the starting alpha by
+`ALPHA_HIT_TIME`; the executable constant at `0x0056ec64` is 800.0 ms.
+`CLevel::Render2DInterface` (`0x00387a54`) paints the authored sprite before
+the normal HUD, then fades it through `UpdateInterfaceEffect` (`0x0037d810`).
+The same frame, alpha, ordering, and 800 ms fade are now rendered and emitted
+to the autoplay event log.
 
 ## Contact, trail, and audio timing
 
@@ -306,7 +325,19 @@ edge.
 - `CEnemy::ProcessHitInfo` (`0x00330fe4`) creates
   `cartoon_hit_splash` for ordinary accepted hits and the big variant for
   heavy/special types. `Unit::AddPlayerHitEffect` (`0x00324234`) attaches this
-  target feedback to `Bip01_Spine1`.
+  target feedback to `Bip01_Spine1`. Native code creates it before health is
+  subtracted and before hurt behavior replaces the enemy animation. The
+  runtime now carries that pre-reaction bone sample with the hit result;
+  deferred application dispatch no longer samples the newly entered hurt
+  pose and shifts the splash away from the actual contact.
+- `CBehaviorHurt::BehaviorStart` (`0x003b8890`) rewrites hit type 105 to the
+  ordinary type-100 reaction while its victim is still grounded, before hit
+  force launches the body. Its state update (`0x003b89f8`) preserves the
+  complete 49--70 graph, including wall-contact priority for states 54/62,
+  the shared state-55 landing transition from 56/58, state 64's facing
+  reversal, state 65's externally owned lifetime, and state 70's direct
+  recovery. `StateEnter` (`0x003b8640`) emits `smoke_splash` on the three
+  authored ground/wall impact states 55, 56, and 63.
 - `Player::PlaySound`/`UpdateSound` (`0x0034905c`/`0x003429d4`) retain combat
   sounds with positive emitter frames. The first punch swoosh uses emitter
   frame 2 and first crosses its rounded runtime frame at 25 ms. Its impact
@@ -345,7 +376,8 @@ edge.
   generic response: states 38/39/40/41 each deal 300 and emit effects
   7/6/8/9 respectively. Core coverage pins all four quadrants; the live
   first-encounter gate also pins the front counter, enemy warning/attack,
-  three-times slow motion, damage immunity, and accepted target contact.
+  three-times slow motion, enemy-side hit suppression, and accepted target
+  contact.
 - `EnemyAttributeFile::ReadEnemyAttackInfo` (`0x0033c2c0`) stores the
   serialized Spider-Sense selector at `EnemyAttackInfo+0x48`, slow-motion
   denominator at `+0x50`, forced-sense gate at `+0x54`, and photo target at
@@ -469,7 +501,12 @@ The coherent native-cadence Release run in
 `analysis/generated/combat-sense-cue-suite/suite-manifest.json`
 completed all 34 selected scenarios with 34 passes and zero failures. The run
 used one executable hash for every scenario and removed 23 generated BMP
-captures after their assertions. The current retained gates are:
+captures after their assertions. The focused post-fix run in
+`analysis/generated/autoplay-main-combat-current/suite-manifest.json` uses one
+new executable hash and passes all 11 selected opening-combat regressions,
+including every directional Spider-Sense branch, launcher and kick-down hurt
+graphs, enemy offense, the health ledger, and the full combo/effects sequence.
+The current retained gates are:
 
 - `OpenAndroidUSM.CoreTests.exe`
 - `OpenAndroidUSM.RenderTests.exe`

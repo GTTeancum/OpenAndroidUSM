@@ -3265,6 +3265,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         attacker->canBeCounterHit,
                         attacker->asset->enemyTypeId});
                 if (accepted) {
+                    // DoNormalSenseAction (0x0034f650) starts the native
+                    // interface.bsprite frame-13 flash at alpha 160 before
+                    // selecting the evade/counter state.
+                    cinematicUi_.startInterfaceEffect(160, 0, -1);
                     // UpdateSpiderSense pops the selected CTargetHelper
                     // record before DoNormalSenseAction (0x0034fc40-
                     // 0x0034fc4e). Keep that one-shot warning lifetime even
@@ -3280,6 +3284,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     levelCinematicRuntime_.setSlowMotion(
                         denominator, 1000.0F, 0.0F, true);
                     if (autoplay) {
+                        autoplay->recordEvent(
+                            syntheticElapsedMilliseconds,
+                            "interface_effect",
+                            "frame=13;alpha=160;fade_ms=800;"
+                            "source=spider_sense");
                         autoplay->recordEvent(
                             syntheticElapsedMilliseconds,
                             "player_slow_motion",
@@ -3987,7 +3996,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     levelCinematicRuntime_.resetSlowMotion();
                 }
                 const auto playPlayerHitEffect =
-                    [&](std::int32_t enemyObjectId) -> Result {
+                    [&](const game::PlayerMeleeHitResult& hit) -> Result {
+                    const std::int32_t enemyObjectId = hit.objectId;
                     const game::LevelEnemyState* enemy =
                         enemyRuntime_.find(enemyObjectId);
                     if (enemy == nullptr || enemy->asset == nullptr) {
@@ -4003,13 +4013,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                 impact->hitType == 137
                             ? "cartoon_hit_splash_big"
                             : "cartoon_hit_splash";
-                    const std::optional<assets::Vector3> spine =
-                        enemyRuntime_.nodeWorldPosition(enemyObjectId,
-                                                        "Bip01_Spine1");
-                    const assets::Vector3 origin = spine.value_or(
-                        assets::Vector3{enemy->position.x, enemy->position.y,
-                                        enemy->position.z +
-                                            enemy->collisionHeight * 0.5F});
+                    // ProcessHitInfo creates this splash before health and
+                    // hurt-state dispatch. LevelEnemyRuntime carries the
+                    // pre-reaction Bip01_Spine1 sample across that boundary.
+                    const assets::Vector3& origin = hit.hitEffectOrigin;
                     if (autoplay) {
                         autoplay->recordEvent(
                             syntheticElapsedMilliseconds,
@@ -4044,7 +4051,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             hit.actualDamage, impact->ultimateAttack,
                             syntheticElapsedMilliseconds,
                             !impact->powerRestoreBlocked);
-                        result = playPlayerHitEffect(hit.objectId);
+                        result = playPlayerHitEffect(hit);
                         if (!result) {
                             return fail(result.message());
                         }
@@ -4101,7 +4108,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             hit.actualDamage, impact->ultimateAttack,
                             syntheticElapsedMilliseconds,
                             !impact->powerRestoreBlocked);
-                        result = playPlayerHitEffect(hit.objectId);
+                        result = playPlayerHitEffect(hit);
                         if (!result) {
                             return fail(result.message());
                         }
@@ -4152,7 +4159,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             hit.actualDamage, false,
                             syntheticElapsedMilliseconds,
                             !impact->powerRestoreBlocked);
-                        result = playPlayerHitEffect(hit.objectId);
+                        result = playPlayerHitEffect(hit);
                         if (!result) {
                             return fail(result.message());
                         }
@@ -4247,7 +4254,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         hitEnemy.actualDamage, impact->ultimateAttack,
                         syntheticElapsedMilliseconds,
                         !impact->powerRestoreBlocked);
-                    result = playPlayerHitEffect(hitEnemy.objectId);
+                    result = playPlayerHitEffect(hitEnemy);
                     if (!result) {
                         return fail(result.message());
                     }
@@ -4770,7 +4777,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                                  : keyRouter_.state()
                                                        .quickTimeEvent.pressed,
                                               gameplayPlayer_.facing(),
-                                              gameplayPlayer_.onWall());
+                                              gameplayPlayer_.onWall(),
+                                              gameplayPlayer_.senseReactState());
             }
             const game::BossProgressState& bossProgress =
                 levelCinematicRuntime_.bossProgress();

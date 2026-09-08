@@ -1429,7 +1429,8 @@ void LevelEnemyRuntime::updateGameplay(
     const LevelCollision* collision,
     bool quickTimeActionPressed,
     const assets::Vector3& playerFacing,
-    bool playerOnWall) noexcept {
+    bool playerOnWall,
+    std::int32_t playerSenseReactState) noexcept {
     updatePlayerWebPellets(elapsedMilliseconds, collision);
     updateGunLines(elapsedMilliseconds, playerPosition, collision);
     updateMolotovs(elapsedMilliseconds, playerPosition, collision);
@@ -1478,6 +1479,7 @@ void LevelEnemyRuntime::updateGameplay(
             !enemy.wallAttached && !enemy.cinematicMotion.active) {
             attachEnemyToWall(enemy, *collision);
         }
+        bool hurtContactedWall = false;
         if (enemy.behavior == EnemyBehaviorState::Hurt &&
             enemy.physicsActive && !enemy.onWall &&
             (std::abs(enemy.hurtVelocity.x) >
@@ -1515,6 +1517,15 @@ void LevelEnemyRuntime::updateGameplay(
                     assets::Vector3 resolved;
                     collision->resolveAirMotion(enemy.position, desired,
                                                 resolved);
+                    // GetPhysicsContextFlags(2) is the wall-contact branch
+                    // consumed by CBehaviorHurt::BehaviorUpdate at
+                    // 0x003b8aea and 0x003b8c66. The portable collision
+                    // solver reports its manifold by clipping the desired
+                    // XY endpoint, so retain that result for the hurt-state
+                    // decision later in this same native update.
+                    hurtContactedWall =
+                        std::abs(resolved.x - desired.x) > 1e-3F ||
+                        std::abs(resolved.y - desired.y) > 1e-3F;
                     enemy.position = resolved;
                 } else {
                     // The native PhysicsEntity is a cylinder. The portable
@@ -1637,7 +1648,13 @@ void LevelEnemyRuntime::updateGameplay(
                 if (clipFinished) nextHurtState = 54;
                 break;
             case 54: // hurt_to_flying loop
-                if (enemy.grounded) nextHurtState = 55;
+                // CBehaviorHurt::BehaviorUpdate (0x003b8aea-0x003b8b08)
+                // gives the wall manifold priority over the ground one.
+                if (hurtContactedWall) {
+                    nextHurtState = 56;
+                } else if (enemy.grounded) {
+                    nextHurtState = 55;
+                }
                 break;
             case 55: // flying_to_ground
                 if (clipFinished) nextHurtState = 59;
@@ -1645,24 +1662,43 @@ void LevelEnemyRuntime::updateGameplay(
             case 57: // idle_to_air
                 if (clipFinished) nextHurtState = 58;
                 break;
+            case 56: // flying_to_wall
             case 58: // falling loop
-                if (enemy.grounded) nextHurtState = 59;
+                // Both cases share 0x003b8c16-0x003b8c2e: a ground
+                // manifold enters the common flying-to-ground impact state.
+                if (enemy.grounded) nextHurtState = 55;
                 break;
             case 60: // airborne common hurt
-                if (clipFinished) nextHurtState = enemy.grounded ? 59 : 58;
+                if (clipFinished) nextHurtState = 58;
                 break;
             case 61: // air_to_flying
                 if (clipFinished) nextHurtState = 62;
                 break;
             case 62: // knockback_to_flying loop
-                if (enemy.grounded) nextHurtState = 63;
+                // Native 0x003b8c66-0x003b8c88 also tests wall before
+                // ground for this airborne-knockback loop.
+                if (hurtContactedWall) {
+                    nextHurtState = 56;
+                } else if (enemy.grounded) {
+                    nextHurtState = 63;
+                }
                 break;
             case 63: // knockback_to_ground
                 if (clipFinished) nextHurtState = 59;
                 break;
             case 64: // air_dragto
+                if (clipFinished) {
+                    // 0x003b8c96-0x003b8cce reverses the Unit face vector
+                    // before selecting AIR_TO_FALL (58).
+                    setFacing(enemy, {-enemy.facing.x, -enemy.facing.y,
+                                      -enemy.facing.z});
+                    nextHurtState = 58;
+                }
+                break;
             case 65: // heavy blow to ground
-                if (clipFinished) nextHurtState = enemy.grounded ? 59 : 58;
+                // The native switch entry branches directly to the return
+                // at 0x003b8e96. This state is externally owned; do not
+                // invent an animation-finish successor.
                 break;
             case 69: // air kickdown
                 if (enemy.grounded) {
@@ -1699,7 +1735,7 @@ void LevelEnemyRuntime::updateGameplay(
                 }
                 break;
             case 70: // ground bounce
-                if (clipFinished) nextHurtState = enemy.grounded ? 59 : 58;
+                if (clipFinished) nextHurtState = 59;
                 break;
             default:
                 if (clipFinished) nextHurtState = 0;
@@ -2096,7 +2132,8 @@ void LevelEnemyRuntime::updateGameplay(
                                               previousAnimationNames[index]
                                           ? previousAnimationTimes[index]
                                           : 0U,
-                                      playerPosition);
+                                      playerPosition,
+                                      playerSenseReactState);
         }
     }
 }
@@ -2369,6 +2406,7 @@ LevelEnemyRuntime::applyPlayerMeleeHitDetailed(
         return std::nullopt;
     }
     const float healthBefore = nearest->health;
+    const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(*nearest);
     const assets::Vector3* effectiveSource =
         sourcePosition != nullptr ? sourcePosition : &attackPosition;
     verticalForce *= kPlayerHitVerticalForceDispatchScale;
@@ -2379,7 +2417,7 @@ LevelEnemyRuntime::applyPlayerMeleeHitDetailed(
     // clamps the delta to zero, and passes that actual damage to AddCombo.
     return PlayerMeleeHitResult{
         nearest->asset->objectId,
-        std::max(0.0F, healthBefore - nearest->health)};
+        std::max(0.0F, healthBefore - nearest->health), hitEffectOrigin};
 }
 
 std::vector<PlayerMeleeHitResult>
@@ -2410,11 +2448,13 @@ LevelEnemyRuntime::applyPlayerSectorMeleeHits(
             continue;
         }
         const float healthBefore = enemy.health;
+        const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(enemy);
         dispatchedVerticalForce *= kPlayerHitVerticalForceDispatchScale;
         applyCombatDamage(enemy, damage, hitType, effectiveSource,
                           horizontalForce, dispatchedVerticalForce);
         hits.push_back({enemy.asset->objectId,
-                        std::max(0.0F, healthBefore - enemy.health)});
+                        std::max(0.0F, healthBefore - enemy.health),
+                        hitEffectOrigin});
     }
     return hits;
 }
@@ -2444,6 +2484,7 @@ LevelEnemyRuntime::applyPlayerAirKickDownSectorMeleeHits(
             continue;
         }
         const float healthBefore = enemy.health;
+        const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(enemy);
         if (enemy.asset->objectId == retainedTargetObjectId) {
             // Player::CheckAttackTarget (0x0034fca0, 0x00350608) calls the
             // scalar SendHitMessage overload for Player+0x594. That overload
@@ -2463,7 +2504,8 @@ LevelEnemyRuntime::applyPlayerAirKickDownSectorMeleeHits(
                               200.0F, 500.0F);
         }
         hits.push_back({enemy.asset->objectId,
-                        std::max(0.0F, healthBefore - enemy.health)});
+                        std::max(0.0F, healthBefore - enemy.health),
+                        hitEffectOrigin});
     }
     return hits;
 }
@@ -2490,11 +2532,13 @@ LevelEnemyRuntime::applyPlayerRadialMeleeHits(
             continue;
         }
         const float healthBefore = enemy.health;
+        const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(enemy);
         dispatchedVerticalForce *= kPlayerHitVerticalForceDispatchScale;
         applyCombatDamage(enemy, damage, hitType, &attackPosition,
                           horizontalForce, dispatchedVerticalForce);
         hits.push_back({enemy.asset->objectId,
-                        std::max(0.0F, healthBefore - enemy.health)});
+                        std::max(0.0F, healthBefore - enemy.health),
+                        hitEffectOrigin});
     }
     return hits;
 }
@@ -2524,11 +2568,13 @@ LevelEnemyRuntime::applyPlayerSenseMeleeHits(
             continue;
         }
         const float healthBefore = enemy.health;
+        const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(enemy);
         dispatchedVerticalForce *= kPlayerHitVerticalForceDispatchScale;
         applyCombatDamage(enemy, damage, hitType, &attackPosition,
                           horizontalForce, dispatchedVerticalForce);
         hits.push_back({enemy.asset->objectId,
-                        std::max(0.0F, healthBefore - enemy.health)});
+                        std::max(0.0F, healthBefore - enemy.health),
+                        hitEffectOrigin});
         attackerHit = attackerHit || enemy.asset->objectId == attackerObjectId;
     }
     if (!attackerHit) {
@@ -2553,11 +2599,13 @@ LevelEnemyRuntime::applyPlayerTargetedHitDetailed(
         return std::nullopt;
     }
     const float healthBefore = enemy->health;
+    const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(*enemy);
     verticalForce *= kPlayerHitVerticalForceDispatchScale;
     applyCombatDamage(*enemy, damage, hitType, sourcePosition,
                       horizontalForce, verticalForce);
     return PlayerMeleeHitResult{
-        objectId, std::max(0.0F, healthBefore - enemy->health)};
+        objectId, std::max(0.0F, healthBefore - enemy->health),
+        hitEffectOrigin};
 }
 
 std::optional<PlayerMeleeHitResult>
@@ -2569,6 +2617,7 @@ LevelEnemyRuntime::applyPlayerWebBindingDetailed(
         return std::nullopt;
     }
     const float healthBefore = enemy->health;
+    const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(*enemy);
     if (damage > 0.0F) {
         applyCombatDamage(*enemy, damage);
     }
@@ -2586,7 +2635,8 @@ LevelEnemyRuntime::applyPlayerWebBindingDetailed(
             *enemy, "ENEMY_BEHAVIOR_TIDE_UP_STATE_TIED", true);
     }
     return PlayerMeleeHitResult{
-        objectId, std::max(0.0F, healthBefore - enemy->health)};
+        objectId, std::max(0.0F, healthBefore - enemy->health),
+        hitEffectOrigin};
 }
 
 bool LevelEnemyRuntime::applyPlayerAirKnockdownBinding(
@@ -2717,6 +2767,14 @@ void LevelEnemyRuntime::applyCombatDamage(
             verticalForce = 0.0F;
             hitType = 100;
         }
+        // CBehaviorHurt::BehaviorStart (0x003b8890-0x003b88ba) only keeps
+        // hit type 105's air-fast-hurt reaction when CEnemy::IsInAir
+        // (0x0032883c) reports true. A grounded enemy receives the ordinary
+        // type-100 front/back reaction instead. This selection happens
+        // before StartMove applies the hit's vertical force.
+        if (hitType == 105 && enemy.grounded) {
+            hitType = 100;
+        }
         enemy.lastPlayerHitType = hitType;
         assets::Vector3 hitAxis{-enemy.facing.x, -enemy.facing.y, 0.0F};
         bool sourceBehind = false;
@@ -2756,7 +2814,7 @@ void LevelEnemyRuntime::applyCombatDamage(
                 break;
             case 121:
                 hurtStateId = sourceBehind ? 52 :
-                    (hasHurtStateAnimation(enemy, 53) ? 53 : 50);
+                    (enemy.allowsVerticalHitForce ? 53 : 50);
                 break;
             case 105:
                 hurtStateId = 60;
@@ -2811,10 +2869,12 @@ std::vector<PlayerMeleeHitResult> LevelEnemyRuntime::applyPlayerWallMeleeHits(
             continue;
         }
         const float previousHealth = enemy.health;
+        const assets::Vector3 hitEffectOrigin = playerHitEffectOrigin(enemy);
         dispatchedVerticalForce *= kPlayerHitVerticalForceDispatchScale;
         applyCombatDamage(enemy, damage, hitType, &attackCenter,
                           horizontalForce, dispatchedVerticalForce);
-        hits.push_back({enemy.asset->objectId, previousHealth - enemy.health});
+        hits.push_back({enemy.asset->objectId, previousHealth - enemy.health,
+                        hitEffectOrigin});
     }
     return hits;
 }
@@ -2898,6 +2958,24 @@ std::optional<assets::Vector3> LevelEnemyRuntime::nodeWorldPosition(
         return std::nullopt;
     }
     return transformPoint(enemy->worldTransform, transformPoint(node));
+}
+
+assets::Vector3 LevelEnemyRuntime::playerHitEffectOrigin(
+    const LevelEnemyState& enemy) const {
+    // CEnemy::ProcessHitInfo (0x00330fe4, 0x00331132) calls
+    // Unit::AddPlayerHitEffect before it subtracts health at 0x003311f0 and
+    // before the subsequent hurt behavior changes the current animation.
+    // Unit::AddPlayerHitEffect (0x00324234) resolves Bip01_Spine1 at that
+    // instant. Capture the same pose rather than asking Application to sample
+    // the newly entered hurt clip after applyCombatDamage returns.
+    if (enemy.asset != nullptr) {
+        if (const auto spine = nodeWorldPosition(enemy.asset->objectId,
+                                                 "Bip01_Spine1")) {
+            return *spine;
+        }
+    }
+    return {enemy.position.x, enemy.position.y,
+            enemy.position.z + enemy.collisionHeight * 0.5F};
 }
 
 const LevelEnemyState* LevelEnemyRuntime::findPlayerWallAttackTarget(
@@ -3454,7 +3532,8 @@ float LevelEnemyRuntime::maximumAttackReach(
 
 void LevelEnemyRuntime::queueAuthoredAttackEvents(
     LevelEnemyState& enemy, std::uint32_t previousTimeMilliseconds,
-    const assets::Vector3& playerPosition) {
+    const assets::Vector3& playerPosition,
+    std::int32_t playerSenseReactState) {
     if (level_ == nullptr || enemy.asset == nullptr ||
         enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
         return;
@@ -3594,6 +3673,14 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
             continue;
         }
         if (!attackIntersectsPlayer(*attack, eventTime)) {
+            continue;
+        }
+        // CBehaviorMeleeAttack::onMessage (0x003ba670) calls
+        // Player::GetSenseReactState at the attack-action message and only
+        // reaches CheckAttack/DoAttack when the result is below one. Keep
+        // this suppression on the melee behavior; hazards and other damage
+        // sources still pass through Player::IsCanBeHit independently.
+        if (enemy.meleeAttackActive && playerSenseReactState >= 1) {
             continue;
         }
         pendingPlayerHits_.push_back(
@@ -5970,6 +6057,16 @@ void LevelEnemyRuntime::enterHurtState(LevelEnemyState& enemy,
     enemy.hurtStateId = stateId;
     selectStateAnimation(enemy, stateName, hurtStateLoops(stateId));
     queueStateSound(enemy, stateName);
+    if (stateId == 55 || stateId == 56 || stateId == 63) {
+        // CBehaviorHurt::StateEnter (0x003b8640-0x003b86ba) attaches the
+        // shipped smoke_splash preset to the active physics-contact surface
+        // for FLYING_TO_GROUND, FLYING_TO_WALL, and
+        // AIR_FLYING_TO_GROUND. The portable body has already resolved its
+        // base to that manifold when these states are entered.
+        pendingEffectCues_.push_back(
+            {enemy.asset->objectId, enemy.asset->roomId,
+             enemy.position, "smoke_splash"});
+    }
 }
 
 void LevelEnemyRuntime::selectStateAnimation(

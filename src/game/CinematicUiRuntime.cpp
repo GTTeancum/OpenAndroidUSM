@@ -132,6 +132,10 @@ void CinematicUiRuntime::bind(const LevelTextCatalog& strings) noexcept {
     tutorialDimBackground_ = false;
     letterboxVisible_ = false;
     comicCoverTipShown_ = false;
+    interfaceEffectAlpha_ = 0.0F;
+    interfaceEffectRatePerMillisecond_ = 0.0F;
+    interfaceEffectFrame_ = -1;
+    interfaceEffectJustStarted_ = false;
 }
 
 Result CinematicUiRuntime::showComicCover(std::int32_t comicIndex) {
@@ -256,6 +260,32 @@ void CinematicUiRuntime::update(std::uint32_t elapsedMilliseconds,
     }
     advanceTimer(elapsed, tutorialRemainingMilliseconds_, tutorialVisible_);
     advanceTimer(elapsed, messageRemainingMilliseconds_, messageVisible_);
+    if (interfaceEffectJustStarted_) {
+        // StartInterfaceEffect records the current Application clock. The
+        // first Render2DInterface paints the full starting alpha before
+        // UpdateInterfaceEffect sees a zero clock delta.
+        interfaceEffectJustStarted_ = false;
+    } else if (interfaceEffectAlpha_ >= 0.0F) {
+        interfaceEffectAlpha_ -=
+            static_cast<float>(elapsed) * interfaceEffectRatePerMillisecond_;
+    }
+}
+
+void CinematicUiRuntime::startInterfaceEffect(
+    std::int32_t alpha, std::int32_t spriteParameter,
+    std::int32_t frame) noexcept {
+    // ALPHA_HIT_TIME is the 800.0f at 0x0056ec64. Native division is based
+    // on the starting alpha itself, including its sign.
+    constexpr float alphaHitTimeMilliseconds = 800.0F;
+    interfaceEffectAlpha_ = static_cast<float>(alpha);
+    // CLevel+0x108 is copied to CSprite+0x118 immediately before PaintFrame.
+    // The recovered Spider-Sense caller supplies zero. A nonzero transform
+    // is not used by this chronological combat path yet.
+    (void)spriteParameter;
+    interfaceEffectRatePerMillisecond_ =
+        static_cast<float>(alpha) / alphaHitTimeMilliseconds;
+    interfaceEffectFrame_ = frame < 0 ? 13 : frame;
+    interfaceEffectJustStarted_ = true;
 }
 
 CinematicUiFrame CinematicUiRuntime::frame(
@@ -265,6 +295,11 @@ CinematicUiFrame CinematicUiRuntime::frame(
     result.quickTimeEventVisible = quickTimeEventVisible;
     result.quickTimeEventProgress =
         std::clamp(quickTimeEventProgress, 0.0F, 1.0F);
+    if (interfaceEffectAlpha_ >= 0.0F && interfaceEffectFrame_ >= 0) {
+        result.interfaceEffectAlpha = static_cast<std::uint8_t>(
+            std::clamp(interfaceEffectAlpha_, 0.0F, 255.0F));
+        result.interfaceEffectFrame = interfaceEffectFrame_;
+    }
     if (tutorialVisible_) {
         result.text = tutorialText_;
         result.textVisible = true;

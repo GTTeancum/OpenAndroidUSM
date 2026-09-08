@@ -297,6 +297,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> transportColorVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> transportTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer>
+        cinematicUiInterfaceEffectVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cinematicUiTextTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiMessagePanelVertexBuffer_;
@@ -359,6 +361,7 @@ private:
     std::size_t enemyLandingCrashWallMeshCount_{};
     std::uint32_t hudVertexCount_{};
     std::uint32_t cinematicUiColorVertexCount_{};
+    std::uint32_t cinematicUiInterfaceEffectVertexCount_{};
     std::uint32_t transportSpriteVertexCount_{};
     std::uint32_t transportColorVertexCount_{};
     std::uint32_t cinematicUiTextVertexCount_{};

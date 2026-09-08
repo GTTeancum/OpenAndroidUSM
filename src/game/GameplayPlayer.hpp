@@ -411,6 +411,7 @@ public:
     }
     [[nodiscard]] std::uint16_t activeStateId() const noexcept;
     [[nodiscard]] std::string_view activeStateName() const noexcept;
+    [[nodiscard]] std::int32_t senseReactState() const noexcept;
     [[nodiscard]] bool punchTransitionReadyAfterImpact() const noexcept;
     [[nodiscard]] bool punchAttackTransitionReady() const noexcept;
     [[nodiscard]] bool jumpAttackTransitionReady() const noexcept;

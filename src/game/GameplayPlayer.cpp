@@ -1713,12 +1713,7 @@ bool GameplayPlayer::applyDamage(
     const bool ultimateInvulnerability =
         activeAttackState_ != nullptr && activeAttackState_->id >= 107 &&
         activeAttackState_->id <= 113;
-    // Successful spider-sense states are the shipped evade/counter response
-    // to a registered attack; the attacker is notified before the state is
-    // entered and its pending hit must not land through that response.
-    if (damage <= 0.0F || dead() || ultimateInvulnerability ||
-        (activeAttackState_ != nullptr &&
-         activeAttackState_->stateClass == 6)) {
+    if (damage <= 0.0F || dead() || ultimateInvulnerability) {
         return false;
     }
     health_ = std::max(0.0F, health_ - damage);
@@ -5746,6 +5741,18 @@ std::string_view GameplayPlayer::activeStateName() const noexcept {
     }
     return activeLocomotionState_ == nullptr ? std::string_view{"k_state_idle"}
                                              : activeLocomotionState_->name;
+}
+
+std::int32_t GameplayPlayer::senseReactState() const noexcept {
+    // Player::GetSenseReactState (0x00340518) reads the current state's
+    // class and motion directly. Enemy attack behaviors use 5 for motions
+    // below 505 and 6 for counter/blink motions instead of treating this as
+    // generic player invulnerability.
+    if (activeAttackState_ == nullptr ||
+        activeAttackState_->stateClass != 6) {
+        return 0;
+    }
+    return activeAttackState_->motionType < 0x1f9 ? 5 : 6;
 }
 
 bool GameplayPlayer::punchTransitionReadyAfterImpact() const noexcept {

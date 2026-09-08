@@ -1962,6 +1962,15 @@ int main() {
         assert(!bootstrap.hud().tutorialAtlas.modulesForFrame(5).empty());
         assert(bootstrap.hud().tutorialTexture.image().width != 0);
         assert(bootstrap.hud().tutorialTexture.image().height != 0);
+        assert(!bootstrap.hud().interfaceAtlas.modulesForFrame(13).empty());
+        for (const auto& module :
+             bootstrap.hud().interfaceAtlas.modulesForFrame(13)) {
+            assert(module.moduleIndex <
+                   bootstrap.hud().interfaceAtlas.modules().size());
+            assert(bootstrap.hud().interfaceAtlas.modules()[module.moduleIndex]
+                       .imageIndex == 0);
+            assert((module.flags & ~0x03U) == 0);
+        }
         assert(bootstrap.hud().transportAtlas.frames().size() == 1);
         assert(!bootstrap.hud().transportAtlas.modulesForFrame(0).empty());
         assert(bootstrap.hud().transportTexture.image().width != 0);
@@ -5022,6 +5031,15 @@ int main() {
         assert(jumpTutorial->find(u"jump") != std::u16string::npos);
         usm::game::CinematicUiRuntime cinematicUi;
         cinematicUi.bind(bootstrap.textCatalog());
+        cinematicUi.startInterfaceEffect(160, 0, -1);
+        assert(cinematicUi.frame().interfaceEffectFrame == 13);
+        assert(cinematicUi.frame().interfaceEffectAlpha == 160);
+        cinematicUi.update(0, false);
+        assert(cinematicUi.frame().interfaceEffectAlpha == 160);
+        cinematicUi.update(400, false);
+        assert(cinematicUi.frame().interfaceEffectAlpha == 80);
+        cinematicUi.update(400, false);
+        assert(cinematicUi.frame().interfaceEffectAlpha == 0);
         assert(cinematicUi.applyCommand(
             usm::game::CinematicCommand{0, -1, "PlayDAECamera", {}}));
         assert(cinematicUi.letterboxVisible());
@@ -8373,6 +8391,10 @@ int main() {
         assert(!senseTimingRuntime.find(394)->meleeSenseActive);
         assert(senseTimingRuntime.findSpiderSenseAttacker(knifeVictim) == nullptr);
         assert(!senseTimingRuntime.consumeSpiderSenseAttacker(394));
+        senseTimingRuntime.updateGameplay(
+            firstKnifeImpact - knifeSenseFrame, knifeVictim, nullptr, false,
+            {1.0F, 0.0F, 0.0F}, false, 5);
+        assert(senseTimingRuntime.consumePlayerHits().empty());
         enemyAttackRuntime.updateGameplay(firstKnifeImpact, knifeVictim);
         auto enemyHits = enemyAttackRuntime.consumePlayerHits();
         const auto firstKnifeHit = std::find_if(
@@ -8721,11 +8743,20 @@ int main() {
         }
         usm::game::LevelEnemyRuntime measuredDamageRuntime;
         assert(measuredDamageRuntime.initialize(bootstrap));
+        const auto measuredPreHurtSpine =
+            measuredDamageRuntime.nodeWorldPosition(394, "Bip01_Spine1");
+        assert(measuredPreHurtSpine);
         const auto measuredHit =
             measuredDamageRuntime.applyPlayerMeleeHitDetailed(
                 attackPosition, {1.0F, 0.0F, 0.0F}, 200.0F, 1000.0F);
         assert(measuredHit && measuredHit->objectId == 394);
         assert(measuredHit->actualDamage == 500.0F);
+        assert(std::abs(measuredHit->hitEffectOrigin.x -
+                        measuredPreHurtSpine->x) < 0.001F);
+        assert(std::abs(measuredHit->hitEffectOrigin.y -
+                        measuredPreHurtSpine->y) < 0.001F);
+        assert(std::abs(measuredHit->hitEffectOrigin.z -
+                        measuredPreHurtSpine->z) < 0.001F);
         // Default difficulty and no damage upgrade: Player::SendHitMessage
         // leaves shipped contact damage unchanged. The collision-complete
         // autoplay gate proves that both state 78 pulses contact the correctly
@@ -8767,6 +8798,34 @@ int main() {
         knockbackRuntime.updateGameplay(50, {}, &encounterCollision);
         assert(knockbackRuntime.find(394)->position.x > knockbackStart.x);
 
+        // CBehaviorHurt::BehaviorStart (0x003b8890-0x003b88ba) rewrites
+        // air-fast hit type 105 to the ordinary type-100 reaction when the
+        // target is still grounded. StartMove applies force only after this
+        // decision, so even a vertical impulse must not select state 60.
+        usm::game::LevelEnemyRuntime groundedAirFastHitRuntime;
+        assert(groundedAirFastHitRuntime.initialize(bootstrap));
+        assert(groundedAirFastHitRuntime.setDiagnosticAiEnabled(394, true));
+        groundedAirFastHitRuntime.updateGameplay(
+            16, {}, &encounterCollision);
+        const auto* groundedAirFastTarget =
+            groundedAirFastHitRuntime.find(394);
+        assert(groundedAirFastTarget != nullptr &&
+               groundedAirFastTarget->grounded);
+        const usm::assets::Vector3 groundedAirFastSource{
+            groundedAirFastTarget->position.x +
+                groundedAirFastTarget->facing.x * 100.0F,
+            groundedAirFastTarget->position.y +
+                groundedAirFastTarget->facing.y * 100.0F,
+            groundedAirFastTarget->position.z};
+        assert(groundedAirFastHitRuntime.applyPlayerTargetedHitDetailed(
+            394, 35.0F, 105, &groundedAirFastSource,
+            0.0F, 1000.0F));
+        groundedAirFastTarget = groundedAirFastHitRuntime.find(394);
+        assert(groundedAirFastTarget->lastPlayerHitType == 100);
+        assert(groundedAirFastTarget->hurtStateId == 49);
+        assert(groundedAirFastTarget->activeAnimation !=
+               "air_to_fast_hurt");
+
         usm::game::LevelEnemyRuntime launcherHitRuntime;
         assert(launcherHitRuntime.initialize(bootstrap));
         assert(launcherHitRuntime.setDiagnosticAiEnabled(394, true));
@@ -8802,6 +8861,68 @@ int main() {
         launchedEnemy = launcherHitRuntime.find(394);
         assert(launchedEnemy->hurtStateId == 60);
         assert(launchedEnemy->activeAnimation == "air_to_fast_hurt");
+        for (int frame = 0;
+             frame < 600 &&
+             launcherHitRuntime.find(394)->hurtStateId != 55;
+             ++frame) {
+            launcherHitRuntime.updateGameplay(
+                10, {}, &encounterCollision);
+        }
+        launchedEnemy = launcherHitRuntime.find(394);
+        assert(launchedEnemy->hurtStateId == 55);
+        assert(launchedEnemy->activeAnimation ==
+               "web_throw_by_spiderman_to_onground");
+        const auto flyingLandingEffects =
+            launcherHitRuntime.consumeEffectCues();
+        assert(flyingLandingEffects.size() == 1);
+        assert(flyingLandingEffects.front().effectType == "smoke_splash");
+        assert(flyingLandingEffects.front().sourceObjectId == 394);
+
+        // AIR_TO_FLYING has its own landing state and the same native
+        // contact-surface smoke dispatch (StateEnter 0x003b86a8-0x003b86ba).
+        usm::game::LevelEnemyRuntime airFlyingLandingRuntime;
+        assert(airFlyingLandingRuntime.initialize(bootstrap));
+        assert(airFlyingLandingRuntime.setDiagnosticAiEnabled(394, true));
+        airFlyingLandingRuntime.updateGameplay(
+            16, {}, &encounterCollision);
+        const auto airFlyingStart =
+            airFlyingLandingRuntime.find(394)->position;
+        const usm::assets::Vector3 airFlyingSource{
+            airFlyingStart.x - 100.0F, airFlyingStart.y,
+            airFlyingStart.z};
+        assert(airFlyingLandingRuntime.applyPlayerTargetedHitDetailed(
+            394, 35.0F, 102, &airFlyingSource,
+            0.0F, 1000.0F));
+        for (int frame = 0;
+             frame < 200 &&
+             airFlyingLandingRuntime.find(394)->hurtStateId != 58;
+             ++frame) {
+            airFlyingLandingRuntime.updateGameplay(
+                10, {}, &encounterCollision);
+        }
+        assert(airFlyingLandingRuntime.find(394)->hurtStateId == 58);
+        assert(airFlyingLandingRuntime.applyPlayerTargetedHitDetailed(
+            394, 35.0F, 106, &airFlyingSource,
+            0.0F, 700.0F));
+        assert(airFlyingLandingRuntime.find(394)->hurtStateId == 61);
+        for (int frame = 0;
+             frame < 600 &&
+             airFlyingLandingRuntime.find(394)->hurtStateId != 63;
+             ++frame) {
+            airFlyingLandingRuntime.updateGameplay(
+                10, {}, &encounterCollision);
+        }
+        const auto* airFlyingLanded =
+            airFlyingLandingRuntime.find(394);
+        assert(airFlyingLanded->hurtStateId == 63);
+        assert(airFlyingLanded->activeAnimation ==
+               "knockback_to_onground");
+        const auto airFlyingLandingEffects =
+            airFlyingLandingRuntime.consumeEffectCues();
+        assert(airFlyingLandingEffects.size() == 1);
+        assert(airFlyingLandingEffects.front().effectType ==
+               "smoke_splash");
+        assert(airFlyingLandingEffects.front().sourceObjectId == 394);
 
         // CBehaviorHurt::BehaviorStart (0x003b87a8) can select an ordinary
         // ground hurt clip for a light hit received during an authored enemy
@@ -10436,7 +10557,7 @@ int main() {
             usm::game::PlayerAttackTarget{
                 {150.0F, 0.0F, 0.0F}, 40.0F, 1240, false, 150.0F}));
         assert(sensePlayer.activeStateId() == 38);
-        assert(!sensePlayer.applyDamage(50.0F));
+        assert(sensePlayer.senseReactState() == 6);
         sensePlayer.update({}, gameplayCameraPose, 267);
         const auto senseImpact = sensePlayer.consumeMeleeImpact();
         assert(senseImpact && senseImpact->stateId == 38);
@@ -10446,6 +10567,21 @@ int main() {
         assert(std::any_of(
             sensePlayer.hitEffects().begin(), sensePlayer.hitEffects().end(),
             [](const auto& effect) { return effect.effectId == 7; }));
+
+        usm::game::GameplayPlayer senseDamagePlayer;
+        assert(senseDamagePlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs, {}, {}, {},
+            nullptr, &bootstrap.playerHitEffectConfigs(),
+            bootstrap.playerHitEffects()));
+        assert(senseDamagePlayer.requestSpiderSense(
+            usm::game::PlayerAttackTarget{
+                {150.0F, 0.0F, 0.0F}, 40.0F, 1240, false, 150.0F}));
+        const float preSenseDamageHealth = senseDamagePlayer.health();
+        // Player::IsCanBeHit (0x003413dc) has no class-six immunity. The
+        // melee behavior suppresses its own hit, while independent damage
+        // still reaches Player::OnHit.
+        assert(senseDamagePlayer.applyDamage(1.0F));
+        assert(senseDamagePlayer.health() == preSenseDamageHealth - 1.0F);
 
         struct DirectionalSenseCase final {
             usm::assets::Vector3 attackerPosition;
@@ -10542,6 +10678,7 @@ int main() {
         assert(nonCounterableSensePlayer.requestSpiderSense(
             nonCounterableTarget));
         assert(nonCounterableSensePlayer.activeStateId() == 36);
+        assert(nonCounterableSensePlayer.senseReactState() == 5);
 
         usm::game::GameplayPlayer subtypeFiveSensePlayer;
         assert(subtypeFiveSensePlayer.initialize(
@@ -10573,6 +10710,7 @@ int main() {
                 {150.0F, 0.0F, 0.0F}, 40.0F, 1241, false, 150.0F,
                 true, true, false, false, std::nullopt, true}));
         assert(blinkStrikePlayer.activeStateId() == 42);
+        assert(blinkStrikePlayer.senseReactState() == 6);
         assert(std::ranges::any_of(
             blinkStrikePlayer.hitEffects(), [](const auto& effect) {
                 return effect.effectId == 25;

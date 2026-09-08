@@ -30,6 +30,8 @@ struct CinematicUiFrame {
     bool quickTimeEventVisible{};
     float quickTimeEventProgress{};
     float blackOverlayAlpha{};
+    std::uint8_t interfaceEffectAlpha{};
+    std::int32_t interfaceEffectFrame{-1};
 };
 
 // Portable state behind CCinematicThread::OnTutorial (0x003710d4),
@@ -44,6 +46,12 @@ public:
     }
     void update(std::uint32_t elapsedMilliseconds,
                 bool dismissPressed) noexcept;
+    // CLevel::StartInterfaceEffect (0x0037d7d0). Spider-Sense calls this
+    // with (160, 0, -1), selecting interface.bsprite frame 13 and the
+    // native ALPHA_HIT_TIME fade.
+    void startInterfaceEffect(std::int32_t alpha = 160,
+                              std::int32_t spriteParameter = 0,
+                              std::int32_t frame = -1) noexcept;
     [[nodiscard]] CinematicUiFrame frame(bool quickTimeEventVisible = false,
                                          float quickTimeEventProgress = 0.0F)
         const;
@@ -80,6 +88,10 @@ private:
     bool tutorialDimBackground_{};
     bool letterboxVisible_{};
     bool comicCoverTipShown_{};
+    float interfaceEffectAlpha_{};
+    float interfaceEffectRatePerMillisecond_{};
+    std::int32_t interfaceEffectFrame_{-1};
+    bool interfaceEffectJustStarted_{};
 };
 
 } // namespace usm::game
