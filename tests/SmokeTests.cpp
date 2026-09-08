@@ -8882,6 +8882,12 @@ int main() {
         assert(launchedEnemy->hurtStateId == 57);
         assert(launchedEnemy->activeAnimation == "idle_to_air");
         assert(!launchedEnemy->grounded);
+        assert(launcherHitRuntime.isInAir(394));
+        const auto* launchedAirListTarget =
+            launcherHitRuntime.findNearestAirbornePlayerTarget(
+                launchedEnemy->position, 1.0F);
+        assert(launchedAirListTarget != nullptr);
+        assert(launchedAirListTarget->asset->objectId == 394);
         assert(launchedEnemy->verticalVelocity == 850.0F);
         launcherHitRuntime.updateGameplay(50, {}, &encounterCollision);
         assert(launcherHitRuntime.find(394)->position.z >
@@ -8896,11 +8902,13 @@ int main() {
         assert(launchedEnemy->hurtStateId == 58);
         assert(launchedEnemy->activeAnimation == "air_to_fall");
         assert(!launchedEnemy->grounded);
+        assert(launcherHitRuntime.isInAir(394));
         assert(launcherHitRuntime.applyPlayerTargetedHitDetailed(
             394, 35.0F, 105, &launcherSource));
         launchedEnemy = launcherHitRuntime.find(394);
         assert(launchedEnemy->hurtStateId == 60);
         assert(launchedEnemy->activeAnimation == "air_to_fast_hurt");
+        assert(launcherHitRuntime.isInAir(394));
         for (int frame = 0;
              frame < 600 &&
              launcherHitRuntime.find(394)->hurtStateId != 55;
@@ -8912,6 +8920,7 @@ int main() {
         assert(launchedEnemy->hurtStateId == 55);
         assert(launchedEnemy->activeAnimation ==
                "web_throw_by_spiderman_to_onground");
+        assert(!launcherHitRuntime.isInAir(394));
         const auto flyingLandingEffects =
             launcherHitRuntime.consumeEffectCues();
         assert(flyingLandingEffects.size() == 1);
@@ -8945,6 +8954,7 @@ int main() {
             394, 35.0F, 106, &airFlyingSource,
             0.0F, 700.0F));
         assert(airFlyingLandingRuntime.find(394)->hurtStateId == 61);
+        assert(airFlyingLandingRuntime.isInAir(394));
         for (int frame = 0;
              frame < 600 &&
              airFlyingLandingRuntime.find(394)->hurtStateId != 63;
@@ -8957,6 +8967,7 @@ int main() {
         assert(airFlyingLanded->hurtStateId == 63);
         assert(airFlyingLanded->activeAnimation ==
                "knockback_to_onground");
+        assert(!airFlyingLandingRuntime.isInAir(394));
         const auto airFlyingLandingEffects =
             airFlyingLandingRuntime.consumeEffectCues();
         assert(airFlyingLandingEffects.size() == 1);
@@ -9092,6 +9103,8 @@ int main() {
         assert(tiedEnemy->health == 480.0F);
         assert(tiedEnemy->behavior ==
                usm::game::EnemyBehaviorState::TiedUp);
+        assert(tiedEnemy->tiedUpStateId == 35);
+        assert(!webBindingRuntime.isInAir(394));
         assert(tiedEnemy->activeAnimation == "tied");
         assert(tiedEnemy->animationLoops);
         assert(tiedEnemy->tiedUpRemainingMilliseconds == 4000);
@@ -9104,6 +9117,7 @@ int main() {
         tiedEnemy = webBindingRuntime.find(394);
         assert(tiedEnemy->behavior ==
                usm::game::EnemyBehaviorState::Disabled);
+        assert(tiedEnemy->tiedUpStateId == -1);
         assert(tiedEnemy->tiedUpRemainingMilliseconds == 0);
         usm::game::LevelEnemyRuntime airKnockdownBindingRuntime;
         assert(airKnockdownBindingRuntime.initialize(bootstrap));
@@ -9116,6 +9130,8 @@ int main() {
         const auto* tiedLieEnemy = airKnockdownBindingRuntime.find(394);
         assert(tiedLieEnemy->behavior ==
                usm::game::EnemyBehaviorState::TiedUp);
+        assert(tiedLieEnemy->tiedUpStateId == 36);
+        assert(!airKnockdownBindingRuntime.isInAir(394));
         assert(tiedLieEnemy->activeAnimation == "air_to_onground");
         assert(tiedLieEnemy->animationLoops);
         assert(tiedLieEnemy->tiedUpRemainingMilliseconds == 4000);
@@ -9139,6 +9155,13 @@ int main() {
              "13355.999023, -6311.277344, 505.131531"});
         assert(airborneHurtRuntime.applyCinematicCommand(
             bootstrap, airborneHurtThread, raiseEnemy));
+        // CEnemy::IsInAir is an authored AI behavior-state predicate, not a
+        // synonym for missing ground support. A moved/settling idle actor is
+        // therefore still in the helper's non-airborne list.
+        assert(!airborneHurtRuntime.find(394)->grounded);
+        assert(!airborneHurtRuntime.isInAir(394));
+        assert(airborneHurtRuntime.findNearestAirbornePlayerTarget(
+                   airborneHurtRuntime.find(394)->position, 1.0F) == nullptr);
         assert(airborneHurtRuntime.applyPlayerMeleeHit(
             {13255.999023F, -6311.277344F, 505.131531F},
             {1.0F, 0.0F, 0.0F}, 200.0F, 35.0F));

@@ -18,7 +18,10 @@ set_enemy_ai 394 0
 set_enemy_ai 395 0
 set_enemy_ai 397 0
 set_enemy_physics 394 1
-teleport 13399 -6360 7 0 -1 0
+# Enemy 394 leaves cinematic 71 facing (0.454,-0.891). Stand on that
+# authored front side so motion 121 selects Hurt state 53 (TO_FLYING), which
+# is the CEnemy::IsInAir condition required by GetGroundWebSpecialState.
+teleport 13454 -6591 7 -0.454 0.891 0
 
 # The opening 35-damage punch retains thug 394.  Releasing A/Cross in the
 # authored cancel window enters state 97 and launches it for another 60.

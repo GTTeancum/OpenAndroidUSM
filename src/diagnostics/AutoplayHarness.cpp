@@ -166,7 +166,8 @@ Result AutoplayHarness::initialize(const std::filesystem::path& scriptPath,
                  "physics_active,detected,behavior,animation,animation_ms,animation_speed,"
                  "animation_loop,animation_reverse,collision_radius,"
                  "collision_height,vertical_velocity,hurt_state,hit_type,"
-                 "hurt_vx,hurt_vy,hurt_vz,grounded,"
+                 "hurt_vx,hurt_vy,hurt_vz,grounded,facing_x,facing_y,facing_z,"
+                 "tied_state,"
                  "anchored_without_support,cinematic_motion,"
                  "cinematic_motion_ms,cinematic_motion_duration_ms,"
                  "cinematic_action,cinematic_action_object,"
@@ -3624,6 +3625,8 @@ void AutoplayHarness::recordFrame(const AutoplaySnapshot& snapshot) {
                   << enemy.lastPlayerHitType << ',' << enemy.hurtVelocity.x
                   << ',' << enemy.hurtVelocity.y << ','
                   << enemy.hurtVelocity.z << ',' << enemy.grounded << ','
+                  << enemy.facing.x << ',' << enemy.facing.y << ','
+                  << enemy.facing.z << ',' << enemy.tiedUpStateId << ','
                   << enemy.anchoredWithoutSupport << ','
                   << enemy.cinematicMotion.active << ','
                   << enemy.cinematicMotion.elapsedMilliseconds << ','

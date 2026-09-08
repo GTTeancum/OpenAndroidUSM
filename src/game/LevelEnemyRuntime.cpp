@@ -1623,6 +1623,7 @@ void LevelEnemyRuntime::updateGameplay(
                 enemy.tiedUpRemainingMilliseconds -= elapsedMilliseconds;
                 continue;
             }
+            enemy.tiedUpStateId = -1;
             enemy.tiedUpRemainingMilliseconds = 0;
             enemy.behavior = enemy.aiEnabled ? EnemyBehaviorState::Idle
                                              : EnemyBehaviorState::Disabled;
@@ -2636,6 +2637,8 @@ LevelEnemyRuntime::applyPlayerWebBindingDetailed(
         // onMessage (0x003c7558) enters state 0x23, whose serialized state
         // 35 selects `tied`; StateEnter (0x003c77d0) seeds 4000 ms.
         enemy->behavior = EnemyBehaviorState::TiedUp;
+        enemy->hurtStateId = -1;
+        enemy->tiedUpStateId = 35;
         enemy->tiedUpRemainingMilliseconds = 4000;
         enemy->meleeAttackActive = false;
         enemy->meleeAttackCooldownMilliseconds = 0;
@@ -2661,6 +2664,8 @@ bool LevelEnemyRuntime::applyPlayerAirKnockdownBinding(
     // CBehaviorTiedUp::onMessage (0x003c7558) enters 0x24 exactly, and
     // StateEnter (0x003c77d0) seeds the same 4000 ms tied lifetime.
     enemy->behavior = EnemyBehaviorState::TiedUp;
+    enemy->hurtStateId = -1;
+    enemy->tiedUpStateId = 36;
     enemy->tiedUpRemainingMilliseconds = 4000;
     enemy->meleeAttackActive = false;
     enemy->meleeAttackCooldownMilliseconds = 0;
@@ -2692,6 +2697,7 @@ void LevelEnemyRuntime::applyCombatDamage(
         meleeEngagerObjectId_ == enemy.asset->objectId) {
         unregisterMeleeEngager(enemy.asset->objectId);
     }
+    enemy.tiedUpStateId = -1;
     enemy.tiedUpRemainingMilliseconds = 0;
     const bool wasRobotPhantomConcealed =
         enemy.robotPhantomTask == RobotPhantomTaskState::ConcealHidden;
@@ -2781,7 +2787,7 @@ void LevelEnemyRuntime::applyCombatDamage(
         // (0x0032883c) reports true. A grounded enemy receives the ordinary
         // type-100 front/back reaction instead. This selection happens
         // before StartMove applies the hit's vertical force.
-        if (hitType == 105 && enemy.grounded) {
+        if (hitType == 105 && !isInAir(enemy)) {
             hitType = 100;
         }
         enemy.lastPlayerHitType = hitType;
@@ -3143,6 +3149,38 @@ bool LevelEnemyRuntime::isNearAttackKeyFrame(
     return false;
 }
 
+bool LevelEnemyRuntime::isInAir(std::int32_t objectId) const noexcept {
+    const LevelEnemyState* enemy = find(objectId);
+    return enemy != nullptr && isInAir(*enemy);
+}
+
+bool LevelEnemyRuntime::isInAir(const LevelEnemyState& enemy) noexcept {
+    // CEnemy::IsInAir (0x0032883c) delegates to
+    // CAIBehaviorManager::IsCurActiveFloat (0x00373dec). The native switch
+    // recognizes these behavior-state IDs exactly; raw contact/ground support
+    // is deliberately not part of this query.
+    if (enemy.behavior == EnemyBehaviorState::TiedUp) {
+        return enemy.tiedUpStateId == 39; // BE_DRAG_IN_AIR
+    }
+    if (enemy.behavior != EnemyBehaviorState::Hurt) {
+        return false;
+    }
+    switch (enemy.hurtStateId) {
+    case 53: // TO_FLYING
+    case 54: // FLYING
+    case 56: // FLYING_TO_WALL
+    case 57: // TO_AIR
+    case 58: // AIR_TO_FALL
+    case 60: // AIR_COMMON
+    case 61: // AIR_TO_FLYING
+    case 62: // AIR_FLYING
+    case 64: // AIR_DRAGTO
+        return true;
+    default:
+        return false;
+    }
+}
+
 const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
     const assets::Vector3& playerPosition,
     const assets::Vector3& attackDirection, bool hasDirectionalInput,
@@ -3167,19 +3205,20 @@ const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
         float distanceSquared{};
     };
     std::vector<EyeCandidate> airborneEyeCandidates;
-    std::vector<EyeCandidate> groundedEyeCandidates;
+    std::vector<EyeCandidate> nonAirborneEyeCandidates;
     airborneEyeCandidates.reserve(states_.size());
-    groundedEyeCandidates.reserve(states_.size());
+    nonAirborneEyeCandidates.reserve(states_.size());
 
     // Player::SearchTargetByAttackRange (0x003430c8) asks
-    // CTargetHelper::getNearestTarget(mask=3). The helper compares the first
-    // entries of its separately sorted airborne and non-airborne lists, with
-    // 1000 cm as the native threshold when the airborne list is absent or
-    // its first entry is farther away.
+    // CTargetHelper::getNearestTarget(mask=3). CTargetHelper::update
+    // (0x003543e4) puts non-airborne enemies in list/mask 1 and airborne
+    // enemies in list/mask 2. getNearestTarget starts from list 1, clamps its
+    // comparison distance to 1000 cm, then lets list 2 replace it only when
+    // strictly nearer.
     const LevelEnemyState* nearestAirborne = nullptr;
-    const LevelEnemyState* nearestGrounded = nullptr;
+    const LevelEnemyState* nearestNonAirborne = nullptr;
     float nearestAirborneSquared = std::numeric_limits<float>::max();
-    float nearestGroundedSquared = std::numeric_limits<float>::max();
+    float nearestNonAirborneSquared = std::numeric_limits<float>::max();
     for (const LevelEnemyState& enemy : states_) {
         if (enemy.asset == nullptr || !enemy.visible || enemy.health <= 0.0F) {
             continue;
@@ -3189,10 +3228,11 @@ const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
         const float z = enemy.position.z - playerPosition.z;
         const float distanceSquared = x * x + y * y + z * z;
         const float distance = std::sqrt(distanceSquared);
-        if (enemy.grounded) {
-            if (distanceSquared < nearestGroundedSquared) {
-                nearestGrounded = &enemy;
-                nearestGroundedSquared = distanceSquared;
+        const bool airborne = isInAir(enemy);
+        if (!airborne) {
+            if (distanceSquared < nearestNonAirborneSquared) {
+                nearestNonAirborne = &enemy;
+                nearestNonAirborneSquared = distanceSquared;
             }
         } else if (distanceSquared < nearestAirborneSquared) {
             nearestAirborne = &enemy;
@@ -3203,8 +3243,7 @@ const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
         // after adding the target radius; the eye routine repeats that same
         // requested-range test before scoring the horizontal direction.
         if (distance - enemy.collisionRadius <= maximumRange) {
-            (enemy.grounded ? groundedEyeCandidates
-                            : airborneEyeCandidates)
+            (!airborne ? nonAirborneEyeCandidates : airborneEyeCandidates)
                 .push_back({&enemy, distanceSquared});
         }
     }
@@ -3217,22 +3256,22 @@ const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
         });
     };
     sortByRange(airborneEyeCandidates);
-    sortByRange(groundedEyeCandidates);
+    sortByRange(nonAirborneEyeCandidates);
 
-    const LevelEnemyState* nearestTarget = nearestAirborne;
+    const LevelEnemyState* nearestTarget = nearestNonAirborne;
     float helperComparisonSquared = 1000.0F * 1000.0F;
+    if (nearestNonAirborne != nullptr &&
+        nearestNonAirborneSquared < helperComparisonSquared) {
+        helperComparisonSquared = nearestNonAirborneSquared;
+    }
     if (nearestAirborne != nullptr &&
         nearestAirborneSquared < helperComparisonSquared) {
-        helperComparisonSquared = nearestAirborneSquared;
-    }
-    if (nearestGrounded != nullptr &&
-        nearestGroundedSquared < helperComparisonSquared) {
-        nearestTarget = nearestGrounded;
+        nearestTarget = nearestAirborne;
     }
     if (nearestTarget != nullptr) {
         const float selectedDistanceSquared =
-            nearestTarget == nearestGrounded
-                ? nearestGroundedSquared
+            nearestTarget == nearestNonAirborne
+                ? nearestNonAirborneSquared
                 : nearestAirborneSquared;
         if (!(selectedDistanceSquared < maximumRange * maximumRange)) {
             nearestTarget = nullptr;
@@ -3241,8 +3280,8 @@ const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
 
     const LevelEnemyState* eyeTarget = nullptr;
     float bestForwardDot = minimumForwardDot;
-    // SearchTargetList appends mask-1 airborne entries and then mask-2
-    // non-airborne entries. SearchTargetByEyeHorizon (0x00343b70) walks that
+    // SearchTargetList appends mask-1 non-airborne entries and then mask-2
+    // airborne entries. SearchTargetByEyeHorizon (0x00343b70) walks that
     // combined output backwards and replaces only for a strictly better dot.
     const auto scoreReverse = [&](const std::vector<EyeCandidate>& candidates) {
         for (auto candidate = candidates.rbegin();
@@ -3275,15 +3314,15 @@ const LevelEnemyState* LevelEnemyRuntime::findPlayerAttackTarget(
             }
         }
     };
-    scoreReverse(groundedEyeCandidates);
     scoreReverse(airborneEyeCandidates);
+    scoreReverse(nonAirborneEyeCandidates);
     if (eyeTarget != nullptr || hasDirectionalInput) {
         return eyeTarget;
     }
     return nearestTarget;
 }
 
-const LevelEnemyState* LevelEnemyRuntime::findNearestGroundedPlayerTarget(
+const LevelEnemyState* LevelEnemyRuntime::findNearestAirbornePlayerTarget(
     const assets::Vector3& playerPosition, float maximumRange) const noexcept {
     if (maximumRange <= 0.0F) {
         return nullptr;
@@ -3292,7 +3331,7 @@ const LevelEnemyState* LevelEnemyRuntime::findNearestGroundedPlayerTarget(
     float nearestDistanceSquared = maximumRange * maximumRange;
     for (const LevelEnemyState& enemy : states_) {
         if (enemy.asset == nullptr || !enemy.visible || enemy.health <= 0.0F ||
-            !enemy.grounded) {
+            !isInAir(enemy)) {
             continue;
         }
         const float x = enemy.position.x - playerPosition.x;
@@ -3336,6 +3375,7 @@ bool LevelEnemyRuntime::setDiagnosticAiEnabled(
     unregisterMeleeEngager(objectId);
     enemy->meleeAttackCooldownMilliseconds = 0;
     enemy->rangeAttackCooldownMilliseconds = 0;
+    enemy->tiedUpStateId = -1;
     enemy->tiedUpRemainingMilliseconds = 0;
     enemy->sandmanTask = SandmanBossTaskState::None;
     enemy->rhinoTask = RhinoBossTaskState::None;
@@ -3476,6 +3516,7 @@ void LevelEnemyRuntime::resetTransientForCheckPointLoad() noexcept {
         enemy.meleeAttackActive = false;
         enemy.meleeAttackRegistered = false;
         enemy.meleeRegistrationTimerMilliseconds = 0.0F;
+        enemy.tiedUpStateId = -1;
         enemy.tiedUpRemainingMilliseconds = 0;
         if (enemy.robotPhantomTask ==
             RobotPhantomTaskState::ConcealHidden) {
@@ -6063,6 +6104,7 @@ void LevelEnemyRuntime::enterHurtState(LevelEnemyState& enemy,
         return;
     }
     enemy.behavior = EnemyBehaviorState::Hurt;
+    enemy.tiedUpStateId = -1;
     enemy.hurtStateId = stateId;
     selectStateAnimation(enemy, stateName, hurtStateLoops(stateId));
     queueStateSound(enemy, stateName);
@@ -6176,6 +6218,7 @@ void LevelEnemyRuntime::enterDeadState(LevelEnemyState& enemy) {
     enemy.hurtStateId = -1;
     enemy.hurtVelocity = {};
     enemy.hurtStartedGrounded = false;
+    enemy.tiedUpStateId = -1;
     enemy.tiedUpRemainingMilliseconds = 0;
     enemy.sandmanTask = SandmanBossTaskState::None;
     enemy.sandmanJumpElapsedMilliseconds = 0;

@@ -3144,7 +3144,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     {enemy->position,
                      enemy->collisionRadius,
                      enemy->asset->objectId,
-                     !enemy->grounded,
+                     enemyRuntime_.isInAir(enemy->asset->objectId),
                      enemy->collisionHeight,
                      enemy->canBeTiedUp,
                      enemy->canBeDraggedTo,
@@ -3290,7 +3290,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 const bool accepted = skillUnlocked && attacker != nullptr &&
                     gameplayPlayer_.requestSpiderSense({
                         attacker->position, attacker->collisionRadius,
-                        attacker->asset->objectId, !attacker->grounded,
+                        attacker->asset->objectId,
+                        enemyRuntime_.isInAir(attacker->asset->objectId),
                         attacker->collisionHeight, attacker->canBeTiedUp,
                         attacker->canBeDraggedTo, attacker->onWall, false,
                         std::nullopt,
@@ -3490,11 +3491,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     webTarget = acquireAttackTarget(1000.0F, 1000.0F);
                 } else if (traversalRequest) {
                     // GetAirWebSpecialState first asks CTargetHelper for mask
-                    // 2: its nearest non-airborne enemy from the 2000 cm
+                    // 2: its nearest airborne enemy from the 2000 cm
                     // helper census. Only an empty helper list falls through
                     // to the ordinary 1000 cm eye/range search.
                     webTarget = selectEnemyTarget(
-                        enemyRuntime_.findNearestGroundedPlayerTarget(
+                        enemyRuntime_.findNearestAirbornePlayerTarget(
                             gameplayPlayer_.position()));
                     if (!webTarget.has_value()) {
                         webTarget = acquireAttackTarget(1000.0F, 1000.0F);
@@ -3637,7 +3638,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 if (heldTarget != nullptr) {
                     playerHeldWebTarget = game::PlayerAttackTarget{
                         heldTarget->position, heldTarget->collisionRadius,
-                        heldTarget->asset->objectId, !heldTarget->grounded,
+                        heldTarget->asset->objectId,
+                        enemyRuntime_.isInAir(heldTarget->asset->objectId),
                         heldTarget->collisionHeight, heldTarget->canBeTiedUp,
                         heldTarget->canBeDraggedTo};
                 }
@@ -3720,7 +3722,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         trackedAttackTarget->position,
                         trackedAttackTarget->collisionRadius,
                         trackedAttackTarget->asset->objectId,
-                        !trackedAttackTarget->grounded,
+                        enemyRuntime_.isInAir(
+                            trackedAttackTarget->asset->objectId),
                         trackedAttackTarget->collisionHeight,
                         trackedAttackTarget->canBeTiedUp,
                         trackedAttackTarget->canBeDraggedTo,

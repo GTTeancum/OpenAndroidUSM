@@ -483,6 +483,22 @@ filters, ordering, ties, world rays, and target IDs through the attack update;
 web lines aimed at targetable scenery also follow the retained object rather
 than snapping back to a stale launch point.
 
+The helper's "airborne" category is an authored behavior category, not a raw
+collision-support test. `CEnemy::IsInAir` (`0x0032883c`) delegates to
+`CAIBehaviorManager::IsCurActiveFloat` (`0x00373dec`). The latter returns true
+only for Hurt states 53, 54, 56, 57, 58, 60, 61, 62, and 64, plus Tied-Up
+state 39 (`BE_DRAG_IN_AIR`). In particular, an idle/cinematic actor whose
+physics capsule is temporarily unsupported remains in the non-airborne list.
+`CTargetHelper::update` (`0x003543e4`) calls that virtual directly: mask 1 is
+the non-airborne list and mask 2 is the airborne list. This also proves the
+native list append/tie order and that `GetAirWebSpecialState`'s mask-2 query
+prefers an authored airborne target. The runtime and every player target
+snapshot now use this exact state predicate; hit type 105's air-fast-hurt gate
+uses it as well. The drag-down
+autoplay approaches the opening thug from its authored front side so its
+motion-121 launch enters state 53 instead of accidentally relying on the old
+`!grounded` approximation.
+
 The passive target marker uses a different native search contract from an
 attack press. `Player::UpdateTarget` (`0x00343058`) runs every player update
 outside class-six and the exact `Player::IsInAirAttack` (`0x0034111c`)

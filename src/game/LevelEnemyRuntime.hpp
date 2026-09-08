@@ -197,6 +197,7 @@ struct LevelEnemyState {
     float meleeRegistrationTimerMilliseconds{};
     // CBehaviorTiedUp states 35-37 start from a 4000 ms authored timer,
     // multiplied by the player's web-duration upgrade rate.
+    std::int16_t tiedUpStateId{-1};
     std::uint32_t tiedUpRemainingMilliseconds{};
     SandmanBossTaskState sandmanTask{SandmanBossTaskState::None};
     assets::Vector3 sandmanJumpStart;
@@ -558,11 +559,10 @@ public:
         float maximumRange = 1000.0F,
         const LevelCollision* collision = nullptr,
         float minimumForwardDot = 0.5F) const noexcept;
-    // CTargetHelper::getNearestTarget(mask=2) reads its separately sorted
-    // non-airborne enemy list. GetAirWebSpecialState consults this list before
-    // its directional/attack-range fallback and caps the helper census at
-    // 2000 cm.
-    [[nodiscard]] const LevelEnemyState* findNearestGroundedPlayerTarget(
+    // CTargetHelper::update (0x003543e4) places CEnemy::IsInAir targets in
+    // list/mask 2. GetAirWebSpecialState consults its nearest entry before the
+    // directional/attack-range fallback and caps the helper census at 2000 cm.
+    [[nodiscard]] const LevelEnemyState* findNearestAirbornePlayerTarget(
         const assets::Vector3& playerPosition,
         float maximumRange = 2000.0F) const noexcept;
     [[nodiscard]] const LevelEnemyState* findPlayerWallAttackTarget(
@@ -583,6 +583,10 @@ public:
         std::int32_t objectId) const noexcept;
     [[nodiscard]] bool isNearAttackKeyFrame(
         std::int32_t objectId) const noexcept;
+    // CEnemy::IsInAir (0x0032883c) does not expose raw physics support. It
+    // delegates to CAIBehaviorManager::IsCurActiveFloat (0x00373dec), which
+    // recognizes only the authored airborne hurt/tied-up behavior states.
+    [[nodiscard]] bool isInAir(std::int32_t objectId) const noexcept;
     [[nodiscard]] bool canEnterWallWeb(std::int32_t objectId) const noexcept;
     [[nodiscard]] bool applyWallWebEvent(const WallWebEvent& event);
     [[nodiscard]] std::optional<assets::Vector3> nodeWorldPosition(
@@ -685,6 +689,8 @@ public:
 
 private:
     [[nodiscard]] LevelEnemyState* findMutable(std::int32_t objectId) noexcept;
+    [[nodiscard]] static bool isInAir(
+        const LevelEnemyState& enemy) noexcept;
     [[nodiscard]] assets::Vector3 playerHitEffectOrigin(
         const LevelEnemyState& enemy) const;
     [[nodiscard]] bool registerMeleeEngager(LevelEnemyState& enemy) noexcept;
