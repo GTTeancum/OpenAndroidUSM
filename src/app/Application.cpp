@@ -3986,6 +3986,47 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             std::to_string(accepted ? 1 : 0));
                 }
             }
+            const auto playPlayerHitEffect =
+                [&](std::int32_t enemyObjectId,
+                    const assets::Vector3& origin, std::int16_t hitType,
+                    float incomingDamage,
+                    std::string_view explicitEffectType = {}) -> Result {
+                // CEnemy::ProcessHitInfo (0x00330fe4) tests the incoming
+                // AIHitTargetInfo damage before it creates a contact splash.
+                // Retained web-bind messages deliberately carry zero damage
+                // and therefore keep their gameplay contact without FX.
+                if (!(incomingDamage > 0.0F) ||
+                    !std::isfinite(incomingDamage)) {
+                    return Result::success();
+                }
+                const game::LevelEnemyState* enemy =
+                    enemyRuntime_.find(enemyObjectId);
+                if (enemy == nullptr || enemy->asset == nullptr) {
+                    return Result::success();
+                }
+                // ProcessHitInfo requests the ordinary cartoon splash for
+                // accepted hits and the big variant for native hit types
+                // 0x79/0x6a (0x89 is first normalized to 0x79).
+                const std::string_view effectType =
+                    !explicitEffectType.empty()
+                        ? explicitEffectType
+                        : (hitType == 121 || hitType == 106 ||
+                                   hitType == 137
+                               ? "cartoon_hit_splash_big"
+                               : "cartoon_hit_splash");
+                if (autoplay) {
+                    autoplay->recordEvent(
+                        syntheticElapsedMilliseconds,
+                        "player_hit_effect",
+                        "enemy=" + std::to_string(enemyObjectId) +
+                            ";type=" + std::string(effectType) + ";x=" +
+                            std::to_string(origin.x) + ";y=" +
+                            std::to_string(origin.y) + ";z=" +
+                            std::to_string(origin.z));
+                }
+                return effectRuntime_.playEffect(effectType, origin,
+                                                 enemy->asset->roomId);
+            };
             for (std::optional<game::PlayerMeleeImpact> impact =
                      gameplayPlayer_.consumeMeleeImpact();
                  impact.has_value();
@@ -3995,41 +4036,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     // motion on the counter's authored contact frame.
                     levelCinematicRuntime_.resetSlowMotion();
                 }
-                const auto playPlayerHitEffect =
-                    [&](const game::PlayerMeleeHitResult& hit) -> Result {
-                    const std::int32_t enemyObjectId = hit.objectId;
-                    const game::LevelEnemyState* enemy =
-                        enemyRuntime_.find(enemyObjectId);
-                    if (enemy == nullptr || enemy->asset == nullptr) {
-                        return Result::success();
-                    }
-                    // CEnemy::ProcessHitInfo (0x00330fe4) requests the
-                    // ordinary cartoon splash for accepted hits and the big
-                    // variant for native hit types 0x79/0x6a (0x89 is first
-                    // normalized to 0x79). Unit::AddPlayerHitEffect
-                    // (0x00324234) attaches it to Bip01_Spine1.
-                    const std::string_view effectType =
-                        impact->hitType == 121 || impact->hitType == 106 ||
-                                impact->hitType == 137
-                            ? "cartoon_hit_splash_big"
-                            : "cartoon_hit_splash";
-                    // ProcessHitInfo creates this splash before health and
-                    // hurt-state dispatch. LevelEnemyRuntime carries the
-                    // pre-reaction Bip01_Spine1 sample across that boundary.
-                    const assets::Vector3& origin = hit.hitEffectOrigin;
-                    if (autoplay) {
-                        autoplay->recordEvent(
-                            syntheticElapsedMilliseconds,
-                            "player_hit_effect",
-                            "enemy=" + std::to_string(enemyObjectId) +
-                                ";type=" + std::string(effectType) + ";x=" +
-                                std::to_string(origin.x) + ";y=" +
-                                std::to_string(origin.y) + ";z=" +
-                                std::to_string(origin.z));
-                    }
-                    return effectRuntime_.playEffect(effectType, origin,
-                                                     enemy->asset->roomId);
-                };
                 if (impact->senseAttack) {
                     const float sectorHalfAngle = std::max(
                         std::abs(impact->minimumAngleDegrees),
@@ -4051,7 +4057,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             hit.actualDamage, impact->ultimateAttack,
                             syntheticElapsedMilliseconds,
                             !impact->powerRestoreBlocked);
-                        result = playPlayerHitEffect(hit);
+                        result = playPlayerHitEffect(
+                            hit.objectId, hit.hitEffectOrigin,
+                            impact->hitType, impact->damage);
                         if (!result) {
                             return fail(result.message());
                         }
@@ -4108,7 +4116,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             hit.actualDamage, impact->ultimateAttack,
                             syntheticElapsedMilliseconds,
                             !impact->powerRestoreBlocked);
-                        result = playPlayerHitEffect(hit);
+                        result = playPlayerHitEffect(
+                            hit.objectId, hit.hitEffectOrigin,
+                            impact->hitType, impact->damage);
                         if (!result) {
                             return fail(result.message());
                         }
@@ -4159,7 +4169,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             hit.actualDamage, false,
                             syntheticElapsedMilliseconds,
                             !impact->powerRestoreBlocked);
-                        result = playPlayerHitEffect(hit);
+                        result = playPlayerHitEffect(
+                            hit.objectId, hit.hitEffectOrigin,
+                            impact->hitType, impact->damage);
                         if (!result) {
                             return fail(result.message());
                         }
@@ -4254,7 +4266,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         hitEnemy.actualDamage, impact->ultimateAttack,
                         syntheticElapsedMilliseconds,
                         !impact->powerRestoreBlocked);
-                    result = playPlayerHitEffect(hitEnemy);
+                    result = playPlayerHitEffect(
+                        hitEnemy.objectId, hitEnemy.hitEffectOrigin,
+                        impact->hitType, impact->damage);
                     if (!result) {
                         return fail(result.message());
                     }
@@ -4856,6 +4870,19 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     gameplayPlayer_.addCombo(
                         event.actualDamage, false,
                         syntheticElapsedMilliseconds);
+                }
+                if (event.kind ==
+                    game::PlayerWebPelletEventKind::EnemyContact) {
+                    // CBullet::CheckCollisions (0x0035cba0, call at
+                    // 0x0035cdfe) constructs the literal `web_splash` at
+                    // 0x0035cae8 and attaches it to the struck Unit after the
+                    // 0x12d damage message.
+                    result = playPlayerHitEffect(
+                        event.hitEnemyObjectId, event.hitEffectOrigin,
+                        123, event.requestedDamage, "web_splash");
+                    if (!result) {
+                        return fail(result.message());
+                    }
                 }
                 if (!autoplay) {
                     continue;

@@ -5248,6 +5248,7 @@ int main() {
         assert(hitSplashPreset != nullptr);
         assert(bootstrap.effects().presets.find("cartoon_hit_splash") !=
                nullptr);
+        assert(bootstrap.effects().presets.find("web_splash") != nullptr);
         const auto* blackWebSplashPreset =
             bootstrap.effects().presets.find("super_web_splash_black");
         assert(blackWebSplashPreset != nullptr);
@@ -11158,6 +11159,12 @@ int main() {
         assert(webPelletContact != webPelletEvents.end());
         assert(webPelletContact->hitEnemyObjectId == 394);
         assert(std::abs(webPelletContact->actualDamage - 20.0F) < 0.01F);
+        const auto expectedWebPelletEffectOrigin =
+            webPelletContact->hitEffectOrigin;
+        assert(std::isfinite(expectedWebPelletEffectOrigin.x));
+        assert(std::isfinite(expectedWebPelletEffectOrigin.y));
+        assert(std::isfinite(expectedWebPelletEffectOrigin.z));
+        assert(expectedWebPelletEffectOrigin.z > webPelletEnemy->position.z);
         assert(std::abs(webPelletRuntime.find(394)->health -
                         (webPelletHealthBefore - 20.0F)) < 0.01F);
         assert(webPelletRuntime.playerWebPellets().empty());

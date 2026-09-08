@@ -333,6 +333,7 @@ private:
         AssertAudioStopped,
         AssertAudioPlayCount,
         AssertAudioStopCount,
+        AssertEventCount,
         AssertEventNotObserved,
         Finish,
     };
@@ -526,6 +527,7 @@ private:
     std::set<std::string> observedEventTypes_;
     std::map<std::string, std::size_t> audioPlayCounts_;
     std::map<std::string, std::size_t> audioStopCounts_;
+    std::map<std::string, std::size_t> eventCounts_;
     std::map<std::int32_t, EnemyTraceState> previousEnemies_;
     std::map<std::int32_t, RoomTraceState> previousRooms_;
     std::map<std::int32_t, ObjectTraceState> previousObjects_;

@@ -2175,7 +2175,7 @@ bool LevelEnemyRuntime::launchPlayerWebPellet(
          true});
     pendingPlayerWebPelletEvents_.push_back(
         {PlayerWebPelletEventKind::Spawned, targetedEnemyObjectId, -1,
-         position, damage, 0.0F});
+         position, damage, 0.0F, {}});
     return true;
 }
 
@@ -2241,19 +2241,20 @@ void LevelEnemyRuntime::updatePlayerWebPellets(
                  hitEnemy->asset->objectId,
                  pellet.position,
                  pellet.damage,
-                 result ? result->actualDamage : 0.0F});
+                 result ? result->actualDamage : 0.0F,
+                 result ? result->hitEffectOrigin : assets::Vector3{}});
             pellet.active = false;
         } else if (staticContact) {
             pendingPlayerWebPelletEvents_.push_back(
                 {PlayerWebPelletEventKind::StaticContact,
                  pellet.targetedEnemyObjectId, -1, pellet.position,
-                 pellet.damage, 0.0F});
+                 pellet.damage, 0.0F, {}});
             pellet.active = false;
         } else if (travel >= remaining) {
             pendingPlayerWebPelletEvents_.push_back(
                 {PlayerWebPelletEventKind::Expired,
                  pellet.targetedEnemyObjectId, -1, pellet.position,
-                 pellet.damage, 0.0F});
+                 pellet.damage, 0.0F, {}});
             pellet.active = false;
         }
     }

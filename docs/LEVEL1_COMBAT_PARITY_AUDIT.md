@@ -330,6 +330,14 @@ to the autoplay event log.
   runtime now carries that pre-reaction bone sample with the hit result;
   deferred application dispatch no longer samples the newly entered hurt
   pose and shifts the splash away from the actual contact.
+- `CBullet::CheckCollisions` (`0x0035cba0`) does not reuse that cartoon
+  splash for the ground web pellet. Its post-message path constructs the
+  literal `web_splash` at `0x0035cae8`, attaches it to the struck Unit, and
+  awards combo from the measured health delta. The portable pellet now
+  carries the pre-reaction spine sample into application dispatch and emits
+  exactly that preset. Its later zero-damage retained bind message remains a
+  contact but creates no second effect, matching `CEnemy::ProcessHitInfo`'s
+  incoming-damage gate.
 - `CBehaviorHurt::BehaviorStart` (`0x003b8890`) rewrites hit type 105 to the
   ordinary type-100 reaction while its victim is still grounded, before hit
   force launches the body. Its state update (`0x003b89f8`) preserves the
@@ -516,7 +524,7 @@ The current retained gates are:
 - `first-encounter-alternate-combat-effects.usmauto` (82/82)
 - `combat-effects-parity-gate.usmauto` (47/47)
 - `first-encounter-normal-progression.usmauto` (14/14)
-- `first-encounter-ground-web-bind-parity.usmauto` (21/21)
+- `first-encounter-ground-web-bind-parity.usmauto` (22/22)
 - `first-encounter-ground-web-throw-parity.usmauto` (32/32)
 - `first-encounter-punch-web-throw-parity.usmauto` (30/30)
 - `first-encounter-air-web-knockdown-parity.usmauto` (27/27)

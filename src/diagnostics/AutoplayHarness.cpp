@@ -1217,6 +1217,13 @@ Result AutoplayHarness::parseScript(
                 return invalid(
                     "assert_audio_stop_count requires event minimum_count");
             }
+        } else if (command == "assert_event_count") {
+            step.kind = StepKind::AssertEventCount;
+            if (!(tokens >> step.label >>
+                  step.durationOrTimeoutMilliseconds)) {
+                return invalid(
+                    "assert_event_count requires event exact_count");
+            }
         } else if (command == "assert_event_not_observed") {
             step.kind = StepKind::AssertEventNotObserved;
             if (!(tokens >> step.label)) {
@@ -2883,6 +2890,21 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         }
         break;
     }
+    case StepKind::AssertEventCount: {
+        const auto count = eventCounts_.find(step.label);
+        const std::size_t actual =
+            count == eventCounts_.end() ? 0U : count->second;
+        if (actual != step.durationOrTimeoutMilliseconds) {
+            failStep(snapshot, step,
+                     "event count did not match the assertion: " +
+                         step.label + " expected=" +
+                         std::to_string(step.durationOrTimeoutMilliseconds) +
+                         " actual=" + std::to_string(actual));
+        } else {
+            completeStep(snapshot, step);
+        }
+        break;
+    }
     case StepKind::AssertEventNotObserved:
         if (observedEventTypes_.contains(step.label)) {
             failStep(snapshot, step,
@@ -3818,6 +3840,7 @@ void AutoplayHarness::recordEvent(std::uint64_t timeMilliseconds,
                                   std::string_view type,
                                   std::string_view detail) {
     observedEventTypes_.emplace(type);
+    ++eventCounts_[std::string(type)];
     if (!eventLog_) {
         return;
     }
@@ -4980,6 +5003,7 @@ std::string AutoplayHarness::stepName(StepKind kind) {
     case StepKind::AssertAudioStopped: return "assert_audio_stopped";
     case StepKind::AssertAudioPlayCount: return "assert_audio_play_count";
     case StepKind::AssertAudioStopCount: return "assert_audio_stop_count";
+    case StepKind::AssertEventCount: return "assert_event_count";
     case StepKind::AssertEventNotObserved:
         return "assert_event_not_observed";
     case StepKind::Finish: return "finish";

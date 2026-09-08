@@ -274,6 +274,7 @@ struct PlayerWebPelletEvent {
     assets::Vector3 position;
     float requestedDamage{};
     float actualDamage{};
+    assets::Vector3 hitEffectOrigin;
 };
 
 struct EnemySeparationEvent {
