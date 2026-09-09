@@ -264,6 +264,17 @@ the normal HUD, then fades it through `UpdateInterfaceEffect` (`0x0037d810`).
 The same frame, alpha, ordering, and 800 ms fade are now rendered and emitted
 to the autoplay event log.
 
+Room 9's type-4 heavy uses the same interface path for damage feedback.
+Attack 21 carries hit type 104, 70 damage, and a 500 ms protection window in
+`EnemysAttackConfigs.bin`. `Player::OnHit` (`0x0034d790`) maps it to state 46,
+`k_state_hurt_knockback`, whose animation 72 is the 433 ms
+`idle_to_knockback_flying` clip. The first of the rush clip's four contact
+keys stores priority zero and 500 ms at `Player+0x704/+0x708`; the remaining
+contacts fail `Player::IsCanBeHit` instead of multiplying the authored damage
+to 280. The same accepted state starts frame 13 at alpha 255 and RGB red.
+`room9-heavy-native-melee.usmauto` retains this combined behavior/effects
+gate without injected hits or health changes.
+
 ## Contact, trail, and audio timing
 
 - `GS_Loading::Update` selects `Application::SetTargetFPS(20)` at
@@ -659,6 +670,7 @@ two rendered captures. The current retained gates are:
 - `first-encounter-manual-combat.usmauto` (19/19)
 - `first-encounter-presentation.usmauto` (10/10)
 - `player-button-combat-probe.usmauto` (34/34)
+- `room9-heavy-native-melee.usmauto` (15/15)
 
 These gates establish the audited source facts and catch their regressions.
 They are not a blanket claim of parity for later-level enemy types,

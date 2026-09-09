@@ -1436,6 +1436,24 @@ int main() {
                     gameplayHudFrame.pixels[component + 2];
         }
         assert(senseEffectChangedPixels > 100);
+        usm::game::CinematicUiFrame damageEffectUi;
+        damageEffectUi.interfaceEffectFrame = 13;
+        damageEffectUi.interfaceEffectAlpha = 255;
+        damageEffectUi.interfaceEffectColorRgb = 0x00ff0000U;
+        assert(gameRenderer.updateCinematicUi(levelOne.hud(), damageEffectUi));
+        gameRenderer.renderFrame();
+        RgbaImage damageEffectFrame;
+        assert(gameRenderer.readBackImage(damageEffectFrame));
+        std::size_t damageRedPixels = 0;
+        for (std::size_t component = 0;
+             component < damageEffectFrame.pixels.size(); component += 4) {
+            damageRedPixels +=
+                damageEffectFrame.pixels[component] >
+                    damageEffectFrame.pixels[component + 1] + 20 &&
+                damageEffectFrame.pixels[component] >
+                    damageEffectFrame.pixels[component + 2] + 20;
+        }
+        assert(damageRedPixels > 100);
         usm::game::CinematicUiFrame restoreFadeUi;
         restoreFadeUi.blackOverlayAlpha = 1.0F;
         assert(gameRenderer.updateCinematicUi(levelOne.hud(), restoreFadeUi));

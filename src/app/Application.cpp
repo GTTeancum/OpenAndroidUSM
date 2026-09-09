@@ -5256,16 +5256,41 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             }
             for (const game::EnemyPlayerHit& hit :
                  enemyRuntime_.consumePlayerHits()) {
+                const bool accepted = !restoreRuntime_.active() &&
+                    gameplayPlayer_.applyDamage(
+                        hit.damage, 0, 0, hit.hitType,
+                        hit.hitProtectionMilliseconds, hit.hitPriority);
                 if (autoplay) {
                     autoplay->recordEvent(
                         syntheticElapsedMilliseconds, "enemy_hit_player",
                         "enemy=" + std::to_string(hit.sourceObjectId) +
                             ";attack=" + std::to_string(hit.attackId) +
                             ";hit_type=" + std::to_string(hit.hitType) +
-                            ";damage=" + std::to_string(hit.damage));
+                            ";damage=" + std::to_string(hit.damage) +
+                            ";hit_protection_ms=" +
+                            std::to_string(hit.hitProtectionMilliseconds) +
+                            ";hit_priority=" +
+                            std::to_string(hit.hitPriority) +
+                            ";accepted=" + (accepted ? "1" : "0"));
                 }
-                if (!restoreRuntime_.active() &&
-                    gameplayPlayer_.applyDamage(hit.damage, 0, 0, hit.hitType)) {
+                if (accepted) {
+                    const std::uint16_t hurtStateId =
+                        gameplayPlayer_.activeStateId();
+                    if (hurtStateId == 46 || hurtStateId == 48 ||
+                        hurtStateId == 49) {
+                        // Player::OnHit (0x0034dbc0-0x0034dbf2) starts the
+                        // frame-13 interface sprite at the global 255 alpha
+                        // and CSprite RGB 0xff0000 for knockback reactions.
+                        cinematicUi_.startInterfaceEffect(255, 0xff0000, -1);
+                        if (autoplay) {
+                            autoplay->recordEvent(
+                                syntheticElapsedMilliseconds,
+                                "interface_effect",
+                                "frame=13;alpha=255;color=ff0000;fade_ms=800;"
+                                "source=player_hit;state=" +
+                                    std::to_string(hurtStateId));
+                        }
+                    }
                     // QTE action 8 supplies grab_to_knockbackflying itself;
                     // CBehaviorThrow/QTEActionManager must not be replaced by
                     // the generic player hurt reaction or sound dispatch.

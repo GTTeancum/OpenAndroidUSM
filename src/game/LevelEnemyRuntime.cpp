@@ -4075,7 +4075,8 @@ void LevelEnemyRuntime::queueAuthoredAttackEvents(
             continue;
         }
         pendingPlayerHits_.push_back(
-            {enemy.asset->objectId, attackId, attack->damage, attack->hitType});
+            {enemy.asset->objectId, attackId, attack->damage, attack->hitType,
+             attack->hitProtectionMilliseconds, 0});
     }
 }
 

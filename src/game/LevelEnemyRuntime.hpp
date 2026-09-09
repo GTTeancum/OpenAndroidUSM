@@ -253,6 +253,12 @@ struct EnemyPlayerHit {
     std::int16_t attackId{-1};
     float damage{};
     std::int32_t hitType{100};
+    // AIHitTargetInfo+0x24/+0x28. Player::OnHit (0x0034d790) installs
+    // this protection window and priority after an accepted hit; subsequent
+    // equal/lower-priority contacts are rejected by IsCanBeHit
+    // (0x003413dc) until Player::Update (0x00353494) ages the window out.
+    float hitProtectionMilliseconds{};
+    std::int32_t hitPriority{};
 };
 
 struct PlayerMeleeHitResult {

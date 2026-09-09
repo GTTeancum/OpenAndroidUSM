@@ -5094,12 +5094,16 @@ int main() {
         cinematicUi.startInterfaceEffect(160, 0, -1);
         assert(cinematicUi.frame().interfaceEffectFrame == 13);
         assert(cinematicUi.frame().interfaceEffectAlpha == 160);
+        assert(cinematicUi.frame().interfaceEffectColorRgb == 0x00ffffffU);
         cinematicUi.update(0, false);
         assert(cinematicUi.frame().interfaceEffectAlpha == 160);
         cinematicUi.update(400, false);
         assert(cinematicUi.frame().interfaceEffectAlpha == 80);
         cinematicUi.update(400, false);
         assert(cinematicUi.frame().interfaceEffectAlpha == 0);
+        cinematicUi.startInterfaceEffect(255, 0xff0000, -1);
+        assert(cinematicUi.frame().interfaceEffectAlpha == 255);
+        assert(cinematicUi.frame().interfaceEffectColorRgb == 0x00ff0000U);
         assert(cinematicUi.applyCommand(
             usm::game::CinematicCommand{0, -1, "PlayDAECamera", {}}));
         assert(cinematicUi.letterboxVisible());
@@ -6691,6 +6695,11 @@ int main() {
         assert(!hammerRushAttack->permitsSpecialAnimationSuccessor);
         assert(bigThugAttack != nullptr && bigThugAttack->damage == 70.0F &&
                bigThugAttack->maximumReach() == 500.0F);
+        assert(bigThugAttack->hitType == 104);
+        assert(bigThugAttack->hitProtectionMilliseconds == 500.0F);
+        assert(bigThugAttack->verticalForce == 300.0F);
+        assert(bigThugAttack->senseReactionType == 1);
+        assert(bigThugAttack->senseSlowMotionDenominator == 3.0F);
         assert(sandmanAttack != nullptr && sandmanAttack->damage == 75.0F &&
                sandmanAttack->maximumReach() == 400.0F);
         assert(bootstrap.enemySpecialActions().actions().size() == 230);
@@ -7843,7 +7852,9 @@ int main() {
         assert(bigThugHits.size() == 1);
         assert(bigThugHits.front().attackId == 21);
         assert(bigThugHits.front().damage == 70.0F);
-
+        assert(bigThugHits.front().hitType == 104);
+        assert(bigThugHits.front().hitProtectionMilliseconds == 500.0F);
+        assert(bigThugHits.front().hitPriority == 0);
         // Room 9's object 30000 is the first heavy rocket enemy in normal
         // player order. These values are serialized in the shipped config;
         // CRocket's remaining flight constants come from 0x00364158.
@@ -10104,6 +10115,39 @@ int main() {
         assert(heavyHurtPlayer.position().x < -50.0F);
         heavyHurtPlayer.update({}, {}, 400);
         assert(heavyHurtPlayer.activeAnimation() == "idle_stand");
+        usm::game::GameplayPlayer protectedKnockbackPlayer;
+        assert(protectedKnockbackPlayer.initialize(
+            bootstrap.player(), nullptr, &playerStateConfigs));
+        protectedKnockbackPlayer.restoreAt({0.0F, 0.0F, 0.0F},
+                                           {1.0F, 0.0F, 0.0F});
+        const float protectedStartHealth = protectedKnockbackPlayer.health();
+        assert(protectedKnockbackPlayer.applyDamage(
+            70.0F, 0, 0, 104, 500.0F, 0));
+        assert(protectedKnockbackPlayer.health() == protectedStartHealth - 70.0F);
+        assert(protectedKnockbackPlayer.activeStateId() == 46);
+        assert(protectedKnockbackPlayer.activeStateName() ==
+               "k_state_hurt_knockback");
+        assert(protectedKnockbackPlayer.hitProtectionRemainingMilliseconds() ==
+               500.0F);
+        assert(protectedKnockbackPlayer.hitProtectionPriority() == 0);
+        // Attack 21 emits three more authored contacts inside the same rush.
+        // Equal-priority contacts cannot pass Player::IsCanBeHit while +0x708
+        // remains positive.
+        assert(!protectedKnockbackPlayer.applyDamage(
+            70.0F, 0, 0, 104, 500.0F, 0));
+        protectedKnockbackPlayer.update({}, {}, 499);
+        assert(!protectedKnockbackPlayer.applyDamage(
+            70.0F, 0, 0, 104, 500.0F, 0));
+        protectedKnockbackPlayer.update({}, {}, 1);
+        assert(protectedKnockbackPlayer.applyDamage(
+            70.0F, 0, 0, 104, 500.0F, 0));
+        // A strictly greater incoming priority bypasses the live window and
+        // replaces the stored native priority.
+        assert(protectedKnockbackPlayer.applyDamage(
+            10.0F, 0, 0, 100, 500.0F, 1));
+        assert(protectedKnockbackPlayer.health() ==
+               protectedStartHealth - 150.0F);
+        assert(protectedKnockbackPlayer.hitProtectionPriority() == 1);
         hurtReactionPlayer.restoreAt({500.0F, 600.0F, 700.0F},
                                      {0.0F, 1.0F, 0.0F});
         assert(hurtReactionPlayer.position().x == 500.0F);

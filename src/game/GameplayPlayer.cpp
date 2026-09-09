@@ -537,6 +537,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     wallJumpRightState_ = nullptr;
     hurtLightState_ = nullptr;
     hurtHeavyState_ = nullptr;
+    hurtKnockbackState_ = nullptr;
     deadOverState_ = nullptr;
     activeLocomotionState_ = nullptr;
     locomotionState_ = LocomotionState::Grounded;
@@ -588,6 +589,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
     pendingCombatEffectCount_ = 0;
     pendingVoxStopEventCount_ = 0;
     hurtReactionRemainingMilliseconds_ = 0;
+    hitProtectionRemainingMilliseconds_ = 0.0F;
+    hitProtectionPriority_ = 0;
     enteredStateCount_ = 0;
     if (states != nullptr) {
         jumpStartState_ = states->findState("k_state_jump_start");
@@ -618,6 +621,7 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
             states->findState("k_state_move_jump_wall_right");
         hurtLightState_ = states->findState("k_state_hurt_light");
         hurtHeavyState_ = states->findState("k_state_hurt_heavy");
+        hurtKnockbackState_ = states->findState("k_state_hurt_knockback");
         deadOverState_ = states->findState("k_state_dead_over");
         if (stateClip(animationBank_, jumpStartState_) == nullptr ||
             stateClip(animationBank_, jumpFallState_) == nullptr ||
@@ -673,7 +677,8 @@ Result GameplayPlayer::initialize(const LevelPlayerAsset& asset,
                 "Player wall states have invalid animation IDs");
         }
         if (stateClip(animationBank_, hurtLightState_) == nullptr ||
-            stateClip(animationBank_, hurtHeavyState_) == nullptr) {
+            stateClip(animationBank_, hurtHeavyState_) == nullptr ||
+            stateClip(animationBank_, hurtKnockbackState_) == nullptr) {
             return Result::failure(
                 "Player hurt states have invalid animation IDs");
         }
@@ -1774,15 +1779,29 @@ bool GameplayPlayer::releaseWeb() noexcept {
 bool GameplayPlayer::applyDamage(
     float damage, std::int32_t damageType,
     std::uint32_t minimumReactionMilliseconds,
-    std::int32_t nativeHitType) noexcept {
-    // Player::IsCanBeHit (0x003413dc) rejects ordinary-priority hits while
-    // the current state id is in the inclusive 107..113 ultimate range. The
-    // original OnHit returns before both health damage and state transitions;
-    // allowing a thug hit here cancels state 109 before its authored splash.
-    const bool ultimateInvulnerability =
-        activeAttackState_ != nullptr && activeAttackState_->id >= 107 &&
-        activeAttackState_->id <= 113;
-    if (damage <= 0.0F || dead() || ultimateInvulnerability) {
+    std::int32_t nativeHitType, float hitProtectionMilliseconds,
+    std::int32_t hitPriority) noexcept {
+    // Player::IsCanBeHit (0x003413dc) first compares the incoming
+    // AIHitTargetInfo+0x28 priority with Player+0x704 while the +0x708
+    // protection timer is positive. Priorities 0/1 are also rejected in
+    // states 2, 3, 55, the ultimate range 107..113, and motions 402..404
+    // (IsTriggerJump at 0x003413b8). Priority 2+ bypasses those state gates.
+    const PlayerStateDefinition* currentState = activeAttackState_ != nullptr
+        ? activeAttackState_
+        : activeScriptedState_ != nullptr ? activeScriptedState_
+                                          : activeLocomotionState_;
+    const std::uint16_t currentStateId = activeStateId();
+    const bool ordinaryPriority = hitPriority < 2;
+    const bool protectedByEarlierHit =
+        hitProtectionRemainingMilliseconds_ > 0.0F &&
+        hitProtectionPriority_ >= hitPriority;
+    const bool protectedState = ordinaryPriority &&
+        (currentStateId == 2 || currentStateId == 3 ||
+         currentStateId == 55 ||
+         (currentStateId >= 107 && currentStateId <= 113) ||
+         (currentState != nullptr && currentState->motionType >= 402 &&
+          currentState->motionType <= 404));
+    if (damage <= 0.0F || dead() || protectedByEarlierHit || protectedState) {
         return false;
     }
     health_ = std::max(0.0F, health_ - damage);
@@ -1799,14 +1818,25 @@ bool GameplayPlayer::applyDamage(
         enterDeadState();
         return true;
     }
-    // Player::OnHit (0x0034d790) maps grounded hit type 100 to state 44 and
-    // hit types 101/0x85/0x86 to state 45.  The opening knife therefore uses
-    // the light reaction while both authored bat attacks use the substantially
-    // longer, backward-moving heavy reaction.
+    if (hitProtectionMilliseconds > 0.0F) {
+        // Player::OnHit (0x0034dbac-0x0034dbc0) stores both fields only for
+        // a positive protection duration. Player::Update then subtracts the
+        // elapsed game time without imposing a separate reaction duration.
+        hitProtectionRemainingMilliseconds_ = hitProtectionMilliseconds;
+        hitProtectionPriority_ = hitPriority;
+    }
+    // Player::OnHit (0x0034d790) maps grounded hit type 100 to state 44,
+    // 101/0x85/0x86 to state 45, and 104/105 to state 46. Room 9's attack 21
+    // therefore uses the authored k_state_hurt_knockback reaction rather than
+    // either ordinary flinch. The apparent AddForce call at 0x0034db82 is the
+    // Player vtable +0x90 slot, Unit::DrawDebug (0x00322c28), a two-byte no-op;
+    // the shipped reaction displacement comes from state 46's animation.
     const bool heavyGroundHit = damageType == 1 || nativeHitType == 101 ||
                                 nativeHitType == 0x85 || nativeHitType == 0x86;
-    const PlayerStateDefinition* hurtState =
-        heavyGroundHit ? hurtHeavyState_ : hurtLightState_;
+    const bool knockbackGroundHit = nativeHitType == 104 || nativeHitType == 105;
+    const PlayerStateDefinition* hurtState = knockbackGroundHit
+        ? hurtKnockbackState_
+        : heavyGroundHit ? hurtHeavyState_ : hurtLightState_;
     // Player::IsOnWall (0x003411cc) excludes motion 15 (roof exit).
     // onWall() also covers that locomotion path for portable traversal
     // updates, but it must not turn a roof exit into a wall-idle reaction.
@@ -1990,6 +2020,8 @@ void GameplayPlayer::restoreAt(const assets::Vector3& position,
     activeHitEffects_.clear();
     pendingHitEffectSpawnCount_ = 0;
     hurtReactionRemainingMilliseconds_ = 0;
+    hitProtectionRemainingMilliseconds_ = 0.0F;
+    hitProtectionPriority_ = 0;
     activeScriptedState_ = nullptr;
     scriptedStateLoops_ = false;
     setAnimation("idle_stand");
@@ -2206,6 +2238,13 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
     attackEnteredDuringPreparedInputFrame_ = false;
     locomotionEnteredDuringPreparedInputFrame_ = false;
     inputFrameAdvanceMilliseconds_ = 0;
+    // Player::Update (0x003534e0-0x00353502) ages Player+0x708 by the game
+    // delta before target, Spider-Sense, or state updates. A non-positive
+    // value is equivalent to an expired native window.
+    if (hitProtectionRemainingMilliseconds_ > 0.0F) {
+        hitProtectionRemainingMilliseconds_ -=
+            static_cast<float>(elapsedMilliseconds);
+    }
     const std::int32_t nextMovementVirtualKey = movementVirtualKey(input);
     const bool movementPressed = nextMovementVirtualKey >= 0 &&
         nextMovementVirtualKey != movementVirtualKey_;

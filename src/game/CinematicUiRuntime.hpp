@@ -32,6 +32,7 @@ struct CinematicUiFrame {
     float blackOverlayAlpha{};
     std::uint8_t interfaceEffectAlpha{};
     std::int32_t interfaceEffectFrame{-1};
+    std::uint32_t interfaceEffectColorRgb{0x00ffffffU};
 };
 
 // Portable state behind CCinematicThread::OnTutorial (0x003710d4),
@@ -47,8 +48,8 @@ public:
     void update(std::uint32_t elapsedMilliseconds,
                 bool dismissPressed) noexcept;
     // CLevel::StartInterfaceEffect (0x0037d7d0). Spider-Sense calls this
-    // with (160, 0, -1), selecting interface.bsprite frame 13 and the
-    // native ALPHA_HIT_TIME fade.
+    // with (160, 0, -1); knockback hurt states call it with
+    // (255, 0xff0000, -1). A zero sprite color means native white.
     void startInterfaceEffect(std::int32_t alpha = 160,
                               std::int32_t spriteParameter = 0,
                               std::int32_t frame = -1) noexcept;
@@ -91,6 +92,7 @@ private:
     float interfaceEffectAlpha_{};
     float interfaceEffectRatePerMillisecond_{};
     std::int32_t interfaceEffectFrame_{-1};
+    std::uint32_t interfaceEffectColorRgb_{0x00ffffffU};
     bool interfaceEffectJustStarted_{};
 };
 

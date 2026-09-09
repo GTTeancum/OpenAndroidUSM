@@ -4623,7 +4623,7 @@ Result D3D11Renderer::updateCinematicUi(
             const std::uint32_t color = rgbaVertexColor(
                 (static_cast<std::uint32_t>(frame.interfaceEffectAlpha)
                  << 24U) |
-                0x00ffffffU);
+                (frame.interfaceEffectColorRgb & 0x00ffffffU));
             const GpuVertex topLeft{
                 {x0, y0, 0.0F}, {}, {u0, flippedV0}, color};
             const GpuVertex topRight{

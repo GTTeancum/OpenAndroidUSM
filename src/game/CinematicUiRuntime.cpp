@@ -135,6 +135,7 @@ void CinematicUiRuntime::bind(const LevelTextCatalog& strings) noexcept {
     interfaceEffectAlpha_ = 0.0F;
     interfaceEffectRatePerMillisecond_ = 0.0F;
     interfaceEffectFrame_ = -1;
+    interfaceEffectColorRgb_ = 0x00ffffffU;
     interfaceEffectJustStarted_ = false;
 }
 
@@ -279,9 +280,11 @@ void CinematicUiRuntime::startInterfaceEffect(
     constexpr float alphaHitTimeMilliseconds = 800.0F;
     interfaceEffectAlpha_ = static_cast<float>(alpha);
     // CLevel+0x108 is copied to CSprite+0x118 immediately before PaintFrame.
-    // The recovered Spider-Sense caller supplies zero. A nonzero transform
-    // is not used by this chronological combat path yet.
-    (void)spriteParameter;
+    // CSprite::PaintModule (0x002e904c) expands its low 24 bits as RGB and
+    // substitutes white when it is zero.
+    interfaceEffectColorRgb_ = spriteParameter == 0
+        ? 0x00ffffffU
+        : static_cast<std::uint32_t>(spriteParameter) & 0x00ffffffU;
     interfaceEffectRatePerMillisecond_ =
         static_cast<float>(alpha) / alphaHitTimeMilliseconds;
     interfaceEffectFrame_ = frame < 0 ? 13 : frame;
@@ -299,6 +302,7 @@ CinematicUiFrame CinematicUiRuntime::frame(
         result.interfaceEffectAlpha = static_cast<std::uint8_t>(
             std::clamp(interfaceEffectAlpha_, 0.0F, 255.0F));
         result.interfaceEffectFrame = interfaceEffectFrame_;
+        result.interfaceEffectColorRgb = interfaceEffectColorRgb_;
     }
     if (tutorialVisible_) {
         result.text = tutorialText_;

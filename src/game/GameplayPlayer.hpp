@@ -266,7 +266,9 @@ public:
     [[nodiscard]] bool applyDamage(
         float damage, std::int32_t damageType = 0,
         std::uint32_t minimumReactionMilliseconds = 0,
-        std::int32_t nativeHitType = 100) noexcept;
+        std::int32_t nativeHitType = 100,
+        float hitProtectionMilliseconds = 0.0F,
+        std::int32_t hitPriority = 0) noexcept;
     void addHealth(float health) noexcept;
     void addSkillPoints(std::int32_t points) noexcept;
     // Player::AddCombo/UpdateComboState (0x00340584/0x003458d0) keep the
@@ -461,6 +463,12 @@ public:
     [[nodiscard]] std::uint32_t hurtReactionRemainingMilliseconds() const
         noexcept {
         return hurtReactionRemainingMilliseconds_;
+    }
+    [[nodiscard]] float hitProtectionRemainingMilliseconds() const noexcept {
+        return hitProtectionRemainingMilliseconds_;
+    }
+    [[nodiscard]] std::int32_t hitProtectionPriority() const noexcept {
+        return hitProtectionPriority_;
     }
 
 private:
@@ -664,6 +672,7 @@ private:
     const PlayerStateDefinition* wallJumpRightState_{};
     const PlayerStateDefinition* hurtLightState_{};
     const PlayerStateDefinition* hurtHeavyState_{};
+    const PlayerStateDefinition* hurtKnockbackState_{};
     const PlayerStateDefinition* deadOverState_{};
     const PlayerStateDefinition* activeLocomotionState_{};
     LocomotionState locomotionState_{LocomotionState::Grounded};
@@ -753,6 +762,8 @@ private:
     std::array<PlayerAttackSoundTrigger, 16> pendingAttackSoundTriggers_{};
     std::size_t pendingAttackSoundTriggerCount_{};
     std::uint32_t hurtReactionRemainingMilliseconds_{};
+    float hitProtectionRemainingMilliseconds_{};
+    std::int32_t hitProtectionPriority_{};
     std::string_view lastActionRejectionReason_;
     std::array<std::string_view, 4> enteredStates_{};
     std::size_t enteredStateCount_{};

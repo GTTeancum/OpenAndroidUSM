@@ -683,6 +683,31 @@ headless `room9-heavy-native-rocket-sense.usmauto` route waits for an actual
 rocket warning, performs a close timed LB evade, proves the cue is consumed
 once and the 3x response starts, and completes without damage.
 
+The same Room 9 heavy selects melee attack 21, `ATTACK_HIT_RHSH_big`, inside
+the shipped 500 cm reach. `EnemyAttributeFile::ReadEnemyAttackInfo`
+(`0x0033c2c0`) identifies its hit type 104, 70 damage, 500 ms post-hit
+protection, 300 vertical-force field, sense type 1, and denominator 3.
+`IBehaviorBase::SpecialAnimActionCheck` (`0x003a8c60`) copies protection to
+`AIHitTargetInfo+0x24` and initializes priority `+0x28` to zero. All four
+64/68/72/76-percent contacts in `idlebaz_rush_attack_idlebaz` reach
+`Player::OnHit`; the first stores those fields at `Player+0x708/+0x704`, and
+`Player::IsCanBeHit` (`0x003413dc`) rejects each equal-priority follow-up
+until `Player::Update` (`0x003534e0`--`0x00353502`) ages the timer out.
+
+Grounded hit types 104/105 select state 46, `k_state_hurt_knockback`, motion
+208 and animation 72, `idle_to_knockback_flying`. Its 433 ms authored root
+moves Spider-Man roughly 442.51 cm backward. The indirect call at
+`Player::OnHit` `0x0034db82` targets Player's vtable `+0x90`, the two-byte
+no-op `Unit::DrawDebug` at `0x00322c28`; the serialized 300 vertical-force
+field therefore does not add a second player trajectory in this build.
+States 46, 48, and 49 also call `CLevel::StartInterfaceEffect` at
+`0x0034dbc0`--`0x0034dbf2` with the global 255 alpha, RGB `0xff0000`, and
+default frame 13. `CSprite::PaintModule` (`0x002e904c`) expands
+`CSprite+0x118` into that RGB modulation. The portable UI now preserves the
+red tint as well as the existing 800 ms fade. The headless
+`room9-heavy-native-melee.usmauto` gate proves one accepted 70-point contact,
+three protected contacts, state 46, the exact animation, and the red flash.
+
 `EnemyBehaviorConfigDatabase` reconstructs the four tables used by
 `BehaviorStateFile`: 239 rows from `BehaviorAnimMapList.bin`, 202 animation
 lists from `BehaviorAnimList.bin`, 63 sound maps from

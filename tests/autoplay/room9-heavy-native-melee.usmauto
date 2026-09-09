@@ -1,0 +1,27 @@
+# Focused Room 9 production-AI gate for the type-4 heavy's close-range rush.
+# No hit, reaction, or health change is injected: attack 21 is selected by the
+# enemy behavior and delivered through its authored animation action volume.
+fixed_step_ms 25
+sample_interval_ms 25
+capture_interval_ms 0
+max_time_ms 65000
+start_time_ms 53033
+render_size 640 360
+
+wait_gameplay 1000
+set_enemy_ai 488 0
+set_enemy_ai 489 0
+set_enemy_ai 505 0
+set_enemy_ai 506 0
+set_enemy_ai 30000 1 1
+# Enemy 30000 starts at -8354.7,10458.2. One metre is inside attack 21's
+# shipped 500 cm reach and below the 500 cm minimum rocket range.
+teleport -8254.7 10458.2 7.785 -1 0 0
+wait_enemy_melee_attack 5000 30000
+wait_enemy_animation 2000 30000 idlebaz_rush_attack_idlebaz
+wait 1600
+assert_health_above 929
+assert_health_below 931
+assert_player_state 46
+wait_enemy_melee_inactive 5000 30000
+finish
