@@ -6,10 +6,21 @@ systems from reverse-engineered native code and shipped data; it is not an
 emulator, binary wrapper, or decompiled-source dump.
 
 > [!IMPORTANT]
-> This is an active reverse-engineering project, not a finished release.
-> Opening cinematics and substantial gameplay flow are reconstructed, but
-> combat and effects are still being audited against the original for 1:1
-> parity. Expect incomplete later-game behavior and regressions.
+> **0.3b is a very early preview, not a finished game. Development is
+> temporarily paused.** Opening cinematics and substantial portions of the
+> first-level gameplay are reconstructed. Combat, effects, and enemy behavior
+> have improved through reverse engineering and automated testing, but 1:1
+> parity is not complete. Sandman's attack sequence remains unfinished, and
+> the latest Sandman changes have not been built or tested. Expect missing
+> features, progression problems, and regressions, especially beyond the
+> opening gameplay.
+
+Please [post issues](https://github.com/GTTeancum/OpenAndroidUSM/issues) for bugs,
+missing behavior, and differences from the original game. Include the version,
+level or encounter, steps to reproduce, and relevant logs or screenshots when
+possible. Reports are welcome during the pause, although responses and fixes
+may be delayed. See the [0.3b release notes](docs/releases/0.3b.md) for this
+checkpoint's scope and limitations.
 
 ## Screenshots
 
