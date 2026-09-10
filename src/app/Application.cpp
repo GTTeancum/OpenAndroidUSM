@@ -1241,7 +1241,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 ";key_percent=" +
                 std::to_string(action.keyFramePercent) +
                 ";attack=" + std::to_string(action.attackId) +
-                ";effect=" + action.effectName;
+                ";next_animation=" + action.nextAnimationName;
             for (std::size_t index = 0; index < action.soundMapIds.size();
                  ++index) {
                 detail += ";sound_map" + std::to_string(index) + "=" +

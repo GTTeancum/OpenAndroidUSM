@@ -2908,6 +2908,22 @@ void LevelEnemyRuntime::applyCombatDamage(
         enemy.robotPhantomTask == RobotPhantomTaskState::ConcealHidden;
     if (enemy.asset->gameType == "Boss_Rhino") {
         applyRhinoDamage(enemy, damage);
+    } else if (enemy.asset->gameType == "Boss_Sandman") {
+        enemy.health = std::max(0.0F, enemy.health - damage);
+        // CBoss::ParseLocalAiMessage (0x0032dea8): the local-hit path
+        // checks death before advancing the phase table. Surviving hits
+        // clamp at 66/33 percent; one hit advances at most one phase.
+        if (enemy.health > 0.0F && enemy.maximumHealth > 0.0F) {
+            const auto healthPercent = static_cast<std::int32_t>(
+                enemy.health * 100.0F / enemy.maximumHealth);
+            if (healthPercent < 67 && enemy.sandmanPhase < 1U) {
+                enemy.health = enemy.maximumHealth * 0.66F;
+                enemy.sandmanPhase = 1;
+            } else if (healthPercent <= 33 && enemy.sandmanPhase <= 1U) {
+                enemy.health = enemy.maximumHealth * 0.33F;
+                enemy.sandmanPhase = 2;
+            }
+        }
     } else if (isElectroBoss(enemy)) {
         enemy.health = std::max(0.0F, enemy.health - damage);
         const std::int32_t healthPercent =
@@ -4967,7 +4983,11 @@ void LevelEnemyRuntime::startSandmanGroundAttack(LevelEnemyState& enemy) {
         enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
         return;
     }
-    constexpr std::string_view kGroundAttack = "ground_attack1";
+    // CBoss::OnEnterState(3), 0x0032cd58, selects the initial clip from
+    // the phase table's float parameter (1/2/3), not a repeat count.
+    const std::string_view kGroundAttack =
+        enemy.sandmanPhase == 0U ? "ground_attack1" :
+        enemy.sandmanPhase == 1U ? "ground_attack12" : "ground_attack13";
     const EnemyArchetypeAsset& archetype =
         level_->enemyArchetypes()[enemy.asset->archetypeIndex];
     if (archetype.animationBank.findClip(kGroundAttack) == nullptr) {
@@ -5064,15 +5084,47 @@ void LevelEnemyRuntime::updateSandmanBoss(
             archetype.animationBank.findClip(enemy.activeAnimation);
         if (clip != nullptr && enemy.animationTimeMilliseconds >=
                                    clip->durationMilliseconds()) {
-            constexpr std::string_view kRecovery =
-                "ground_attack1_to_idle";
-            enemy.sandmanTask = SandmanBossTaskState::GroundAttackRecovery;
-            enemy.activeAnimation = kRecovery;
+            // CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack (0x003b9e44)
+            // follows +0x6c only when EnemyAttackInfo+0x46 permits it.
+            // The shipped special-action string supplies the successor;
+            // it is not an effect asset or a name to synthesize.
+            std::string nextAnimation;
+            for (const auto* event :
+                 level_->enemySpecialActions().findAttackEvents(
+                     enemy.asset->enemyTypeId, enemy.activeAnimation)) {
+                if (event->attackId > std::numeric_limits<std::int16_t>::max()) {
+                    continue;
+                }
+                const auto* attack = level_->attackConfigs().find(
+                    static_cast<std::int16_t>(event->attackId));
+                if (attack != nullptr && attack->permitsSpecialAnimationSuccessor) {
+                    nextAnimation = event->nextAnimationName;
+                }
+            }
+            if (nextAnimation.empty() ||
+                archetype.animationBank.findClip(nextAnimation) == nullptr) {
+                return;
+            }
+            bool successorDealsDamage = false;
+            for (const auto* event :
+                 level_->enemySpecialActions().findAttackEvents(
+                     enemy.asset->enemyTypeId, nextAnimation)) {
+                if (event->attackId > std::numeric_limits<std::int16_t>::max()) {
+                    continue;
+                }
+                const auto* attack = level_->attackConfigs().find(
+                    static_cast<std::int16_t>(event->attackId));
+                successorDealsDamage |= attack != nullptr && attack->damage > 0.0F;
+            }
+            enemy.sandmanTask = successorDealsDamage
+                ? SandmanBossTaskState::GroundAttack
+                : SandmanBossTaskState::GroundAttackRecovery;
+            enemy.activeAnimation = std::move(nextAnimation);
             enemy.animationTimeMilliseconds = 0;
             enemy.animationSpeed = 1.0F;
             enemy.animationLoops = false;
             enemy.animationReversed = false;
-            enemy.meleeAttackActive = false;
+            enemy.meleeAttackActive = successorDealsDamage;
         }
         return;
     }

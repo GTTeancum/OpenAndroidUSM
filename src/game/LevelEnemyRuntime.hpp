@@ -214,6 +214,7 @@ struct LevelEnemyState {
     std::int16_t tiedUpStateId{-1};
     std::uint32_t tiedUpRemainingMilliseconds{};
     SandmanBossTaskState sandmanTask{SandmanBossTaskState::None};
+    std::uint32_t sandmanPhase{};
     assets::Vector3 sandmanJumpStart;
     assets::Vector3 sandmanJumpTarget;
     std::uint32_t sandmanJumpElapsedMilliseconds{};

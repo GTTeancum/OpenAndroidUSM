@@ -114,9 +114,9 @@ Result EnemySpecialActionConfigDatabase::load(
             }
             action.soundMapIds.push_back(nextAction);
         }
-        if (!reader.readString(action.effectName)) {
+        if (!reader.readString(action.nextAnimationName)) {
             actions_.clear();
-            return Result::failure("Enemy special-action effect is truncated");
+            return Result::failure("Enemy special-action next animation is truncated");
         }
         actions_.push_back(std::move(action));
     }

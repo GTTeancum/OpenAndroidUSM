@@ -23,7 +23,10 @@ struct EnemyAnimationSpecialAction {
     // BehaviorSoundMapList row IDs, resolved by the original
     // IBehaviorBase::SpecialAnimActionCheck at 0x003a8c60.
     std::vector<std::int16_t> soundMapIds;
-    std::string effectName;
+    // AIAnimSpecialActionInfo+0x38: SpecialAnimActionCheck (0x003a8c60)
+    // resolves this as an animation index and stores it at IBehaviorBase+0x6c.
+    // SpecialAnimNextActionCheck (0x003a857c) consumes it as the next clip.
+    std::string nextAnimationName;
 };
 
 // Typed reader for EnemysSpecialAnimConfigs.bin, reconstructed from
