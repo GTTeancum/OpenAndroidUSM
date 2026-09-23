@@ -315,6 +315,29 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
         TIMEOUT 120 LABELS "input-parity")
 
     if(USM_BUILD_WINDOWS_APP)
+    add_executable(OpenAndroidUSM.AudioBackendTests
+        tests/XAudio2BackendTests.cpp
+        src/audio/xaudio2/XAudio2System.cpp
+    )
+    target_compile_features(OpenAndroidUSM.AudioBackendTests PRIVATE cxx_std_20)
+    target_compile_definitions(OpenAndroidUSM.AudioBackendTests PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+    )
+    target_include_directories(OpenAndroidUSM.AudioBackendTests PRIVATE src)
+    target_link_libraries(OpenAndroidUSM.AudioBackendTests PRIVATE
+        OpenAndroidUSM.Core
+        xaudio2
+    )
+    if(MSVC)
+        target_compile_options(OpenAndroidUSM.AudioBackendTests PRIVATE
+            /W4 /permissive- /EHsc /utf-8)
+    endif()
+    add_test(NAME OpenAndroidUSM.AudioBackendTests
+        COMMAND OpenAndroidUSM.AudioBackendTests)
+    set_tests_properties(OpenAndroidUSM.AudioBackendTests PROPERTIES
+        TIMEOUT 10 LABELS "windows-audio")
+
     add_executable(OpenAndroidUSM.RenderTests
         tests/D3D11RenderTests.cpp
     )
