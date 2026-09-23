@@ -21,7 +21,13 @@ int main() {
     try {
         usm::audio::XAudio2System audio;
         const usm::Result init = audio.initialize();
-        require(static_cast<bool>(init), init.message());
+        if (!init) {
+            if (init.message() == "IXAudio2::CreateMasteringVoice failed") {
+                std::cout << "SKIP XAudio2 backend: no mastering endpoint available\n";
+                return 77;
+            }
+            throw std::runtime_error(std::string(init.message()));
+        }
 
         usm::audio::PcmAudio clip;
         clip.sampleRate = 48000;

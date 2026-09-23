@@ -336,7 +336,7 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     add_test(NAME OpenAndroidUSM.AudioBackendTests
         COMMAND OpenAndroidUSM.AudioBackendTests)
     set_tests_properties(OpenAndroidUSM.AudioBackendTests PROPERTIES
-        TIMEOUT 10 LABELS "windows-audio")
+        TIMEOUT 10 LABELS "windows-audio" SKIP_RETURN_CODE 77)
 
     add_executable(OpenAndroidUSM.D3D11BackendTests
         tests/D3D11BackendTests.cpp
