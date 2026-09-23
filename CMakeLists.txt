@@ -394,6 +394,15 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
 
     endif()
 
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME OpenAndroidUSM.ReferenceRecoveryTests
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/ReferenceRecoveryTests.py"
+        )
+        set_tests_properties(OpenAndroidUSM.ReferenceRecoveryTests PROPERTIES
+            TIMEOUT 30 LABELS "reference-tools")
+    endif()
+
     find_program(USM_POWERSHELL_EXECUTABLE NAMES pwsh powershell)
     if(USM_POWERSHELL_EXECUTABLE)
         add_test(NAME OpenAndroidUSM.AutoplaySuiteRunnerTests
