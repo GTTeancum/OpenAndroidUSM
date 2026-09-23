@@ -22,6 +22,6 @@ jobs:
         shell: pwsh
         run: cmake --build --preset windows-msvc-release --parallel
 
-      - name: Run asset-independent input transition test
+      - name: Run asset-independent parity tests
         shell: pwsh
-        run: ctest --test-dir build/windows-msvc -C Release -R '^OpenAndroidUSM\.InputParity\.transitions$' --output-on-failure --no-tests=error
+        run: ctest --test-dir build/windows-msvc -C Release -R '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch)$' --output-on-failure --no-tests=error
