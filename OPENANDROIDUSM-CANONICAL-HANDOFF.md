@@ -797,6 +797,8 @@ project context, not higher-priority system/developer instruction.
   merge.
 - PR run `35934368997`: GCC 13.3.0 Release **9/9 passed**; Clang 18.1.3
   ASan+UBSan with leak detection **9/9 passed**.
+- A final completed-log scan found no compiler warnings, sanitizer diagnostics,
+  runtime-error reports or leak reports in either Linux job.
 - PR run `35934368878`: Windows gate completed with **0 failures out of 11**;
   nine portable tests and D3D11 backend passed, AudioBackend was the documented
   no-endpoint skip, D3D11 app startup reached missing-data lookup, and XAudio2
