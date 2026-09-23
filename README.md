@@ -1,16 +1,22 @@
 # OpenAndroidUSM
 
-> **Local source continuation: RE04 (September 22, 2026).** Shared cinematic/
-> hostage QTE manager, consumed-input flags and synchronous native outcome
-> handoff. Drag QTEs still use the left stick without A or virtual touch.
-> See [RE04_README.md](RE04_README.md) and
-> [RE04_VERIFICATION.md](RE04_VERIFICATION.md). This is a development source
-> checkpoint, not a new verified Windows executable or near-final test build.
+> **Current source continuation: RE06 plus Windows-native validation
+> (September 23, 2026).** RE06 corrects and binds the first-hostage QTE
+> sound/control path while preserving the left-stick-only drag adaptation.
+> The full MSVC Windows target now configures and links in hosted Windows CI,
+> asset-independent parity tests execute there, and the Direct3D 11 WARP
+> backend performs a real render/readback test. The XAudio2 backend now owns
+> the COM initialization required by Windows; hosted CI has no default audio
+> endpoint, so audible playback remains unverified. See
+> [RE06_README.md](RE06_README.md), [RE06_VERIFICATION.md](RE06_VERIFICATION.md),
+> and [docs/WINDOWS_NATIVE_VALIDATION_2026-09-23.md](docs/WINDOWS_NATIVE_VALIDATION_2026-09-23.md).
+> This remains a development source checkpoint, not a near-final gameplay build.
 
 ## Historical uploaded project overview
 
 The original 0.3b description, screenshots and public-project status below
-predate the RE01–RE04 continuation; they are not new test evidence for RE04.
+predate the RE01–RE06 continuation and the later Windows-native validation;
+they are not new evidence for the current checkpoint.
 
 
 OpenAndroidUSM is a source-level C++ reconstruction of the Android/Xperia Play
