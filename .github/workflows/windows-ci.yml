@@ -71,8 +71,10 @@ jobs:
           $joined = $log -join "`n"
           if ($joined -match 'Game data was not found') {
               Write-Host 'XAudio2 startup reached game-data lookup.'
+          } elseif ($joined -match 'IXAudio2::CreateMasteringVoice failed \(HRESULT 0x80070490\)') {
+              Write-Warning 'Runner has no default Windows audio endpoint; runtime audio test is skipped.'
           } elseif ($joined -match 'IXAudio2::CreateMasteringVoice failed') {
-              Write-Warning 'Runner has no usable XAudio2 mastering endpoint; runtime audio test is skipped.'
+              throw 'Unexpected XAudio2 mastering-voice failure'
           } else {
               throw 'Executable failed before a classified XAudio2 startup result'
           }

@@ -22,9 +22,9 @@ int main() {
         usm::audio::XAudio2System audio;
         const usm::Result init = audio.initialize();
         if (!init) {
-            if (std::string_view(init.message()).starts_with(
-                    "IXAudio2::CreateMasteringVoice failed")) {
-                std::cout << "SKIP XAudio2 backend: no mastering endpoint available\n";
+            if (std::string_view(init.message()) ==
+                "IXAudio2::CreateMasteringVoice failed (HRESULT 0x80070490)") {
+                std::cout << "SKIP XAudio2 backend: no default audio endpoint available\n";
                 return 77;
             }
             throw std::runtime_error(std::string(init.message()));
