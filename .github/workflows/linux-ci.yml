@@ -1,0 +1,69 @@
+name: Linux portable validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ASSET_INDEPENDENT_TEST_REGEX: '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch)$'
+
+jobs:
+  gcc-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CC: gcc
+      CXX: g++
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/linux-gcc-release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DUSM_BUILD_WINDOWS_APP=OFF
+          -DUSM_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build/linux-gcc-release --parallel
+
+      - name: Run asset-independent parity tests
+        run: >-
+          ctest --test-dir build/linux-gcc-release
+          -R "${ASSET_INDEPENDENT_TEST_REGEX}"
+          --output-on-failure
+          --no-tests=error
+
+  clang-sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+      ASAN_OPTIONS: detect_leaks=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/linux-clang-sanitize -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DUSM_BUILD_WINDOWS_APP=OFF
+          -DUSM_BUILD_TESTS=ON
+          "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer"
+          "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build/linux-clang-sanitize --parallel 2
+
+      - name: Run asset-independent parity tests under ASan+UBSan
+        run: >-
+          ctest --test-dir build/linux-clang-sanitize
+          -R "${ASSET_INDEPENDENT_TEST_REGEX}"
+          --output-on-failure
+          --no-tests=error
