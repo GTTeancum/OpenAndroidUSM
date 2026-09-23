@@ -338,6 +338,30 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     set_tests_properties(OpenAndroidUSM.AudioBackendTests PROPERTIES
         TIMEOUT 10 LABELS "windows-audio")
 
+    add_executable(OpenAndroidUSM.D3D11BackendTests
+        tests/D3D11BackendTests.cpp
+    )
+    target_compile_features(OpenAndroidUSM.D3D11BackendTests PRIVATE cxx_std_20)
+    target_compile_definitions(OpenAndroidUSM.D3D11BackendTests PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+    )
+    target_include_directories(OpenAndroidUSM.D3D11BackendTests PRIVATE src)
+    target_link_libraries(OpenAndroidUSM.D3D11BackendTests PRIVATE
+        OpenAndroidUSM.D3D11
+        d3d11
+        dxgi
+        d3dcompiler
+    )
+    if(MSVC)
+        target_compile_options(OpenAndroidUSM.D3D11BackendTests PRIVATE
+            /W4 /permissive- /EHsc /utf-8)
+    endif()
+    add_test(NAME OpenAndroidUSM.D3D11BackendTests
+        COMMAND OpenAndroidUSM.D3D11BackendTests)
+    set_tests_properties(OpenAndroidUSM.D3D11BackendTests PROPERTIES
+        TIMEOUT 10 LABELS "windows-renderer")
+
     add_executable(OpenAndroidUSM.RenderTests
         tests/D3D11RenderTests.cpp
     )
