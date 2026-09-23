@@ -22,7 +22,8 @@ int main() {
         usm::audio::XAudio2System audio;
         const usm::Result init = audio.initialize();
         if (!init) {
-            if (init.message() == "IXAudio2::CreateMasteringVoice failed") {
+            if (std::string_view(init.message()).starts_with(
+                    "IXAudio2::CreateMasteringVoice failed")) {
                 std::cout << "SKIP XAudio2 backend: no mastering endpoint available\n";
                 return 77;
             }

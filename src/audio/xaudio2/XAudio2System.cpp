@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 
 namespace usm::audio {
 namespace {
@@ -44,11 +45,19 @@ XAudio2System::~XAudio2System() {
 Result XAudio2System::initialize() {
     HRESULT result = XAudio2Create(&engine_);
     if (FAILED(result)) {
-        return Result::failure("XAudio2Create failed");
+        char message[80]{};
+        std::snprintf(message, sizeof(message),
+                      "XAudio2Create failed (HRESULT 0x%08X)",
+                      static_cast<unsigned int>(result));
+        return Result::failure(message);
     }
     result = engine_->CreateMasteringVoice(&masteringVoice_);
     if (FAILED(result)) {
-        return Result::failure("IXAudio2::CreateMasteringVoice failed");
+        char message[96]{};
+        std::snprintf(message, sizeof(message),
+                      "IXAudio2::CreateMasteringVoice failed (HRESULT 0x%08X)",
+                      static_cast<unsigned int>(result));
+        return Result::failure(message);
     }
     lastUpdateTime_ = std::chrono::steady_clock::now();
     return Result::success();
