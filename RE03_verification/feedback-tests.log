@@ -1,0 +1,65 @@
+Internal ctest changing into directory: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+UpdateCTestConfiguration  from :/mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/DartConfiguration.tcl
+Parse Config file:/mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/DartConfiguration.tcl
+Parse Config file:/mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/DartConfiguration.tcl
+Test project /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 9
+    Start  9: OpenAndroidUSM.QteParity.gamepad
+
+9: Test command: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/OpenAndroidUSM.QteParityTests "gamepad"
+9: Working Directory: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+9: Test timeout computed to be: 120
+9: PASS gamepad: 61 checks
+1/4 Test  #9: OpenAndroidUSM.QteParity.gamepad ..................   Passed    5.02 sec
+test 12
+    Start 12: OpenAndroidUSM.QteParity.controller_boundaries
+
+12: Test command: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/OpenAndroidUSM.QteParityTests "controller_boundaries"
+12: Working Directory: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+12: Test timeout computed to be: 120
+12: PASS controller_boundaries: 3024 checks
+2/4 Test #12: OpenAndroidUSM.QteParity.controller_boundaries ....   Passed    5.32 sec
+test 13
+    Start 13: OpenAndroidUSM.QteParity.controller_first_level
+
+13: Test command: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/OpenAndroidUSM.QteParityTests "controller_first_level"
+13: Working Directory: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+13: Test timeout computed to be: 120
+13: Loaded StartQTE: source 20004 / file cinematics/levelnew_01_20004_cinematic.cff
+13: Raw XInput level 1 QTE: 20004 / config 6 -> 20010 failure
+13: Raw XInput level 1 QTE: 20004 / config 6 -> 20006 success
+13: PASS controller_first_level: 208 checks
+3/4 Test #13: OpenAndroidUSM.QteParity.controller_first_level ...   Passed    5.10 sec
+test 14
+    Start 14: OpenAndroidUSM.QteParity.feedback
+
+14: Test command: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux/OpenAndroidUSM.QteParityTests "feedback"
+14: Working Directory: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+14: Test timeout computed to be: 120
+14: FAIL: line 964: level.buttonConfigs().find(13)->interactionValue==16
+4/4 Test #14: OpenAndroidUSM.QteParity.feedback .................***Failed    5.13 sec
+FAIL: line 964: level.buttonConfigs().find(13)->interactionValue==16
+
+
+The following tests passed:
+	OpenAndroidUSM.QteParity.gamepad
+	OpenAndroidUSM.QteParity.controller_boundaries
+	OpenAndroidUSM.QteParity.controller_first_level
+
+75% tests passed, 1 tests failed out of 4
+
+Label Time Summary:
+qte-parity    =  20.57 sec*proc (4 tests)
+
+Total Test time (real) =  20.58 sec
+
+The following tests FAILED:
+	 14 - OpenAndroidUSM.QteParity.feedback (Failed)        qte-parity
+Errors while running CTest

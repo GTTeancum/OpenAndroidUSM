@@ -29,3 +29,11 @@
 - The current stopping milestone is verified first-level gameplay with no
   known graphical or audio issues. At that point, stop changing the project
   and request user review without marking the durable goal complete.
+
+## Explicit PC control adaptation (RE03 user instruction)
+
+- Drag QTEs use left-thumbstick movement in the general requested direction,
+  with no A hold and no touch emulation. Tap/mash use their separate A input.
+- Keep controller thresholds/gesture lifecycle documented as PC policies, not
+  Android reverse-engineering facts. Preserve recovered QTE timing, compound
+  sequences, outcome sounds, control release, and cinematic consequences.

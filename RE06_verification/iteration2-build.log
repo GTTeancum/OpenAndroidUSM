@@ -1,0 +1,22 @@
+[0/1] Re-running CMake...
+CMake Deprecation Warning at build/windows-msvc/_deps/pugixml-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /mnt/data/re06/OpenAndroidUSM/build/re06-baseline
+[1/10] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[2/10] Linking CXX static library libOpenAndroidUSM.Core.a
+[3/10] Linking CXX executable OpenAndroidUSM.QteParityTests
+[4/10] Linking CXX executable OpenAndroidUSM.CoreTests
+[5/10] Linking CXX executable OpenAndroidUSM.InputParityTests
+[6/10] Linking CXX executable OpenAndroidUSM.QteControlTests
+[7/10] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[8/10] Building CXX object CMakeFiles/OpenAndroidUSM.HostageIntegrationTests.dir/tests/HostageIntegrationTests.cpp.o
+[9/10] Linking CXX executable OpenAndroidUSM.HostageIntegrationTests

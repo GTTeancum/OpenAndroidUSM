@@ -1,0 +1,6 @@
+[1/6] Linking CXX static library libOpenAndroidUSM.Core.a
+[2/6] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[3/6] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[4/6] Linking CXX executable OpenAndroidUSM.InputParityTests
+[5/6] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+[6/6] Linking CXX executable OpenAndroidUSM.CoreTests

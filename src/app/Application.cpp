@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -137,6 +138,9 @@ struct RuntimeCheckPointSnapshot {
 } // namespace
 
 int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+    // PC counterpart of the device's virtual Timer epoch. Do not derive
+    // getTime from the capped simulation backlog or the slow-motion delta.
+    const auto deviceTimerEpoch = std::chrono::steady_clock::now();
     gAutoplayDiagnostics = nullptr;
     gShowErrorDialogs = !options.autoplayScript.has_value();
     std::optional<diagnostics::AutoplayHarness> autoplay;
@@ -1618,8 +1622,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         }
         wallWebSounds_.emplace(id, std::move(clip));
     }
-    constexpr std::array<std::uint16_t, 3> hostageVoxSoundIds{
-        0x18b, 0xa3, 0xa5};
+    constexpr std::array<std::uint16_t, 6> hostageVoxSoundIds{
+        0x18b, 0xa3, 0xa5, 0x188, 0x189, 0x18a};
     for (const std::uint16_t voxSoundId : hostageVoxSoundIds) {
         const audio::VoxSoundRecord* record = voxSounds_.find(voxSoundId);
         if (record == nullptr) {
@@ -1912,7 +1916,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     if (!result) {
         return fail(result.message());
     }
-    result = hostageRuntime_.initialize(levelOne_, &objectRuntime_);
+    levelCinematicRuntime_.setInputResetHandler([this]() noexcept {
+        keyRouter_.resetGameplayKeypad();
+    });
+    quickTimeEvent_.bind(levelOne_.buttonConfigs(), levelOne_.hud().interfaceAtlas, &nativeRandomizer_, &levelCinematicRuntime_);
+    result = hostageRuntime_.initialize(levelOne_, quickTimeEvent_, &objectRuntime_);
     if (!result) {
         return fail(result.message());
     }
@@ -1972,7 +1980,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             return saveResult;
         };
     gameplayCinematics_.bind(levelOne_.cinematics());
-    quickTimeEvent_.bind(levelOne_.buttonConfigs());
     cinematicUi_.bind(levelOne_.textCatalog());
     result = deathConfirmationRuntime_.bind(levelOne_.textCatalog());
     if (!result) {
@@ -2171,7 +2178,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             deathConfirmationRuntime_.reset();
             exitMenuRuntime_.reset();
             gameplayCinematics_.bind(levelOne_.cinematics());
-            quickTimeEvent_.bind(levelOne_.buttonConfigs());
+            quickTimeEvent_.bind(levelOne_.buttonConfigs(), levelOne_.hud().interfaceAtlas, &nativeRandomizer_, &levelCinematicRuntime_);
             cinematicUi_.bind(levelOne_.textCatalog());
             levelCinematicRuntime_.resetTransientForCheckPointLoad();
             enemyRuntime_.resetTransientForCheckPointLoad();
@@ -2380,6 +2387,52 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         }
         return startResult;
     };
+    const auto applyQteEffects = [&]() -> Result {
+        const auto playCues = [&](const std::vector<std::uint16_t>& cues) -> Result {
+            for (const auto soundId : cues) {
+                const auto* record = voxSounds_.find(soundId);
+                const auto clip = hostageSounds_.find(soundId);
+                if (!record || clip == hostageSounds_.end()) {
+                    return Result::failure("QTE cue has no preloaded original sound");
+                }
+                Result soundResult = playAudio(clip->second, false, record->eventName);
+                if (!soundResult) { return soundResult; }
+            }
+            return Result::success();
+        };
+        // One level manager, one drain: no duplicated cinematic/hostage cues.
+        Result effects = playCues(quickTimeEvent_.consumeSoundCues());
+        // Control effects already ran synchronously inside the bound manager.
+        // Replaying a detached release here could overwrite a later cinematic.
+        (void)quickTimeEvent_.consumeControlRelease();
+        return effects;
+    };
+    std::function<Result(std::uint32_t)> advanceGameplayCinematics;
+    Result qteHandoffResult = Result::success();
+    const game::QteHandoffHandler dispatchQteHandoff =
+        [&](const game::QteCinematicHandoff& handoff) {
+        // SetState ELF 0x37a7a0..0x37a7b2 clears IGM before removal/add/update.
+        keyRouter_.consumePausePress();
+        if (!qteHandoffResult) { return; }
+        qteHandoffResult = game::dispatchQteCinematicHandoff(
+            handoff, gameplayCinematics_,
+            [&](const game::GameplayCinematicPlayback& source) {
+                releaseGameplayCollada(*source.asset, source.elapsedMilliseconds);
+            },
+            startGameplayCinematic,
+            advanceGameplayCinematics);
+        if (autoplay && handoff.sourceCinematicId != -1) {
+            autoplay->recordEvent(traceTimeMilliseconds, "qte_cinematic_handoff",
+                "source=" + std::to_string(handoff.sourceCinematicId) +
+                ";outcome=" + std::to_string(handoff.outcomeCinematicId));
+        }
+    };
+    const auto handleQteCinematic = [&]() -> Result {
+        const Result effects = applyQteEffects();
+        if (!effects) { return effects; }
+        // Live update/draw uses synchronous dispatch, not detached queues.
+        return qteHandoffResult;
+    };
     if (!hasIntroCinematic && levelOne_.player().linkedCinematicId >= 0) {
         // Later levels author their opening as an ordinary CFF cinematic
         // graph (camera-thread ChangeCamera commands) rather than Level 1's
@@ -2413,6 +2466,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
     std::uint64_t previousNativeTickBucket = nativeTickBucket(introStart);
     std::uint64_t pendingNativeTickBucket = previousNativeTickBucket;
     std::uint32_t pendingNativeUpdates = 0;
+    std::uint32_t nativeTimerMilliseconds = 0;
     const auto playGameplaySound =
         [&playAudio](std::int16_t, std::string_view eventName,
                      const audio::PcmAudio& clip, bool loop) {
@@ -2458,6 +2512,35 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             {*position, record->minimumDistance, record->maximumDistance,
              record->distanceCullingEnabled},
             loop);
+    };
+    const game::HostageSoundCallbacks hostageAudio{
+        [this, audioEnabled](std::uint16_t soundId) {
+            const auto* record = voxSounds_.find(soundId);
+            return audioEnabled && record && audio_.isNamedPlaying(record->eventName);
+        },
+        [this, &playSpatialSound](std::int32_t objectId, std::uint16_t soundId) -> Result {
+            const auto* record = voxSounds_.find(soundId);
+            const auto clip = hostageSounds_.find(soundId);
+            if (!record || clip == hostageSounds_.end()) {
+                return Result::failure("Hostage cue has no preloaded sound");
+            }
+            return playSpatialSound(objectId, record->eventName, clip->second, false);
+        },
+        [this, &stopNamedAudio](std::uint16_t soundId) -> Result {
+            const auto* record = voxSounds_.find(soundId);
+            if (!record) { return Result::failure("Hostage stop has no VoxSound record"); }
+            return stopNamedAudio(record->eventName);
+        }
+    };
+    const game::HostageUpdateHooks hostageHooks{
+        [&hostageAudio, &applyQteEffects](const game::HostageSoundCue& cue) -> Result {
+            // A synchronous ForceFailQTE cue precedes the following hostage stop.
+            const Result pending = applyQteEffects();
+            return pending ? hostageAudio.dispatch(cue) : pending;
+        },
+        [this](bool enabled, bool preservePauseButton) {
+            levelCinematicRuntime_.enableControls(enabled, preservePauseButton);
+        }
     };
     const auto dispatchObjectEvents =
         [this, &autoplay, &traceTimeMilliseconds, &playSpatialSound,
@@ -2571,11 +2654,17 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         : window_.pumpMessages();
     };
     while (shouldRunFrame()) {
+        // The cinematic step captures this frame's live dispatch context.
+        // Never retain references into a previous iteration (intro/death/UI).
+        advanceGameplayCinematics = {};
+        qteHandoffResult = Result::success();
         std::uint32_t realDeltaMilliseconds = 0;
         bool presentThisFrame = true;
         if (autoplay) {
             realDeltaMilliseconds = autoplay->fixedStepMilliseconds();
             syntheticElapsedMilliseconds += realDeltaMilliseconds;
+            nativeTimerMilliseconds = static_cast<std::uint32_t>(
+                syntheticElapsedMilliseconds);
         } else {
             if (pendingNativeUpdates == 0) {
                 auto frameTime = std::chrono::steady_clock::now();
@@ -2601,6 +2690,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     std::min<std::uint64_t>(
                         currentTickBucket - previousNativeTickBucket, 2U));
                 pendingNativeTickBucket = currentTickBucket;
+                // irr::os::Timer::tick is outside Application's capped
+                // inner loop: both catch-up updates read this same sample.
+                nativeTimerMilliseconds = static_cast<std::uint32_t>(
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        frameTime - deviceTimerEpoch).count());
             }
 
             --pendingNativeUpdates;
@@ -2709,7 +2803,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ? reconstructed::InputContext::Menu
                             : reconstructed::InputContext::Gameplay);
                 });
+            const auto physicalStick = controller_.leftStick();
+            keyRouter_.publishGameplayStick(physicalStick.x, physicalStick.y);
         }
+        const auto keypadResetAtPublication = keyRouter_.gameplayKeypadResetCount();
         const auto introDuration =
             hasIntroCinematic
                 ? levelOne_.introColladaDurationMilliseconds()
@@ -3123,12 +3220,20 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             }
             result = renderer_.setCamera(cameraPose);
         } else {
-            const auto stick = controller_.leftStick();
+            // Diagnostic autoplay has a direct per-update keypad snapshot.
+            // Respect a synchronous native reset since its publication too,
+            // without erasing separate QTE/rescue/switch event intent.
+            if (autoplay && keypadResetAtPublication != keyRouter_.gameplayKeypadResetCount()) {
+                autoplayInput.motion = {};
+                autoplayInput.jumpPressed = autoplayInput.jumpHeld = autoplayInput.jumpReleased = false;
+                autoplayInput.webPressed = autoplayInput.webHeld = autoplayInput.webReleased = false;
+                autoplayInput.punchPressed = autoplayInput.spiderSensePressed = autoplayInput.superAttackPressed = false;
+            }
             game::PlayerMotionInput motion =
                 autoplay ? autoplayInput.motion
-                         : game::PlayerMotionInput{stick.x, stick.y};
+                         : game::PlayerMotionInput{keyRouter_.gameplayStickX(), keyRouter_.gameplayStickY()};
             if (!autoplay && motion.right == 0.0F && motion.forward == 0.0F) {
-                const auto& input = keyRouter_.state();
+                const auto& input = keyRouter_.gameplayKeypad();
                 motion.right = static_cast<float>(input.moveRight.held) -
                                static_cast<float>(input.moveLeft.held);
                 motion.forward = static_cast<float>(input.moveUp.held) -
@@ -3149,38 +3254,40 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             }
             const bool jumpPressed = autoplay
                 ? autoplayInput.jumpPressed
-                : keyRouter_.state().jump.pressed;
+                : keyRouter_.gameplayKeypad().jump.pressed;
             const bool jumpHeld = autoplay
                 ? autoplayInput.jumpHeld
-                : keyRouter_.state().jump.held;
+                : keyRouter_.gameplayKeypad().jump.held;
             const bool jumpReleased = autoplay
                 ? autoplayInput.jumpReleased
-                : keyRouter_.state().jump.released;
+                : keyRouter_.gameplayKeypad().jump.released;
             const bool webPressed = autoplay
                 ? autoplayInput.webPressed
-                : keyRouter_.state().web.pressed;
+                : keyRouter_.gameplayKeypad().web.pressed;
             const bool webHeld = autoplay
                 ? autoplayInput.webHeld
-                : keyRouter_.state().web.held;
+                : keyRouter_.gameplayKeypad().web.held;
             const bool webReleased = autoplay
                 ? autoplayInput.webReleased
-                : keyRouter_.state().web.released;
+                : keyRouter_.gameplayKeypad().web.released;
             const bool punchPressed = autoplay
                 ? autoplayInput.punchPressed
-                : keyRouter_.state().punch.pressed;
+                : keyRouter_.gameplayKeypad().punch.pressed;
             const bool punchHeld = !punchPressed && !autoplay &&
-                keyRouter_.state().punch.held;
+                keyRouter_.gameplayKeypad().punch.held;
             const bool spiderSensePressed = autoplay
                 ? autoplayInput.spiderSensePressed
-                : keyRouter_.state().spiderSense.pressed;
+                : keyRouter_.gameplayKeypad().spiderSense.pressed;
             const bool superAttackPressed = autoplay
                 ? autoplayInput.superAttackPressed
-                : keyRouter_.state().superAttack.pressed;
+                : keyRouter_.gameplayKeypad().superAttack.pressed;
+            // Original R1 release starts CHostage rescue. Cross DOWN is
+            // the separate CQTEManager action; neither is a punch alias.
             const bool rescuePressed =
-                punchPressed &&
-                (controlsEnabled || hostageRuntime_.quickTimeActive()) &&
-                (hostageRuntime_.quickTimeActive() ||
-                 hostageRuntime_.canStartRescue(gameplayPlayer_));
+                (autoplay ? autoplayInput.rescueRequested
+                          : keyRouter_.state().rescueRequested) &&
+                controlsEnabled &&
+                hostageRuntime_.canStartRescue(gameplayPlayer_);
             const auto cameraBeforeMovement =
                 gameplayCamera_.sample(gameplayPlayer_.position());
             const auto attackDirection =
@@ -3979,31 +4086,19 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 wallWebLoopSoundId_ = -1;
                 if (!result) { return fail(result.message()); }
             }
-            result = hostageRuntime_.update(
-                gameplayPlayer_, objectRuntime_, levelBonusRuntime_,
-                gameDeltaMilliseconds, rescuePressed);
+            if (!modalTutorialActive) {
+                result = hostageRuntime_.updateObjects(
+                    gameplayPlayer_, objectRuntime_, levelBonusRuntime_,
+                    {gameDeltaMilliseconds, realDeltaMilliseconds,
+                     nativeTimerMilliseconds}, rescuePressed, hostageHooks);
+            }
             if (!result) {
                 return fail(result.message());
             }
-            for (const game::HostageSoundCue& cue :
-                 hostageRuntime_.consumeSoundCues()) {
-                const audio::VoxSoundRecord* record =
-                    voxSounds_.find(cue.voxSoundId);
-                const auto clip = hostageSounds_.find(cue.voxSoundId);
-                if (record == nullptr || clip == hostageSounds_.end()) {
-                    return fail("Hostage cue has no preloaded sound");
-                }
-                if (cue.action == game::HostageSoundAction::StopLoop) {
-                    result = stopNamedAudio(record->eventName);
-                } else {
-                    result = playSpatialSound(
-                        cue.hostageObjectId, record->eventName, clip->second,
-                        cue.action == game::HostageSoundAction::StartLoop);
-                }
-                if (!result) {
-                    return fail(result.message());
-                }
-            }
+            result = applyQteEffects(); // Drain any remaining manager effects.
+            if (!result) { return fail(result.message()); }
+            // Bound hostage hooks already dispatched their sounds synchronously.
+            // No second queue drain or "requested = playing" fallback.
             objectRuntime_.updateComicCollections(
                 gameplayPlayer_.position());
             result = dispatchObjectEvents();
@@ -4723,15 +4818,25 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     }
                 }
             }
-            if (result && !gameplayPlayer_.dead()) {
+            // All captures outlive the gameplay block: this callback also
+            // runs during the current frame's QTE Draw, below that block.
+            advanceGameplayCinematics =
+                [this, &playSpatialSound, &autoplay, &traceTimeMilliseconds,
+                 &playNamedAudio, &stopNamedAudio, &saveCinematicCheckPoint,
+                 &nativeTimerMilliseconds, &realDeltaMilliseconds,
+                 &playGameplaySound, &stopPlayerStateSound,
+                 &releaseGameplayCollada, &exitAfterPresent,
+                 &startGameplayCinematic](std::uint32_t cinematicDeltaMilliseconds) -> Result {
+                Result stepResult = Result::success();
                 Result commandResult = Result::success();
                 bool cinematicDamageApplied = false;
-                result = gameplayCinematics_.update(
-                    gameDeltaMilliseconds,
+                stepResult = gameplayCinematics_.update(
+                    cinematicDeltaMilliseconds,
                     [this, &commandResult, &cinematicDamageApplied,
                      &playSpatialSound, &autoplay, &traceTimeMilliseconds,
                      &playNamedAudio, &stopNamedAudio,
-                     &saveCinematicCheckPoint](
+                     &saveCinematicCheckPoint, &nativeTimerMilliseconds,
+                     &realDeltaMilliseconds](
                         const game::LevelCinematicAsset& cinematic,
                         const game::CinematicThread& thread,
                         const game::CinematicCommand& command) {
@@ -4883,7 +4988,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         if (commandResult) {
                             commandResult =
                                 quickTimeEvent_.applyCommand(
-                                    command, cinematic.objectId);
+                                    command,
+                                    {nativeTimerMilliseconds, realDeltaMilliseconds},
+                                    cinematic.objectId);
                         }
                         if (commandResult) {
                             commandResult = levelCinematicRuntime_.applyCommand(
@@ -4926,11 +5033,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                         }
                         return true;
                     });
-                if (result && !commandResult) {
-                    result = commandResult;
+                if (stepResult && !commandResult) {
+                    stepResult = commandResult;
                 }
-                if (result && cinematicDamageApplied) {
-                    result = playerSounds_.dispatchStateEnter(
+                if (stepResult && cinematicDamageApplied) {
+                    stepResult = playerSounds_.dispatchStateEnter(
                         "k_state_hurt_light", playGameplaySound,
                         stopPlayerStateSound);
                 }
@@ -4960,45 +5067,62 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     }
                     if (!terminalCinematic &&
                         completedCinematic->nextCinematicId >= 0) {
-                        result = startGameplayCinematic(
+                        stepResult = startGameplayCinematic(
                             completedCinematic->nextCinematicId);
-                        if (!result) {
+                        if (!stepResult) {
                             break;
                         }
                     }
                 }
                 for (const std::int32_t requestedCinematic :
                      levelCinematicRuntime_.consumeCinematicStartRequests()) {
-                    if (result) {
-                        result = startGameplayCinematic(requestedCinematic);
+                    if (stepResult) {
+                        stepResult = startGameplayCinematic(requestedCinematic);
                     }
                 }
+                return stepResult;
+            };
+            if (result && !gameplayPlayer_.dead()) {
+                result = advanceGameplayCinematics(gameDeltaMilliseconds);
             }
             if (result) {
                 result = dispatchObjectEvents();
             }
-            quickTimeEvent_.update(
-                gameDeltaMilliseconds,
-                autoplay ? autoplayInput.quickTimeEventPressed
-                         : keyRouter_.state().quickTimeEvent.pressed);
-            if (const auto qteCinematic =
-                    quickTimeEvent_.consumeCinematicRequest()) {
-                levelCinematicRuntime_.endQuickTimeEvent();
-                const std::int32_t sourceId =
-                    quickTimeEvent_.sourceCinematicId();
-                if (const auto* source = gameplayCinematics_.playback(sourceId)) {
-                    releaseGameplayCollada(*source->asset,
-                                           source->elapsedMilliseconds);
-                    gameplayCinematics_.remove(sourceId);
-                    if (autoplay) {
-                        autoplay->recordEvent(
-                            traceTimeMilliseconds, "qte_cinematic_handoff",
-                            "source=" + std::to_string(sourceId) +
-                                ";outcome=" + std::to_string(*qteCinematic));
-                    }
-                }
-                result = startGameplayCinematic(*qteCinematic);
+            if (!result) { return fail(result.message()); }
+            game::QteInput cinematicQteInput;
+            if (autoplay) {
+                // qte_tap is still a tap; it no longer forces drag success.
+                // Automatic gestures use the same directional adapter as XInput.
+                cinematicQteInput = autoplay->quickTimeInput(
+                    quickTimeEvent_, autoplayInput.quickTimeEventPressed);
+            } else {
+                const auto& action = keyRouter_.state().quickTimeEvent;
+                const auto stick = controller_.leftStick();
+                cinematicQteInput = qteGamepad_.translate(
+                    quickTimeEvent_, controller_.connected(), action.pressed,
+                    stick.x, stick.y);
             }
+            const game::QteInputConsumption qteConsumed = quickTimeEvent_.update(
+                {nativeTimerMilliseconds, realDeltaMilliseconds}, cinematicQteInput,
+                dispatchQteHandoff);
+            // CQTEManager precedes QTEActionManager in CLevel::Update. A
+            // consumed Cross press must not advance both managers, nor leak
+            // through to later UI consumers. Keep keypad hold/history intact.
+            if (qteConsumed.quickTimePress) {
+                keyRouter_.consumeQuickTimePress();
+                autoplayInput.quickTimeEventPressed = false;
+            }
+            if (qteConsumed.jumpPress) {
+                keyRouter_.consumeJumpPress();
+                autoplayInput.jumpPressed = false;
+            }
+            if (qteConsumed.rescuePress) {
+                keyRouter_.consumeRescueRequest();
+                autoplayInput.rescueRequested = false;
+            }
+            hostageRuntime_.observeQuickTime();
+            result = handleQteCinematic();
+            if (!result) { return fail(result.message()); }
             if (!gameplayPlayer_.dead() &&
                 !gameplayCinematics_.hasActiveColladaPlayback()) {
                 enemyRuntime_.updateGameplay(gameDeltaMilliseconds,
@@ -5840,16 +5964,27 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         if (result) {
             game::CinematicUiFrame uiFrame = cinematicUi_.frame(
                 qteVisible, qteProgress);
-            if (hostageRuntime_.quickTimeActive() &&
+            // Snapshot the upcoming Draw before drawStep mutates fade/count.
+            // Catch-up updates may prepare this repeatedly, but do not fade.
+            uiFrame.quickTimeFeedback = quickTimeEvent_.feedbackFrame();
+            if (quickTimeEvent_.state() == game::QteState::Drag &&
                 !uiFrame.messagePanelVisible) {
-                uiFrame.text = u"Press [X]";
+                uiFrame.text = platform::QteGamepadAdapter::prompt(
+                    quickTimeEvent_.gesturePath().direction());
+                uiFrame.textVisible = true;
+                uiFrame.tutorialPanelVisible = true;
+                uiFrame.tutorialButton = -1;
+                uiFrame.dimBackground = false;
+            } else if (hostageRuntime_.quickTimeActive() &&
+                !uiFrame.messagePanelVisible) {
+                uiFrame.text = u"Press [A]";
                 uiFrame.textVisible = true;
                 uiFrame.tutorialPanelVisible = true;
                 uiFrame.tutorialButton = -1;
                 uiFrame.dimBackground = false;
             } else if (hostageRuntime_.contextPromptVisible() &&
                        !uiFrame.textVisible) {
-                uiFrame.text = u"Press [X] to rescue";
+                uiFrame.text = u"Press [RB] to rescue";
                 uiFrame.textVisible = true;
                 uiFrame.tutorialPanelVisible = true;
                 uiFrame.tutorialButton = -1;
@@ -5919,6 +6054,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
             presentThisFrame = true;
         }
         if (presentThisFrame) {
+            quickTimeEvent_.drawStep(dispatchQteHandoff);
+            result = handleQteCinematic();
+            if (!result) { return fail(result.message()); }
             renderer_.renderFrame();
         }
         if (autoplay) {

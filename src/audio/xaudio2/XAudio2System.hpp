@@ -43,6 +43,9 @@ public:
                      const assets::Vector3& target,
                      const assets::Vector3& up) noexcept;
     void update();
+    // Main-thread query. Includes live one-shots/fading voices, but not completed
+    // buffers, error callbacks, failed submissions, or distance-culled requests.
+    [[nodiscard]] bool isNamedPlaying(std::string_view eventName) const noexcept;
 
 private:
     class VoiceCallback final : public IXAudio2VoiceCallback {

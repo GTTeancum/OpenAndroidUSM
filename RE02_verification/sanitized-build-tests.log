@@ -1,0 +1,199 @@
+-- The CXX compiler identification is Clang 17.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/local/swift/usr/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- The C compiler identification is Clang 17.0.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/local/swift/usr/bin/clang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
+-- Check size of off64_t
+-- Check size of off64_t - done
+-- Looking for fseeko
+-- Looking for fseeko - found
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+CMake Deprecation Warning at build/windows-msvc/_deps/pugixml-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Configuring done (3.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /mnt/data/work/OpenAndroidUSM/build/re02-sanitized
+[1/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/compress.c.o
+[2/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/adler32.c.o
+[3/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/gzclose.c.o
+[4/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/crc32.c.o
+[5/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/gzlib.c.o
+[6/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/gzwrite.c.o
+[7/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/gzread.c.o
+[8/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/inftrees.c.o
+[9/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/inffast.c.o
+[10/121] Building CXX object CMakeFiles/OpenAndroidUSM.PVRTC.dir/_deps/powervr-decompress/PVRTDecompress.cpp.o
+[11/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/uncompr.c.o
+[12/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/zutil.c.o
+[13/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/infback.c.o
+[14/121] Linking CXX static library libOpenAndroidUSM.PVRTC.a
+[15/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/trees.c.o
+[16/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/inflate.c.o
+[17/121] Building C object _deps/zlib-build/CMakeFiles/zlibstatic.dir/deflate.c.o
+[18/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/CinematicSoundBank.cpp.o
+[19/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/OggAudio.cpp.o
+[20/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/EnemyBehaviorSoundBank.cpp.o
+[21/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/LevelMusicBank.cpp.o
+[22/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/SpatialSound.cpp.o
+[23/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/PlayerStateSoundBank.cpp.o
+[24/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/SoundEventCatalog.cpp.o
+[25/121] Building CXX object CMakeFiles/OpenAndroidUSM.Vorbis.dir/_deps/stb-vorbis/stb_vorbis.c.o
+[26/121] Linking CXX static library libOpenAndroidUSM.Vorbis.a
+[27/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/BtexTexture.cpp.o
+[28/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/DdsAtcTexture.cpp.o
+[29/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/VoxSoundTable.cpp.o
+[30/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/BresFile.cpp.o
+[31/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/AnimationDisplacement.cpp.o
+[32/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/ColladaAnimation.cpp.o
+[33/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/TgaTexture.cpp.o
+[34/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/SpriteAtlas.cpp.o
+[35/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/filesystem/GbmpArchive.cpp.o
+[36/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/IrrScene.cpp.o
+[37/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/AttackConfig.cpp.o
+[38/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/CinematicScript.cpp.o
+[39/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/ColladaSkinning.cpp.o
+[40/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeActionConfig.cpp.o
+[41/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/ButtonConfig.cpp.o
+[42/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/ColladaMesh.cpp.o
+[43/121] Building CXX object _deps/pugixml-build/CMakeFiles/pugixml-static.dir/src/pugixml.cpp.o
+[44/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/CinematicPlayer.cpp.o
+[45/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeActionRuntime.cpp.o
+[46/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/ExitMenuRuntime.cpp.o
+[47/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/CinematicCamera.cpp.o
+[48/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/CinematicCameraTrack.cpp.o
+[49/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/DeathConfirmationRuntime.cpp.o
+[50/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/CinematicUiRuntime.cpp.o
+[51/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EnemyRangeAttackConfig.cpp.o
+[52/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EnemySpecialActionConfig.cpp.o
+[53/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EnemyBehaviorConfig.cpp.o
+[54/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EnemyAttackIntervalConfig.cpp.o
+[55/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EffectBillboard.cpp.o
+[56/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/GameplayCamera.cpp.o
+[57/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EnemyAttributeConfig.cpp.o
+[58/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/EffectPreset.cpp.o
+[59/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/GameplayCinematicScheduler.cpp.o
+[60/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelDamageRuntime.cpp.o
+[61/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelDeathRuntime.cpp.o
+[62/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelCollision.cpp.o
+[63/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelCheckPointRuntime.cpp.o
+[64/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelCinematicRuntime.cpp.o
+[65/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelBonusRuntime.cpp.o
+[66/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHintRuntime.cpp.o
+[67/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelEffectRuntime.cpp.o
+[68/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/NativeRandomizer.cpp.o
+[69/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/GameplayPlayer.cpp.o
+[70/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelDropRuntime.cpp.o
+[71/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelMusicRuntime.cpp.o
+[72/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelTriggerSoundRuntime.cpp.o
+[73/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelRestoreRuntime.cpp.o
+[74/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[75/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelTriggerRuntime.cpp.o
+[76/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/PlayerHudHealthState.cpp.o
+[77/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LocalizedStringTable.cpp.o
+[78/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/PlayerHitEffectConfig.cpp.o
+[79/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QteGesturePath.cpp.o
+[80/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/PlayerStateConfig.cpp.o
+[81/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QteSpriteAnimation.cpp.o
+[82/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelSlideRuntime.cpp.o
+[83/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelObjectRuntime.cpp.o
+[84/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[85/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/WallWebRuntime.cpp.o
+[86/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/WebSwingRuntime.cpp.o
+[87/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/reconstructed/input/XperiaKeyRouter.cpp.o
+[88/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/WebLineGeometry.cpp.o
+[89/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/platform/input/XInputStateTranslator.cpp.o
+[90/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/compress.c.o
+[91/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/adler32.c.o
+[92/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/WebGrabPointRuntime.cpp.o
+[93/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/gzclose.c.o
+[94/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/crc32.c.o
+[95/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/gzlib.c.o
+[96/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/gzwrite.c.o
+[97/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/gzread.c.o
+[98/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/deflate.c.o
+[99/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/inftrees.c.o
+[100/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/inffast.c.o
+[101/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/infback.c.o
+[102/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/uncompr.c.o
+[103/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/zutil.c.o
+[104/121] Linking C static library _deps/zlib-build/libz.a
+[105/121] Linking CXX static library _deps/pugixml-build/libpugixml.a
+[106/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/inflate.c.o
+[107/121] Building C object _deps/zlib-build/CMakeFiles/zlib.dir/trees.c.o
+[108/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelOneBootstrap.cpp.o
+[109/121] Building CXX object CMakeFiles/OpenAndroidUSM.InputTransitionsTests.dir/tests/InputTransitionsTests.cpp.o
+[110/121] Linking C shared library _deps/zlib-build/libz.so.1.3.1
+[111/121] Creating library symlink _deps/zlib-build/libz.so.1 _deps/zlib-build/libz.so
+[112/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelEnemyRuntime.cpp.o
+[113/121] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[114/121] Building CXX object CMakeFiles/OpenAndroidUSM.QteParityTests.dir/tests/QteParityTests.cpp.o
+[115/121] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+[116/121] Linking CXX static library libOpenAndroidUSM.Core.a
+[117/121] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[118/121] Linking CXX executable OpenAndroidUSM.InputParityTests
+[119/121] Linking CXX executable OpenAndroidUSM.QteParityTests
+[120/121] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+[121/121] Linking CXX executable OpenAndroidUSM.CoreTests
+Internal ctest changing into directory: /mnt/data/work/OpenAndroidUSM/build/re02-sanitized
+Test project /mnt/data/work/OpenAndroidUSM/build/re02-sanitized
+      Start  1: OpenAndroidUSM.CoreTests
+ 1/16 Test  #1: OpenAndroidUSM.CoreTests .................   Passed   41.85 sec
+      Start  2: OpenAndroidUSM.QteParity.clock
+ 2/16 Test  #2: OpenAndroidUSM.QteParity.clock ...........   Passed    0.02 sec
+      Start  3: OpenAndroidUSM.QteParity.cinematic
+ 3/16 Test  #3: OpenAndroidUSM.QteParity.cinematic .......   Passed    6.04 sec
+      Start  4: OpenAndroidUSM.QteParity.hostage
+ 4/16 Test  #4: OpenAndroidUSM.QteParity.hostage .........   Passed    6.23 sec
+      Start  5: OpenAndroidUSM.QteParity.attributes
+ 5/16 Test  #5: OpenAndroidUSM.QteParity.attributes ......   Passed    0.02 sec
+      Start  6: OpenAndroidUSM.QteParity.gesture
+ 6/16 Test  #6: OpenAndroidUSM.QteParity.gesture .........   Passed    6.05 sec
+      Start  7: OpenAndroidUSM.QteParity.sprite
+ 7/16 Test  #7: OpenAndroidUSM.QteParity.sprite ..........   Passed    5.91 sec
+      Start  8: OpenAndroidUSM.QteParity.sequence
+ 8/16 Test  #8: OpenAndroidUSM.QteParity.sequence ........   Passed    6.04 sec
+      Start  9: OpenAndroidUSM.QteParity.gamepad
+ 9/16 Test  #9: OpenAndroidUSM.QteParity.gamepad .........   Passed    5.83 sec
+      Start 10: OpenAndroidUSM.QteParity.audio
+10/16 Test #10: OpenAndroidUSM.QteParity.audio ...........   Passed    5.98 sec
+      Start 11: OpenAndroidUSM.InputParity.buttons
+11/16 Test #11: OpenAndroidUSM.InputParity.buttons .......   Passed    0.03 sec
+      Start 12: OpenAndroidUSM.InputParity.routing
+12/16 Test #12: OpenAndroidUSM.InputParity.routing .......   Passed    0.01 sec
+      Start 13: OpenAndroidUSM.InputParity.sticks
+13/16 Test #13: OpenAndroidUSM.InputParity.sticks ........   Passed    0.01 sec
+      Start 14: OpenAndroidUSM.InputParity.hostage
+14/16 Test #14: OpenAndroidUSM.InputParity.hostage .......   Passed    6.15 sec
+      Start 15: OpenAndroidUSM.InputParity.autoplay
+15/16 Test #15: OpenAndroidUSM.InputParity.autoplay ......   Passed    0.01 sec
+      Start 16: OpenAndroidUSM.InputParity.transitions
+16/16 Test #16: OpenAndroidUSM.InputParity.transitions ...   Passed    0.03 sec
+
+100% tests passed, 0 tests failed out of 16
+
+Label Time Summary:
+input-parity    =   6.24 sec*proc (6 tests)
+qte-parity      =  42.12 sec*proc (9 tests)
+
+Total Test time (real) =  90.22 sec

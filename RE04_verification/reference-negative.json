@@ -1,0 +1,6 @@
+{
+  "test": "Reject deliberately modified temporary reference, not the supplied original",
+  "mutated_file_offset": "0x0037a5e4",
+  "exit": 1,
+  "original_unchanged": true
+}

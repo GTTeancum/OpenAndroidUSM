@@ -1,0 +1,73 @@
+[0/1] Re-running CMake...
+CMake Deprecation Warning at build/windows-msvc/_deps/pugixml-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /mnt/data/work/OpenAndroidUSM/build/re02-linux
+[1/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QteSpriteAnimation.cpp.o
+[2/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[3/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QteGesturePath.cpp.o
+[4/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelCinematicRuntime.cpp.o
+[5/13] Building CXX object CMakeFiles/OpenAndroidUSM.QteParityTests.dir/tests/QteParityTests.cpp.o
+[6/13] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[7/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+[8/13] Linking CXX static library libOpenAndroidUSM.Core.a
+[9/13] Linking CXX executable OpenAndroidUSM.InputParityTests
+[10/13] Linking CXX executable OpenAndroidUSM.QteParityTests
+[11/13] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+[12/13] Linking CXX executable OpenAndroidUSM.CoreTests
+Internal ctest changing into directory: /mnt/data/work/OpenAndroidUSM/build/re02-linux
+Test project /mnt/data/work/OpenAndroidUSM/build/re02-linux
+      Start  1: OpenAndroidUSM.CoreTests
+ 1/16 Test  #1: OpenAndroidUSM.CoreTests .................   Passed   13.78 sec
+      Start  2: OpenAndroidUSM.QteParity.clock
+ 2/16 Test  #2: OpenAndroidUSM.QteParity.clock ...........   Passed    0.01 sec
+      Start  3: OpenAndroidUSM.QteParity.cinematic
+ 3/16 Test  #3: OpenAndroidUSM.QteParity.cinematic .......   Passed    1.99 sec
+      Start  4: OpenAndroidUSM.QteParity.hostage
+ 4/16 Test  #4: OpenAndroidUSM.QteParity.hostage .........   Passed    2.08 sec
+      Start  5: OpenAndroidUSM.QteParity.attributes
+ 5/16 Test  #5: OpenAndroidUSM.QteParity.attributes ......   Passed    0.00 sec
+      Start  6: OpenAndroidUSM.QteParity.gesture
+ 6/16 Test  #6: OpenAndroidUSM.QteParity.gesture .........   Passed    1.94 sec
+      Start  7: OpenAndroidUSM.QteParity.sprite
+ 7/16 Test  #7: OpenAndroidUSM.QteParity.sprite ..........   Passed    1.98 sec
+      Start  8: OpenAndroidUSM.QteParity.sequence
+ 8/16 Test  #8: OpenAndroidUSM.QteParity.sequence ........   Passed    1.98 sec
+      Start  9: OpenAndroidUSM.QteParity.gamepad
+ 9/16 Test  #9: OpenAndroidUSM.QteParity.gamepad .........   Passed    2.03 sec
+      Start 10: OpenAndroidUSM.QteParity.audio
+10/16 Test #10: OpenAndroidUSM.QteParity.audio ...........***Failed    1.97 sec
+FAIL: line 408: catalog.index(root/"sounds",&table)
+
+      Start 11: OpenAndroidUSM.InputParity.buttons
+11/16 Test #11: OpenAndroidUSM.InputParity.buttons .......   Passed    0.01 sec
+      Start 12: OpenAndroidUSM.InputParity.routing
+12/16 Test #12: OpenAndroidUSM.InputParity.routing .......   Passed    0.00 sec
+      Start 13: OpenAndroidUSM.InputParity.sticks
+13/16 Test #13: OpenAndroidUSM.InputParity.sticks ........   Passed    0.00 sec
+      Start 14: OpenAndroidUSM.InputParity.hostage
+14/16 Test #14: OpenAndroidUSM.InputParity.hostage .......   Passed    2.01 sec
+      Start 15: OpenAndroidUSM.InputParity.autoplay
+15/16 Test #15: OpenAndroidUSM.InputParity.autoplay ......   Passed    0.01 sec
+      Start 16: OpenAndroidUSM.InputParity.transitions
+16/16 Test #16: OpenAndroidUSM.InputParity.transitions ...   Passed    0.02 sec
+
+94% tests passed, 1 tests failed out of 16
+
+Label Time Summary:
+input-parity    =   2.05 sec*proc (6 tests)
+qte-parity      =  13.98 sec*proc (9 tests)
+
+Total Test time (real) =  29.82 sec
+
+The following tests FAILED:
+	 10 - OpenAndroidUSM.QteParity.audio (Failed)           qte-parity
+Errors while running CTest

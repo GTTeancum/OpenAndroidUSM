@@ -1,0 +1,76 @@
+RE02 reproduction commands (Linux Bash)
+=======================================
+These reproduce the completed native-core validation. They are not Windows
+runtime validation. Actual build and CTest output is retained in the *.log files.
+Dependency source files below were restored from the user's original archive;
+no package installation into the host or new vendor source is required.
+
+# Run from the OpenAndroidUSM project root, with the original game/ folder.
+ROOT="$PWD"
+DEPS="$ROOT/build/windows-msvc/_deps"
+test -f "$DEPS/powervr-decompress/PVRTDecompress.cpp"
+test -f "$DEPS/powervr-decompress/PVRTDecompress.h"
+test -f "$DEPS/stb-vorbis/stb_vorbis.c"
+test -f "$DEPS/zlib-src/CMakeLists.txt"
+test -f "$DEPS/pugixml-src/CMakeLists.txt"
+
+# Prepare exactly the previously downloaded, hash-checked single-file sources.
+for name in re02-linux re02-sanitized; do
+    mkdir -p "$ROOT/build/$name/_deps/powervr-decompress" \
+             "$ROOT/build/$name/_deps/stb-vorbis"
+    cp "$DEPS/powervr-decompress/PVRTDecompress.cpp" \
+       "$DEPS/powervr-decompress/PVRTDecompress.h" \
+       "$ROOT/build/$name/_deps/powervr-decompress/"
+    cp "$DEPS/stb-vorbis/stb_vorbis.c" "$ROOT/build/$name/_deps/stb-vorbis/"
+done
+
+# GNU Release build and the complete portable test suite.
+cmake -S "$ROOT" -B "$ROOT/build/re02-linux" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DFETCHCONTENT_SOURCE_DIR_ZLIB="$DEPS/zlib-src" \
+    -DFETCHCONTENT_SOURCE_DIR_PUGIXML="$DEPS/pugixml-src" \
+    -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+cmake --build "$ROOT/build/re02-linux" --parallel 4
+ctest --test-dir "$ROOT/build/re02-linux" --output-on-failure -V
+
+# Clang 17 was used in the recorded sanitizer run. Use a fresh build directory.
+cmake -S "$ROOT" -B "$ROOT/build/re02-sanitized" -G Ninja \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+    '-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer' \
+    '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer' \
+    '-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O1 -gline-tables-only' \
+    '-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O1 -gline-tables-only' \
+    '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined' \
+    -DFETCHCONTENT_SOURCE_DIR_ZLIB="$DEPS/zlib-src" \
+    -DFETCHCONTENT_SOURCE_DIR_PUGIXML="$DEPS/pugixml-src" \
+    -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+cmake --build "$ROOT/build/re02-sanitized" --parallel 4
+ASAN_OPTIONS=detect_leaks=1 \
+UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+    ctest --test-dir "$ROOT/build/re02-sanitized" --output-on-failure -V
+
+# Original binary identity (does not execute the binary).
+python tools/verify_re02_reference.py
+
+# Independent application of the patch: start from an unmodified RE01 source
+# checkout, NOT from a directory already overlaid with RE02 replacement files.
+# git apply --check /absolute/path/to/RE02.patch
+# git apply /absolute/path/to/RE02.patch
+# Configure a fresh build directory as above using the existing vendor cache.
+# Repeat cmake --build and ctest there. The retained clean-build-tests.log
+# records a fresh configure, 121 build steps, and all 17 tests passing.
+
+# Source-package hashes, after extracting the cumulative source archive:
+# sha256sum -c RE02_verification/source-files.sha256
+# sha256sum -c RE02_verification/package-files.sha256
+# (The overlay lists only its own supplied files in overlay-files.sha256.)
+
+Windows interfaces retained but NOT executed for RE02
+====================================================
+cmake --preset windows-msvc-release
+cmake --build --preset windows-msvc-release
+ctest --test-dir build/windows-msvc -C Release -R "^OpenAndroidUSM\.(CoreTests$|InputParity\.|QteParity\.)" --output-on-failure
+
+The Windows-only application, D3D11 renderer and platform APIs were excluded
+from the Linux build. No old uploaded executable is a build of RE02.

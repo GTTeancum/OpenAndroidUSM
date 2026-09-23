@@ -1,0 +1,56 @@
+{
+  "clean": {
+    "tests": 20,
+    "passed": 20,
+    "elapsed_seconds": 102.7,
+    "check_counts": {
+      "clock": 400033,
+      "cinematic": 54,
+      "hostage": 199,
+      "attributes": 7,
+      "gesture": 262187,
+      "sprite": 500011,
+      "sequence": 28,
+      "gamepad": 61,
+      "audio": 12,
+      "first_level": 125,
+      "controller_boundaries": 789461,
+      "controller_first_level": 208,
+      "feedback": 6326
+    }
+  },
+  "sanitize": {
+    "tests": 20,
+    "passed": 20,
+    "elapsed_seconds": 301.42,
+    "check_counts": {
+      "clock": 400033,
+      "cinematic": 54,
+      "hostage": 199,
+      "attributes": 7,
+      "gesture": 262187,
+      "sprite": 500011,
+      "sequence": 28,
+      "gamepad": 61,
+      "audio": 12,
+      "first_level": 125,
+      "controller_boundaries": 789461,
+      "controller_first_level": 208,
+      "feedback": 6326
+    }
+  },
+  "clean_patch": {
+    "patch_sha256": "25e490ffdc545cd273152738d1e59ea219d1306a5f631db80777f08ff7a90da3",
+    "baseline_archive_sha256": "4dc42a09e63ed25f8ff1c37ed409eb19999ffb0711373ad29be7a879887178f7",
+    "check_exit": 0,
+    "apply_exit": 0,
+    "matched_files": 298
+  },
+  "original_material": {
+    "files": 599,
+    "bytes": 170642144
+  },
+  "baseline_archive_sha256": "4dc42a09e63ed25f8ff1c37ed409eb19999ffb0711373ad29be7a879887178f7",
+  "original_reference_sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
+  "scope": "Native Linux source/asset/rule tests; no ARM differential execution, Windows build, GPU, audible output, physical controller or normal first-level playthrough verified."
+}

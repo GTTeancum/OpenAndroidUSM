@@ -1,0 +1,13 @@
+[1/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/OggAudio.cpp.o
+[2/13] Building CXX object CMakeFiles/OpenAndroidUSM.PVRTC.dir/_deps/powervr-decompress/PVRTDecompress.cpp.o
+[3/13] Linking CXX static library libOpenAndroidUSM.PVRTC.a
+[4/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/BtexTexture.cpp.o
+[5/13] Building CXX object CMakeFiles/OpenAndroidUSM.Vorbis.dir/_deps/stb-vorbis/stb_vorbis.c.o
+[6/13] Linking CXX static library libOpenAndroidUSM.Vorbis.a
+[7/13] Linking CXX static library libOpenAndroidUSM.Core.a
+[8/13] Linking CXX executable OpenAndroidUSM.CoreTests
+[9/13] Linking CXX executable OpenAndroidUSM.InputParityTests
+[10/13] Linking CXX executable OpenAndroidUSM.QteParityTests
+[11/13] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[12/13] Building CXX object CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o
+[13/13] Linking CXX executable OpenAndroidUSM.QteControlTests

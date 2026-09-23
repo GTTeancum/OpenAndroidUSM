@@ -1,0 +1,275 @@
+{
+  "relative_to": "Delivered RE01 source archive",
+  "RE01_archive_sha256": "42c26fb7f5ae165971613941a0dd312357c5a23e624a4bc98c8d5d0470875e19",
+  "original_upload_commit": "59903b8037945c24ad81a5f947d69f01dc4de5b7",
+  "local_RE01_commit": "6e2b851724a2b36e3778a1d904efab0e08ca7e38",
+  "changed_count": 33,
+  "files": [
+    {
+      "path": "CMakeLists.txt",
+      "status": "modified",
+      "old_bytes": 11085,
+      "old_sha256": "8cb2bd9b4d502d2980067b1a8047402e8cf4182e4774ea143722846a02e2384e",
+      "new_bytes": 12207,
+      "new_sha256": "b578e26be85a63b10bfe12737b2e4603efbe478031f99a8d071f3a3fddc4cb42"
+    },
+    {
+      "path": "RE02_README.md",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 3966,
+      "new_sha256": "b8b244e275fe9442eedc8fb9a2bd697e3b245b964d3b451e5c0070104c2636a8"
+    },
+    {
+      "path": "RE02_VERIFICATION.md",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 7360,
+      "new_sha256": "c15c7ded3308af21959c42bbd29c09a2722454fd45a747a837c9165ecbc05466"
+    },
+    {
+      "path": "docs/RE02_EVIDENCE.md",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 12785,
+      "new_sha256": "632b26dd13d6ee37b8162010cd2ab37c5bef1a5a012ec7eb7b7694272c4fb36d"
+    },
+    {
+      "path": "docs/RECONSTRUCTION.md",
+      "status": "modified",
+      "old_bytes": 190376,
+      "old_sha256": "6b5b851071ec18316cda552bbeb66b2b79a77f3f866349baa0d46e2c7ac9e8b0",
+      "new_bytes": 192047,
+      "new_sha256": "803c3d44e9a214b1d16539247ee3f9f5231648874d01bacec83a8dd527a2ea85"
+    },
+    {
+      "path": "docs/references/re02-original-fingerprints.json",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 10824,
+      "new_sha256": "d6c6f09c00ac9bdc47b5975cd23fbf550899cc44d5ac378471c6fd19afa06110"
+    },
+    {
+      "path": "src/app/Application.cpp",
+      "status": "modified",
+      "old_bytes": 313677,
+      "old_sha256": "f50cb705a7a5c4cce2337565645a7b67e2058dd1fcbfe4fe11b54414afbde7b1",
+      "new_bytes": 317848,
+      "new_sha256": "877f11db174bccd8dcedee8f9f593e4bd7b6fe3813ee484fc4e7d91582cc89ea"
+    },
+    {
+      "path": "src/app/Application.hpp",
+      "status": "modified",
+      "old_bytes": 4536,
+      "old_sha256": "74a8f062f87a3bee7dbaeea95ec4217d6e5f3af90fe06f7a3780795d37b33df6",
+      "new_bytes": 4629,
+      "new_sha256": "704dca2b25358d981bc938be37c583fa19ce1cb485e6148773f427000ec7d50b"
+    },
+    {
+      "path": "src/diagnostics/AutoplayHarness.cpp",
+      "status": "modified",
+      "old_bytes": 254354,
+      "old_sha256": "f09dbe8a0b2d0b68ec8da0472cf83a611698c836e482dfa29de006b05d9cc0ba",
+      "new_bytes": 255046,
+      "new_sha256": "961f15f0111bdf9a7127ab8fd2034c2ffe9a5aed66c64e473caf7d6c4377fedd"
+    },
+    {
+      "path": "src/diagnostics/AutoplayHarness.hpp",
+      "status": "modified",
+      "old_bytes": 19630,
+      "old_sha256": "312228f0528eed5ed911311054dea4b13ebfb0482162e5494b403a0ed3a31e45",
+      "new_bytes": 19883,
+      "new_sha256": "3b68896b1ea2daf43fb51d499e791d5de86b4cc462dd7a6f523c884cf126ecad"
+    },
+    {
+      "path": "src/game/ButtonMashProgress.hpp",
+      "status": "modified",
+      "old_bytes": 1507,
+      "old_sha256": "d09e2c4d8c0581c672b5e2bd8b2536289e8cd3809c397bf0329538020b82e4aa",
+      "new_bytes": 2823,
+      "new_sha256": "8545ea66c23433c9aca2b68901d3568d8a163e38d55b5f74daff57bf51b3f351"
+    },
+    {
+      "path": "src/game/GameplayPlayer.hpp",
+      "status": "modified",
+      "old_bytes": 36529,
+      "old_sha256": "4faa215e624ef3648a9bc97293227966e34a66f36be1eaf760c7b5d597050543",
+      "new_bytes": 36759,
+      "new_sha256": "c0b6af4d559c1ebdb996400bcc88215cc3ed1d403b0c5e90fb28f045922fdc51"
+    },
+    {
+      "path": "src/game/HostageAttributes.hpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 450,
+      "new_sha256": "7cf5c1560b5407e3cab2c7d36026730fce5f89eb883814f734abb4d46f0bb55e"
+    },
+    {
+      "path": "src/game/LevelCinematicRuntime.cpp",
+      "status": "modified",
+      "old_bytes": 39528,
+      "old_sha256": "fbafbbba1c4cca0d3868107c19c5d5628b77dc41b4d3ef5ed0c76f1dc8abb953",
+      "new_bytes": 39592,
+      "new_sha256": "430ec1c96efa4f253c862aefff07dd5040ccdaa0d7107aa49075e366f2129e13"
+    },
+    {
+      "path": "src/game/LevelHostageRuntime.cpp",
+      "status": "modified",
+      "old_bytes": 14908,
+      "old_sha256": "a931474125ee298d88a18105f15a265ef6f5cb39a1a2b9585bde79bfc89a9a6e",
+      "new_bytes": 19724,
+      "new_sha256": "71f909ecd872d87473384b5049f851a9367de545fb431a155b211856eedd258c"
+    },
+    {
+      "path": "src/game/LevelHostageRuntime.hpp",
+      "status": "modified",
+      "old_bytes": 3676,
+      "old_sha256": "7b1b6529386284e8b0c8a012685c41b40960da9fe33e5adaa6e370403eca38b9",
+      "new_bytes": 5586,
+      "new_sha256": "0d314a1a81f89477c053f35beb044638a3c2bc559d8ab03e3ca44ae0d8c692cb"
+    },
+    {
+      "path": "src/game/LevelOneBootstrap.cpp",
+      "status": "modified",
+      "old_bytes": 138494,
+      "old_sha256": "9a712aa0680d8d0bbd506e716b95acb823ead076d9d713a0aa185c7a4bbc6fb3",
+      "new_bytes": 138250,
+      "new_sha256": "98c2d7c30e94ed72dc3096366fb623c9b9da074e93530dce7a6336297d6c1fcc"
+    },
+    {
+      "path": "src/game/QteClock.hpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 2591,
+      "new_sha256": "e648947601b63f3ff88f470671b153dc84ce3c72b8f0afd7f8d9089e69b8c9b2"
+    },
+    {
+      "path": "src/game/QteGesturePath.cpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 2920,
+      "new_sha256": "d46fcd1558a98f6e0fcff31985f8f9a02a6105ab31bb59d8e1a217ed7bba68b3"
+    },
+    {
+      "path": "src/game/QteGesturePath.hpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 1313,
+      "new_sha256": "0046565e42963794029a54973a93a6e3610132c18e3028bdac235628a7073c97"
+    },
+    {
+      "path": "src/game/QteSpriteAnimation.cpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 2704,
+      "new_sha256": "791bdc186b10158d5195a2491bf020eb72bf00a6a81670fbe6129b3ebf388211"
+    },
+    {
+      "path": "src/game/QteSpriteAnimation.hpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 1377,
+      "new_sha256": "a924d92906182edd98e4cbcaf1d3073caa7acb972558396a30b27c6c65f0051d"
+    },
+    {
+      "path": "src/game/QuickTimeEventRuntime.cpp",
+      "status": "modified",
+      "old_bytes": 3700,
+      "old_sha256": "0c926b76a290368c4f5c2d5d3bfdb35e82d0a19aed3191e9948539e55fad3e2e",
+      "new_bytes": 11304,
+      "new_sha256": "9e4d86d65dcf46daa41029dced7a4ac4f49bcccad8e35803365687e6998dc3b6"
+    },
+    {
+      "path": "src/game/QuickTimeEventRuntime.hpp",
+      "status": "modified",
+      "old_bytes": 1851,
+      "old_sha256": "0e46d9f4c62b58cd8831b016efc904e50cb4a49a5c0fb0bc73f66d7f29bd24e1",
+      "new_bytes": 4707,
+      "new_sha256": "2a8692bc7a12e9b44ca74a5cd7f4e28cf03c68fca14206a7da17024fe30b8244"
+    },
+    {
+      "path": "src/platform/input/QteGamepadAdapter.hpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 2275,
+      "new_sha256": "33a133a6f22555fdefe413f5208470a989fea43c3b032e13dc1c9aa8ff1711f7"
+    },
+    {
+      "path": "src/platform/input/XInputStateTranslator.cpp",
+      "status": "modified",
+      "old_bytes": 4239,
+      "old_sha256": "f34015b8d175aaa443f7681fdf4a7513bf2c1ed68cf5abef597a22c15c50da95",
+      "new_bytes": 4223,
+      "new_sha256": "3b94c82e6a5b4f7745fec68096254fc9e0799562ef75bc08f1498834369e0d7e"
+    },
+    {
+      "path": "src/reconstructed/input/XperiaKeyEvent.hpp",
+      "status": "modified",
+      "old_bytes": 962,
+      "old_sha256": "fe4c0424e1016bb6816db291097bcf11ad3e7792edc5b21f0422a8e94f7b3188",
+      "new_bytes": 1066,
+      "new_sha256": "3ddf3130267028120739bd337b536632cfac5a12a7c6ab391815278598cdef10"
+    },
+    {
+      "path": "src/reconstructed/input/XperiaKeyRouter.cpp",
+      "status": "modified",
+      "old_bytes": 2728,
+      "old_sha256": "606560ef803c1b419b478fd0a6df3cdb85e7dc45ed7063a5b23d24f4be93abef",
+      "new_bytes": 2961,
+      "new_sha256": "9e553b37f66956141280eaf34be7a9eccb14ff76a1afb577e1b86894584c1060"
+    },
+    {
+      "path": "tests/InputParityTests.cpp",
+      "status": "modified",
+      "old_bytes": 16340,
+      "old_sha256": "536849a22ba4d4a61a7f4e91946a3370e3310a3c14bc7504ac7d6b30498fdf71",
+      "new_bytes": 17363,
+      "new_sha256": "cfc6bff7f2f780d76cf74ecd291995fec056f968f93b23b268731018c64ec28f"
+    },
+    {
+      "path": "tests/InputTransitionsTests.cpp",
+      "status": "modified",
+      "old_bytes": 3268,
+      "old_sha256": "6259a44a587351ad3f17ac7fefc1bdff01138085ce3d438f32396e259c7c8d9d",
+      "new_bytes": 3283,
+      "new_sha256": "ae43cacdf83c305a2f7cbb2a47dd2690f87914239bcdf617a3c4c3bdbb74fb22"
+    },
+    {
+      "path": "tests/QteParityTests.cpp",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 34258,
+      "new_sha256": "50973256b2ad645cd672094fdee68bea91f0269c951678bca8cc9271c5bdfdff"
+    },
+    {
+      "path": "tests/SmokeTests.cpp",
+      "status": "modified",
+      "old_bytes": 754414,
+      "old_sha256": "c6395fd40bd75ae343879ef150b22259f5c38132f390cb729d84dc669cb55b77",
+      "new_bytes": 756540,
+      "new_sha256": "def78863ef93f096bb45d165f34fdfdedd7c78f2f12954b965383beb6447554a"
+    },
+    {
+      "path": "tools/verify_re02_reference.py",
+      "status": "added",
+      "old_bytes": null,
+      "old_sha256": null,
+      "new_bytes": 1837,
+      "new_sha256": "abfca4f5dfafc8a158d8f53bad75a63de724e8bf09c2d12fb2514456c2728b6c"
+    }
+  ],
+  "patch_sha256": "a0370c11c3f93eb2b2d6c44d5783e9862d3762f0c71800299ce345921157096a",
+  "note": "Verification logs/manifests and the patch itself are package additions, not recursively included in this change manifest."
+}

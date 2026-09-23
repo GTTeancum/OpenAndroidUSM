@@ -60,6 +60,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <charconv>
 #include <array>
 #include <cmath>
 #include <filesystem>
@@ -5982,15 +5983,17 @@ int main() {
         assert(roomTwoHostageAsset->hostageHealthOrbCount == 10);
         assert(roomTwoHostageAsset->hostageSkillPointOrbCount == 0);
         assert(roomTwoHostageAsset->hostageHintHeight == 180.0F);
-        assert(roomTwoHostageAsset->hostageButtonHeight == -101.0F);
+        assert(roomTwoHostageAsset->hostageButtonHeight == 85.0F);
         assert(roomTwoHostageAsset->hostageIsWoman);
 
         usm::game::LevelBonusRuntime hostageBonuses;
         assert(hostageBonuses.initialize(bootstrap.bonuses()));
         const std::size_t hostageInitialBonusCount =
             hostageBonuses.states().size();
+        usm::game::QuickTimeEventRuntime hostageQte;
+        hostageQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
         usm::game::LevelHostageRuntime hostageRuntime;
-        assert(hostageRuntime.initialize(bootstrap, &objectRuntime));
+        assert(hostageRuntime.initialize(bootstrap, hostageQte, &objectRuntime));
         assert(hostageRuntime.states().size() == 4);
         assert(objectRuntime.find(30018)->activeAnimation == "tied");
         assert(objectRuntime.find(30018)->animationLoops);
@@ -6000,23 +6003,28 @@ int main() {
         hostagePlayer.restoreAt(roomTwoHostageAsset->position,
                                 {1.0F, 0.0F, 0.0F});
         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                     hostageBonuses, 0, false));
+                                     hostageBonuses, {0, 0, 0}, {}));
         assert(hostageRuntime.contextPromptVisible());
         assert(hostageRuntime.canStartRescue(hostagePlayer));
         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                     hostageBonuses, 0, true));
+                                     hostageBonuses, {0, 0, 0}, {true, false}));
         assert(hostagePlayer.activeStateId() == 27);
         assert(hostagePlayer.activeAnimation() == "stand_to_unhitch");
         hostagePlayer.update({}, {}, 1000);
         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                     hostageBonuses, 0, false));
+                                     hostageBonuses, {0, 0, 0}, {}));
         assert(hostageRuntime.quickTimeActive());
         assert(hostagePlayer.activeStateId() == 28);
         assert(hostagePlayer.activeAnimation() == "unhitch_to_unhitch");
         for (std::int32_t action = 0; action < 8; ++action) {
             assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                         hostageBonuses, 1, true));
+                                         hostageBonuses, {1, 1, static_cast<std::uint32_t>(action + 1)}, {false, true}));
         }
+        assert(hostageRuntime.find(30018)->quickTimeOutcome ==
+               usm::game::HostageQteOutcome::Success);
+        assert(hostagePlayer.activeStateId() == 28);
+        assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+                                     hostageBonuses, {0, 0, 8}, {}));
         assert(!hostageRuntime.quickTimeActive());
         assert(hostagePlayer.activeStateId() == 29);
         assert(hostagePlayer.activeAnimation() == "unhitch_to_stand");
@@ -6024,12 +6032,12 @@ int main() {
         assert(hostageCuttingCues.size() == 2);
         assert(hostageCuttingCues.front().voxSoundId == 0x18b);
         assert(hostageCuttingCues.front().action ==
-               usm::game::HostageSoundAction::StartLoop);
+               usm::game::HostageSoundAction::PlayOnceIfStopped);
         assert(hostageCuttingCues.back().action ==
-               usm::game::HostageSoundAction::StopLoop);
+               usm::game::HostageSoundAction::Stop);
         hostagePlayer.update({}, {}, 1000);
         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                     hostageBonuses, 0, false));
+                                     hostageBonuses, {0, 0, 0}, {}));
         assert(hostageRuntime.find(30018)->phase ==
                usm::game::HostageRescuePhase::Release);
         assert(hostageBonuses.states().size() ==
@@ -6039,20 +6047,22 @@ int main() {
                        roomTwoHostageAsset->hostageSkillPointOrbCount));
         objectRuntime.advanceAnimations(100000);
         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                     hostageBonuses, 0, false));
+                                     hostageBonuses, {0, 0, 0}, {}));
         assert(hostageRuntime.find(30018)->phase ==
                usm::game::HostageRescuePhase::Thank);
         objectRuntime.advanceAnimations(100000);
         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
-                                     hostageBonuses, 0, false));
+                                     hostageBonuses, {0, 0, 0}, {}));
         assert(hostageRuntime.find(30018)->phase ==
                usm::game::HostageRescuePhase::Freed);
         assert(objectRuntime.find(30018)->activeAnimation ==
                "idle_watching_idle");
         assert(objectRuntime.find(30018)->animationLoops);
         const auto hostageThankCues = hostageRuntime.consumeSoundCues();
-        assert(hostageThankCues.size() == 1);
-        assert(hostageThankCues.front().voxSoundId == 0xa3);
+        assert(hostageThankCues.size() == 2);
+        assert(hostageThankCues.front().action ==
+               usm::game::HostageSoundAction::Stop);
+        assert(hostageThankCues.back().voxSoundId == 0xa3);
         hostageBonuses.update(roomTwoHostageAsset->position, 3000);
         assert(hostageBonuses.consumeGrants().size() ==
                static_cast<std::size_t>(
@@ -6063,8 +6073,10 @@ int main() {
         assert(failedHostageObjects.initialize(bootstrap));
         usm::game::LevelBonusRuntime failedHostageBonuses;
         assert(failedHostageBonuses.initialize(bootstrap.bonuses()));
+        usm::game::QuickTimeEventRuntime failedHostageQte;
+        failedHostageQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
         usm::game::LevelHostageRuntime failedHostageRuntime;
-        assert(failedHostageRuntime.initialize(bootstrap,
+        assert(failedHostageRuntime.initialize(bootstrap, failedHostageQte,
                                                &failedHostageObjects));
         usm::game::GameplayPlayer failedHostagePlayer;
         assert(failedHostagePlayer.initialize(bootstrap.player(), nullptr,
@@ -6073,18 +6085,27 @@ int main() {
                                       {1.0F, 0.0F, 0.0F});
         assert(failedHostageRuntime.update(
             failedHostagePlayer, failedHostageObjects,
-            failedHostageBonuses, 0, false));
+            failedHostageBonuses, {0, 0, 0}, {}));
         assert(failedHostageRuntime.update(
             failedHostagePlayer, failedHostageObjects,
-            failedHostageBonuses, 0, true));
+            failedHostageBonuses, {0, 0, 0}, {true, false}));
         failedHostagePlayer.update({}, {}, 1000);
         assert(failedHostageRuntime.update(
             failedHostagePlayer, failedHostageObjects,
-            failedHostageBonuses, 0, false));
+            failedHostageBonuses, {0, 0, 0}, {}));
         assert(failedHostageRuntime.quickTimeActive());
         assert(failedHostageRuntime.update(
             failedHostagePlayer, failedHostageObjects,
-            failedHostageBonuses, 4000, false));
+            failedHostageBonuses, {4000, 4000, 4000}, {}));
+        assert(failedHostageRuntime.quickTimeActive());
+        assert(failedHostageRuntime.update(
+            failedHostagePlayer, failedHostageObjects,
+            failedHostageBonuses, {1, 1, 4001}, {}));
+        assert(failedHostageRuntime.find(30018)->quickTimeOutcome ==
+               usm::game::HostageQteOutcome::Failure);
+        assert(failedHostageRuntime.update(
+            failedHostagePlayer, failedHostageObjects,
+            failedHostageBonuses, {0, 0, 4001}, {}));
         assert(failedHostageRuntime.find(30018)->phase ==
                usm::game::HostageRescuePhase::Tied);
         assert(failedHostagePlayer.activeStateId() == 0);
@@ -7248,22 +7269,35 @@ int main() {
             {"int", "^ID^Cinematic^Fail", "20010"},
         };
         usm::game::QuickTimeEventRuntime successfulQte;
-        successfulQte.bind(bootstrap.buttonConfigs());
-        assert(successfulQte.applyCommand(startLevelOneQte, 20005));
-        assert(successfulQte.sourceCinematicId() == 20005);
+        successfulQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
+        assert(successfulQte.applyCommand(startLevelOneQte, {0, 0}, 20004));
+        assert(successfulQte.sourceCinematicId() == 20004);
         assert(successfulQte.active());
         assert(successfulQte.durationMilliseconds() == 3900);
-        successfulQte.update(2000, true);
+        successfulQte.update({2000, 50}, true);
+        assert(successfulQte.active()); // Original record 6 is a drag, not an A tap.
+        successfulQte.update({2050, 50}, usm::game::QteInput{
+            false, successfulQte.gesturePath().end(), false});
         assert(!successfulQte.active());
+        for (int draw = 0; draw < 8; ++draw) {
+            successfulQte.drawStep();
+            assert(!successfulQte.consumeCinematicRequest());
+        }
+        successfulQte.drawStep();
         assert(successfulQte.consumeCinematicRequest() == 20006);
         assert(!successfulQte.consumeCinematicRequest().has_value());
         usm::game::QuickTimeEventRuntime failedQte;
-        failedQte.bind(bootstrap.buttonConfigs());
-        assert(failedQte.applyCommand(startLevelOneQte));
-        failedQte.update(3899, false);
+        failedQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
+        assert(failedQte.applyCommand(startLevelOneQte, {0, 0}));
+        failedQte.update({3899, 3899}, false);
         assert(failedQte.active());
-        failedQte.update(1, false);
+        failedQte.update({3900, 1}, false);
+        assert(failedQte.active());
+        failedQte.update({3901, 1}, false);
         assert(!failedQte.active());
+        for (int tick = 0; tick < 40 && failedQte.visible(); ++tick) {
+            failedQte.update({3901, 50}, false); failedQte.drawStep();
+        }
         assert(failedQte.consumeCinematicRequest() == 20010);
         const auto* wallWebButton = bootstrap.buttonConfigs().find(12);
         assert(wallWebButton != nullptr);
@@ -7273,25 +7307,31 @@ int main() {
         auto startMashQte = startLevelOneQte;
         startMashQte.attributes.front().value = "12";
         usm::game::QuickTimeEventRuntime mashQte;
-        mashQte.bind(bootstrap.buttonConfigs());
-        assert(mashQte.applyCommand(startMashQte));
-        mashQte.update(0, true);
+        mashQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
+        assert(mashQte.applyCommand(startMashQte, {0, 0}));
+        mashQte.update({0, 0}, true);
         assert(mashQte.active() && mashQte.completedActionCount() == 1);
-        mashQte.update(499, false);
+        mashQte.update({499, 499}, false);
         assert(mashQte.completedActionCount() == 1);
-        mashQte.update(1, false);
+        mashQte.update({500, 1}, false);
         assert(mashQte.completedActionCount() == 0);
         for (int tap = 0; tap < 7; ++tap) {
-            mashQte.update(50, true);
+            mashQte.update({static_cast<std::uint32_t>(550 + tap * 50), 50}, true);
             assert(mashQte.active());
         }
-        mashQte.update(50, true);
+        mashQte.update({900, 50}, true);
         assert(!mashQte.active() && mashQte.completedActionCount() == 8);
+        for (int draw = 0; draw < 9; ++draw) { mashQte.drawStep(); }
         assert(mashQte.consumeCinematicRequest() == 20006);
-        assert(mashQte.applyCommand(startMashQte));
+        assert(mashQte.applyCommand(startMashQte, {0, 0}));
         assert(mashQte.completedActionCount() == 0);
-        mashQte.update(3000, false);
+        mashQte.update({3000, 3000}, false);
+        assert(mashQte.active());
+        mashQte.update({3001, 1}, false);
         assert(!mashQte.active());
+        for (int tick = 0; tick < 40 && mashQte.visible(); ++tick) {
+            mashQte.update({3001, 50}, false); mashQte.drawStep();
+        }
         assert(mashQte.consumeCinematicRequest() == 20010);
         const auto roomNineCameraCinematic = std::find_if(
             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),

@@ -1,0 +1,20 @@
+{
+  "base": "Delivered RE01, exact local commit 6e2b851724a2b36e3778a1d904efab0e08ca7e38",
+  "patch": "RE02.patch",
+  "patch_bytes": 178013,
+  "patch_sha256": "a0370c11c3f93eb2b2d6c44d5783e9862d3762f0c71800299ce345921157096a",
+  "git_apply_check_passed": true,
+  "git_apply_passed": true,
+  "final_source_files_compared": 348,
+  "all_final_source_files_equal": true,
+  "unchanged_archive_only_files_verified": [
+    "RE01.patch",
+    "analysis/README.md"
+  ],
+  "clean_native_build_code_test_tool_files_compared": 316,
+  "clean_native_build_code_test_tool_files_equal": true,
+  "clean_build_log": "clean-build-tests.log",
+  "late_changes_relative_to_built_code": "Documentation only; all src/, tests/, tools/ and CMake files match the clean-build source tree.",
+  "windows_application_compiled": false,
+  "note": "Byte equality includes Windows-only source but does not imply that Windows-only source was compiled."
+}

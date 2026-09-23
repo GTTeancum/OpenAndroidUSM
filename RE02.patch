@@ -1,0 +1,3729 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d296ea9..5cf934a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.25)
+ project(OpenAndroidUSM VERSION 0.1.0 LANGUAGES CXX)
+ 
+ option(USM_BUILD_TESTS "Build unit tests" ON)
++option(USM_BUILD_WINDOWS_APP "Build the Windows D3D11/XInput application" ${WIN32})
++if(USM_BUILD_WINDOWS_APP AND NOT WIN32)
++    message(FATAL_ERROR "USM_BUILD_WINDOWS_APP needs a Windows target/toolchain")
++endif()
+ 
+ include(FetchContent)
+ set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+@@ -143,6 +147,8 @@ add_library(OpenAndroidUSM.Core STATIC
+     src/game/PlayerHudHealthState.cpp
+     src/game/PlayerHitEffectConfig.cpp
+     src/game/PlayerStateConfig.cpp
++    src/game/QteGesturePath.cpp
++    src/game/QteSpriteAnimation.cpp
+     src/game/QuickTimeEventRuntime.cpp
+     src/game/WallWebRuntime.cpp
+     src/game/WebGrabPointRuntime.cpp
+@@ -164,6 +170,7 @@ if(MSVC)
+     target_compile_options(OpenAndroidUSM.Core PRIVATE /W4 /permissive- /EHsc /utf-8)
+ endif()
+ 
++if(USM_BUILD_WINDOWS_APP)
+ add_library(OpenAndroidUSM.D3D11 STATIC
+     src/renderer/d3d11/D3D11Renderer.cpp
+ )
+@@ -227,6 +234,7 @@ add_custom_command(TARGET OpenAndroidUSM POST_BUILD
+         "${CMAKE_SOURCE_DIR}/xboxButtons.png"
+         "$<TARGET_FILE_DIR:OpenAndroidUSM>/xboxButtons.png"
+ )
++endif()
+ 
+ include(CTest)
+ if(BUILD_TESTING AND USM_BUILD_TESTS)
+@@ -246,6 +254,18 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+     endif()
+     add_test(NAME OpenAndroidUSM.CoreTests COMMAND OpenAndroidUSM.CoreTests)
+ 
++    add_executable(OpenAndroidUSM.QteParityTests tests/QteParityTests.cpp)
++    target_compile_features(OpenAndroidUSM.QteParityTests PRIVATE cxx_std_20)
++    target_link_libraries(OpenAndroidUSM.QteParityTests PRIVATE OpenAndroidUSM.Core)
++    target_compile_definitions(OpenAndroidUSM.QteParityTests PRIVATE
++        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
++    foreach(group IN ITEMS clock cinematic hostage attributes gesture sprite sequence gamepad audio first_level)
++        add_test(NAME OpenAndroidUSM.QteParity.${group}
++            COMMAND OpenAndroidUSM.QteParityTests ${group})
++        set_tests_properties(OpenAndroidUSM.QteParity.${group} PROPERTIES
++            TIMEOUT 120 LABELS "qte-parity")
++    endforeach()
++
+     add_executable(OpenAndroidUSM.InputParityTests tests/InputParityTests.cpp)
+     target_compile_features(OpenAndroidUSM.InputParityTests PRIVATE cxx_std_20)
+     target_link_libraries(OpenAndroidUSM.InputParityTests PRIVATE OpenAndroidUSM.Core)
+@@ -267,6 +287,7 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+     set_tests_properties(OpenAndroidUSM.InputParity.transitions PROPERTIES
+         TIMEOUT 120 LABELS "input-parity")
+ 
++    if(USM_BUILD_WINDOWS_APP)
+     add_executable(OpenAndroidUSM.RenderTests
+         tests/D3D11RenderTests.cpp
+     )
+@@ -295,6 +316,8 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+     )
+     add_test(NAME OpenAndroidUSM.RenderTests COMMAND OpenAndroidUSM.RenderTests)
+ 
++    endif()
++
+     find_program(USM_POWERSHELL_EXECUTABLE NAMES pwsh powershell)
+     if(USM_POWERSHELL_EXECUTABLE)
+         add_test(NAME OpenAndroidUSM.AutoplaySuiteRunnerTests
+diff --git a/RE02_README.md b/RE02_README.md
+new file mode 100644
+index 0000000..00c8db9
+--- /dev/null
++++ b/RE02_README.md
+@@ -0,0 +1,85 @@
++# OpenAndroidUSM RE02 — Native source continuation
++
++September 22, 2026. Cumulative over delivered **RE01**, which was based on the
++uploaded commit `59903b8037945c24ad81a5f947d69f01dc4de5b7`.
++
++**Not ready for near-final testing. No new Windows game executable is included.**
++This preserves completed reverse-engineering/source work; it is not a request
++for user acceptance testing or a claim of finished first-level gameplay.
++
++## Changes
++
++Reconstructs the original absolute QTE timeout and float32 pause calculation;
++real-time mash and original result-sprite timing; all four authored drag-path
++rules, compound sequencing, and draw-driven outcome timing. Removes the
++incorrect A-tap shortcut for the actual first-level drag. A plus left-stick
++coordinates are an explicit PC input translation; only the recovered manager
++judges success. Autoplay sends original path points.
++
++Corrects hostage object/QTE update ordering, cutting-loop start, interruption
++handling, original tap/success/failure sound events, and the ButtonHeight
++sentinel. Device disconnection now cancels PC state instead of issuing an R1
++release that could rescue/switch. Combat's existing two-update press window
++remains separate from QTE taps.
++
++See `docs/RE02_EVIDENCE.md` for original addresses and remaining differences;
++`RE02_verification/` contains the real build/test logs, reference fingerprints,
++asset witnesses, unchanged-original-data verification, and source/patch checks.
++
++## Files and applying the source
++
++`OpenAndroidUSM_RE02_Source.zip` is the complete cumulative source, including
++RE01. It contains neither original game material nor vendor/build caches.
++Continue using the original uploaded `game/` and dependency material.
++
++`OpenAndroidUSM_RE02_Overlay.zip` contains changed/new files relative to **RE01**.
++Extract its contents into that project's root, preserving unrelated local edits.
++Do not apply the RE01-relative overlay directly to an unmodified original
++upload. The cumulative source is the alternative for that case. The included
++`RE02.patch` is an alternative to overlaying replacement files, not an
++additional step afterward.
++
++The exact delivered-source manifest and clean-application check are included.
++No original `.so`, APK, game texture/audio, generated decompiler dump, or game
++executable is in either archive.
++
++## Reference check
++
++From the project root, with the original supplied library in place:
++
++```sh
++python tools/verify_re02_reference.py
++```
++
++This uses the standard-library-only ELF parser from RE01. It fails on a
++different reference. It does not execute ARM and is not proof of gameplay
++parity by itself.
++
++## Build interfaces
++
++The existing Windows MSVC interfaces are retained:
++
++```powershell
++cmake --preset windows-msvc-release
++cmake --build --preset windows-msvc-release
++ctest --test-dir build/windows-msvc -C Release -R "^OpenAndroidUSM\.(CoreTests$|InputParity\.|QteParity\.)" --output-on-failure
++```
++
++**These Windows commands were not executed for RE02.** The newly edited
++Windows application wiring is uncompiled here. The prior uploaded executable
++must not be mistaken for a build containing these source changes.
++
++On Linux, CMake now excludes the Windows-only D3D11/application/render-test
++targets by default. `USM_BUILD_WINDOWS_APP` remains on by default on Windows;
++trying to enable it on Linux fails explicitly. Native Linux core builds and
++tests are recorded in `RE02_verification/commands.txt`, with dependency sources
++restored from the supplied archive. This is a portable core/test build, not a
++Linux graphical port.
++
++## Outstanding acceptance work
++
++Windows compilation, normal first-level play, rendering/audio and physical
++XInput are unverified. Original QTE UI composition, shared manager arbitration
++among cinematic/hostage/wall/enemy QTEs, full input/pause lifetimes, some hostage
++animation/audio/ambient behavior, and the uploaded Sandman work remain open.
++The native test results must not be substituted for those acceptance checks.
+diff --git a/RE02_VERIFICATION.md b/RE02_VERIFICATION.md
+new file mode 100644
+index 0000000..96d394a
+--- /dev/null
++++ b/RE02_VERIFICATION.md
+@@ -0,0 +1,128 @@
++# OpenAndroidUSM RE02 — Source and verification report
++
++**September 22, 2026 · Development continuation, not near-final testing**
++
++This continues the delivered RE01 native C++ port of the Android/Xperia Play
++release of *Ultimate Spider-Man: Total Mayhem*. It is source-level reverse
++engineering from the supplied library and assets. No emulator, original-ARM
++runtime bridge, invented replacement gameplay, or newly verified Windows game
++executable is included.
++
++## Implemented in this continuation
++
++**Original QTE clocks and state order.** Replaced accumulated simulation-time
++and `>=` timeout shortcuts with the original absolute timer, float32 arithmetic,
++strict `>` boundary and recovered pause calculation. Mash idle and sprite
++updates use their separate real-time input. Input/timeout ordering, compound
++QTE sequencing, result sounds, control release and later cinematic dispatch are
++represented explicitly. The original normal-success handoff occurs on the
++ninth Draw call; it is no longer a made-up elapsed-time delay.
++
++**Actual first-level drag and both authored outcomes.** The live source cinematic
++is 20004, with a command at 2000 ms using config 6, success 20006 and failure
++20010. Config 6 is a drag, not an A tap. The port now follows the original
++four-direction path-selection and release rules, including signed coordinates,
++tie ordering and the different endpoint tolerances. Its samples come from the
++original interface sprite metadata. A plus the left stick supplies virtual
++touch coordinates as an explicit PC adaptation; the recovered gameplay rules,
++not a forced-success shortcut, determine the outcome. Autoplay also supplies
++authored points. Five other packed QTE cinematics were not falsely counted as
++live first-level coverage: their rooms are absent from the main scene's links.
++
++**Hostage rescue ordering and sounds.** The hostage object now observes the
++previous QTE-manager update. Cutting starts at the original remaining-action
++check rather than at QTE entry. Interrupted rescue no longer grants completion
++rewards or overwrites the interrupting player state. Original tap/success/fail
++sound events are routed separately from spatial hostage sounds. The authored
++ButtonHeight sentinel and Ultimate-state restriction follow the recovered
++branches. Sound events and decoding were tested; actual speaker output was not.
++
++**XInput transport cancellation.** Disconnecting while holding RB clears host
++input rather than fabricating an R1 release that could trigger rescue or switch
++requests. A real RB release still follows the recovered R1 route. This is a PC
++device policy, not an assertion about Android device-disconnect behavior.
++Combat's existing two-update press window remains distinct from QTE input.
++
++## Tests actually executed
++
++| Build/run | Result | CTest elapsed time |
++| --- | --- | --- |
++| GCC 14.2, native Linux x86-64 Release | **17/17 passed** | 31.16 s |
++| Clang 17, complete portable suite with AddressSanitizer, UndefinedBehaviorSanitizer and leak detection | **17/17 passed**, no reported sanitizer errors | 118.62 s |
++| Fresh RE01 copy, clean-applied code patch, fresh Release configure/build/test | **17/17 passed** | 33.19 s |
++
++These runs cover the existing native core suite, ten QTE groups, and six input
++groups. They include 200,000 clock-oracle operations; all 65,536 signed-coordinate
++values across the four drag rules; 100,000 sprite timing steps; and 100,000
++controller-transition frames. Exact per-test logs/check counts are preserved.
++The original four QTE audio entries were decoded with the production decoder.
++
++The asset-level fixture advances the actual first-level cinematic scheduler to
++its StartQTE command and completes both its real success and failure handoffs.
++Other cinematic commands are observed, not executed against a full rendered
++world. The hostage fixture positions a diagnostic player at the authored
++hostage. Neither fixture demonstrates normal play from the title screen.
++
++A final separate patch-application check and source hashes are included.
++Source, tests and build scripts match the clean-build tree byte-for-byte;
++later documentation is checked separately. Intermediate failed test iterations
++remain in the logs rather than being relabeled as successful runs.
++
++## Original reference and unchanged material
++
++Original library: `game/original/libspiderman.so`, 7,713,000 bytes.
++
++```text
++SHA256 f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679
++```
++
++All **599 used original game-data/library files**, totaling **170,642,144 bytes**,
++were freshly compared with their members in the 17 uploaded split volumes and
++remain unchanged. This is not a full verification of the roughly 95 GB expanded
++archive. Forty-eight original functions have retained symbol/address/byte
++fingerprints. Supplied Ghidra addresses are ELF addresses plus 0x10000; the
++new evidence records ELF instruction addresses explicitly.
++
++`tools/verify_re02_reference.py` passes against the supplied library and rejects
++a deliberately modified temporary copy. This establishes reference identity,
++not behavioral equivalence. The tests compare reconstructed code against
++instruction-shaped rules and original asset facts; **the original ARM program
++was not executed** for differential validation.
++
++## Remaining barriers to near-final testing
++
++**Windows is not verified.** The Windows-only application wiring was edited but
++not compiled here. D3D11 presentation, audible XAudio2, physical XInput, normal
++first-level play and a newly built Windows executable remain unverified. Linux
++CMake now excludes Windows-only targets by default so the full portable build
++works; it is not a graphical Linux port. No old executable is represented as
++containing RE02.
++
++**Original game integration is still incomplete.** QTE visual composition and
++failure fading are not fully reconstructed in the renderer. Shared QTE/input
++ownership among cinematic, hostage, wall and enemy paths; the actual PC pause
++menu lifecycle; remaining hostage animation/audio/ambient behavior; and the
++uploaded Sandman work remain open. Clock pause API tests do not prove working
++in-game pause. Reconnection still uses the inherited held-button policy.
++
++Further original inspection located the interactive-button and switch-counter
++consumers. Their order-dependent behavior is documented, not replaced by an
++invented nearest-switch action. Full consumer integration remains outstanding.
++
++## Deliverables and application
++
++- `OpenAndroidUSM_RE02_Source.zip`: complete cumulative source through RE02.
++- `OpenAndroidUSM_RE02_Overlay.zip`: changed/new files relative to delivered
++  **RE01**, plus the evidence and actual verification records.
++- This report and `docs/RE02_EVIDENCE.md`: scope, original addresses, exact
++  interpretations and remaining limitations.
++
++The overlay applies to **RE01**, not directly to the unmodified original upload.
++Its `RE02.patch` is an alternative to copying replacement files, not a second
++step after overlaying them. The cumulative source includes all preceding
++source changes. Retain the original `game/` and supplied dependency material;
++neither package redistributes original game binaries/assets, build caches or a
++game executable. Existing Windows build interfaces are documented but not
++claimed to have been executed.
++
++**RE02 preserves the completed work. It is not a near-final acceptance build.**
+diff --git a/docs/RE02_EVIDENCE.md b/docs/RE02_EVIDENCE.md
+new file mode 100644
+index 0000000..fadd8f1
+--- /dev/null
++++ b/docs/RE02_EVIDENCE.md
+@@ -0,0 +1,220 @@
++# RE02 — Original QTE, rescue, and PC input reconstruction
++
++Reference date: September 22, 2026. All addresses in this document are **ELF
++instruction addresses**, with the Thumb bit removed. The supplied Ghidra
++exports are rebased by **+0x10000**. This document supersedes the old isolated
++A-tap cinematic shortcut described in the uploaded reconstruction notes.
++
++## Scope and reference
++
++This continues the delivered RE01 native C++ source. It does not execute the
++original ARM code, introduce an emulator, call a binary compatibility bridge,
++or reconstruct gameplay from screenshots. The reference is the supplied
++`game/original/libspiderman.so`, 7,713,000 bytes:
++
++`f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679`
++
++`docs/references/re02-original-fingerprints.json` pins 48 retained functions by
++symbol name, ELF address, length, and byte hash. Run
++`python tools/verify_re02_reference.py` against the supplied local library.
++A deliberately altered temporary copy was rejected. Fingerprint verification
++establishes the reference identity, **not gameplay equivalence**.
++
++A fresh comparison read the 599 `game/data` and `game/original` members from
++all 17 uploaded split ZIP volumes and compared their hashes with the working
++files. All 170,642,144 bytes matched. This does not claim verification of the
++unused roughly 95 GB expanded archive. No original binary, game asset, or bulk
++decompiler output is redistributed in RE02.
++
++## 1. Timeout, update, and pause clocks
++
++`CQTEManager::IsOutTime` at `0x0037a4b8` compares
++`((float(timerNow) - start) - pauseAdjustment) > duration`. This is not the
++uploaded accumulated-simulation `>=` test. `BeginNowQTE`, `0x0037aa08`, records
++the absolute timer. `SetPause`, `0x0037a4fc`, preserves its unusual native
++arithmetic: the pause marker is `now - (now - start)`; resume overwrites the
++adjustment with `now - marker`. It does not accumulate conventional pause
++lengths. RE02 retains each float32 operation, strict boundaries, and the
++non-modular behavior at the 32-bit timer wrap.
++
++`Application::GetRealTs`, `0x003ce5d4`, is a separate unslowed update duration.
++Mash idle uses it, not scaled world time. The supplied animation code also uses
++it. `irr::os::Timer::getTime` / `tick`, `0x0042aea0` / `0x0042b054`, return the
++cached timer value shared by inner catch-up steps. The host loop now provides
++one absolute sample per outer tick, alongside separate real and simulation
++steps. It retains the inherited fixed-step/catch-up policy.
++
++`CLevel::PauseTimer` / `ResumeTimer`, `0x0036f42c` / `0x0036f3e4`, call the QTE
++pause API in the original. The reconstructed clock's pause API is tested, but
++**the PC Start/pause-menu lifecycle is not reconstructed by this change**.
++An accurate clock method alone is not a claim of working pause integration.
++
++## 2. Authored drag gesture, not an A-tap shortcut
++
++The linked first-level cinematic is **20004**. Its command at **2000 ms** uses
++config **6**, success **20006**, and failure **20010**. The previous isolated
++smoke fixture used synthetic source ID **20005**, which is not this cinematic.
++The new integration fixture uses the actual linked asset and both actual
++outcomes. `RE02_verification/asset-witness.json` records original member hashes
++and the CFF attributes read directly from the supplied archive.
++
++Config 6 is interaction type 1, value 14, origin `(360,101)`, duration 3900 ms.
++Its path is interface animation 5: fourteen authored samples ending at
++`(360,251)`. `CalculateEndPos`, `0x0037a3f8`, adds the sprite offsets to the
++configuration in float32, truncates to an integer, and retains the signed
++16-bit coordinate. No replacement curve is generated.
++
++`UpdateDragState`, `0x0037acd4`, selects the closest sample using the deciding
++axis only: X for values 11/12 and Y for 13/14. Strict `<` makes an equidistant
++position retain the earlier sample. It snaps both coordinates to that sample;
++the final sample succeeds. The release event in `onEvent`, `0x0037abf0`, uses a
++different rule: both axes must be within ten pixels, inclusive, of the stored
++endpoint. RE02 preserves the distinction rather than substituting a distance
++circle or a success percentage.
++
++The original `appKeyPressed`, `0x003cc75c`, supplies a Cross flag for tap/mash.
++The recovered manager does not use that flag to force state-1 drag success.
++The PC adapter therefore uses **A as a virtual touch hold and the left stick
++as positional displacement**. Both axes use the authored primary-axis span;
++positive XInput Y is inverted to screen Y. That mapping is an explicit host
++input policy, **not claimed original Xperia hardware behavior**. The native
++manager remains the sole success/failure judge. Diagnostic autoplay sends the
++same original samples; its `qte_tap` command is no longer a drag-success cheat.
++
++The archive also contains five additional QTE-bearing CFFs for source IDs
++20016, 20045, 20051, 20062, and 20081. Their rooms are not among the thirteen
++links in `levelnew_01.irr`. They are not promoted into live first-level gameplay
++or counted as normal-flow coverage simply because their files exist.
++
++## 3. QTE order and result handoff
++
++`CQTEManager::Update`, `0x0037b240`, is reconstructed as explicit states
++0/1/2/3/4/5/6 for tap, drag, mash, success display, failure display, success
++handled, and failure handled. Inactive is -1.
++
++Tap/mash input runs **before** the timeout. A final late tap can produce tap,
++success, and then failure sounds in that order. Drag timeout runs **before**
++positional completion; reaching the final sample in that same update can
++replace the failure with success. These are observed instruction-order quirks,
++not changes chosen for game feel.
++
++`BeginQTE`, `0x0037ab40`, ignores a new Begin in states 0 through 3. Compound
++record 2 traverses its authored `[0,3,1]` children. `SetState`, `0x0037a67c`,
++returns early when the state is unchanged: consecutive drag children retain
++the previous result animation and release endpoint, even while nearest-sample
++updates read the new child. The tests exercise this easily lost detail.
++Random-position records use the shared existing native randomizer; an absent
++shared randomizer is rejected instead of silently supplying a made-up seed.
++
++`SetState(3/4)` emits sounds 0x188/0x189, restarts the original result animation,
++and calls `EndQTE` (`0x0037a5b0`) to restore control and reset slow motion.
++Outcome dispatch is later, via `SuccessHandle` / `FailHandle`,
++`0x0037a5e4` / `0x0037a630`; the source cinematic is removed then.
++
++`CSpriteInstance::UpdateSpriteAnim`, `0x002d9c10`, uses a strict residual
++`> 50.0` loop and its own tick/frame advancement, not a conventional
++accumulated-duration player. The original 50.0 constant is at `0x00505380`.
++`SetAnim`, `SetAnimSafe`, `Restart`, and `IsAnimEnded` at
++`0x002d9ce8`, `0x002d9d04`, `0x002d9cc4`, and `0x002d9d1c` preserve restart,
++residual, same-animation, and last-frame rules.
++
++`CQTEManager::Draw`, `0x0037a7c8`, changes state. The constructor sums animation
++7's durations to eight, and Draw compares before incrementing its counter;
++normal success therefore hands off on the **ninth Draw call**. Success Update
++does not advance that result sprite. Failure advances its sprite and tests
++animation completion. Photo result animation 29 has its separate one-frame
++end behavior. The application calls `drawStep` once per presented frame,
++not once per capped simulation substep.
++
++This reconstructs **result timing**, not complete QTE rendering. The original
++sprite composition, explosion scaling/alpha, control-button drawing, and
++failure fading are not all wired to Direct3D. The inherited generic prompt/bar
++still exists. No pixel-accurate UI or successful Windows rendering is claimed.
++
++## 4. Hostage rescue ordering and original sound cues
++
++`CHostage::Update`, `0x00328068`, runs as an object update before the shared QTE
++manager later in `CLevel::Update`, `0x003720bc`. RE02 separates the two phases;
++the hostage observes the **previous** manager result/action count. The
++convenience fixture wrapper retains object-then-manager ordering.
++
++The cutting loop 0x18b is not started merely by entering the QTE. The original
++checks for exactly seven remaining actions in the object phase. Config 11 has
++eight actions, so this is normally observed on the object update after the
++first accepted tap. Idle decay still restores only one action per qualifying
++update, even after a large real-time delta, and runs after success checking.
++
++Interrupting the player during the rescue no longer automatically overwrites
++the interrupting state or grants completion rewards. Forced failure queues the
++original failure cue before the cutting-loop stop. Rescue-end transitions keep
++the original independent state-mismatch/animation-complete tests and repeated
++stop requests.
++
++The separate QTE-manager sounds **0x18a (tap), 0x188 (success), 0x189 (failure)**
++now use the existing application Play2D path; the hostage's cutting/thanks
++spatial cues remain separate. All four relevant supplied sound entries were
++decoded to PCM by the portable production decoder. This verifies decoding and
++queued events, **not audible XAudio2 playback or matching acoustic timing**.
++
++The original hostage constructor (`0x00328c20`) defaults ButtonHeight to 85.
++`ProcessUserAttr`, `0x00328724`, subtracts 100 only for a positive authored
++value. The shipped -1 therefore means default 85, not -101. The port now follows
++that branch. `Player::IsUltimateState`, `0x0033002c`, checks IDs 107 through 113;
++these also block the rescue prompt/initiation as in the inspected path.
++
++Remaining hostage differences include the native ambient-help/random cadence,
++room activation and full input ownership, animation-completion generality,
++checkpoint Save/Load shape, and audio-manager `IsPlaying` feedback (the PC uses
++a request latch). These have not been declared equivalent.
++
++## 5. XInput device cancellation and switch consumers
++
++A physical R1 release in `appKeyReleased`, branch `0x003cc2b8–0x003cc2ea`,
++sets rescue, an interactive-button flag, and the switch counter to 4.
++Disconnecting a PC controller is not that event. The old translator synthesized
++key-up events on disconnect, which could now start a rescue. RE02 sends one
++explicit transport-cancel notification, clears held/pending state across
++contexts, and emits no native release action. This is a PC device-lifecycle
++fix, not invented Android key-handler semantics.
++
++Reconnection's treatment of physically held buttons is still the inherited
++translator policy: a newly observed held button produces a down event. Full
++cross-context arbitration and the exact lifetime of all native global flags
++remain to be audited. The drag adapter's cancellation/fresh-edge tests do not
++claim a physical reconnect interlock that the poller does not implement.
++
++Further original inspection identifies real switch consumers, without adding
++an invented nearest-object shortcut:
++
++- `InteractiveButton::Update`, `0x0032f1ac`, consumes and clears the boolean at
++  `0x00566518`, then performs its object's event path.
++- `CSwitchObject::Update`, `0x00310828`, reads the word at `0x0056651c` and
++  arithmetic-shifts it right. In-range, a nonzero pre-shift value also calls
++  `doAction` (`0x003107a4`); the out-of-range branch still shifts it. The literal
++  4 is therefore not evidence of a target-object index or single-use boolean.
++
++These reader functions are fingerprinted and recorded for continuation, but
++**their object interaction systems are not newly wired in RE02**. Native object
++iteration order and activation matter; resetting or consuming this counter
++once per host frame would not reproduce the inspected code.
++
++## Verification interpretation
++
++The supplied logs distinguish the baseline, intermediate failures, corrected
++final release/sanitizer runs, and clean source rebuild. A test named “parity”
++means it checks a recovered rule; it is not a side-by-side ARM execution test.
++The clock and sprite stress oracles are independent instruction-shaped C++
++transcriptions. No original ARM instruction was executed.
++
++The first-level integration fixture advances the actual cinematic scheduler
++to the actual StartQTE command and dispatches both authored outcomes. Other
++cinematic commands are observed rather than executed against a complete world.
++The hostage fixture positions the diagnostic player at asset 30018. Neither
++fixture demonstrates normal title-to-level play, rendered combat, physical
++XInput, or audible audio.
++
++**The first-level graphical/audio review milestone and near-final testing
++readiness have not been reached.** Windows app compilation/runtime, shared QTE
++ownership, original QTE visual composition, pause/input lifecycle, and the
++uploaded Sandman work remain open. No pre-existing executable is relabeled as
++a new or verified RE02 build.
+diff --git a/docs/RECONSTRUCTION.md b/docs/RECONSTRUCTION.md
+index 1200d77..1a4815b 100644
+--- a/docs/RECONSTRUCTION.md
++++ b/docs/RECONSTRUCTION.md
+@@ -1827,31 +1827,56 @@ uses the authored camera pose until the cinematic ends, then returns to the
+ active gameplay `CameraArea`. Tests cover all eight shipped tracks, signed
+ distance reconstruction, linear interpolation, and authored hard cuts.
+ 
+-## Controller-native quick-time events
+-
+-`ButtonConfigDatabase` follows `ButtonConfigFile::LoadConfig` and
+-`ReadBasic` at `0x002fb9b4` and `0x002fb8d4`. It preserves all twenty shipped
+-`BCONFIG.bin` records, including interaction type/value, screen position,
+-duration, sprite animation IDs, required action count, and compound sequence.
+-The level-one QTE uses record 6 (`k_igm_button_qte_1_2`) with its authored
+-3900 ms response window.
+-
+-`QuickTimeEventRuntime` reconstructs `CCinematicThread::StartQTE` at
+-`0x0037153c`, `Player::BeginQTE` at `0x0034c9b4`, and the success/failure
+-cinematic dispatch from `CQTEManager` at `0x0038a5e4` and `0x0038a630`.
+-Because the mobile interaction is a positional touch gesture, the native
+-controller route deliberately maps the abstract QTE action to XInput A. A
+-press selects authored success cinematic 20006; expiry selects authored fail
+-cinematic 20010. `InterfaceControl` now also preserves the original
+-`ControlEnable` and `BlackEnable` state, so gameplay input and encounter
+-triggers cannot interfere while the QTE owns control.
+-
+-The source cinematic ID is retained from `CCinematicThread::StartQTE` and
+-removed before the outcome is dispatched, matching `CQTEManager::SuccessHandle`
+-and `FailHandle`. `CQTEManager::EndQTE` (`0x0038a5b0`) restores player input
+-and calls `Application::ResetSlowMotion` (`0x003e0598`); it does not change
+-the independent HUD, arrow, bands, or skip flags. This distinction matters
+-for Level 6's floor-break chain `41428 -> 41464/86 -> 87`.
++## Controller-native quick-time events (RE02 correction)
++
++`ButtonConfigDatabase` preserves the twenty supplied `BCONFIG.bin` records.
++The first-level **linked** cinematic is **20004**, whose `StartQTE` at 2000 ms
++selects record **6**, success cinematic **20006**, and failure cinematic
++**20010**. The old isolated test used synthetic source ID 20005. Five other
++CFF files in the pack contain `StartQTE`, but their rooms are not linked by
++`levelnew_01.irr`; RE02 does not introduce them into normal gameplay.
++
++Record 6 is a **drag**, not a tap. `QuickTimeEventRuntime` now follows the
++original `CQTEManager` states, `CalculateEndPos`, `UpdateDragState`, and release
++event (`onEvent`). It reads all fourteen authored points from
++`interface.bsprite` animation 5. The native update selects the closest sample
++on the deciding axis, with strict earlier-sample tie breaking; release instead
++checks both axes against the stored endpoint with an inclusive ten-pixel box.
++**An A press by itself no longer forces this drag to succeed.**
++
++The PC adapter uses A as a virtual touch hold and the left stick as positional
++input relative to the original path origin, with an equal scale on both axes
++set by the authored primary-axis span. This is an explicit PC device
++translation policy, not a claimed original Xperia mapping. Only the recovered
++manager decides success or failure. Autoplay likewise supplies authored
++coordinates instead of a force-success shortcut. Unplugging produces a
++transport cancellation, not a synthetic R1 release/rescue request.
++
++The timeout now preserves the original absolute float32 timer and strict `>`
++comparison. The real-time mash-idle clock is independent. Tap/mash process
++input before timeout; drag checks timeout before positional completion. The
++original compound-sequence same-state behavior is retained, including its
++unchanged release endpoint. Random-position records consume the shared native
++randomizer, never a separately invented seed.
++
++`EndQTE` restores controls and slow motion on entry to success/failure display;
++it does not immediately start the outcome cinematic. Result-sprite timing is
++reconstructed from `CSpriteInstance`, and success handoff occurs after the
++original nine Draw calls for the supplied animation metadata (not after nine
++simulation updates). Failure follows the original animation-ended condition.
++The source cinematic is removed when the outcome is dispatched.
++
++The Windows application wiring carries separate absolute and real-step clocks,
++plays the original QTE tap/success/failure sound assets, and invokes Draw-side
++state transitions once per presented frame. It has **not been compiled or run
++on Windows in this checkpoint**. Native QTE visual composition is still
++incomplete: the inherited generic prompt/bar remains, rather than a claim of
++original sprite/effect rendering parity. Shared manager ownership across
++cinematic, hostage, wall-web, and enemy QTEs also remains unresolved.
++
++Addresses in the RE02 evidence document and fingerprint manifest are ELF
++addresses; the older imported Ghidra comments elsewhere are offset by +0x10000.
++See `docs/RE02_EVIDENCE.md` and `RE02_README.md` for measured coverage and limits.
+ 
+ Collada camera teardown is separate: `CCinematicThread::UnUseDAECamera`
+ (`0x00370710`) calls `OnOffDaeMovieUI(false)` (`0x0037043c`), which restores
+diff --git a/docs/references/re02-original-fingerprints.json b/docs/references/re02-original-fingerprints.json
+new file mode 100644
+index 0000000..59f8feb
+--- /dev/null
++++ b/docs/references/re02-original-fingerprints.json
+@@ -0,0 +1,345 @@
++{
++  "size": 7713000,
++  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
++  "machine": "ELF32 little-endian ARM",
++  "symbols": [
++    {
++      "name": "_ZN7CSprite16GetAFrameOffsetXEii",
++      "elf_address": "0x002d612c",
++      "thumb": true,
++      "size": 16,
++      "sha256": "37a511655b81e5a9ebb6f42265109cf3cb85a4a7f2afe18dfc50fb6d9d0fe3d4"
++    },
++    {
++      "name": "_ZN7CSprite16GetAFrameOffsetYEii",
++      "elf_address": "0x002d613c",
++      "thumb": true,
++      "size": 16,
++      "sha256": "950d22591d3bd300d1476fd8571eecf464a188daba33105fa8fa2ea94218485c"
++    },
++    {
++      "name": "_ZN7CSprite15GetAnimDurationEi",
++      "elf_address": "0x002d7c84",
++      "thumb": true,
++      "size": 36,
++      "sha256": "d4196baaae1485845e82ef13bf8e12158e8018c16226521457c507350263dd5c"
++    },
++    {
++      "name": "_ZN15CSpriteInstance12InitInstanceEiiP7CSprite",
++      "elf_address": "0x002d9af8",
++      "thumb": true,
++      "size": 60,
++      "sha256": "6ef769c93d16fe7fc70771b23d6cd0104fc5c5fe0bbbfccf6305bdd80d945244"
++    },
++    {
++      "name": "_ZN15CSpriteInstance16UpdateSpriteAnimEf",
++      "elf_address": "0x002d9c10",
++      "thumb": true,
++      "size": 172,
++      "sha256": "82d01d3b835ec9688cfa4ec99d6455b46dbc889830e09da6d7b26e1b8c334eb5"
++    },
++    {
++      "name": "_ZN15CSpriteInstance7RestartEv",
++      "elf_address": "0x002d9cc4",
++      "thumb": true,
++      "size": 36,
++      "sha256": "2a54521dd7de9216fe99629f6463dd6b13391300e3d34648c9f72d2f8871414b"
++    },
++    {
++      "name": "_ZN15CSpriteInstance7SetAnimEi",
++      "elf_address": "0x002d9ce8",
++      "thumb": true,
++      "size": 26,
++      "sha256": "430201f6d2d6d8ad7bfd6c2e32780313fcbb934466c16d1693daaba3419d4a1e"
++    },
++    {
++      "name": "_ZN15CSpriteInstance11SetAnimSafeEi",
++      "elf_address": "0x002d9d04",
++      "thumb": true,
++      "size": 24,
++      "sha256": "94f49810538d763b40caa2776c7168d65783952665eaf02c985dc11277c66104"
++    },
++    {
++      "name": "_ZN15CSpriteInstance11IsAnimEndedEv",
++      "elf_address": "0x002d9d1c",
++      "thumb": true,
++      "size": 74,
++      "sha256": "29d1f48717d47a0b1aef088f82fbf58ec1c34bf9bb41470542590d4d9b8a7997"
++    },
++    {
++      "name": "_ZN15CSpriteInstance6UpdateEf",
++      "elf_address": "0x002d9d68",
++      "thumb": true,
++      "size": 24,
++      "sha256": "35f2c388576d57bdddd98c011945583f0390323b80224cee0e2a57a17064b08b"
++    },
++    {
++      "name": "_ZN16ButtonConfigFile9ReadBasicEP12ButtonConfigP11CBinaryFile",
++      "elf_address": "0x002eb8d4",
++      "thumb": true,
++      "size": 222,
++      "sha256": "fc44abd8754202712a307c82798822fd9f2af369275fbcd4f60f1fc181ff5c1a"
++    },
++    {
++      "name": "_ZN16ButtonConfigFile10LoadConfigEPKc",
++      "elf_address": "0x002eb9b4",
++      "thumb": true,
++      "size": 136,
++      "sha256": "902716323ea15d1bf7e3a1fb86ceeb23601c64ff49579223f2089bf108c6ab30"
++    },
++    {
++      "name": "_ZN13CSwitchObject8doActionEv",
++      "elf_address": "0x003107a4",
++      "thumb": true,
++      "size": 108,
++      "sha256": "7e4155bdb69ced337b3e84a4107cb30d2632ab99c2d23ad625838392e84745c1"
++    },
++    {
++      "name": "_ZN13CSwitchObject6UpdateEf",
++      "elf_address": "0x00310828",
++      "thumb": true,
++      "size": 1028,
++      "sha256": "d0b0a5953f09e47daae612d9b9d5e25c1e349ef66afae8cbb4f926030fa3f8af"
++    },
++    {
++      "name": "_ZN8CHostage11OnExitStateEi",
++      "elf_address": "0x00327d98",
++      "thumb": true,
++      "size": 74,
++      "sha256": "7a25661e98f530fb59bc8cfbfc39466f58ce2bf105e745a6292e0c68ebfe3b78"
++    },
++    {
++      "name": "_ZN8CHostage12OnEnterStateEi",
++      "elf_address": "0x00327de4",
++      "thumb": true,
++      "size": 528,
++      "sha256": "6253a4194f69d0f895d476ec2f64cd20fe5ebba75c91271fd292dd980a5719d8"
++    },
++    {
++      "name": "_ZN8CHostage6UpdateEf",
++      "elf_address": "0x00328068",
++      "thumb": true,
++      "size": 1352,
++      "sha256": "602e73d58728990678567ae103d2ccf6b9103081eda16e01a7ed6fcc672cf782"
++    },
++    {
++      "name": "_ZN8CHostage15ProcessUserAttrEPN3irr2io11IAttributesE",
++      "elf_address": "0x00328724",
++      "thumb": true,
++      "size": 676,
++      "sha256": "345863591bbdb8b0cee296bce789c8170e0950c7d0fb0b084fd6d6ce43aa877b"
++    },
++    {
++      "name": "_ZN8CHostageC1Ev",
++      "elf_address": "0x00328c20",
++      "thumb": true,
++      "size": 372,
++      "sha256": "7555491c3e3c224c745cabf118434625adc9516dfafbb3209e135b672282ecfd"
++    },
++    {
++      "name": "_ZN17InteractiveButton6UpdateEf",
++      "elf_address": "0x0032f1ac",
++      "thumb": true,
++      "size": 388,
++      "sha256": "55ec41a2b9c0f80392f5e9d9dece601960ca9db0e10b17c5c9eefade2992c02e"
++    },
++    {
++      "name": "_ZN6Player10IsUltimateEi",
++      "elf_address": "0x0033002c",
++      "thumb": true,
++      "size": 22,
++      "sha256": "d88f9a42fc4b87a9036c42bdf02c95790eeb0a6281f5ac722d0c491134cad507"
++    },
++    {
++      "name": "_ZN6CLevel8ResumeItEv",
++      "elf_address": "0x0036f3e4",
++      "thumb": true,
++      "size": 72,
++      "sha256": "1e12545b2fbb0c6f844a66ae57cc8372195f661542d9a50caab1cab8259f5ca5"
++    },
++    {
++      "name": "_ZN6CLevel10PauseTimerEv",
++      "elf_address": "0x0036f42c",
++      "thumb": true,
++      "size": 24,
++      "sha256": "68d88b01e7526d11544ce8223f077094b578b39994779cc5222b94c6f5b7c129"
++    },
++    {
++      "name": "_ZN6CLevel6UpdateEf",
++      "elf_address": "0x003720bc",
++      "thumb": true,
++      "size": 1688,
++      "sha256": "5ec788200423ab60e59b6adb9396cdcb08130ea57fd6d9cbfa7140106c343a89"
++    },
++    {
++      "name": "_ZN11CQTEManager15CalculateEndPosEP12ButtonConfigii",
++      "elf_address": "0x0037a3f8",
++      "thumb": true,
++      "size": 106,
++      "sha256": "9695a674c3114b80a3aa8567d4f383dd6ab1b8fa671ff2367c4d8e9a4d290d7a"
++    },
++    {
++      "name": "_ZN11CQTEManager10GetQTETimeEi",
++      "elf_address": "0x0037a464",
++      "thumb": true,
++      "size": 84,
++      "sha256": "3bb115fb27986c070322db4b438394d80d2111d2ed8c9de869afa50b139fde06"
++    },
++    {
++      "name": "_ZN11CQTEManager9IsOutTimeEv",
++      "elf_address": "0x0037a4b8",
++      "thumb": true,
++      "size": 68,
++      "sha256": "756f989ef1fcdf4822abe1d7734cf34a4bff710ee3936d085b792847242db2fd"
++    },
++    {
++      "name": "_ZN11CQTEManager8SetPauseEb",
++      "elf_address": "0x0037a4fc",
++      "thumb": true,
++      "size": 96,
++      "sha256": "b1b71abc06a83baf49def169c20bf014ce724ae1cfe8d6124729a71e99b2bbc4"
++    },
++    {
++      "name": "_ZN11CQTEManager6EndQTEEv",
++      "elf_address": "0x0037a5b0",
++      "thumb": true,
++      "size": 52,
++      "sha256": "79c93206f203f587d78388dae661d0dce6fe4521d95b8868a3e16527888dd37c"
++    },
++    {
++      "name": "_ZN11CQTEManager13SuccessHandleEv",
++      "elf_address": "0x0037a5e4",
++      "thumb": true,
++      "size": 76,
++      "sha256": "186d171d9ae2b12b71a66f96916b88c9ee05fd388aafb1529ebe144cdd83be88"
++    },
++    {
++      "name": "_ZN11CQTEManager10FailHandleEv",
++      "elf_address": "0x0037a630",
++      "thumb": true,
++      "size": 76,
++      "sha256": "7ec93470cf683588f3f2f16083870b820d9d5b9c757b54694ffdbc171248fc74"
++    },
++    {
++      "name": "_ZN11CQTEManager8SetStateEi",
++      "elf_address": "0x0037a67c",
++      "thumb": true,
++      "size": 332,
++      "sha256": "dcf6a85d3a724edb2428bb25a44d5d1024b7f5fec80372faebc4ccc49a9dc8f2"
++    },
++    {
++      "name": "_ZN11CQTEManager4DrawEv",
++      "elf_address": "0x0037a7c8",
++      "thumb": true,
++      "size": 540,
++      "sha256": "3547a2cca9cc7526786e36032e48fdbf28dd0ab2b20eb0cbb2f5e748253c9895"
++    },
++    {
++      "name": "_ZN11CQTEManager12ForceFailQTEEv",
++      "elf_address": "0x0037a9fc",
++      "thumb": true,
++      "size": 10,
++      "sha256": "9af497dce9eb1b5f74f790a5ebcdfe20cbf0299d9b6ed9b46b2a222e7de32b7d"
++    },
++    {
++      "name": "_ZN11CQTEManager11BeginNowQTEEv",
++      "elf_address": "0x0037aa08",
++      "thumb": true,
++      "size": 312,
++      "sha256": "42fa12b37c92687f6b9b9b22654f693b3d11814ca7734baf1ebb114e42dd46b9"
++    },
++    {
++      "name": "_ZN11CQTEManager8BeginQTEEiiii",
++      "elf_address": "0x0037ab40",
++      "thumb": true,
++      "size": 120,
++      "sha256": "89d03744fb39e91be7bc7d7b1f8068499184181f755f3e6f8630534f1693d288"
++    },
++    {
++      "name": "_ZN11CQTEManager7NextQTEEv",
++      "elf_address": "0x0037abb8",
++      "thumb": true,
++      "size": 30,
++      "sha256": "a8388dd9715adeea40240d85399959f468debe15c3e5e2ac7ce675d6a7e64397"
++    },
++    {
++      "name": "_ZN11CQTEManager12CheckSuccessEv",
++      "elf_address": "0x0037abd8",
++      "thumb": true,
++      "size": 24,
++      "sha256": "837d465fb4d27f0fd50c4fbee0e1f3854e928d978464d8b55cf70d9c61c65cf2"
++    },
++    {
++      "name": "_ZN11CQTEManager7onEventEPK6IEventPK12EventManager",
++      "elf_address": "0x0037abf0",
++      "thumb": true,
++      "size": 228,
++      "sha256": "9945203aaf6931f038e49972ca2a8c29f73a687ac1115134e363161feeb028ce"
++    },
++    {
++      "name": "_ZN11CQTEManager15UpdateDragStateEf",
++      "elf_address": "0x0037acd4",
++      "thumb": true,
++      "size": 276,
++      "sha256": "d30a90e393eded9cfd9f35083dc8e0665ac0bc8d61529ae7628375c35edb49af"
++    },
++    {
++      "name": "_ZN11CQTEManagerC1EP13ControlScheme",
++      "elf_address": "0x0037aee4",
++      "thumb": true,
++      "size": 420,
++      "sha256": "8e8decb416fc862b6770a7d8a09d8cec42a8a2d31b8ef05a7ad7af55c274319a"
++    },
++    {
++      "name": "_ZN11CQTEManager6UpdateEf",
++      "elf_address": "0x0037b240",
++      "thumb": true,
++      "size": 460,
++      "sha256": "b37b509937754778139e710d09a0ab2765c5720af3f39addf0bac66ba3e7cc90"
++    },
++    {
++      "name": "appKeyReleased",
++      "elf_address": "0x003cbd5c",
++      "thumb": true,
++      "size": 2560,
++      "sha256": "b2916599043cee7ca7fdd61dd778a08e971694b52e28ef4a0dd2608f3e44a445"
++    },
++    {
++      "name": "appKeyPressed",
++      "elf_address": "0x003cc75c",
++      "thumb": true,
++      "size": 424,
++      "sha256": "14c28da418a40afd56b8ee069a5ccc84d2b712311a1c5e0e3c3155be5c1f4966"
++    },
++    {
++      "name": "_ZN11Application9GetRealTsEv",
++      "elf_address": "0x003ce5d4",
++      "thumb": true,
++      "size": 6,
++      "sha256": "f78d91149676a372a853c5a27e3cad21cbbf0491abe786f995158982ceb1b0cf"
++    },
++    {
++      "name": "_ZN11Application6UpdateEv",
++      "elf_address": "0x003d1624",
++      "thumb": true,
++      "size": 248,
++      "sha256": "0393a33cc6b9e20db0382c715ce131c24b98dbaaac282d6ca58a42bac7912d0d"
++    },
++    {
++      "name": "_ZN3irr2os5Timer7getTimeEv",
++      "elf_address": "0x0042aea0",
++      "thumb": true,
++      "size": 56,
++      "sha256": "68ff62d52f84891ba3fa4fbdb7a6212e38b0d430c4d05e59a5709302b74cf683"
++    },
++    {
++      "name": "_ZN3irr2os5Timer4tickEv",
++      "elf_address": "0x0042b054",
++      "thumb": true,
++      "size": 24,
++      "sha256": "90d074a34fb8cbd249c4cecc9e10a718910b5e98323a1a140043ace815826982"
++    }
++  ],
++  "ghidra_rebase_offset": "0x00010000",
++  "note": "Reference identity only. Original ARM was inspected, not executed. No original code bytes are included."
++}
+diff --git a/src/app/Application.cpp b/src/app/Application.cpp
+index e2f2e28..7f0a0c4 100644
+--- a/src/app/Application.cpp
++++ b/src/app/Application.cpp
+@@ -137,6 +137,9 @@ struct RuntimeCheckPointSnapshot {
+ } // namespace
+ 
+ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
++    // PC counterpart of the device's virtual Timer epoch. Do not derive
++    // getTime from the capped simulation backlog or the slow-motion delta.
++    const auto deviceTimerEpoch = std::chrono::steady_clock::now();
+     gAutoplayDiagnostics = nullptr;
+     gShowErrorDialogs = !options.autoplayScript.has_value();
+     std::optional<diagnostics::AutoplayHarness> autoplay;
+@@ -1618,8 +1621,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+         }
+         wallWebSounds_.emplace(id, std::move(clip));
+     }
+-    constexpr std::array<std::uint16_t, 3> hostageVoxSoundIds{
+-        0x18b, 0xa3, 0xa5};
++    constexpr std::array<std::uint16_t, 6> hostageVoxSoundIds{
++        0x18b, 0xa3, 0xa5, 0x188, 0x189, 0x18a};
+     for (const std::uint16_t voxSoundId : hostageVoxSoundIds) {
+         const audio::VoxSoundRecord* record = voxSounds_.find(voxSoundId);
+         if (record == nullptr) {
+@@ -1972,7 +1975,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             return saveResult;
+         };
+     gameplayCinematics_.bind(levelOne_.cinematics());
+-    quickTimeEvent_.bind(levelOne_.buttonConfigs());
++    quickTimeEvent_.bind(levelOne_.buttonConfigs(), levelOne_.hud().interfaceAtlas, &nativeRandomizer_);
+     cinematicUi_.bind(levelOne_.textCatalog());
+     result = deathConfirmationRuntime_.bind(levelOne_.textCatalog());
+     if (!result) {
+@@ -2171,7 +2174,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             deathConfirmationRuntime_.reset();
+             exitMenuRuntime_.reset();
+             gameplayCinematics_.bind(levelOne_.cinematics());
+-            quickTimeEvent_.bind(levelOne_.buttonConfigs());
++            quickTimeEvent_.bind(levelOne_.buttonConfigs(), levelOne_.hud().interfaceAtlas, &nativeRandomizer_);
+             cinematicUi_.bind(levelOne_.textCatalog());
+             levelCinematicRuntime_.resetTransientForCheckPointLoad();
+             enemyRuntime_.resetTransientForCheckPointLoad();
+@@ -2380,6 +2383,44 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+         }
+         return startResult;
+     };
++    const auto applyQteEffects = [&]() -> Result {
++        const auto playCues = [&](const std::vector<std::uint16_t>& cues) -> Result {
++            for (const auto soundId : cues) {
++                const auto* record = voxSounds_.find(soundId);
++                const auto clip = hostageSounds_.find(soundId);
++                if (!record || clip == hostageSounds_.end()) {
++                    return Result::failure("QTE cue has no preloaded original sound");
++                }
++                Result soundResult = playAudio(clip->second, false, record->eventName);
++                if (!soundResult) { return soundResult; }
++            }
++            return Result::success();
++        };
++        Result effects = playCues(hostageRuntime_.consumeQuickTimeSoundCues());
++        if (effects) { effects = playCues(quickTimeEvent_.consumeSoundCues()); }
++        const bool hostageEnded = hostageRuntime_.consumeControlRelease();
++        const bool cinematicEnded = quickTimeEvent_.consumeControlRelease();
++        if (hostageEnded || cinematicEnded) { levelCinematicRuntime_.endQuickTimeEvent(); }
++        return effects;
++    };
++    const auto handleQteCinematic = [&]() -> Result {
++        const Result effects = applyQteEffects();
++        if (!effects) { return effects; }
++        if (const auto qteCinematic = quickTimeEvent_.consumeCinematicRequest()) {
++            const std::int32_t sourceId = quickTimeEvent_.sourceCinematicId();
++            if (const auto* source = gameplayCinematics_.playback(sourceId)) {
++                releaseGameplayCollada(*source->asset, source->elapsedMilliseconds);
++                gameplayCinematics_.remove(sourceId);
++                if (autoplay) {
++                    autoplay->recordEvent(traceTimeMilliseconds, "qte_cinematic_handoff",
++                        "source=" + std::to_string(sourceId) +
++                        ";outcome=" + std::to_string(*qteCinematic));
++                }
++            }
++            return startGameplayCinematic(*qteCinematic);
++        }
++        return Result::success();
++    };
+     if (!hasIntroCinematic && levelOne_.player().linkedCinematicId >= 0) {
+         // Later levels author their opening as an ordinary CFF cinematic
+         // graph (camera-thread ChangeCamera commands) rather than Level 1's
+@@ -2413,6 +2454,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+     std::uint64_t previousNativeTickBucket = nativeTickBucket(introStart);
+     std::uint64_t pendingNativeTickBucket = previousNativeTickBucket;
+     std::uint32_t pendingNativeUpdates = 0;
++    std::uint32_t nativeTimerMilliseconds = 0;
+     const auto playGameplaySound =
+         [&playAudio](std::int16_t, std::string_view eventName,
+                      const audio::PcmAudio& clip, bool loop) {
+@@ -2576,6 +2618,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+         if (autoplay) {
+             realDeltaMilliseconds = autoplay->fixedStepMilliseconds();
+             syntheticElapsedMilliseconds += realDeltaMilliseconds;
++            nativeTimerMilliseconds = static_cast<std::uint32_t>(
++                syntheticElapsedMilliseconds);
+         } else {
+             if (pendingNativeUpdates == 0) {
+                 auto frameTime = std::chrono::steady_clock::now();
+@@ -2601,6 +2645,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                     std::min<std::uint64_t>(
+                         currentTickBucket - previousNativeTickBucket, 2U));
+                 pendingNativeTickBucket = currentTickBucket;
++                // irr::os::Timer::tick is outside Application's capped
++                // inner loop: both catch-up updates read this same sample.
++                nativeTimerMilliseconds = static_cast<std::uint32_t>(
++                    std::chrono::duration_cast<std::chrono::milliseconds>(
++                        frameTime - deviceTimerEpoch).count());
+             }
+ 
+             --pendingNativeUpdates;
+@@ -3984,13 +4033,17 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                 wallWebLoopSoundId_ = -1;
+                 if (!result) { return fail(result.message()); }
+             }
+-            result = hostageRuntime_.update(
+-                gameplayPlayer_, objectRuntime_, levelBonusRuntime_,
+-                {gameDeltaMilliseconds, realDeltaMilliseconds},
+-                {rescuePressed, hostageQuickTimePressed});
++            if (!modalTutorialActive) {
++                result = hostageRuntime_.updateObjects(
++                    gameplayPlayer_, objectRuntime_, levelBonusRuntime_,
++                    {gameDeltaMilliseconds, realDeltaMilliseconds,
++                     nativeTimerMilliseconds}, rescuePressed);
++            }
+             if (!result) {
+                 return fail(result.message());
+             }
++            result = applyQteEffects(); // ForceFailQTE sound precedes CHostage's loop stop.
++            if (!result) { return fail(result.message()); }
+             for (const game::HostageSoundCue& cue :
+                  hostageRuntime_.consumeSoundCues()) {
+                 const audio::VoxSoundRecord* record =
+@@ -4737,7 +4790,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                     [this, &commandResult, &cinematicDamageApplied,
+                      &playSpatialSound, &autoplay, &traceTimeMilliseconds,
+                      &playNamedAudio, &stopNamedAudio,
+-                     &saveCinematicCheckPoint](
++                     &saveCinematicCheckPoint, &nativeTimerMilliseconds,
++                     &realDeltaMilliseconds](
+                         const game::LevelCinematicAsset& cinematic,
+                         const game::CinematicThread& thread,
+                         const game::CinematicCommand& command) {
+@@ -4889,7 +4943,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                         if (commandResult) {
+                             commandResult =
+                                 quickTimeEvent_.applyCommand(
+-                                    command, cinematic.objectId);
++                                    command,
++                                    {nativeTimerMilliseconds, realDeltaMilliseconds},
++                                    cinematic.objectId);
+                         }
+                         if (commandResult) {
+                             commandResult = levelCinematicRuntime_.applyCommand(
+@@ -4983,28 +5039,27 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             if (result) {
+                 result = dispatchObjectEvents();
+             }
+-            quickTimeEvent_.update(
+-                gameDeltaMilliseconds,
+-                autoplay ? autoplayInput.quickTimeEventPressed
+-                         : keyRouter_.state().quickTimeEvent.pressed);
+-            if (const auto qteCinematic =
+-                    quickTimeEvent_.consumeCinematicRequest()) {
+-                levelCinematicRuntime_.endQuickTimeEvent();
+-                const std::int32_t sourceId =
+-                    quickTimeEvent_.sourceCinematicId();
+-                if (const auto* source = gameplayCinematics_.playback(sourceId)) {
+-                    releaseGameplayCollada(*source->asset,
+-                                           source->elapsedMilliseconds);
+-                    gameplayCinematics_.remove(sourceId);
+-                    if (autoplay) {
+-                        autoplay->recordEvent(
+-                            traceTimeMilliseconds, "qte_cinematic_handoff",
+-                            "source=" + std::to_string(sourceId) +
+-                                ";outcome=" + std::to_string(*qteCinematic));
+-                    }
+-                }
+-                result = startGameplayCinematic(*qteCinematic);
++            if (!result) { return fail(result.message()); }
++            hostageRuntime_.updateQuickTime(
++                {nativeTimerMilliseconds, realDeltaMilliseconds},
++                hostageQuickTimePressed);
++            game::QteInput cinematicQteInput;
++            if (autoplay) {
++                // qte_tap is still a tap; it no longer forces drag success.
++                // Automatic gestures traverse original samples explicitly.
++                cinematicQteInput = autoplay->quickTimeInput(
++                    quickTimeEvent_, autoplayInput.quickTimeEventPressed);
++            } else {
++                const auto& action = keyRouter_.state().quickTimeEvent;
++                const auto stick = controller_.leftStick();
++                cinematicQteInput = qteGamepad_.translate(
++                    quickTimeEvent_, controller_.connected(), action.pressed,
++                    action.held, action.released, stick.x, stick.y);
+             }
++            quickTimeEvent_.update(
++                {nativeTimerMilliseconds, realDeltaMilliseconds}, cinematicQteInput);
++            result = handleQteCinematic();
++            if (!result) { return fail(result.message()); }
+             if (!gameplayPlayer_.dead() &&
+                 !gameplayCinematics_.hasActiveColladaPlayback()) {
+                 enemyRuntime_.updateGameplay(gameDeltaMilliseconds,
+@@ -5846,7 +5901,18 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+         if (result) {
+             game::CinematicUiFrame uiFrame = cinematicUi_.frame(
+                 qteVisible, qteProgress);
+-            if (hostageRuntime_.quickTimeActive() &&
++            if (quickTimeEvent_.state() == game::QteState::Drag &&
++                !uiFrame.messagePanelVisible) {
++                const auto& path = quickTimeEvent_.gesturePath();
++                const auto start = path.start(), end = path.end();
++                uiFrame.text = path.horizontal()
++                    ? (end.x > start.x ? u"Hold [A] + left stick RIGHT" : u"Hold [A] + left stick LEFT")
++                    : (end.y > start.y ? u"Hold [A] + left stick DOWN" : u"Hold [A] + left stick UP");
++                uiFrame.textVisible = true;
++                uiFrame.tutorialPanelVisible = true;
++                uiFrame.tutorialButton = -1;
++                uiFrame.dimBackground = false;
++            } else if (hostageRuntime_.quickTimeActive() &&
+                 !uiFrame.messagePanelVisible) {
+                 uiFrame.text = u"Press [A]";
+                 uiFrame.textVisible = true;
+@@ -5925,6 +5991,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             presentThisFrame = true;
+         }
+         if (presentThisFrame) {
++            quickTimeEvent_.drawStep();
++            result = handleQteCinematic();
++            if (!result) { return fail(result.message()); }
+             renderer_.renderFrame();
+         }
+         if (autoplay) {
+diff --git a/src/app/Application.hpp b/src/app/Application.hpp
+index 258c9f6..00062a7 100644
+--- a/src/app/Application.hpp
++++ b/src/app/Application.hpp
+@@ -35,6 +35,7 @@
+ #include "game/LevelOneBootstrap.hpp"
+ #include "game/PlayerHudHealthState.hpp"
+ #include "game/PlayerStateConfig.hpp"
++#include "platform/input/QteGamepadAdapter.hpp"
+ #include "platform/windows/Window.hpp"
+ #include "platform/windows/XInputController.hpp"
+ #include "reconstructed/input/XperiaKeyRouter.hpp"
+@@ -64,6 +65,7 @@ public:
+ private:
+     platform::Window window_;
+     platform::XInputController controller_;
++    platform::QteGamepadAdapter qteGamepad_;
+     reconstructed::XperiaKeyRouter keyRouter_;
+     game::LevelOneBootstrap levelOne_;
+     renderer::D3D11Renderer renderer_;
+diff --git a/src/diagnostics/AutoplayHarness.cpp b/src/diagnostics/AutoplayHarness.cpp
+index 2ba16fd..3a781e5 100644
+--- a/src/diagnostics/AutoplayHarness.cpp
++++ b/src/diagnostics/AutoplayHarness.cpp
+@@ -5208,4 +5208,21 @@ std::string AutoplayHarness::csv(std::string_view value) {
+     return result;
+ }
+ 
++game::QteInput AutoplayHarness::quickTimeInput(
++    const game::QuickTimeEventRuntime& runtime, bool actionPressed) noexcept {
++    game::QteInput input{actionPressed, std::nullopt, false};
++    if (qteGestureGeneration_ != runtime.generation()) {
++        qteGestureGeneration_ = runtime.generation(); qteGestureSample_ = 0;
++    }
++    if (!autoQuickTimeActions_ || runtime.state() != game::QteState::Drag) {
++        return input;
++    }
++    const auto path = runtime.gesturePath().samples();
++    if (!path.empty()) {
++        input.dragPosition = path[std::min(qteGestureSample_, path.size() - 1)];
++        if (qteGestureSample_ < path.size()) { ++qteGestureSample_; }
++    }
++    return input;
++}
++
+ } // namespace usm::diagnostics
+diff --git a/src/diagnostics/AutoplayHarness.hpp b/src/diagnostics/AutoplayHarness.hpp
+index 4594a90..c678b4a 100644
+--- a/src/diagnostics/AutoplayHarness.hpp
++++ b/src/diagnostics/AutoplayHarness.hpp
+@@ -13,6 +13,7 @@
+ #include "game/LevelObjectRuntime.hpp"
+ #include "game/LevelOneBootstrap.hpp"
+ #include "game/PlayerStateConfig.hpp"
++#include "game/QuickTimeEventRuntime.hpp"
+ 
+ #include <cstdint>
+ #include <filesystem>
+@@ -180,6 +181,8 @@ public:
+                                     const std::filesystem::path& outputPath);
+     [[nodiscard]] AutoplayFrameInput update(
+         const AutoplaySnapshot& snapshot);
++    [[nodiscard]] game::QteInput quickTimeInput(
++        const game::QuickTimeEventRuntime& runtime, bool actionPressed) noexcept;
+     void recordFrame(const AutoplaySnapshot& snapshot);
+     void recordEvent(std::uint64_t timeMilliseconds, std::string_view type,
+                      std::string_view detail);
+@@ -233,6 +236,8 @@ public:
+     }
+ 
+ private:
++    std::uint64_t qteGestureGeneration_{};
++    std::size_t qteGestureSample_{};
+     enum class StepKind {
+         WaitGameplay,
+         WaitIntro,
+diff --git a/src/game/ButtonMashProgress.hpp b/src/game/ButtonMashProgress.hpp
+index 7411b69..4b42e6e 100644
+--- a/src/game/ButtonMashProgress.hpp
++++ b/src/game/ButtonMashProgress.hpp
+@@ -10,7 +10,11 @@ namespace usm::game {
+ // without a tap. This timer is separate from the whole prompt's timeout.
+ class ButtonMashProgress final {
+ public:
+-    void reset() noexcept { completed_ = 0; idleMilliseconds_ = 0; }
++    void reset() noexcept {
++        completed_ = 0;
++        idleMilliseconds_ = 0;
++        managerIdleMilliseconds_ = 0.0F;
++    }
+ 
+     [[nodiscard]] bool update(std::uint32_t elapsedMilliseconds,
+                               bool actionPressed, std::int16_t required,
+@@ -35,11 +39,38 @@ public:
+         return false;
+     }
+ 
++    // CQTEManager state 2 does not return early after CheckSuccess: its
++    // float idle timer still advances, can restore one action, and is then
++    // followed by IsOutTime. Keep that ordering in the manager callers.
++    // Legacy wall-web/QTEAction callers remain on update() until their
++    // complete caller/manager split has been audited.
++    [[nodiscard]] bool updateManager(std::uint32_t realMilliseconds,
++                                     bool actionPressed, std::int16_t required,
++                                     bool decays) noexcept {
++        const auto count = std::max<std::int16_t>(required, 1);
++        bool succeeded = false;
++        if (actionPressed) {
++            completed_ = static_cast<std::int16_t>(
++                std::min<int>(count, static_cast<int>(completed_) + 1));
++            managerIdleMilliseconds_ = 0.0F;
++            succeeded = completed_ >= count;
++        }
++        if (decays) {
++            managerIdleMilliseconds_ += static_cast<float>(realMilliseconds);
++            if (managerIdleMilliseconds_ >= 500.0F && completed_ > 0) {
++                --completed_;
++                managerIdleMilliseconds_ = 0.0F;
++            }
++        }
++        return succeeded;
++    }
++
+     [[nodiscard]] std::int16_t completed() const noexcept { return completed_; }
+ 
+ private:
+     std::int16_t completed_{};
+     std::uint32_t idleMilliseconds_{};
++    float managerIdleMilliseconds_{};
+ };
+ 
+ } // namespace usm::game
+diff --git a/src/game/GameplayPlayer.hpp b/src/game/GameplayPlayer.hpp
+index 95e3a09..68ec810 100644
+--- a/src/game/GameplayPlayer.hpp
++++ b/src/game/GameplayPlayer.hpp
+@@ -409,6 +409,11 @@ public:
+         return completedComboHitCount_;
+     }
+     [[nodiscard]] bool dead() const noexcept { return health_ <= 0.0F; }
++    // Player::IsUltimate(-1), ELF 0x0033002c: inclusive state IDs 107..113.
++    [[nodiscard]] bool isUltimateState() const noexcept {
++        const auto state = activeStateId();
++        return state >= 107 && state <= 113;
++    }
+     [[nodiscard]] bool cinematicDriven() const noexcept {
+         return cinematicDriven_;
+     }
+diff --git a/src/game/HostageAttributes.hpp b/src/game/HostageAttributes.hpp
+new file mode 100644
+index 0000000..f7b1513
+--- /dev/null
++++ b/src/game/HostageAttributes.hpp
+@@ -0,0 +1,13 @@
++#pragma once
++
++namespace usm::game {
++
++// CHostage ctor (ELF 0x00328c20): default +0x36c = 85.0f.
++// ProcessUserAttr (0x0032891e..0x00328938): VFP GT, subtract 100 only
++// for a positive authored value. The shipped -1 sentinel keeps 85;
++// it is not converted to -101 (below the character).
++[[nodiscard]] constexpr float hostageButtonHeight(float authored) noexcept {
++    return authored > 0.0F ? authored - 100.0F : 85.0F;
++}
++
++} // namespace usm::game
+diff --git a/src/game/LevelCinematicRuntime.cpp b/src/game/LevelCinematicRuntime.cpp
+index a8894e1..254e69e 100644
+--- a/src/game/LevelCinematicRuntime.cpp
++++ b/src/game/LevelCinematicRuntime.cpp
+@@ -779,7 +779,8 @@ void LevelCinematicRuntime::setColladaMovieUi(bool active) noexcept {
+ 
+ void LevelCinematicRuntime::endQuickTimeEvent() noexcept {
+     // CQTEManager::EndQTE (0x0038a5b0) calls
+-    // CLevel::EnableControls(true, false) after the QTE feedback state ends.
++    // CLevel::EnableControls(true, false) on entry to feedback state 3/4,
++    // before the later outcome cinematic dispatch from state 5/6.
+     // That path does not rewrite the independently authored presentation
+     // flags from InterfaceControl.
+     controlsEnabled_ = true;
+diff --git a/src/game/LevelHostageRuntime.cpp b/src/game/LevelHostageRuntime.cpp
+index 23ed77c..c07e806 100644
+--- a/src/game/LevelHostageRuntime.cpp
++++ b/src/game/LevelHostageRuntime.cpp
+@@ -3,6 +3,7 @@
+ #include <algorithm>
+ #include <cmath>
+ #include <limits>
++#include <utility>
+ 
+ namespace usm::game {
+ namespace {
+@@ -28,10 +29,14 @@ Result LevelHostageRuntime::initialize(const LevelOneBootstrap& level,
+                                        LevelObjectRuntime* objects) {
+     states_.clear();
+     soundCues_.clear();
++    quickTimeSoundCues_.clear();
++    quickTimeControlRelease_ = false;
+     quickTimeConfig_ = level.buttonConfigs().find(11);
+     if (quickTimeConfig_ == nullptr ||
+         quickTimeConfig_->durationMilliseconds <= 0.0F ||
+-        !std::isfinite(quickTimeConfig_->durationMilliseconds)) {
++        !std::isfinite(quickTimeConfig_->durationMilliseconds) ||
++        static_cast<double>(quickTimeConfig_->durationMilliseconds) >
++            static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
+         return Result::failure(
+             "Hostage rescue QTE button config 11 is invalid");
+     }
+@@ -53,8 +58,8 @@ Result LevelHostageRuntime::initialize(const LevelOneBootstrap& level,
+         LevelHostageState state;
+         state.asset = &object;
+         state.quickTimeDurationMilliseconds =
+-            static_cast<std::uint32_t>(std::lround(
+-                quickTimeConfig_->durationMilliseconds));
++            static_cast<std::uint32_t>(std::round(
++                static_cast<double>(quickTimeConfig_->durationMilliseconds)));
+         state.requiredActions = std::max<std::int16_t>(
+             1, quickTimeConfig_->requiredActionCount);
+         states_.push_back(state);
+@@ -75,6 +80,20 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                                    LevelBonusRuntime& bonuses,
+                                    HostageTimeStep time,
+                                    HostageInput input) {
++    const Result result = updateObjects(player, objects, bonuses, time,
++                                        input.rescueRequested);
++    if (result) {
++        updateQuickTime({time.timerMilliseconds, time.realMilliseconds},
++                        input.quickTimeActionPressed);
++    }
++    return result;
++}
++
++Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
++                                          LevelObjectRuntime& objects,
++                                          LevelBonusRuntime& bonuses,
++                                          HostageTimeStep time,
++                                          bool rescueRequested) {
+     const std::uint32_t elapsedMilliseconds = time.simulationMilliseconds;
+     for (LevelHostageState& hostage : states_) {
+         if (hostage.asset == nullptr) {
+@@ -88,13 +107,18 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+         const LevelObjectState* object =
+             objects.find(hostage.asset->objectId);
+         const bool visible = object != nullptr && object->visible;
++        if (!visible) {
++            hostage.promptVisible = false;
++            continue;
++        }
+         hostage.promptVisible =
+             hostage.phase == HostageRescuePhase::Tied && visible &&
+-            !player.airborne() && playerInsideEnableRadius(hostage, player);
++            !player.airborne() && !player.isUltimateState() &&
++            playerInsideEnableRadius(hostage, player);
+ 
+         switch (hostage.phase) {
+         case HostageRescuePhase::Tied:
+-            if (hostage.promptVisible && input.rescueRequested) {
++            if (hostage.promptVisible && rescueRequested) {
+                 const assets::Vector3 direction{
+                     hostage.asset->position.x - player.position().x,
+                     hostage.asset->position.y - player.position().y, 0.0F};
+@@ -106,6 +130,7 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                 hostage.phase = HostageRescuePhase::RescueStart;
+                 hostage.phaseElapsedMilliseconds = 0;
+                 hostage.promptVisible = false;
++                rescueRequested = false; // The native global is consumed once.
+             }
+             break;
+         case HostageRescuePhase::RescueStart:
+@@ -115,7 +140,10 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                 if (!result) {
+                     return result;
+                 }
+-            } else if (player.scriptedStateAnimationFinished()) {
++            }
++            // Native checks the animation even after resetting an interrupted
++            // hostage. Do not collapse these independent checks into else-if.
++            if (player.scriptedStateAnimationFinished()) {
+                 Result result = player.enterScriptedState(
+                     kRescueQuickTimePlayerState, true);
+                 if (!result) {
+@@ -126,65 +154,81 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                 hostage.quickTimeElapsedMilliseconds = 0;
+                 hostage.completedActions = 0;
+                 hostage.buttonProgress.reset();
+-                soundCues_.push_back({hostage.asset->objectId,
+-                                      kRescueCuttingLoopSound,
+-                                      HostageSoundAction::StartLoop});
++                hostage.quickTimeClock.begin(time.timerMilliseconds);
++                hostage.quickTimeOutcome = HostageQteOutcome::Running;
++                hostage.cuttingLoopRequested = false;
+             }
+             break;
+         case HostageRescuePhase::QuickTime: {
+-            // Existing timeout bookkeeping remains separate from mash idle.
+-            // RE01 follow-up: native IsOutTime (ELF 0x0037a4b8) uses an
+-            // absolute, pause-adjusted irr::os::Timer and strict > duration.
+-            // Do not confuse fixing GetRealTs below with timeout parity.
+-            hostage.quickTimeElapsedMilliseconds =
+-                static_cast<std::uint32_t>(std::min<std::uint64_t>(
+-                    static_cast<std::uint64_t>(
+-                        hostage.quickTimeElapsedMilliseconds) +
+-                        elapsedMilliseconds,
+-                    hostage.quickTimeDurationMilliseconds));
+-            // CQTEManager::Update, ELF 0x0037b240 (Ghidra 0x0038b240),
+-            // state 2: ignore rescue requests; consume Cross once, and
+-            // restore one remaining action after 500 ms without a tap.
+-            // Use the shipped interaction type, not a new rescue-specific
+-            // count or timer. This is also used by cinematic QTEs.
+-            const bool succeeded = hostage.buttonProgress.update(
+-                time.realMilliseconds, input.quickTimeActionPressed,
+-                hostage.requiredActions,
+-                quickTimeConfig_ != nullptr &&
+-                    quickTimeConfig_->interactionType == 3);
+-            hostage.completedActions = hostage.buttonProgress.completed();
+-            if (succeeded) {
++            // CHostage::Update reads the previous CQTEManager result/count.
++            // A final tap or timeout in this update is observed on the next
++            // object update, not eagerly inside the button-input operation.
++            const bool succeeded =
++                hostage.quickTimeOutcome == HostageQteOutcome::Success;
++            const bool failed =
++                hostage.quickTimeOutcome == HostageQteOutcome::Failure;
++            if (succeeded || failed) {
+                 soundCues_.push_back({hostage.asset->objectId,
+                                       kRescueCuttingLoopSound,
+                                       HostageSoundAction::StopLoop});
+-                Result result = player.enterScriptedState(
+-                    kRescueEndPlayerState, false);
+-                if (!result) {
+-                    return result;
++                hostage.cuttingLoopRequested = false;
++                if (succeeded) {
++                    Result result = player.enterScriptedState(
++                        kRescueEndPlayerState, false);
++                    if (!result) { return result; }
++                    hostage.phase = HostageRescuePhase::RescueEnd;
++                    hostage.phaseElapsedMilliseconds = 0;
++                } else {
++                    player.clearScriptedState(); // Native requests idle here.
++                    Result result = setPhase(hostage, HostageRescuePhase::Tied,
++                                             player, objects, bonuses);
++                    if (!result) { return result; }
+                 }
+-                hostage.phase = HostageRescuePhase::RescueEnd;
+-                hostage.phaseElapsedMilliseconds = 0;
+-            } else if (hostage.quickTimeElapsedMilliseconds >=
+-                       hostage.quickTimeDurationMilliseconds) {
++            } else if (player.activeStateId() != kRescueQuickTimePlayerState) {
++                // An interrupted rescue fails; it must not replace the
++                // interrupting player state with idle or grant rescue rewards.
++                hostage.quickTimeOutcome = HostageQteOutcome::Failure;
++                quickTimeSoundCues_.push_back(0x189); // ForceFailQTE -> SetState(4)
++                quickTimeControlRelease_ = true;
+                 soundCues_.push_back({hostage.asset->objectId,
+                                       kRescueCuttingLoopSound,
+                                       HostageSoundAction::StopLoop});
++                hostage.cuttingLoopRequested = false;
+                 Result result = setPhase(hostage, HostageRescuePhase::Tied,
+                                          player, objects, bonuses);
+-                if (!result) {
+-                    return result;
+-                }
++                if (!result) { return result; }
++            } else if (hostage.requiredActions - hostage.completedActions == 7 &&
++                       !hostage.cuttingLoopRequested) {
++                // ELF 0x0032844c compares remaining actions to literal 7.
++                // It does not start this loop at QTE entry, or for any
++                // arbitrary nonzero progress. Subsequent counts keep it on.
++                soundCues_.push_back({hostage.asset->objectId,
++                                      kRescueCuttingLoopSound,
++                                      HostageSoundAction::StartLoop});
++                hostage.cuttingLoopRequested = true;
+             }
+             break;
+         }
+         case HostageRescuePhase::RescueEnd:
+-            if (player.activeStateId() != kRescueEndPlayerState ||
+-                player.scriptedStateAnimationFinished()) {
+-                player.clearScriptedState();
+-                Result result = setPhase(hostage, HostageRescuePhase::Release,
++            // Native calls Stop(0x18b) each state-3 object update. Repeated
++            // stop requests are intentional and have no new gameplay effect.
++            soundCues_.push_back({hostage.asset->objectId,
++                                  kRescueCuttingLoopSound,
++                                  HostageSoundAction::StopLoop});
++            if (player.activeStateId() != kRescueEndPlayerState) {
++                Result result = setPhase(hostage, HostageRescuePhase::Tied,
+                                          player, objects, bonuses);
+-                if (!result) {
+-                    return result;
++                if (!result) { return result; }
++            }
++            if (player.scriptedStateAnimationFinished()) {
++                player.clearScriptedState();
++                // OnExitState(0) prevents a freshly reset, still-animating
++                // tied hostage from entering release after an interruption.
++                if (hostage.phase != HostageRescuePhase::Tied ||
++                    objects.animationFinished(hostage.asset->objectId)) {
++                    Result result = setPhase(hostage, HostageRescuePhase::Release,
++                                             player, objects, bonuses);
++                    if (!result) { return result; }
+                 }
+             }
+             break;
+@@ -214,13 +258,59 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+     return Result::success();
+ }
+ 
++void LevelHostageRuntime::updateQuickTime(QteTimeStep time,
++                                          bool actionPressed) noexcept {
++    for (LevelHostageState& hostage : states_) {
++        if (hostage.phase != HostageRescuePhase::QuickTime ||
++            hostage.quickTimeOutcome != HostageQteOutcome::Running ||
++            quickTimeConfig_ == nullptr) {
++            continue;
++        }
++        hostage.quickTimeElapsedMilliseconds =
++            hostage.quickTimeClock.displayElapsed(
++                time.timerMilliseconds, quickTimeConfig_->durationMilliseconds);
++        if (actionPressed) { quickTimeSoundCues_.push_back(0x18a); }
++        const bool succeeded = hostage.buttonProgress.updateManager(
++            time.realMilliseconds, actionPressed, hostage.requiredActions,
++            quickTimeConfig_->interactionType == 3);
++        actionPressed = false; // CQTEManager consumes the Cross flag once.
++        hostage.completedActions = hostage.buttonProgress.completed();
++        if (succeeded) {
++            quickTimeSoundCues_.push_back(0x188);
++            quickTimeControlRelease_ = true;
++        }
++        if (hostage.quickTimeClock.expired(
++                time.timerMilliseconds, quickTimeConfig_->durationMilliseconds)) {
++            quickTimeSoundCues_.push_back(0x189);
++            quickTimeControlRelease_ = true;
++            hostage.quickTimeOutcome = HostageQteOutcome::Failure;
++        } else if (succeeded) {
++            hostage.quickTimeOutcome = HostageQteOutcome::Success;
++        }
++    }
++}
++
++std::vector<std::uint16_t> LevelHostageRuntime::consumeQuickTimeSoundCues() noexcept {
++    return std::exchange(quickTimeSoundCues_, {});
++}
++bool LevelHostageRuntime::consumeControlRelease() noexcept {
++    return std::exchange(quickTimeControlRelease_, false);
++}
++
++void LevelHostageRuntime::setPause(bool paused,
++                                  std::uint32_t timerMilliseconds) noexcept {
++    for (auto& hostage : states_) {
++        hostage.quickTimeClock.setPause(paused, timerMilliseconds);
++    }
++}
++
+ bool LevelHostageRuntime::canStartRescue(
+     const GameplayPlayer& player) const noexcept {
+     return std::any_of(states_.begin(), states_.end(),
+                        [&player, this](const LevelHostageState& hostage) {
+                            return hostage.phase == HostageRescuePhase::Tied &&
+                                   hostage.promptVisible &&
+-                                  !player.airborne() &&
++                                  !player.airborne() && !player.isUltimateState() &&
+                                   playerInsideEnableRadius(hostage, player);
+                        });
+ }
+@@ -294,7 +384,10 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+     hostage.promptVisible = false;
+     switch (phase) {
+     case HostageRescuePhase::Tied:
+-        player.clearScriptedState();
++        // CHostage::SetState(0) changes the hostage, not the player. Only
++        // branches with an evidenced Player::SetNextStateId(0) clear it.
++        hostage.quickTimeOutcome = HostageQteOutcome::Inactive;
++        hostage.cuttingLoopRequested = false;
+         hostage.quickTimeElapsedMilliseconds = 0;
+         hostage.completedActions = 0;
+         hostage.buttonProgress.reset();
+diff --git a/src/game/LevelHostageRuntime.hpp b/src/game/LevelHostageRuntime.hpp
+index 7c10778..57681b8 100644
+--- a/src/game/LevelHostageRuntime.hpp
++++ b/src/game/LevelHostageRuntime.hpp
+@@ -2,6 +2,7 @@
+ 
+ #include "core/Result.hpp"
+ #include "game/ButtonMashProgress.hpp"
++#include "game/QteClock.hpp"
+ #include "game/GameplayPlayer.hpp"
+ #include "game/LevelBonusRuntime.hpp"
+ #include "game/LevelObjectRuntime.hpp"
+@@ -41,8 +42,15 @@ struct HostageSoundCue {
+ // The mash-idle timer reads Application::GetRealTs, not the scaled
+ // simulation delta. Keep the two clocks explicit at the call boundary.
+ struct HostageTimeStep {
+-    std::uint32_t simulationMilliseconds{};
+-    std::uint32_t realMilliseconds{};
++    std::uint32_t simulationMilliseconds;
++    std::uint32_t realMilliseconds;
++    std::uint32_t timerMilliseconds;
++
++    HostageTimeStep(std::uint32_t simulation, std::uint32_t real,
++                    std::uint32_t timer) noexcept
++        : simulationMilliseconds(simulation), realMilliseconds(real),
++          timerMilliseconds(timer) {}
++
+ };
+ 
+ struct HostageInput {
+@@ -50,6 +58,8 @@ struct HostageInput {
+     bool quickTimeActionPressed{};
+ };
+ 
++enum class HostageQteOutcome { Inactive, Running, Success, Failure };
++
+ struct LevelHostageState {
+     const LevelObjectAsset* asset{};
+     HostageRescuePhase phase{HostageRescuePhase::Tied};
+@@ -60,10 +70,13 @@ struct LevelHostageState {
+     std::int16_t requiredActions{1};
+     bool promptVisible{};
+     ButtonMashProgress buttonProgress;
++    QteClock quickTimeClock;
++    HostageQteOutcome quickTimeOutcome{HostageQteOutcome::Inactive};
++    bool cuttingLoopRequested{};
+ };
+ 
+ // Portable reconstruction of CHostage::Update/OnEnterState/OnExitState at
+-// 0x00338068, 0x00337de4, and 0x00337d98. The seven native states own the
++// ELF 0x00328068, 0x00327de4, and 0x00327d98 (+0x10000 in supplied Ghidra). The seven native states own the
+ // player rescue clips, button-config 11 QTE, hostage animation sequence, and
+ // health/skill reward-orb creation.
+ class LevelHostageRuntime final {
+@@ -76,6 +89,21 @@ public:
+                                 HostageTimeStep time,
+                                 HostageInput input);
+ 
++    // CLevel::Update (ELF 0x003720bc) advances hostage objects before the
++    // QTE manager. The Windows loop uses these two explicit phases. update()
++    // is a composed object-then-manager step for portable fixtures.
++    [[nodiscard]] Result updateObjects(GameplayPlayer& player,
++                                       LevelObjectRuntime& objects,
++                                       LevelBonusRuntime& bonuses,
++                                       HostageTimeStep time,
++                                       bool rescueRequested);
++    void updateQuickTime(QteTimeStep time, bool actionPressed) noexcept;
++    void setPause(bool paused, std::uint32_t timerMilliseconds) noexcept;
++    // CQTEManager cues are global Play2D events, unlike CHostage's spatial
++    // cutting/thanks voices. They are drained at the manager update stage.
++    [[nodiscard]] std::vector<std::uint16_t> consumeQuickTimeSoundCues() noexcept;
++    [[nodiscard]] bool consumeControlRelease() noexcept;
++
+     [[nodiscard]] bool canStartRescue(
+         const GameplayPlayer& player) const noexcept;
+     [[nodiscard]] bool ownsPlayerControl() const noexcept;
+@@ -88,7 +116,14 @@ public:
+     [[nodiscard]] const LevelHostageState* find(
+         std::int32_t objectId) const noexcept;
+     [[nodiscard]] std::vector<HostageSoundCue> consumeSoundCues();
+-    void clearTransientCues() noexcept { soundCues_.clear(); }
++    void clearTransientCues() noexcept {
++        soundCues_.clear();
++        quickTimeSoundCues_.clear();
++        quickTimeControlRelease_ = false;
++        // Snapshot restoration stops the host audio voices before copying
++        // this runtime. Do not retain a stale "loop is playing" latch.
++        for (auto& state : states_) { state.cuttingLoopRequested = false; }
++    }
+ 
+ private:
+     [[nodiscard]] Result setPhase(LevelHostageState& hostage,
+@@ -103,6 +138,8 @@ private:
+     const ButtonConfigDefinition* quickTimeConfig_{};
+     std::vector<LevelHostageState> states_;
+     std::vector<HostageSoundCue> soundCues_;
++    std::vector<std::uint16_t> quickTimeSoundCues_;
++    bool quickTimeControlRelease_{};
+ };
+ 
+ } // namespace usm::game
+diff --git a/src/game/LevelOneBootstrap.cpp b/src/game/LevelOneBootstrap.cpp
+index dc1528b..7a48b8b 100644
+--- a/src/game/LevelOneBootstrap.cpp
++++ b/src/game/LevelOneBootstrap.cpp
+@@ -1,4 +1,5 @@
+ #include "game/LevelOneBootstrap.hpp"
++#include "game/HostageAttributes.hpp"
+ 
+ #include "filesystem/GbmpArchive.hpp"
+ 
+@@ -1618,12 +1619,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
+                     floatAttribute(node, "HeightAbove", 180.0F);
+                 const float buttonHeight =
+                     floatAttribute(node, "ButtonHeightAbove", 0.0F);
+-                // The native constructor starts at 85. A negative authored
+-                // override is shifted down by another 100 before storage;
+-                // positive/zero values leave the constructor default intact.
+-                if (buttonHeight < 0.0F) {
+-                    object.hostageButtonHeight = buttonHeight - 100.0F;
+-                }
++                object.hostageButtonHeight = hostageButtonHeight(buttonHeight);
+                 object.hostageIsWoman =
+                     asciiLower(objectArchetypes_[archetypeIndex].meshFile)
+                         .find("woman") !=
+diff --git a/src/game/QteClock.hpp b/src/game/QteClock.hpp
+new file mode 100644
+index 0000000..7dff72a
+--- /dev/null
++++ b/src/game/QteClock.hpp
+@@ -0,0 +1,67 @@
++#pragma once
++
++#include <algorithm>
++#include <cstdint>
++#include <limits>
++
++namespace usm::game {
++
++// The two clocks read by CQTEManager::Update are not interchangeable:
++//   Timer::getTime (ELF 0x0042aea0): absolute, shared by catch-up updates;
++//   Application::GetRealTs (0x003ce5d4): unslowed update duration.
++// Neither is the scaled simulation duration. Require both at call sites.
++struct QteTimeStep {
++    std::uint32_t timerMilliseconds;
++    std::uint32_t realMilliseconds;
++};
++
++// Direct reconstruction of CQTEManager::BeginNowQTE / IsOutTime / SetPause
++// (ELF 0x0037aa08 / 0x0037a4b8 / 0x0037a4fc). Keep each native float32
++// conversion and subtraction, including the unusual pause-marker formula.
++// Replacing this with integer elapsed time or conventional accumulated pause
++// duration changes the executable's boundary and long-running-clock behavior.
++class QteClock final {
++public:
++    void begin(std::uint32_t now) noexcept {
++        start_ = static_cast<float>(now);
++        pauseAdjustment_ = 0.0F;
++    }
++
++    void setPause(bool paused, std::uint32_t now) noexcept {
++        if (paused) {
++            // Both getTime calls read the same tick-cached Timer value.
++            const float first = static_cast<float>(now);
++            const float second = static_cast<float>(now);
++            pauseMarker_ = first - (second - start_);
++        } else {
++            pauseAdjustment_ = static_cast<float>(now) - pauseMarker_;
++            pauseMarker_ = 0.0F;
++        }
++    }
++
++    [[nodiscard]] float elapsed(std::uint32_t now) const noexcept {
++        const float sinceStart = static_cast<float>(now) - start_;
++        return sinceStart - pauseAdjustment_;
++    }
++
++    [[nodiscard]] bool expired(std::uint32_t now, float duration) const noexcept {
++        return elapsed(now) > duration; // Native VFP GT, not >=.
++    }
++
++    // Integer diagnostics/HUD only; never used to decide the timeout.
++    [[nodiscard]] std::uint32_t displayElapsed(std::uint32_t now,
++                                             float duration) const noexcept {
++        const double value = std::clamp(static_cast<double>(elapsed(now)), 0.0,
++                                       static_cast<double>(duration));
++        return static_cast<std::uint32_t>(std::min(
++            value, static_cast<double>(std::numeric_limits<std::uint32_t>::max())));
++    }
++
++private:
++    static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
++    float start_{};            // CQTEManager + 0x60
++    float pauseMarker_{};      // + 0x64
++    float pauseAdjustment_{};  // + 0x68
++};
++
++} // namespace usm::game
+diff --git a/src/game/QteGesturePath.cpp b/src/game/QteGesturePath.cpp
+new file mode 100644
+index 0000000..0595bd8
+--- /dev/null
++++ b/src/game/QteGesturePath.cpp
+@@ -0,0 +1,68 @@
++#include "game/QteGesturePath.hpp"
++
++#include <bit>
++#include <cmath>
++#include <cstdlib>
++#include <limits>
++
++namespace usm::game {
++namespace {
++bool coordinate(float base, std::int16_t offset, std::int16_t& out) {
++    const float sum = base + static_cast<float>(offset);
++    // Reject malformed metadata before the float->integer conversion. All
++    // shipped values are representable; native VCVT then SXTH retains low 16.
++    if (!std::isfinite(sum) || static_cast<double>(sum) < -2147483648.0 ||
++        static_cast<double>(sum) >= 2147483648.0) { return false; }
++    const auto word = static_cast<std::int32_t>(sum);
++    out = std::bit_cast<std::int16_t>(static_cast<std::uint16_t>(word));
++    return true;
++}
++}
++Result QteGesturePath::bind(const ButtonConfigDefinition& config,
++                            const assets::SpriteAtlas& atlas) {
++    clear();
++    if (config.interactionType != 1 || config.interactionValue < 11 ||
++        config.interactionValue > 14) {
++        return Result::failure("QTE drag references an unsupported interaction value");
++    }
++    const auto id = static_cast<std::size_t>(config.interactionValue - 9);
++    if (id >= atlas.animations().size()) {
++        return Result::failure("QTE drag animation is missing");
++    }
++    const auto& animation = atlas.animations()[id];
++    const std::size_t first = animation.firstFrameIndex;
++    const std::size_t count = animation.frameCount;
++    if (count == 0 || first + count > atlas.animationFrames().size()) {
++        return Result::failure("QTE drag animation has invalid frame metadata");
++    }
++    samples_.reserve(count);
++    for (std::size_t i = 0; i < count; ++i) {
++        const auto& frame = atlas.animationFrames()[first + i];
++        QtePoint point;
++        if (!coordinate(config.screenX, frame.x, point.x) ||
++            !coordinate(config.screenY, frame.y, point.y)) {
++            clear();
++            return Result::failure("QTE drag contains an invalid coordinate");
++        }
++        samples_.push_back(point);
++    }
++    horizontal_ = config.interactionValue == 11 || config.interactionValue == 12;
++    return Result::success();
++}
++std::size_t QteGesturePath::nearest(QtePoint input) const noexcept {
++    std::size_t best = 0;
++    if (samples_.empty()) { return best; }
++    const int axis = horizontal_ ? input.x : input.y;
++    int bestDistance = std::abs(axis - (horizontal_ ? samples_[0].x : samples_[0].y));
++    for (std::size_t i = 1; i < samples_.size(); ++i) {
++        const int distance = std::abs(axis - (horizontal_ ? samples_[i].x : samples_[i].y));
++        if (distance < bestDistance) { best = i; bestDistance = distance; }
++    }
++    return best;
++}
++bool QteGesturePath::releaseSucceeded(QtePoint input) const noexcept {
++    if (samples_.empty()) { return false; }
++    return std::abs(static_cast<int>(input.x) - end().x) <= 10 &&
++           std::abs(static_cast<int>(input.y) - end().y) <= 10;
++}
++} // namespace usm::game
+diff --git a/src/game/QteGesturePath.hpp b/src/game/QteGesturePath.hpp
+new file mode 100644
+index 0000000..677d0ad
+--- /dev/null
++++ b/src/game/QteGesturePath.hpp
+@@ -0,0 +1,35 @@
++#pragma once
++
++#include "assets/SpriteAtlas.hpp"
++#include "core/Result.hpp"
++#include "game/ButtonConfig.hpp"
++
++#include <cstdint>
++#include <span>
++#include <vector>
++
++namespace usm::game {
++struct QtePoint {
++    std::int16_t x{};
++    std::int16_t y{};
++    bool operator==(const QtePoint&) const = default;
++};
++
++// CQTEManager::CalculateEndPos / UpdateDragState / onEvent, ELF
++// 0x0037a3f8 / 0x0037acd4 / 0x0037abf0. No invented curve or percentage target.
++class QteGesturePath final {
++public:
++    [[nodiscard]] Result bind(const ButtonConfigDefinition& config,
++                              const assets::SpriteAtlas& atlas);
++    void clear() noexcept { samples_.clear(); horizontal_ = false; }
++    [[nodiscard]] std::span<const QtePoint> samples() const noexcept { return samples_; }
++    [[nodiscard]] bool horizontal() const noexcept { return horizontal_; }
++    [[nodiscard]] QtePoint start() const noexcept { return samples_.empty() ? QtePoint{} : samples_.front(); }
++    [[nodiscard]] QtePoint end() const noexcept { return samples_.empty() ? QtePoint{} : samples_.back(); }
++    [[nodiscard]] std::size_t nearest(QtePoint input) const noexcept;
++    [[nodiscard]] bool releaseSucceeded(QtePoint input) const noexcept;
++private:
++    std::vector<QtePoint> samples_;
++    bool horizontal_{};
++};
++} // namespace usm::game
+diff --git a/src/game/QteSpriteAnimation.cpp b/src/game/QteSpriteAnimation.cpp
+new file mode 100644
+index 0000000..e686a08
+--- /dev/null
++++ b/src/game/QteSpriteAnimation.cpp
+@@ -0,0 +1,61 @@
++#include "game/QteSpriteAnimation.hpp"
++#include <bit>
++#include <cmath>
++
++namespace usm::game {
++void QteSpriteAnimation::bind(const assets::SpriteAtlas& atlas) noexcept {
++    atlas_ = &atlas;
++    animationId_ = frameIndex_ = ticks_ = 0;
++    residual_ = 0;
++    looped_ = false;
++}
++void QteSpriteAnimation::restart() noexcept {
++    frameIndex_ = ticks_ = 0;
++    looped_ = false;
++    // CSpriteInstance::Restart deliberately retains the fractional residue.
++}
++void QteSpriteAnimation::setAnimation(std::int16_t id, bool safe) noexcept {
++    if (atlas_ == nullptr || id < 0 || static_cast<std::size_t>(id) >= atlas_->animations().size()) { return; }
++    if (id != animationId_ || safe) { animationId_ = id; restart(); }
++    looped_ = false;
++}
++const assets::SpriteAnimationFrame* QteSpriteAnimation::frame() const noexcept {
++    if (atlas_ == nullptr || animationId_ < 0 || frameIndex_ < 0 ||
++        static_cast<std::size_t>(animationId_) >= atlas_->animations().size()) { return nullptr; }
++    const auto& anim = atlas_->animations()[animationId_];
++    const auto index = static_cast<std::size_t>(anim.firstFrameIndex) + frameIndex_;
++    if (frameIndex_ >= anim.frameCount || index >= atlas_->animationFrames().size()) { return nullptr; }
++    return &atlas_->animationFrames()[index];
++}
++void QteSpriteAnimation::update(std::uint32_t elapsed) noexcept {
++    const auto* current = frame();
++    if (!current || ticks_ < 0 || current->duration == 0) { return; }
++    residual_ += static_cast<float>(elapsed);
++    std::uint32_t steps = 0;
++    // ELF data 0x00505380 is float32 50.0. Strict >, not >=.
++    while (residual_ > 50.0F) {
++        const float next = residual_ - 50.0F;
++        // Malformed external steps beyond float resolution must not hang the
++        // host. The original Application supplies a 50 ms real step.
++        if (next == residual_ || !std::isfinite(next)) { return; }
++        residual_ = next;
++        ticks_ = std::bit_cast<std::int16_t>(static_cast<std::uint16_t>(
++            static_cast<std::uint16_t>(ticks_) + 1U));
++        ++steps;
++    }
++    if (current->duration > ticks_) { return; }
++    frameIndex_ = std::bit_cast<std::int16_t>(static_cast<std::uint16_t>(
++        static_cast<std::uint16_t>(frameIndex_) + steps));
++    ticks_ = 0;
++    if (frameIndex_ >= atlas_->animations()[animationId_].frameCount) {
++        frameIndex_ = 0;
++        looped_ = true;
++    }
++}
++bool QteSpriteAnimation::ended() const noexcept {
++    if (looped_) { return true; }
++    const auto* current = frame();
++    if (!current || frameIndex_ != atlas_->animations()[animationId_].frameCount - 1) { return false; }
++    return current->duration == 0 || ticks_ == current->duration - 1;
++}
++} // namespace usm::game
+diff --git a/src/game/QteSpriteAnimation.hpp b/src/game/QteSpriteAnimation.hpp
+new file mode 100644
+index 0000000..65758c4
+--- /dev/null
++++ b/src/game/QteSpriteAnimation.hpp
+@@ -0,0 +1,33 @@
++#pragma once
++
++#include "assets/SpriteAtlas.hpp"
++
++#include <cstdint>
++
++namespace usm::game {
++// The zero-flags CSpriteInstance timing used by CQTEManager. Original ELF:
++// InitInstance 0x002d9af8, Restart 0x002d9cc4, SetAnim 0x002d9ce8,
++// SetAnimSafe 0x002d9d04, UpdateSpriteAnim 0x002d9c10, IsAnimEnded 0x002d9d1c.
++// This is not a conventional duration-summing animation player.
++class QteSpriteAnimation final {
++public:
++    void bind(const assets::SpriteAtlas& atlas) noexcept;
++    void setAnimation(std::int16_t id, bool restartEvenIfSame = false) noexcept;
++    void update(std::uint32_t realMilliseconds) noexcept;
++    [[nodiscard]] bool ended() const noexcept;
++    [[nodiscard]] std::int16_t animationId() const noexcept { return animationId_; }
++    [[nodiscard]] std::int16_t frameIndex() const noexcept { return frameIndex_; }
++    [[nodiscard]] std::int16_t ticks() const noexcept { return ticks_; }
++    [[nodiscard]] float residualMilliseconds() const noexcept { return residual_; }
++    [[nodiscard]] bool looped() const noexcept { return looped_; }
++    [[nodiscard]] const assets::SpriteAnimationFrame* frame() const noexcept;
++private:
++    void restart() noexcept;
++    const assets::SpriteAtlas* atlas_{};
++    std::int16_t animationId_{};
++    std::int16_t frameIndex_{};
++    std::int16_t ticks_{};
++    float residual_{};
++    bool looped_{};
++};
++} // namespace usm::game
+diff --git a/src/game/QuickTimeEventRuntime.cpp b/src/game/QuickTimeEventRuntime.cpp
+index 5e1d4e1..04d9026 100644
+--- a/src/game/QuickTimeEventRuntime.cpp
++++ b/src/game/QuickTimeEventRuntime.cpp
+@@ -1,104 +1,237 @@
+ #include "game/QuickTimeEventRuntime.hpp"
+ 
+ #include <algorithm>
++#include <bit>
+ #include <charconv>
+ #include <cmath>
+ #include <limits>
+ #include <string_view>
++#include <utility>
+ 
+ namespace usm::game {
+ namespace {
+-
+ bool integerAttribute(const CinematicCommand& command, std::string_view name,
+                       std::int32_t& value) noexcept {
+-    const CinematicAttribute* attribute = command.findAttribute(name);
+-    if (attribute == nullptr) {
+-        return false;
+-    }
++    const auto* attribute = command.findAttribute(name);
++    if (!attribute) { return false; }
+     const char* begin = attribute->value.data();
+     const char* end = begin + attribute->value.size();
+     const auto parsed = std::from_chars(begin, end, value);
+     return parsed.ec == std::errc{} && parsed.ptr == end;
+ }
+-
+-} // namespace
+-
+-void QuickTimeEventRuntime::bind(
+-    const ButtonConfigDatabase& configs) noexcept {
+-    configs_ = &configs;
+-    configId_ = -1;
+-    sourceCinematicId_ = -1;
+-    successCinematicId_ = -1;
+-    failureCinematicId_ = -1;
+-    elapsedMilliseconds_ = 0;
+-    durationMilliseconds_ = 0;
+-    cinematicRequest_.reset();
+-    buttonProgress_.reset();
+-    active_ = false;
++std::int16_t shortWord(int value) noexcept {
++    return std::bit_cast<std::int16_t>(static_cast<std::uint16_t>(value));
++}
++}
++void QuickTimeEventRuntime::bind(const ButtonConfigDatabase& configs,
++                                const assets::SpriteAtlas& atlas,
++                                NativeRandomizer* randomizer) noexcept {
++    configs_ = &configs; atlas_ = &atlas; randomizer_ = randomizer;
++    configId_ = sourceCinematicId_ = successCinematicId_ = failureCinematicId_ = -1;
++    elapsedMilliseconds_ = durationMilliseconds_ = 0;
++    cinematicRequest_.reset(); compound_ = nullptr; sequenceIndex_ = 0;
++    state_ = QteState::Inactive; path_.clear(); remaining_ = 0; idle_ = 0;
++    clock_ = {}; position_ = {}; releaseEnd_ = {}; releaseControl_ = false; sounds_.clear();
++    ++generation_;
++    resultSprite_.bind(atlas); promptSprite_.bind(atlas);
++    promptSprite_.setAnimation(6);
++    successDrawCount_ = successDrawLimit_ = 0;
++    if (atlas.animations().size() > 7) {
++        const auto& anim = atlas.animations()[7];
++        for (std::size_t i = 0; i < anim.frameCount &&
++             anim.firstFrameIndex + i < atlas.animationFrames().size(); ++i) {
++            successDrawLimit_ += atlas.animationFrames()[anim.firstFrameIndex + i].duration;
++        }
++    }
++}
++const ButtonConfigDefinition* QuickTimeEventRuntime::definition() const noexcept {
++    return configs_ ? configs_->find(configId_) : nullptr;
++}
++Result QuickTimeEventRuntime::validate(const ButtonConfigDefinition& d) const {
++    if (d.interactionType != 0 && d.interactionType != 1 && d.interactionType != 3) {
++        return Result::failure("StartQTE has an invalid or nested interaction type");
++    }
++    if (!std::isfinite(d.durationMilliseconds) || d.durationMilliseconds <= 0 ||
++        static_cast<double>(d.durationMilliseconds) > std::numeric_limits<std::uint32_t>::max()) {
++        return Result::failure("StartQTE has an invalid duration");
++    }
++    if (!std::isfinite(d.screenX) || !std::isfinite(d.screenY) ||
++        d.screenX < -32000 || d.screenX > 32000 || d.screenY < -32000 || d.screenY > 32000) {
++        return Result::failure("StartQTE has invalid screen coordinates");
++    }
++    if ((d.interactionValue == 15 || d.interactionValue == 16) && randomizer_ == nullptr) {
++        return Result::failure("Random-position QTE needs the shared native randomizer");
++    }
++    if (d.interactionType == 1) {
++        QteGesturePath check;
++        return check.bind(d, *atlas_);
++    }
++    return Result::success();
+ }
+-
+ Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command,
+-                                          std::int32_t sourceCinematicId) {
+-    if (command.name != "StartQTE") {
+-        return Result::success();
+-    }
+-    if (configs_ == nullptr) {
+-        return Result::failure("Quick-time-event runtime is not bound");
+-    }
+-    std::int32_t configId = -1;
+-    std::int32_t successId = -1;
+-    std::int32_t failureId = -1;
+-    if (!integerAttribute(command, "QTEID", configId) ||
+-        !integerAttribute(command, "^ID^Cinematic^Success", successId) ||
+-        !integerAttribute(command, "^ID^Cinematic^Fail", failureId)) {
++                                         QteTimeStep time, std::int32_t sourceId) {
++    if (command.name != "StartQTE") { return Result::success(); }
++    if (!configs_ || !atlas_ || atlas_->animations().size() <= 29) {
++        return Result::failure("Quick-time-event runtime is not bound to original sprite metadata");
++    }
++    std::int32_t id = -1, success = -1, failure = -1;
++    if (!integerAttribute(command, "QTEID", id) ||
++        !integerAttribute(command, "^ID^Cinematic^Success", success) ||
++        !integerAttribute(command, "^ID^Cinematic^Fail", failure)) {
+         return Result::failure("StartQTE has invalid attributes");
+     }
+-    const ButtonConfigDefinition* definition = configs_->find(configId);
+-    if (definition == nullptr || definition->durationMilliseconds <= 0.0F ||
+-        definition->durationMilliseconds >
+-            static_cast<float>(std::numeric_limits<std::uint32_t>::max())) {
+-        return Result::failure("StartQTE references an invalid button config");
++    const auto* d = configs_->find(id);
++    if (!d) { return Result::failure("StartQTE references a missing button config"); }
++    if (d->interactionType == 2) {
++        if (d->sequence.empty()) { return Result::failure("StartQTE sequence is empty"); }
++        for (const auto childId : d->sequence) {
++            const auto* child = configs_->find(childId);
++            if (!child) { return Result::failure("StartQTE sequence references a missing child"); }
++            const auto result = validate(*child);
++            if (!result) { return result; }
++        }
++    } else {
++        const auto result = validate(*d);
++        if (!result) { return result; }
+     }
+-
+-    configId_ = configId;
+-    sourceCinematicId_ = sourceCinematicId;
+-    successCinematicId_ = successId;
+-    failureCinematicId_ = failureId;
+-    elapsedMilliseconds_ = 0;
+-    durationMilliseconds_ = static_cast<std::uint32_t>(
+-        std::lround(definition->durationMilliseconds));
+-    cinematicRequest_.reset();
+-    buttonProgress_.reset();
+-    active_ = true;
++    // BeginQTE uses an unsigned state >3 guard (inactive -1 is accepted).
++    if (state_ >= QteState::Tap && state_ <= QteState::SuccessDisplay) { return Result::success(); }
++    sourceCinematicId_ = sourceId; successCinematicId_ = success; failureCinematicId_ = failure;
++    cinematicRequest_.reset(); compound_ = d->interactionType == 2 ? d : nullptr;
++    sequenceIndex_ = 0;
++    beginNow(compound_ ? compound_->sequence[0] : id, time);
+     return Result::success();
+ }
+-
+-void QuickTimeEventRuntime::update(std::uint32_t elapsedMilliseconds,
+-                                   bool actionPressed) noexcept {
+-    if (!active_ || cinematicRequest_.has_value()) {
+-        return;
+-    }
+-    elapsedMilliseconds_ = static_cast<std::uint32_t>(std::min<std::uint64_t>(
+-        durationMilliseconds_, static_cast<std::uint64_t>(elapsedMilliseconds_) +
+-                                   elapsedMilliseconds));
+-    const auto* definition = configs_ == nullptr ? nullptr : configs_->find(configId_);
+-    const bool succeeded = definition != nullptr && buttonProgress_.update(
+-        elapsedMilliseconds, actionPressed, definition->requiredActionCount,
+-        definition->interactionType == 3);
+-    if (succeeded) {
+-        cinematicRequest_ = successCinematicId_;
+-        active_ = false;
+-    } else if (elapsedMilliseconds_ >= durationMilliseconds_) {
+-        cinematicRequest_ = failureCinematicId_;
+-        active_ = false;
++void QuickTimeEventRuntime::beginNow(std::int32_t id, QteTimeStep time) noexcept {
++    configId_ = id;
++    const auto& d = *definition();
++    clock_.begin(time.timerMilliseconds); elapsedMilliseconds_ = 0;
++    durationMilliseconds_ = static_cast<std::uint32_t>(std::round(static_cast<double>(d.durationMilliseconds)));
++    remaining_ = d.requiredActionCount;
++    float x = d.screenX, y = d.screenY;
++    if (d.interactionValue == 15 || d.interactionValue == 16) {
++        x = (x + static_cast<float>(randomizer_->range(0, 240))) - 120.0F;
++        y = (y + static_cast<float>(randomizer_->range(0, 160))) - 80.0F;
+     }
++    position_ = {shortWord(static_cast<int>(x)), shortWord(static_cast<int>(y))};
++    promptSprite_.setAnimation(d.interactionValue == 16 ? 28 : 6);
++    successDrawCount_ = 0;
++    ++generation_;
++    // Preserve SetState's same-state early return, including consecutive
++    // drag children. UpdateDragState reads each new config's own samples.
++    const auto next = d.interactionType == 0 ? QteState::Tap :
++                      d.interactionType == 1 ? QteState::Drag : QteState::Mash;
++    if (d.interactionType == 1) {
++        (void)path_.bind(d, *atlas_); // validated before starting the sequence
++    } else { path_.clear(); }
++    setState(next);
+ }
+-
+-std::optional<std::int32_t>
+-QuickTimeEventRuntime::consumeCinematicRequest() noexcept {
+-    std::optional<std::int32_t> request = cinematicRequest_;
+-    cinematicRequest_.reset();
+-    return request;
++void QuickTimeEventRuntime::setState(QteState next) noexcept {
++    if (state_ == next) { return; }
++    const auto* d = definition();
++    switch (next) {
++    case QteState::Drag:
++        releaseEnd_ = path_.end();
++        resultSprite_.setAnimation(static_cast<std::int16_t>(d->interactionValue - 9));
++        break;
++    case QteState::Mash: idle_ = 0; break;
++    case QteState::SuccessDisplay:
++    case QteState::FailureDisplay:
++        sounds_.push_back(next == QteState::SuccessDisplay ? 0x188 : 0x189);
++        resultSprite_.setAnimation(d && d->interactionValue == 16 ? 29 :
++                                  next == QteState::SuccessDisplay ? 7 : 1, true);
++        releaseControl_ = true;
++        break;
++    case QteState::SuccessHandled: cinematicRequest_ = successCinematicId_; break;
++    case QteState::FailureHandled: cinematicRequest_ = failureCinematicId_; break;
++    default: break;
++    }
++    state_ = next;
++}
++void QuickTimeEventRuntime::checkSuccess(QteTimeStep time) noexcept {
++    if (compound_ && sequenceIndex_ + 1 < compound_->sequence.size()) {
++        beginNow(compound_->sequence[++sequenceIndex_], time);
++    } else { setState(QteState::SuccessDisplay); }
++}
++void QuickTimeEventRuntime::update(QteTimeStep time, const QteInput& input) noexcept {
++    if (!visible()) { return; }
++    const auto* d = definition();
++    if (!d) { return; }
++    // The CButton release event is delivered before CQTEManager::Update.
++    if (state_ == QteState::Drag) {
++        if (input.dragPosition) { position_ = *input.dragPosition; }
++        if (input.dragReleased) {
++            if (std::abs(static_cast<int>(position_.x) - releaseEnd_.x) <= 10 &&
++                std::abs(static_cast<int>(position_.y) - releaseEnd_.y) <= 10) { checkSuccess(time); }
++            else { setState(QteState::FailureDisplay); }
++        }
++    }
++    d = definition();
++    elapsedMilliseconds_ = clock_.displayElapsed(time.timerMilliseconds, d->durationMilliseconds);
++    switch (state_) {
++    case QteState::Tap:
++    case QteState::Mash: {
++        const bool mash = state_ == QteState::Mash;
++        if (input.actionPressed) {
++            sounds_.push_back(0x18a);
++            remaining_ = shortWord(static_cast<int>(remaining_) - 1);
++            if (remaining_ <= 0) { checkSuccess(time); }
++            if (mash) { idle_ = 0; }
++        }
++        promptSprite_.update(time.realMilliseconds);
++        if (mash) {
++            resultSprite_.update(time.realMilliseconds);
++            // Lookup occurs again after CheckSuccess may have begun a child.
++            d = definition();
++            idle_ += static_cast<float>(time.realMilliseconds);
++            if (idle_ >= 500.0F && remaining_ < d->requiredActionCount) {
++                remaining_ = shortWord(static_cast<int>(remaining_) + 1); idle_ = 0;
++            }
++        }
++        d = definition();
++        if (clock_.expired(time.timerMilliseconds, d->durationMilliseconds)) { setState(QteState::FailureDisplay); }
++        break;
++    }
++    case QteState::Drag: {
++        promptSprite_.update(time.realMilliseconds);
++        resultSprite_.update(time.realMilliseconds);
++        // Native state 1 tests timeout FIRST, then still calls UpdateDragState.
++        if (clock_.expired(time.timerMilliseconds, d->durationMilliseconds)) { setState(QteState::FailureDisplay); }
++        const auto nearest = path_.nearest(position_);
++        const auto samples = path_.samples();
++        if (!samples.empty()) {
++            position_ = samples[nearest];
++            if (nearest == samples.size() - 1) { checkSuccess(time); }
++        }
++        break;
++    }
++    case QteState::SuccessDisplay:
++        if (resultSprite_.ended()) { setState(QteState::SuccessHandled); }
++        break;
++    case QteState::FailureDisplay:
++        if (resultSprite_.ended()) { setState(QteState::FailureHandled); }
++        else { resultSprite_.update(time.realMilliseconds); }
++        break;
++    default: break;
++    }
++}
++void QuickTimeEventRuntime::drawStep() noexcept {
++    if (state_ == QteState::SuccessDisplay) {
++        // CQTEManager::Draw +0xb6: compare before increment. The shipped
++        // animation 7 has duration sum 8, therefore nine draws, not eight.
++        if (successDrawCount_ >= successDrawLimit_) { setState(QteState::SuccessHandled); }
++        ++successDrawCount_;
++    } else if (state_ == QteState::FailureDisplay && resultSprite_.ended()) {
++        setState(QteState::FailureHandled);
++    }
++}
++std::int16_t QuickTimeEventRuntime::completedActionCount() const noexcept {
++    const auto* d = definition();
++    return d ? shortWord(static_cast<int>(d->requiredActionCount) - remaining_) : 0;
++}
++bool QuickTimeEventRuntime::consumeControlRelease() noexcept { return std::exchange(releaseControl_, false); }
++std::vector<std::uint16_t> QuickTimeEventRuntime::consumeSoundCues() noexcept { return std::exchange(sounds_, {}); }
++std::optional<std::int32_t> QuickTimeEventRuntime::consumeCinematicRequest() noexcept {
++    return std::exchange(cinematicRequest_, std::nullopt);
+ }
+-
+ } // namespace usm::game
+diff --git a/src/game/QuickTimeEventRuntime.hpp b/src/game/QuickTimeEventRuntime.hpp
+index 13516e7..fa42144 100644
+--- a/src/game/QuickTimeEventRuntime.hpp
++++ b/src/game/QuickTimeEventRuntime.hpp
+@@ -1,44 +1,75 @@
+ #pragma once
+ 
++#include "assets/SpriteAtlas.hpp"
+ #include "core/Result.hpp"
+ #include "game/ButtonConfig.hpp"
+-#include "game/ButtonMashProgress.hpp"
+ #include "game/CinematicScript.hpp"
++#include "game/NativeRandomizer.hpp"
++#include "game/QteClock.hpp"
++#include "game/QteGesturePath.hpp"
++#include "game/QteSpriteAnimation.hpp"
+ 
+ #include <cstdint>
+ #include <optional>
++#include <vector>
+ 
+ namespace usm::game {
++enum class QteState : std::int8_t {
++    Inactive = -1, Tap = 0, Drag = 1, Mash = 2,
++    SuccessDisplay = 3, FailureDisplay = 4, SuccessHandled = 5, FailureHandled = 6
++};
++struct QteInput {
++    bool actionPressed{}; // Original Cross flag; does NOT complete a drag.
++    std::optional<QtePoint> dragPosition;
++    bool dragReleased{};  // Original event 0x1f, before the manager update.
++};
+ 
+-// Renderer-independent controller reconstruction of Player::BeginQTE
+-// (0x0034c9b4) and CQTEManager::BeginQTE/SuccessHandle/FailHandle
+-// (0x0038ab40/0x0038a5e4/0x0038a630).
++// Native reconstruction of CQTEManager, original ELF 0x0037a3f8..0x0037b40c.
++// Draw has gameplay side effects; drawStep is called once per presented frame,
++// not once per simulation catch-up update. Hostage/enemy ownership is separate
++// in the inherited application and is NOT asserted unified by this class.
+ class QuickTimeEventRuntime final {
+ public:
+-    void bind(const ButtonConfigDatabase& configs) noexcept;
++    void bind(const ButtonConfigDatabase& configs, const assets::SpriteAtlas& atlas,
++              NativeRandomizer* randomizer = nullptr) noexcept;
+     [[nodiscard]] Result applyCommand(const CinematicCommand& command,
++                                      QteTimeStep time,
+                                       std::int32_t sourceCinematicId = -1);
+-    void update(std::uint32_t elapsedMilliseconds, bool actionPressed) noexcept;
+-
+-    [[nodiscard]] bool active() const noexcept { return active_; }
+-    [[nodiscard]] std::int32_t configId() const noexcept { return configId_; }
+-    [[nodiscard]] std::int32_t sourceCinematicId() const noexcept {
+-        return sourceCinematicId_;
+-    }
+-    [[nodiscard]] std::uint32_t elapsedMilliseconds() const noexcept {
+-        return elapsedMilliseconds_;
++    void update(QteTimeStep time, const QteInput& input) noexcept;
++    void update(QteTimeStep time, bool actionPressed) noexcept {
++        update(time, QteInput{actionPressed, std::nullopt, false});
+     }
+-    [[nodiscard]] std::uint32_t durationMilliseconds() const noexcept {
+-        return durationMilliseconds_;
++    void drawStep() noexcept;
++    void setPause(bool paused, std::uint32_t timerMilliseconds) noexcept {
++        clock_.setPause(paused, timerMilliseconds);
+     }
+-    [[nodiscard]] std::int16_t completedActionCount() const noexcept {
+-        return buttonProgress_.completed();
+-    }
+-    [[nodiscard]] std::optional<std::int32_t>
+-    consumeCinematicRequest() noexcept;
+-
++    [[nodiscard]] bool active() const noexcept { return state_ >= QteState::Tap && state_ <= QteState::Mash; }
++    [[nodiscard]] bool visible() const noexcept { return state_ >= QteState::Tap && state_ <= QteState::FailureDisplay; }
++    [[nodiscard]] QteState state() const noexcept { return state_; }
++    [[nodiscard]] std::int32_t configId() const noexcept { return configId_; }
++    [[nodiscard]] std::int32_t sourceCinematicId() const noexcept { return sourceCinematicId_; }
++    [[nodiscard]] std::uint32_t elapsedMilliseconds() const noexcept { return elapsedMilliseconds_; }
++    [[nodiscard]] std::uint32_t durationMilliseconds() const noexcept { return durationMilliseconds_; }
++    [[nodiscard]] std::int16_t completedActionCount() const noexcept;
++    [[nodiscard]] std::int16_t remainingActionCount() const noexcept { return remaining_; }
++    [[nodiscard]] const QteGesturePath& gesturePath() const noexcept { return path_; }
++    [[nodiscard]] QtePoint buttonPosition() const noexcept { return position_; }
++    [[nodiscard]] std::uint64_t generation() const noexcept { return generation_; }
++    [[nodiscard]] const QteSpriteAnimation& resultSprite() const noexcept { return resultSprite_; }
++    [[nodiscard]] const QteSpriteAnimation& promptSprite() const noexcept { return promptSprite_; }
++    [[nodiscard]] std::uint32_t successDrawCount() const noexcept { return successDrawCount_; }
++    [[nodiscard]] bool consumeControlRelease() noexcept;
++    [[nodiscard]] std::vector<std::uint16_t> consumeSoundCues() noexcept;
++    [[nodiscard]] std::optional<std::int32_t> consumeCinematicRequest() noexcept;
+ private:
++    [[nodiscard]] Result validate(const ButtonConfigDefinition& definition) const;
++    void beginNow(std::int32_t id, QteTimeStep time) noexcept;
++    void checkSuccess(QteTimeStep time) noexcept;
++    void setState(QteState state) noexcept;
++    [[nodiscard]] const ButtonConfigDefinition* definition() const noexcept;
+     const ButtonConfigDatabase* configs_{};
++    const assets::SpriteAtlas* atlas_{};
++    NativeRandomizer* randomizer_{};
+     std::int32_t configId_{-1};
+     std::int32_t sourceCinematicId_{-1};
+     std::int32_t successCinematicId_{-1};
+@@ -46,8 +77,20 @@ private:
+     std::uint32_t elapsedMilliseconds_{};
+     std::uint32_t durationMilliseconds_{};
+     std::optional<std::int32_t> cinematicRequest_;
+-    ButtonMashProgress buttonProgress_;
+-    bool active_{};
++    QteClock clock_;
++    QteGesturePath path_;
++    QteSpriteAnimation resultSprite_, promptSprite_;
++    QteState state_{QteState::Inactive};
++    QtePoint position_;
++    QtePoint releaseEnd_;
++    std::int16_t remaining_{};
++    float idle_{};
++    const ButtonConfigDefinition* compound_{};
++    std::size_t sequenceIndex_{};
++    std::uint32_t successDrawLimit_{};
++    std::uint32_t successDrawCount_{};
++    std::uint64_t generation_{};
++    bool releaseControl_{};
++    std::vector<std::uint16_t> sounds_;
+ };
+-
+ } // namespace usm::game
+diff --git a/src/platform/input/QteGamepadAdapter.hpp b/src/platform/input/QteGamepadAdapter.hpp
+new file mode 100644
+index 0000000..85fd8c7
+--- /dev/null
++++ b/src/platform/input/QteGamepadAdapter.hpp
+@@ -0,0 +1,50 @@
++#pragma once
++
++#include "game/QuickTimeEventRuntime.hpp"
++
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++
++namespace usm::platform {
++// PC input adaptation, NOT a claimed Xperia hardware mapping. A is a virtual
++// touch hold; left-stick displacement supplies a position on the original
++// screen. The recovered manager alone judges the gesture and its release.
++// There is no velocity, arbitrary success percentage, or force-success call.
++class QteGamepadAdapter final {
++public:
++    [[nodiscard]] game::QteInput translate(
++        const game::QuickTimeEventRuntime& runtime, bool connected,
++        bool pressed, bool held, bool released, float stickX, float stickY) noexcept {
++        game::QteInput input{connected && pressed, std::nullopt, false};
++        if (generation_ != runtime.generation()) {
++            generation_ = runtime.generation(); dragging_ = false;
++        }
++        if (!connected || runtime.state() != game::QteState::Drag) {
++            dragging_ = false; return input;
++        }
++        if (pressed) { dragging_ = true; }
++        if (!dragging_ || (!held && !released)) { return input; }
++        const auto& path = runtime.gesturePath();
++        const auto start = path.start(), end = path.end();
++        const float extent = static_cast<float>(std::abs(path.horizontal()
++            ? static_cast<int>(end.x) - start.x : static_cast<int>(end.y) - start.y));
++        const auto axis = [](float v) { return std::isfinite(v) ? std::clamp(v, -1.0F, 1.0F) : 0.0F; };
++        // Same scale on both axes; XInput up is positive, screen down positive.
++        // Truncate toward zero, as the native screen-coordinate conversions do.
++        const auto coordinate = [](float v) {
++            return static_cast<std::int16_t>(std::clamp(v, -32768.0F, 32767.0F));
++        };
++        input.dragPosition = game::QtePoint{
++            coordinate(static_cast<float>(start.x) + axis(stickX) * extent),
++            coordinate(static_cast<float>(start.y) - axis(stickY) * extent)};
++        input.dragReleased = released;
++        if (released) { dragging_ = false; }
++        return input;
++    }
++    [[nodiscard]] bool dragging() const noexcept { return dragging_; }
++private:
++    std::uint64_t generation_{};
++    bool dragging_{};
++};
++} // namespace usm::platform
+diff --git a/src/platform/input/XInputStateTranslator.cpp b/src/platform/input/XInputStateTranslator.cpp
+index 361919b..8e71f24 100644
+--- a/src/platform/input/XInputStateTranslator.cpp
++++ b/src/platform/input/XInputStateTranslator.cpp
+@@ -75,11 +75,10 @@ void XInputStateTranslator::update(bool connected, std::uint16_t buttons,
+                                    std::int16_t leftX, std::int16_t leftY,
+                                    const EventHandler& handler) noexcept {
+     if (!connected) {
+-        if (connected_) {
+-            for (const Binding& binding : kBindings) {
+-                emitTransition((previousButtons_ & binding.mask) != 0, false,
+-                               binding.keyCode, binding.scanCode, handler);
+-            }
++        if (connected_ && handler) {
++            // Losing the device is NOT appKeyReleased(R1). Synthetic UP
++            // events would rescue/switch/select when the controller vanished.
++            handler({{}, {}, false, true});
+         }
+         previousButtons_ = 0;
+         leftStick_ = {};
+diff --git a/src/reconstructed/input/XperiaKeyEvent.hpp b/src/reconstructed/input/XperiaKeyEvent.hpp
+index 652faed..61a3756 100644
+--- a/src/reconstructed/input/XperiaKeyEvent.hpp
++++ b/src/reconstructed/input/XperiaKeyEvent.hpp
+@@ -41,6 +41,8 @@ struct XperiaKeyEvent {
+     XperiaKeyCode keyCode{};
+     XperiaScanCode scanCode{};
+     bool pressed{};
++    // PC transport notification, not an Android key or a synthetic key-up.
++    bool deviceCancelled{};
+ };
+ 
+ } // namespace usm::reconstructed
+diff --git a/src/reconstructed/input/XperiaKeyRouter.cpp b/src/reconstructed/input/XperiaKeyRouter.cpp
+index 018fa7d..14dd36c 100644
+--- a/src/reconstructed/input/XperiaKeyRouter.cpp
++++ b/src/reconstructed/input/XperiaKeyRouter.cpp
+@@ -4,6 +4,12 @@ namespace usm::reconstructed {
+ 
+ void XperiaKeyRouter::route(const XperiaKeyEvent& event,
+                             InputContext context) noexcept {
++    if (event.deviceCancelled) {
++        // Clear held buttons and pending PC events across all contexts. This
++        // does not enter any native key handler or generate a release action.
++        state_ = {};
++        return;
++    }
+     const bool gameplay = context == InputContext::Gameplay;
+ 
+     switch (event.keyCode) {
+diff --git a/tests/InputParityTests.cpp b/tests/InputParityTests.cpp
+index adbb6a7..19804b4 100644
+--- a/tests/InputParityTests.cpp
++++ b/tests/InputParityTests.cpp
+@@ -101,8 +101,8 @@ void buttons() {
+     translator.update(false, 0xffff, 32000, -32000, emit);
+     CHECK(!translator.connected());
+     CHECK(translator.leftStick().x == 0.0F && translator.leftStick().y == 0.0F);
+-    CHECK(events.size() == bindings.size());
+-    for (const auto& event : events) { CHECK(!event.pressed); }
++    CHECK(events.size() == 1 && events.front().deviceCancelled);
++    CHECK(!events.front().pressed);
+     events.clear();
+     translator.update(false, 0, 0, 0, emit);
+     CHECK(events.empty());
+@@ -163,13 +163,20 @@ void routing() {
+         CHECK(!router.state().rescueRequested);
+     }
+ 
+-    // This is explicitly the inherited PC disconnect policy: it emits UP,
+-    // including R1 UP. Do not silently present this as original Android RE.
+-    frame(xi::RightShoulder);
++    // Device cancellation is a PC transport event, never native R1 UP.
++    frame(xi::RightShoulder | xi::A | xi::X);
+     frame(0, false);
+-    CHECK(router.state().rescueRequested);
++    CHECK(!router.state().rescueRequested && !router.state().switchRequested);
++    CHECK(!router.state().jump.held && !router.state().jump.pressed && !router.state().jump.released);
++    CHECK(!router.state().punch.held && !router.state().punch.pressed && !router.state().punch.released);
++    CHECK(!router.state().quickTimeEvent.held && !router.state().quickTimeEvent.pressed && !router.state().quickTimeEvent.released);
+     frame(0, false);
+     CHECK(!router.state().rescueRequested);
++    // Cancellation clears an old context without synthesizing menu selection.
++    router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, true}, InputContext::Menu);
++    CHECK(router.state().menuSelected.held);
++    router.route({{}, {}, false, true}, InputContext::Gameplay);
++    CHECK(!router.state().menuSelected.held && !router.state().menuSelected.released);
+ }
+ 
+ void sticks() {
+@@ -218,6 +225,7 @@ struct HostageFixture {
+     XperiaKeyRouter router;
+     XInputStateTranslator translator;
+     std::size_t initialBonusCount{};
++    std::uint32_t timerMilliseconds{};
+     HostageFixture(const usm::game::LevelOneBootstrap& level,
+                    const usm::game::PlayerStateConfigDatabase& configs) {
+         CHECK(objects.initialize(level));
+@@ -233,9 +241,12 @@ struct HostageFixture {
+         CHECK(hostage.contextPromptVisible());
+     }
+     void frame(std::uint16_t buttons, std::uint32_t elapsed = 0) {
+-        frameClocks(buttons, {elapsed, elapsed});
++        frameClocks(buttons, elapsed, elapsed);
+     }
+-    void frameClocks(std::uint16_t buttons, usm::game::HostageTimeStep time) {
++    void frameClocks(std::uint16_t buttons, std::uint32_t simulation,
++                     std::uint32_t real) {
++        timerMilliseconds += real;
++        const usm::game::HostageTimeStep time{simulation, real, timerMilliseconds};
+         router.beginFrame();
+         translator.update(true, buttons, 0, 0, [&](const XperiaKeyEvent& event) {
+             router.route(event, InputContext::Gameplay);
+@@ -308,6 +319,8 @@ void hostage() {
+         f.start();
+         f.frame(xi::A); f.frame(0);
+         f.frame(0, 4001);
++        CHECK(f.state().quickTimeOutcome == usm::game::HostageQteOutcome::Failure);
++        f.frame(0); // Object observes the manager result on its next update.
+         CHECK(f.state().phase == usm::game::HostageRescuePhase::Tied);
+         CHECK(f.state().completedActions == 0);
+         CHECK(f.player.activeStateId() == 0);
+@@ -317,11 +330,11 @@ void hostage() {
+         f.frame(xi::A);
+         CHECK(f.state().completedActions == 1);
+         // Native GetRealTs is independent of simulation slow motion.
+-        f.frameClocks(0, {0, 499});
++        f.frameClocks(0, 0, 499);
+         CHECK(f.state().completedActions == 1);
+-        f.frameClocks(0, {0, 1});
++        f.frameClocks(0, 0, 1);
+         CHECK(f.state().completedActions == 0);
+-        CHECK(f.state().quickTimeElapsedMilliseconds == 0);
++        CHECK(f.state().quickTimeElapsedMilliseconds == 500);
+     }
+ }
+ 
+diff --git a/tests/InputTransitionsTests.cpp b/tests/InputTransitionsTests.cpp
+index fb592f4..6de9dfd 100644
+--- a/tests/InputTransitionsTests.cpp
++++ b/tests/InputTransitionsTests.cpp
+@@ -49,7 +49,7 @@ int main() {
+             !check(state.quickTimeEvent.pressed == jumpEdge, frame, "single QTE edge") ||
+             !check(state.jump.pressed == (jumpHeld && (jumpEdge || previousJumpEdge)), frame, "two-update jump window") ||
+             !check(state.punch.pressed == (punchHeld && (punchEdge || previousPunchEdge)), frame, "two-update punch window") ||
+-            !check(state.rescueRequested == ((up & xi::RightShoulder) != 0), frame, "R1 release") ||
++            !check(state.rescueRequested == (connected && ((up & xi::RightShoulder) != 0)), frame, "R1 release") ||
+             !check(state.switchRequested == state.rescueRequested, frame, "switch event") ||
+             !check(!state.switchRequested || state.switchRequestValue == 4, frame, "switch value") ||
+             !check(state.web.held == ((current & xi::B) != 0), frame, "web held") ||
+diff --git a/tests/QteParityTests.cpp b/tests/QteParityTests.cpp
+new file mode 100644
+index 0000000..7a25fb9
+--- /dev/null
++++ b/tests/QteParityTests.cpp
+@@ -0,0 +1,721 @@
++#include "game/GameplayCinematicScheduler.hpp"
++#include "game/HostageAttributes.hpp"
++#include "game/QteSpriteAnimation.hpp"
++#include "platform/input/QteGamepadAdapter.hpp"
++#include "diagnostics/AutoplayHarness.hpp"
++#include "audio/VoxSoundTable.hpp"
++#include "audio/SoundEventCatalog.hpp"
++#include "game/LevelHostageRuntime.hpp"
++#include "game/LevelOneBootstrap.hpp"
++#include "game/PlayerStateConfig.hpp"
++#include "game/QteClock.hpp"
++#include "game/QuickTimeEventRuntime.hpp"
++
++#include <array>
++#include <bit>
++#include <cmath>
++#include <cstdint>
++#include <filesystem>
++#include <iostream>
++#include <limits>
++#include <stdexcept>
++#include <string>
++#include <string_view>
++
++namespace {
++std::uint64_t checks = 0;
++void check(bool condition, const char* expression, int line) {
++    ++checks;
++    if (!condition) {
++        throw std::runtime_error("line " + std::to_string(line) + ": " + expression);
++    }
++}
++#define CHECK(expression) check(static_cast<bool>(expression), #expression, __LINE__)
++using namespace usm::game;
++
++// Independent instruction-shaped reference. Round after each VFP operation;
++// this is a transcription oracle, not execution of the original ARM program.
++float round32(double value) { return static_cast<float>(value); }
++struct ClockReference {
++    float start{}, marker{}, adjustment{};
++    void begin(std::uint32_t t) { start = round32(t); adjustment = 0; }
++    void pause(bool paused, std::uint32_t t) {
++        if (paused) {
++            const float elapsed = round32(static_cast<double>(round32(t)) - start);
++            marker = round32(static_cast<double>(round32(t)) - elapsed);
++        } else {
++            adjustment = round32(static_cast<double>(round32(t)) - marker);
++            marker = 0;
++        }
++    }
++    float elapsed(std::uint32_t t) {
++        const float a = round32(static_cast<double>(round32(t)) - start);
++        return round32(static_cast<double>(a) - adjustment);
++    }
++};
++
++void clockTests() {
++    QteClock clock;
++    clock.begin(1000);
++    CHECK(clock.elapsed(4999) == 3999.0F);
++    CHECK(!clock.expired(5000, 4000.0F));
++    CHECK(clock.expired(5001, 4000.0F));
++    CHECK(clock.displayElapsed(100, 4000) == 0);
++    CHECK(clock.displayElapsed(9000, 4000) == 4000);
++    clock.setPause(true, 1800);
++    clock.setPause(false, 3800);
++    CHECK(clock.elapsed(3800) == 0.0F); // Native formula, not conventional pause.
++    CHECK(!clock.expired(7800, 4000.0F));
++    CHECK(clock.expired(7801, 4000.0F));
++    clock.setPause(true, 4000);
++    clock.setPause(false, 5000);
++    CHECK(clock.elapsed(5000) == 0.0F); // Adjustment is overwritten, not summed.
++    clock.begin(10000);
++    CHECK(clock.elapsed(10123) == 123.0F);
++    clock.begin(0x01000000U);
++    CHECK(clock.elapsed(0x01000001U) == 0.0F); // uint->float ties-to-even.
++    CHECK(clock.elapsed(0x01000002U) == 2.0F);
++    CHECK(!clock.expired(0x01000001U, 0.5F));
++    CHECK(clock.expired(0x01000002U, 0.5F));
++    clock.begin(0xfffffff0U);
++    CHECK(clock.elapsed(0x20U) < 0.0F); // Native is not modular elapsed.
++    CHECK(!clock.expired(0x20U, 4000.0F));
++    clock.begin(0);
++    CHECK(!clock.expired(1234, 1234.5F));
++    CHECK(clock.expired(1235, 1234.5F)); // No rounding of the configured duration.
++
++    std::uint32_t rng = 0x7c32a119U;
++    const auto next = [&] { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; };
++    const std::array<std::uint32_t, 12> edges{0, 1, 499, 500, 4000, 4001,
++        0x00ffffff, 0x01000000, 0x01000001, 0x7fffffff, 0xfffffff0, 0xffffffff};
++    for (std::uint32_t run = 0; run < 10000; ++run) {
++        QteClock subject;
++        ClockReference reference;
++        const auto start = run < edges.size() ? edges[run] : next();
++        subject.begin(start); reference.begin(start);
++        for (int operation = 0; operation < 20; ++operation) {
++            const auto now = next();
++            switch (next() % 8) {
++                case 0: subject.begin(now); reference.begin(now); break;
++                case 1: subject.setPause(true, now); reference.pause(true, now); break;
++                case 2: subject.setPause(false, now); reference.pause(false, now); break;
++                default: break;
++            }
++            const float expected = reference.elapsed(now);
++            CHECK(std::bit_cast<std::uint32_t>(subject.elapsed(now)) ==
++                  std::bit_cast<std::uint32_t>(expected));
++            const float duration = static_cast<float>(next() % 100000) + 0.5F;
++            CHECK(subject.expired(now, duration) == (expected > duration));
++        }
++    }
++    ButtonMashProgress progress;
++    for (int i = 0; i < 7; ++i) { CHECK(!progress.updateManager(0, true, 8, true)); }
++    CHECK(progress.updateManager(500, true, 8, true));
++    CHECK(progress.completed() == 7); // Success tested before same-update decay.
++    progress.reset();
++    CHECK(!progress.updateManager(0, true, 8, true));
++    CHECK(!progress.updateManager(1500, false, 8, true));
++    CHECK(progress.completed() == 0); // At most one decay, no catch-up loop.
++    CHECK(!progress.updateManager(0, true, 8, false));
++    CHECK(!progress.updateManager(10000, false, 8, false));
++    CHECK(progress.completed() == 1); // Ordinary tap QTEs have no mash decay.
++}
++
++CinematicCommand startCommand(int id) {
++    CinematicCommand command;
++    command.name = "StartQTE";
++    command.attributes = {{"int", "QTEID", std::to_string(id)},
++        {"int", "^ID^Cinematic^Success", "20006"},
++        {"int", "^ID^Cinematic^Fail", "20010"}};
++    return command;
++}
++
++void finishFeedback(QuickTimeEventRuntime& qte, std::uint32_t now) {
++    for (int i = 0; i < 40 && qte.visible(); ++i) {
++        qte.update({now, 50}, false);
++        qte.drawStep();
++    }
++    CHECK(!qte.visible());
++}
++void cinematicTests(const LevelOneBootstrap& level) {
++    CHECK(level.buttonConfigs().find(6)->interactionType == 1);
++    CHECK(level.buttonConfigs().find(6)->durationMilliseconds == 3900.0F);
++    CHECK(level.buttonConfigs().find(9)->interactionType == 0);
++    QuickTimeEventRuntime qte;
++    qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++    CHECK(qte.applyCommand(startCommand(9), {10000, 0}, 20005));
++    qte.update({13900, 1}, false);
++    CHECK(qte.active() && qte.elapsedMilliseconds() == 3900);
++    qte.update({13900, 50}, true);
++    CHECK(!qte.active() && qte.state() == QteState::SuccessDisplay);
++    CHECK(!qte.consumeCinematicRequest());
++    CHECK(qte.consumeControlRelease() && !qte.consumeControlRelease());
++    CHECK((qte.consumeSoundCues() == std::vector<std::uint16_t>{0x18a, 0x188}));
++    // Success Draw compares before increment: 0..8 are nine presentations.
++    for (int i = 0; i < 8; ++i) {
++        qte.drawStep();
++        CHECK(qte.state() == QteState::SuccessDisplay);
++        qte.update({13900, 1000}, false); // Updates alone do not count draws.
++        CHECK(!qte.consumeCinematicRequest());
++    }
++    qte.drawStep();
++    CHECK(qte.state() == QteState::SuccessHandled);
++    CHECK(qte.consumeCinematicRequest() == 20006);
++    CHECK(!qte.consumeCinematicRequest());
++    CHECK(qte.applyCommand(startCommand(9), {10000, 0}, 20005));
++    qte.update({13901, 1}, true);
++    CHECK(qte.state() == QteState::FailureDisplay);
++    CHECK((qte.consumeSoundCues() == std::vector<std::uint16_t>{0x18a, 0x188, 0x189}));
++    finishFeedback(qte, 13901);
++    CHECK(qte.consumeCinematicRequest() == 20010);
++    CHECK(qte.applyCommand(startCommand(9), {10000, 0}, 20005));
++    qte.setPause(true, 10900);
++    qte.setPause(false, 13000);
++    qte.update({16900, 50}, false);
++    CHECK(qte.active());
++    qte.update({16901, 1}, false);
++    CHECK(qte.state() == QteState::FailureDisplay);
++    finishFeedback(qte, 16901);
++    CHECK(qte.consumeCinematicRequest() == 20010);
++
++    CHECK(qte.applyCommand(startCommand(11), {20000, 0}));
++    qte.update({20000, 0}, true);
++    CHECK(qte.completedActionCount() == 1);
++    qte.update({20000, 499}, false);
++    CHECK(qte.completedActionCount() == 1 && qte.elapsedMilliseconds() == 0);
++    qte.update({20000, 1}, false);
++    CHECK(qte.completedActionCount() == 0 && qte.elapsedMilliseconds() == 0);
++    qte.update({24001, 50}, false);
++    CHECK(qte.state() == QteState::FailureDisplay);
++    finishFeedback(qte, 24001);
++    CHECK(qte.consumeCinematicRequest() == 20010);
++    CHECK(qte.applyCommand(startCommand(11), {20000, 0}));
++    for (int i = 0; i < 7; ++i) { qte.update({20000, 0}, true); }
++    qte.update({24001, 0}, true);
++    CHECK(qte.completedActionCount() == 8);
++    CHECK(qte.state() == QteState::FailureDisplay); // late eighth tap loses
++    finishFeedback(qte, 24001);
++    CHECK(qte.consumeCinematicRequest() == 20010);
++    CHECK(!qte.applyCommand(startCommand(32000), {0, 0}));
++    CHECK(!qte.applyCommand(startCommand(14), {0, 0})); // no invented private RNG
++}
++
++void gestureTests(const LevelOneBootstrap& level) {
++    constexpr std::array<int, 4> ids{0, 4, 10, 6};
++    for (const auto id : ids) {
++        QteGesturePath path;
++        CHECK(path.bind(*level.buttonConfigs().find(id), level.hud().interfaceAtlas));
++        CHECK(path.samples().size() == 14);
++        // Exhaust every signed-short coordinate of the deciding axis. The
++        // ignored axis varies too. Independent scalar nearest-point oracle.
++        for (int v = -32768; v <= 32767; ++v) {
++            const auto other = static_cast<std::int16_t>(-1 - v);
++            const QtePoint input = path.horizontal()
++                ? QtePoint{static_cast<std::int16_t>(v), other}
++                : QtePoint{other, static_cast<std::int16_t>(v)};
++            int closest = 100000; std::size_t expected = 0;
++            for (std::size_t i = 0; i < path.samples().size(); ++i) {
++                const auto p = path.samples()[i];
++                const int d = std::abs(v - (path.horizontal() ? p.x : p.y));
++                if (d < closest) { closest = d; expected = i; }
++            }
++            CHECK(path.nearest(input) == expected);
++        }
++        const auto end = path.end();
++        CHECK(path.releaseSucceeded({static_cast<std::int16_t>(end.x+10), static_cast<std::int16_t>(end.y-10)}));
++        CHECK(!path.releaseSucceeded({static_cast<std::int16_t>(end.x+11), end.y}));
++        CHECK(!path.releaseSucceeded({end.x, static_cast<std::int16_t>(end.y-11)}));
++    }
++    QuickTimeEventRuntime qte;
++    qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++    CHECK(qte.applyCommand(startCommand(6), {10000, 0}));
++    CHECK((qte.gesturePath().start() == QtePoint{360, 101}));
++    CHECK((qte.gesturePath().end() == QtePoint{360, 251}));
++    qte.update({10050, 50}, true);
++    CHECK(qte.state() == QteState::Drag); // A-only shortcut is gone.
++    qte.update({10100, 50}, QteInput{false, QtePoint{360,246}, false});
++    CHECK(qte.state() == QteState::Drag);
++    CHECK((qte.buttonPosition() == QtePoint{367,242}));
++    qte.update({10150, 50}, QteInput{false, QtePoint{-32000,247}, false});
++    CHECK(qte.state() == QteState::SuccessDisplay); // Y nearest, X ignored then snapped.
++    CHECK((qte.buttonPosition() == QtePoint{360,251}));
++    finishFeedback(qte, 10150);
++    CHECK(qte.consumeCinematicRequest() == 20006);
++
++    CHECK(qte.applyCommand(startCommand(6), {20000, 0}));
++    qte.update({23901, 50}, QteInput{false, QtePoint{360,251}, false});
++    CHECK(qte.state() == QteState::SuccessDisplay); // timeout THEN nearest success
++    CHECK((qte.consumeSoundCues() == std::vector<std::uint16_t>{0x188,0x189,0x188}));
++    finishFeedback(qte, 23901);
++    CHECK(qte.consumeCinematicRequest() == 20006);
++    CHECK(qte.applyCommand(startCommand(6), {30000, 0}));
++    qte.update({30050, 50}, QteInput{false, QtePoint{371,251}, true});
++    CHECK(qte.state() == QteState::FailureDisplay); // release uses BOTH axes
++    finishFeedback(qte, 30050);
++    CHECK(qte.consumeCinematicRequest() == 20010);
++    CHECK(qte.applyCommand(startCommand(6), {40000, 0}));
++    qte.update({40050, 50}, QteInput{false, QtePoint{370,241}, true});
++    CHECK(qte.state() == QteState::SuccessDisplay); // inclusive 10x10 box
++}
++
++void spriteTests(const LevelOneBootstrap& level) {
++    QteSpriteAnimation sprite;
++    sprite.bind(level.hud().interfaceAtlas);
++    sprite.setAnimation(1, true);
++    sprite.update(50);
++    CHECK(sprite.frameIndex() == 0 && sprite.ticks() == 0 && sprite.residualMilliseconds() == 50);
++    sprite.update(0);
++    CHECK(sprite.frameIndex() == 0);
++    sprite.update(1);
++    CHECK(sprite.frameIndex() == 1 && sprite.ticks() == 0 && sprite.residualMilliseconds() == 1);
++    sprite.update(100);
++    CHECK(sprite.frameIndex() == 3 && sprite.ticks() == 0 && sprite.residualMilliseconds() == 1);
++    sprite.setAnimation(1);
++    CHECK(sprite.frameIndex() == 3); // same SetAnim does not restart
++    sprite.setAnimation(1, true);
++    CHECK(sprite.frameIndex() == 0 && sprite.residualMilliseconds() == 1);
++    sprite.update(49);
++    CHECK(sprite.frameIndex() == 0 && sprite.residualMilliseconds() == 50);
++    sprite.update(1);
++    CHECK(sprite.frameIndex() == 1 && sprite.residualMilliseconds() == 1);
++    sprite.setAnimation(29, true);
++    CHECK(sprite.ended()); // one frame of duration 1, counter==duration-1
++    // Independent instruction transcription exercised against original metadata.
++    struct Ref {
++        int anim{}, frame{}, ticks{}; float residual{}; bool looped{};
++        void set(int id, bool safe) {
++            if (anim != id || safe) { anim=id; frame=ticks=0; looped=false; }
++            looped=false;
++        }
++    } ref;
++    sprite.bind(level.hud().interfaceAtlas);
++    std::uint32_t rng=0x543b629d;
++    const auto next=[&] {rng^=rng<<13; rng^=rng>>17; rng^=rng<<5; return rng;};
++    const std::array<int,9> animations{0,1,2,3,4,5,6,7,29};
++    for (int n=0;n<100000;++n) {
++        if ((next()%7)==0) {
++            const auto id=animations[next()%animations.size()]; const bool safe=next()&1;
++            sprite.setAnimation(static_cast<std::int16_t>(id),safe); ref.set(id,safe);
++        }
++        const std::uint32_t dt=next()%201;
++        const auto& anim=level.hud().interfaceAtlas.animations()[ref.anim];
++        const auto& frame=level.hud().interfaceAtlas.animationFrames()[anim.firstFrameIndex+ref.frame];
++        if (frame.duration && ref.ticks>=0) {
++            ref.residual+=static_cast<float>(dt); int steps=0;
++            while(ref.residual>50) {ref.residual-=50; ++steps; ++ref.ticks;}
++            if(frame.duration<=ref.ticks) {
++                ref.frame+=steps; ref.ticks=0;
++                if(ref.frame>=anim.frameCount) {ref.frame=0;ref.looped=true;}
++            }
++        }
++        sprite.update(dt);
++        CHECK(sprite.frameIndex()==ref.frame);
++        CHECK(sprite.ticks()==ref.ticks);
++        CHECK(sprite.residualMilliseconds()==ref.residual);
++        CHECK(sprite.looped()==ref.looped);
++        const auto& f=level.hud().interfaceAtlas.animationFrames()[anim.firstFrameIndex+ref.frame];
++        CHECK(sprite.ended()==(ref.looped || (ref.frame==anim.frameCount-1 &&
++            (!f.duration || ref.ticks==f.duration-1))));
++    }
++}
++
++void sequenceTests(const LevelOneBootstrap& level) {
++    {
++        QuickTimeEventRuntime sequence;
++        sequence.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(sequence.applyCommand(startCommand(2),{1000,0}));
++        const auto retainedEnd=sequence.gesturePath().end();
++        sequence.update({1050,50},QteInput{false,retainedEnd,false});
++        CHECK(sequence.configId()==3);
++        CHECK(sequence.gesturePath().end()!=retainedEnd);
++        // Same-state SetState(Drag) did not recompute the release endpoint.
++        sequence.update({1100,0},QteInput{false,retainedEnd,true});
++        CHECK(sequence.configId()==1 && sequence.state()==QteState::Drag);
++    }
++
++    NativeRandomizer random, reference;
++    QuickTimeEventRuntime qte;
++    qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas, &random);
++    CHECK(qte.applyCommand(startCommand(2), {10000,0}));
++    CHECK(qte.configId()==0 && qte.durationMilliseconds()==3000);
++    const auto originalEnd=qte.gesturePath().end();
++    const auto initialGeneration=qte.generation();
++    qte.update({10500,50}, QteInput{false,originalEnd,false});
++    CHECK(qte.configId()==3 && qte.durationMilliseconds()==1300);
++    CHECK(qte.generation()==initialGeneration+1);
++    CHECK(qte.elapsedMilliseconds()==0);
++    CHECK(qte.resultSprite().animationId()==2); // SetState(Drag) was a no-op
++    qte.update({10600,50}, QteInput{false,qte.gesturePath().end(),false});
++    CHECK(qte.configId()==1 && qte.durationMilliseconds()==2500);
++    qte.update({10700,50}, QteInput{false,qte.gesturePath().end(),false});
++    CHECK(qte.state()==QteState::SuccessDisplay);
++    finishFeedback(qte,10700);
++    CHECK(qte.consumeCinematicRequest()==20006);
++    CHECK(random.state()==reference.state()); // ordinary/drag do not draw RNG
++    CHECK(qte.applyCommand(startCommand(14),{20000,0}));
++    const int expectedX=240+reference.range(0,240)-120;
++    const int expectedY=160+reference.range(0,160)-80;
++    CHECK(qte.buttonPosition().x==expectedX && qte.buttonPosition().y==expectedY);
++    CHECK(random.state()==reference.state());
++    // An active BeginQTE must not replace the current interaction or consume RNG.
++    const auto generation=qte.generation();
++    CHECK(qte.applyCommand(startCommand(19),{20010,0}));
++    CHECK(qte.configId()==14 && qte.generation()==generation);
++    CHECK(random.state()==reference.state());
++    qte.update({20050,50},true); finishFeedback(qte,20050);
++    (void)qte.consumeCinematicRequest();
++    CHECK(qte.applyCommand(startCommand(19),{21000,0}));
++    (void)reference.range(0,240);(void)reference.range(0,160);
++    CHECK(random.state()==reference.state());
++    qte.update({21050,50},true);
++    CHECK(qte.state()==QteState::SuccessDisplay);
++    qte.update({21100,50},false);
++    CHECK(qte.state()==QteState::SuccessHandled); // photo's one-frame result ends via Update
++}
++
++void gamepadTests(const LevelOneBootstrap& level) {
++    QuickTimeEventRuntime qte;
++    qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++    usm::platform::QteGamepadAdapter pad;
++    CHECK(qte.applyCommand(startCommand(6),{1000,0}));
++    auto input=pad.translate(qte,true,true,true,false,0,0);
++    CHECK((input.dragPosition==QtePoint{360,101}));
++    qte.update({1050,50},input); CHECK(qte.active());
++    input=pad.translate(qte,true,false,true,false,0,1); // wrong direction
++    qte.update({1100,50},input); CHECK(qte.active());
++    input=pad.translate(qte,true,false,true,false,0,-0.5F);
++    qte.update({1150,50},input); CHECK(qte.active());
++    input=pad.translate(qte,true,false,false,true,0,-0.5F);
++    CHECK(input.dragReleased);
++    qte.update({1200,50},input); CHECK(qte.state()==QteState::FailureDisplay);
++    finishFeedback(qte,1200);(void)qte.consumeCinematicRequest();
++    CHECK(qte.applyCommand(startCommand(6),{2000,0}));
++    input=pad.translate(qte,true,false,true,false,0,-1); // held across activation is not a fresh touch
++    CHECK(!input.dragPosition);
++    qte.update({2050,50},input); CHECK(qte.active());
++    input=pad.translate(qte,true,true,true,false,0,0);
++    qte.update({2100,50},input);
++    input=pad.translate(qte,true,false,true,false,0,-1);
++    qte.update({2150,50},input); CHECK(qte.state()==QteState::SuccessDisplay);
++    finishFeedback(qte,2150);(void)qte.consumeCinematicRequest();
++    CHECK(qte.applyCommand(startCommand(6),{3000,0}));
++    (void)pad.translate(qte,true,true,true,false,0,0);
++    input=pad.translate(qte,false,false,false,true,0,-1);
++    CHECK(!input.dragPosition && !input.dragReleased && !input.actionPressed);
++    qte.update({3050,50},input); CHECK(qte.active());
++    input=pad.translate(qte,true,false,true,false,0,-1);
++    CHECK(!input.dragPosition); // reconnect does not inherit a held gesture
++    qte.update({3100,50},input); CHECK(qte.active());
++    // Diagnostic autoplay also sends positions; it cannot force success by A.
++    usm::diagnostics::AutoplayHarness autoplay;
++    for(int i=0;i<14;++i) {
++        input=autoplay.quickTimeInput(qte,true);
++        CHECK(input.dragPosition==qte.gesturePath().samples()[i]);
++        qte.update({static_cast<std::uint32_t>(3150+i*50),50},input);
++        CHECK((i==13)==(qte.state()==QteState::SuccessDisplay));
++    }
++}
++
++void firstLevelFlowTests(const LevelOneBootstrap& level) {
++    // This tuple comes from the actual linked first-level CFF, not the
++    // inherited smoke fixture's synthetic source ID 20005. Five further CFFs
++    // containing StartQTE exist in the pack but their rooms are NOT linked by
++    // levelnew_01.irr; do not silently promote unused assets into gameplay.
++    struct Authored { int source, config, success, failure, stamp; };
++    constexpr std::array records{Authored{20004,6,20006,20010,2000}};
++    CHECK(level.mainScene().linkedSceneFiles().size()==13);
++    for(const int unusedSource:{20016,20045,20051,20062,20081}) {
++        CHECK(std::none_of(level.cinematics().begin(),level.cinematics().end(),
++            [&](const auto& c) {return c.objectId==unusedSource;}));
++    }
++    int actualCommands=0;
++    for(const auto& asset:level.cinematics()) {
++        for(const auto& thread:asset.script.threads()) {
++            for(const auto& command:thread.commands) {
++                if(command.name=="StartQTE") {
++                    ++actualCommands;
++                    std::cout << "Loaded StartQTE: source " << asset.objectId
++                        << " / file " << asset.scriptFile << '\n';
++                }
++            }
++        }
++    }
++    CHECK(actualCommands==static_cast<int>(records.size()));
++    for(const auto& record:records) {
++        const auto source=std::find_if(level.cinematics().begin(),level.cinematics().end(),
++            [&](const auto& c) {return c.objectId==record.source;});
++        CHECK(source!=level.cinematics().end() && source->scriptAvailable);
++        const CinematicCommand* authored=nullptr;
++        for(const auto& thread:source->script.threads()) {
++            for(const auto& command:thread.commands) {
++                if(command.name=="StartQTE") { CHECK(!authored); authored=&command; }
++            }
++        }
++        CHECK(authored && authored->timestampMilliseconds==static_cast<unsigned>(record.stamp));
++        const auto attribute=[&](std::string_view key,int expected) {
++            const auto* found=authored->findAttribute(key);
++            CHECK(found && found->value==std::to_string(expected));
++        };
++        attribute("QTEID",record.config);
++        attribute("^ID^Cinematic^Success",record.success);
++        attribute("^ID^Cinematic^Fail",record.failure);
++        for(const bool succeed:{false,true}) {
++            GameplayCinematicScheduler scheduler;
++            scheduler.bind(level.cinematics()); CHECK(scheduler.start(record.source));
++            QuickTimeEventRuntime qte; qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++            std::uint32_t now=10000;
++            int commands=0, starts=0;
++            while(!qte.active() && now<30000) {
++                now+=50;
++                CHECK(scheduler.update(50,[&](const auto& asset,const auto&,const auto& command) {
++                    ++commands;
++                    if(command.name=="StartQTE") {
++                        CHECK(qte.applyCommand(command,{now,50},asset.objectId)); ++starts;
++                    }
++                    // Scheduler/manager integration only: other commands are
++                    // observed, not executed against a simulated world here.
++                    return true;
++                }));
++            }
++            CHECK(qte.active() && starts==1 && commands>0);
++            CHECK(qte.sourceCinematicId()==record.source && qte.configId()==record.config);
++            const auto started=now;
++            const auto duration=qte.durationMilliseconds();
++            for(int frame=0;frame<100 && qte.active();++frame) {
++                now+=50;
++                QteInput input;
++                if(qte.state()==QteState::Drag) {
++                    // A alone cannot win a drag even in the failure scenario.
++                    input.actionPressed=true;
++                    if(succeed) {
++                        const auto path=qte.gesturePath().samples();
++                        input.dragPosition=path[std::min<std::size_t>(frame,path.size()-1)];
++                    }
++                } else {input.actionPressed=succeed;}
++                qte.update({now,50},input);
++            }
++            CHECK(!qte.active());
++            CHECK(qte.state()==(succeed?QteState::SuccessDisplay:QteState::FailureDisplay));
++            CHECK(succeed || now==started+(duration/50+1)*50);
++            CHECK(qte.consumeControlRelease());
++            finishFeedback(qte,now);
++            const auto next=qte.consumeCinematicRequest();
++            CHECK(next==(succeed?record.success:record.failure));
++            CHECK(scheduler.active(record.source));
++            scheduler.remove(qte.sourceCinematicId()); CHECK(!scheduler.active(record.source));
++            CHECK(scheduler.start(*next)); CHECK(scheduler.active(*next));
++            CHECK(scheduler.playback(*next)->asset->scriptAvailable);
++            std::cout << "Authored level 1 QTE: " << record.source << " / config "
++                << record.config << " -> " << *next << (succeed?" success":" failure") << '\n';
++        }
++    }
++}
++
++void audioTests(const std::filesystem::path& root) {
++    usm::audio::VoxSoundTable table;
++    usm::audio::SoundEventCatalog catalog;
++    CHECK(table.load(root)); CHECK(catalog.index(root/"sound",&table));
++    for (const std::uint16_t id : {0x188,0x189,0x18a,0x18b}) {
++        const auto* record=table.find(id); CHECK(record);
++        usm::audio::PcmAudio clip;
++        const auto decoded=catalog.decode(record->eventName,clip);
++        if(!decoded) {throw std::runtime_error(decoded.message());}
++        CHECK(decoded);
++        std::cout << "Decoded original QTE sound " << id << ": " << record->eventName << '\n';
++    }
++}
++
++struct HostageFixture {
++    LevelObjectRuntime objects;
++    LevelBonusRuntime bonuses;
++    LevelHostageRuntime hostages;
++    GameplayPlayer player;
++    std::uint32_t now{10000};
++    std::size_t initialBonuses{};
++    HostageFixture(const LevelOneBootstrap& level, const PlayerStateConfigDatabase& configs) {
++        CHECK(objects.initialize(level));
++        CHECK(bonuses.initialize(level.bonuses()));
++        CHECK(hostages.initialize(level, &objects));
++        CHECK(player.initialize(level.player(), nullptr, &configs));
++        const auto* captive = hostages.find(30018);
++        CHECK(captive && captive->asset);
++        CHECK(captive->asset->hostageButtonHeight == 85.0F);
++        player.restoreAt(captive->asset->position, {1, 0, 0});
++        initialBonuses = bonuses.states().size();
++    }
++    const LevelHostageState& state() const { return *hostages.find(30018); }
++    void objectStep(bool rescue = false, std::uint32_t simulation = 0) {
++        CHECK(hostages.updateObjects(player, objects, bonuses, {simulation, 0, now}, rescue));
++    }
++    void qteStep(bool tap = false, std::uint32_t real = 0) {
++        hostages.updateQuickTime({now, real}, tap);
++    }
++    void start(bool tapOnActivation = false) {
++        objectStep();
++        CHECK(hostages.contextPromptVisible());
++        objectStep(true);
++        CHECK(player.activeStateId() == 27);
++        CHECK(hostages.consumeSoundCues().empty());
++        player.update({}, {}, 1000);
++        objectStep();
++        CHECK(state().phase == HostageRescuePhase::QuickTime);
++        CHECK(state().completedActions == 0);
++        CHECK(hostages.consumeSoundCues().empty());
++        qteStep(tapOnActivation);
++    }
++    void finishInput(std::uint32_t at) {
++        now = at;
++        for (int i = 0; i < 8; ++i) { objectStep(); qteStep(true); }
++    }
++};
++
++void hostageTests(const LevelOneBootstrap& level, const PlayerStateConfigDatabase& configs) {
++    {
++        HostageFixture f(level, configs);
++        f.start(true); // A can be consumed on the exact activation update.
++        CHECK(f.state().completedActions == 1);
++        CHECK(f.hostages.consumeSoundCues().empty());
++        f.objectStep();
++        const auto start = f.hostages.consumeSoundCues();
++        CHECK(start.size() == 1 && start[0].voxSoundId == 0x18b);
++        CHECK(start[0].action == HostageSoundAction::StartLoop);
++        f.objectStep();
++        CHECK(f.hostages.consumeSoundCues().empty());
++        f.qteStep(false, 500);
++        CHECK(f.state().completedActions == 0);
++        f.objectStep();
++        CHECK(f.hostages.consumeSoundCues().empty()); // Decay does not stop loop.
++        f.now = 14000;
++        f.qteStep(false);
++        CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Running);
++        f.now = 14001;
++        f.qteStep(false);
++        CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Failure);
++        CHECK(f.player.activeStateId() == 28); // Not an eager player transition.
++        CHECK(f.hostages.consumeSoundCues().empty());
++        f.objectStep();
++        CHECK(f.state().phase == HostageRescuePhase::Tied);
++        const auto stop = f.hostages.consumeSoundCues();
++        CHECK(stop.size() == 1 && stop[0].action == HostageSoundAction::StopLoop);
++        CHECK(f.bonuses.states().size() == f.initialBonuses);
++        f.start();
++        CHECK(f.state().completedActions == 0);
++    }
++    {
++        HostageFixture f(level, configs);
++        f.start();
++        for (int i = 0; i < 20; ++i) { f.objectStep(); f.qteStep(false, 50); }
++        CHECK(f.hostages.consumeSoundCues().empty()); // No input, no cutting sound.
++        f.finishInput(14000);
++        CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Success);
++        CHECK(f.player.activeStateId() == 28);
++        f.objectStep();
++        CHECK(f.player.activeStateId() == 29);
++        CHECK(f.state().phase == HostageRescuePhase::RescueEnd);
++        f.player.restoreAt(f.state().asset->position, {1, 0, 0}); // Interrupted end clip.
++        f.objectStep();
++        CHECK(f.state().phase == HostageRescuePhase::Tied);
++        CHECK(f.bonuses.states().size() == f.initialBonuses);
++    }
++    {
++        HostageFixture f(level, configs);
++        f.start();
++        for (int i = 0; i < 7; ++i) { f.objectStep(); f.qteStep(true); }
++        f.now = 14001;
++        f.objectStep(); f.qteStep(true);
++        CHECK(f.state().completedActions == 8);
++        CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Failure);
++        f.objectStep();
++        CHECK(f.state().phase == HostageRescuePhase::Tied);
++        CHECK(f.bonuses.states().size() == f.initialBonuses);
++    }
++    {
++        HostageFixture f(level, configs);
++        f.start(true);
++        f.objectStep();
++        (void)f.hostages.consumeSoundCues();
++        CHECK(f.player.enterScriptedState(27, false)); // Interrupt with another clip.
++        f.objectStep();
++        CHECK(f.state().phase == HostageRescuePhase::Tied);
++        CHECK(f.player.activeStateId() == 27); // Do not clobber the interrupting state.
++        CHECK(f.bonuses.states().size() == f.initialBonuses);
++        const auto stop = f.hostages.consumeSoundCues();
++        CHECK(stop.size() == 1 && stop[0].action == HostageSoundAction::StopLoop);
++    }
++    {
++        HostageFixture f(level, configs);
++        CHECK(f.player.enterScriptedState(107, true));
++        CHECK(f.player.isUltimateState());
++        f.objectStep(true);
++        CHECK(f.state().phase == HostageRescuePhase::Tied);
++        CHECK(!f.hostages.contextPromptVisible());
++        CHECK(!f.hostages.canStartRescue(f.player));
++    }
++    {
++        HostageFixture f(level, configs);
++        f.start();
++        f.hostages.setPause(true, 10900);
++        f.hostages.setPause(false, 13000);
++        f.now = 17000; f.qteStep();
++        CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Running);
++        f.now = 17001; f.qteStep();
++        CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Failure);
++    }
++    {
++        HostageFixture f(level, configs);
++        f.start(true);
++        CHECK((f.hostages.consumeQuickTimeSoundCues() == std::vector<std::uint16_t>{0x18a}));
++        CHECK(!f.hostages.consumeControlRelease());
++        for (int i=0;i<6;++i) { f.qteStep(true); }
++        CHECK(f.hostages.consumeQuickTimeSoundCues() == std::vector<std::uint16_t>(6,0x18a));
++        f.now=14001; f.qteStep(true);
++        CHECK((f.hostages.consumeQuickTimeSoundCues() == std::vector<std::uint16_t>{0x18a,0x188,0x189}));
++        CHECK(f.hostages.consumeControlRelease() && !f.hostages.consumeControlRelease());
++        CHECK(f.state().quickTimeOutcome==HostageQteOutcome::Failure);
++        f.qteStep(true); CHECK(f.hostages.consumeQuickTimeSoundCues().empty());
++    }
++
++}
++
++void attributesTests() {
++    CHECK(hostageButtonHeight(-1) == 85);
++    CHECK(hostageButtonHeight(-100) == 85);
++    CHECK(hostageButtonHeight(0) == 85);
++    CHECK(hostageButtonHeight(185) == 85);
++    CHECK(hostageButtonHeight(100) == 0);
++    CHECK(hostageButtonHeight(50) == -50);
++    CHECK(hostageButtonHeight(std::numeric_limits<float>::quiet_NaN()) == 85);
++}
++} // namespace
++
++int main(int argc, char** argv) {
++    try {
++        if (argc != 2) { throw std::runtime_error("Expected clock, cinematic, hostage, or attributes"); }
++        const std::string_view group = argv[1];
++        if (group == "clock") { clockTests(); }
++        else if (group == "attributes") { attributesTests(); }
++        else {
++            const std::filesystem::path root = USM_TEST_GAME_DATA_ROOT;
++            CHECK(std::filesystem::is_regular_file(root / "configs.pack"));
++            LevelOneBootstrap level;
++            CHECK(level.load(root));
++            if (group == "cinematic") { cinematicTests(level); }
++            else if (group == "gesture") { gestureTests(level); }
++            else if (group == "sprite") { spriteTests(level); }
++            else if (group == "sequence") { sequenceTests(level); }
++            else if (group == "gamepad") { gamepadTests(level); }
++            else if (group == "audio") { audioTests(root); }
++            else if (group == "first_level") { firstLevelFlowTests(level); }
++            else if (group == "hostage") {
++                PlayerStateConfigDatabase configs;
++                CHECK(configs.load(root));
++                hostageTests(level, configs);
++            } else { throw std::runtime_error("Unknown QTE parity group"); }
++        }
++        std::cout << "PASS " << group << ": " << checks << " checks\n";
++        return 0;
++    } catch (const std::exception& error) {
++        std::cerr << "FAIL: " << error.what() << '\n';
++        return 1;
++    }
++}
+diff --git a/tests/SmokeTests.cpp b/tests/SmokeTests.cpp
+index 6fd646c..1ce1225 100644
+--- a/tests/SmokeTests.cpp
++++ b/tests/SmokeTests.cpp
+@@ -5983,7 +5983,7 @@ int main() {
+         assert(roomTwoHostageAsset->hostageHealthOrbCount == 10);
+         assert(roomTwoHostageAsset->hostageSkillPointOrbCount == 0);
+         assert(roomTwoHostageAsset->hostageHintHeight == 180.0F);
+-        assert(roomTwoHostageAsset->hostageButtonHeight == -101.0F);
++        assert(roomTwoHostageAsset->hostageButtonHeight == 85.0F);
+         assert(roomTwoHostageAsset->hostageIsWoman);
+ 
+         usm::game::LevelBonusRuntime hostageBonuses;
+@@ -6001,23 +6001,28 @@ int main() {
+         hostagePlayer.restoreAt(roomTwoHostageAsset->position,
+                                 {1.0F, 0.0F, 0.0F});
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, {0, 0}, {}));
++                                     hostageBonuses, {0, 0, 0}, {}));
+         assert(hostageRuntime.contextPromptVisible());
+         assert(hostageRuntime.canStartRescue(hostagePlayer));
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, {0, 0}, {true, false}));
++                                     hostageBonuses, {0, 0, 0}, {true, false}));
+         assert(hostagePlayer.activeStateId() == 27);
+         assert(hostagePlayer.activeAnimation() == "stand_to_unhitch");
+         hostagePlayer.update({}, {}, 1000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, {0, 0}, {}));
++                                     hostageBonuses, {0, 0, 0}, {}));
+         assert(hostageRuntime.quickTimeActive());
+         assert(hostagePlayer.activeStateId() == 28);
+         assert(hostagePlayer.activeAnimation() == "unhitch_to_unhitch");
+         for (std::int32_t action = 0; action < 8; ++action) {
+             assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                         hostageBonuses, {1, 1}, {false, true}));
++                                         hostageBonuses, {1, 1, static_cast<std::uint32_t>(action + 1)}, {false, true}));
+         }
++        assert(hostageRuntime.find(30018)->quickTimeOutcome ==
++               usm::game::HostageQteOutcome::Success);
++        assert(hostagePlayer.activeStateId() == 28);
++        assert(hostageRuntime.update(hostagePlayer, objectRuntime,
++                                     hostageBonuses, {0, 0, 8}, {}));
+         assert(!hostageRuntime.quickTimeActive());
+         assert(hostagePlayer.activeStateId() == 29);
+         assert(hostagePlayer.activeAnimation() == "unhitch_to_stand");
+@@ -6030,7 +6035,7 @@ int main() {
+                usm::game::HostageSoundAction::StopLoop);
+         hostagePlayer.update({}, {}, 1000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, {0, 0}, {}));
++                                     hostageBonuses, {0, 0, 0}, {}));
+         assert(hostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Release);
+         assert(hostageBonuses.states().size() ==
+@@ -6040,20 +6045,22 @@ int main() {
+                        roomTwoHostageAsset->hostageSkillPointOrbCount));
+         objectRuntime.advanceAnimations(100000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, {0, 0}, {}));
++                                     hostageBonuses, {0, 0, 0}, {}));
+         assert(hostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Thank);
+         objectRuntime.advanceAnimations(100000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, {0, 0}, {}));
++                                     hostageBonuses, {0, 0, 0}, {}));
+         assert(hostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Freed);
+         assert(objectRuntime.find(30018)->activeAnimation ==
+                "idle_watching_idle");
+         assert(objectRuntime.find(30018)->animationLoops);
+         const auto hostageThankCues = hostageRuntime.consumeSoundCues();
+-        assert(hostageThankCues.size() == 1);
+-        assert(hostageThankCues.front().voxSoundId == 0xa3);
++        assert(hostageThankCues.size() == 2);
++        assert(hostageThankCues.front().action ==
++               usm::game::HostageSoundAction::StopLoop);
++        assert(hostageThankCues.back().voxSoundId == 0xa3);
+         hostageBonuses.update(roomTwoHostageAsset->position, 3000);
+         assert(hostageBonuses.consumeGrants().size() ==
+                static_cast<std::size_t>(
+@@ -6074,18 +6081,27 @@ int main() {
+                                       {1.0F, 0.0F, 0.0F});
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, {0, 0}, {}));
++            failedHostageBonuses, {0, 0, 0}, {}));
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, {0, 0}, {true, false}));
++            failedHostageBonuses, {0, 0, 0}, {true, false}));
+         failedHostagePlayer.update({}, {}, 1000);
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, {0, 0}, {}));
++            failedHostageBonuses, {0, 0, 0}, {}));
++        assert(failedHostageRuntime.quickTimeActive());
++        assert(failedHostageRuntime.update(
++            failedHostagePlayer, failedHostageObjects,
++            failedHostageBonuses, {4000, 4000, 4000}, {}));
+         assert(failedHostageRuntime.quickTimeActive());
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, {4000, 4000}, {}));
++            failedHostageBonuses, {1, 1, 4001}, {}));
++        assert(failedHostageRuntime.find(30018)->quickTimeOutcome ==
++               usm::game::HostageQteOutcome::Failure);
++        assert(failedHostageRuntime.update(
++            failedHostagePlayer, failedHostageObjects,
++            failedHostageBonuses, {0, 0, 4001}, {}));
+         assert(failedHostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Tied);
+         assert(failedHostagePlayer.activeStateId() == 0);
+@@ -7249,22 +7265,35 @@ int main() {
+             {"int", "^ID^Cinematic^Fail", "20010"},
+         };
+         usm::game::QuickTimeEventRuntime successfulQte;
+-        successfulQte.bind(bootstrap.buttonConfigs());
+-        assert(successfulQte.applyCommand(startLevelOneQte, 20005));
+-        assert(successfulQte.sourceCinematicId() == 20005);
++        successfulQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
++        assert(successfulQte.applyCommand(startLevelOneQte, {0, 0}, 20004));
++        assert(successfulQte.sourceCinematicId() == 20004);
+         assert(successfulQte.active());
+         assert(successfulQte.durationMilliseconds() == 3900);
+-        successfulQte.update(2000, true);
++        successfulQte.update({2000, 50}, true);
++        assert(successfulQte.active()); // Original record 6 is a drag, not an A tap.
++        successfulQte.update({2050, 50}, usm::game::QteInput{
++            false, successfulQte.gesturePath().end(), false});
+         assert(!successfulQte.active());
++        for (int draw = 0; draw < 8; ++draw) {
++            successfulQte.drawStep();
++            assert(!successfulQte.consumeCinematicRequest());
++        }
++        successfulQte.drawStep();
+         assert(successfulQte.consumeCinematicRequest() == 20006);
+         assert(!successfulQte.consumeCinematicRequest().has_value());
+         usm::game::QuickTimeEventRuntime failedQte;
+-        failedQte.bind(bootstrap.buttonConfigs());
+-        assert(failedQte.applyCommand(startLevelOneQte));
+-        failedQte.update(3899, false);
++        failedQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
++        assert(failedQte.applyCommand(startLevelOneQte, {0, 0}));
++        failedQte.update({3899, 3899}, false);
+         assert(failedQte.active());
+-        failedQte.update(1, false);
++        failedQte.update({3900, 1}, false);
++        assert(failedQte.active());
++        failedQte.update({3901, 1}, false);
+         assert(!failedQte.active());
++        for (int tick = 0; tick < 40 && failedQte.visible(); ++tick) {
++            failedQte.update({3901, 50}, false); failedQte.drawStep();
++        }
+         assert(failedQte.consumeCinematicRequest() == 20010);
+         const auto* wallWebButton = bootstrap.buttonConfigs().find(12);
+         assert(wallWebButton != nullptr);
+@@ -7274,25 +7303,31 @@ int main() {
+         auto startMashQte = startLevelOneQte;
+         startMashQte.attributes.front().value = "12";
+         usm::game::QuickTimeEventRuntime mashQte;
+-        mashQte.bind(bootstrap.buttonConfigs());
+-        assert(mashQte.applyCommand(startMashQte));
+-        mashQte.update(0, true);
++        mashQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
++        assert(mashQte.applyCommand(startMashQte, {0, 0}));
++        mashQte.update({0, 0}, true);
+         assert(mashQte.active() && mashQte.completedActionCount() == 1);
+-        mashQte.update(499, false);
++        mashQte.update({499, 499}, false);
+         assert(mashQte.completedActionCount() == 1);
+-        mashQte.update(1, false);
++        mashQte.update({500, 1}, false);
+         assert(mashQte.completedActionCount() == 0);
+         for (int tap = 0; tap < 7; ++tap) {
+-            mashQte.update(50, true);
++            mashQte.update({static_cast<std::uint32_t>(550 + tap * 50), 50}, true);
+             assert(mashQte.active());
+         }
+-        mashQte.update(50, true);
++        mashQte.update({900, 50}, true);
+         assert(!mashQte.active() && mashQte.completedActionCount() == 8);
++        for (int draw = 0; draw < 9; ++draw) { mashQte.drawStep(); }
+         assert(mashQte.consumeCinematicRequest() == 20006);
+-        assert(mashQte.applyCommand(startMashQte));
++        assert(mashQte.applyCommand(startMashQte, {0, 0}));
+         assert(mashQte.completedActionCount() == 0);
+-        mashQte.update(3000, false);
++        mashQte.update({3000, 3000}, false);
++        assert(mashQte.active());
++        mashQte.update({3001, 1}, false);
+         assert(!mashQte.active());
++        for (int tick = 0; tick < 40 && mashQte.visible(); ++tick) {
++            mashQte.update({3001, 50}, false); mashQte.drawStep();
++        }
+         assert(mashQte.consumeCinematicRequest() == 20010);
+         const auto roomNineCameraCinematic = std::find_if(
+             bootstrap.cinematics().begin(), bootstrap.cinematics().end(),
+diff --git a/tools/verify_re02_reference.py b/tools/verify_re02_reference.py
+new file mode 100644
+index 0000000..5393c3e
+--- /dev/null
++++ b/tools/verify_re02_reference.py
+@@ -0,0 +1,46 @@
++#!/usr/bin/env python3
++"""Verify RE02's supplied original reference identity, without executing ARM."""
++from __future__ import annotations
++
++import argparse
++import json
++import struct
++import sys
++from pathlib import Path
++
++# Shared ELF32 parser shipped with the cumulative RE01 source.
++from verify_re01_reference import inspect_elf
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("reference", nargs="?", type=Path,
++                        default=ROOT / "game/original/libspiderman.so")
++    parser.add_argument("--manifest", type=Path,
++                        default=ROOT / "docs/references/re02-original-fingerprints.json")
++    parser.add_argument("--output", type=Path)
++    args = parser.parse_args()
++    try:
++        expected = json.loads(args.manifest.read_text(encoding="utf-8"))
++        actual = inspect_elf(args.reference, [s["name"] for s in expected["symbols"]])
++        for key in ("size", "sha256", "machine", "symbols"):
++            if actual[key] != expected[key]:
++                raise ValueError(f"Reference mismatch in {key}; do not reuse the recorded addresses")
++        actual["verified"] = True
++        actual["ghidra_rebase_offset"] = expected["ghidra_rebase_offset"]
++        actual["note"] = "Identity verification only; no ARM code was executed."
++        text = json.dumps(actual, indent=2) + "\n"
++        if args.output:
++            args.output.parent.mkdir(parents=True, exist_ok=True)
++            args.output.write_text(text, encoding="utf-8")
++        print(text, end="")
++        return 0
++    except (OSError, ValueError, KeyError, TypeError, struct.error) as error:
++        print(f"Reference verification failed: {error}", file=sys.stderr)
++        return 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

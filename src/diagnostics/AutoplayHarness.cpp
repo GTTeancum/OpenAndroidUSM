@@ -1296,6 +1296,8 @@ AutoplayFrameInput AutoplayHarness::update(
             input.superAttackPressed || stepInput.superAttackPressed;
         input.quickTimeEventPressed =
             input.quickTimeEventPressed || stepInput.quickTimeEventPressed;
+        input.rescueRequested =
+            input.rescueRequested || stepInput.rescueRequested;
         input.menuUpReleased =
             input.menuUpReleased || stepInput.menuUpReleased;
         input.menuDownReleased =
@@ -1332,8 +1334,8 @@ AutoplayFrameInput AutoplayHarness::update(
              (snapshot.tutorialVisible && !snapshot.controlsEnabled &&
               step.kind == StepKind::WaitControls)) &&
             step.kind != StepKind::Capture);
-        input.punchPressed =
-            input.punchPressed ||
+        input.quickTimeEventPressed =
+            input.quickTimeEventPressed ||
             (autoQuickTimeActions_ &&
              snapshot.hostageQuickTimeEventActive &&
              step.kind != StepKind::Capture);
@@ -2160,7 +2162,7 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
                          std::to_string(hostage->requiredActions));
         } else if (hostage->phase == game::HostageRescuePhase::Tied) {
             if (hostage->promptVisible) {
-                input.punchPressed = true;
+                input.rescueRequested = true;
             } else if (snapshot.controlsEnabled) {
                 input.motion = steerToward(snapshot,
                                            hostage->asset->position);
@@ -2168,7 +2170,7 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
         } else if (hostage->phase ==
                        game::HostageRescuePhase::QuickTime &&
                    autoQuickTimeActions_) {
-            input.punchPressed = true;
+            input.quickTimeEventPressed = true;
         }
         break;
     }
@@ -5204,6 +5206,26 @@ std::string AutoplayHarness::csv(std::string_view value) {
     }
     result.push_back('"');
     return result;
+}
+
+game::QteInput AutoplayHarness::quickTimeInput(
+    const game::QuickTimeEventRuntime& runtime, bool actionPressed) noexcept {
+    float x = 0.0F, y = 0.0F;
+    const bool newGesture = qteGestureGeneration_ != runtime.generation();
+    qteGestureGeneration_ = runtime.generation();
+    // One neutral observation per new gesture, then the same stick intent a
+    // player supplies. No asset-coordinate traversal or forced-success path.
+    if (autoQuickTimeActions_ && !newGesture &&
+        runtime.state() == game::QteState::Drag) {
+        switch (runtime.gesturePath().direction()) {
+        case game::QteDirection::Left: x = -1.0F; break;
+        case game::QteDirection::Right: x = 1.0F; break;
+        case game::QteDirection::Up: y = 1.0F; break;
+        case game::QteDirection::Down: y = -1.0F; break;
+        case game::QteDirection::None: break;
+        }
+    }
+    return qteGamepad_.translate(runtime, true, actionPressed, x, y);
 }
 
 } // namespace usm::diagnostics

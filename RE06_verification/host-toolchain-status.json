@@ -1,0 +1,19 @@
+{
+  "paths": {
+    "x86_64-w64-mingw32-g++": null,
+    "x86_64-w64-mingw32-clang++": null,
+    "clang-cl": "/usr/local/swift/usr/bin/clang-cl",
+    "cl": null,
+    "wine": null,
+    "wine64": null,
+    "cmake": "/usr/bin/cmake",
+    "ninja": "/usr/bin/ninja",
+    "g++": "/usr/bin/g++",
+    "clang++": "/usr/local/swift/usr/bin/clang++"
+  },
+  "windows_application_compiled": false,
+  "windows_audio_query_compiled": false,
+  "physical_xinput_executed": false,
+  "graphical_port_executed": false,
+  "note": "No Windows SDK/import-library toolchain established. clang-cl alone is not a Windows SDK. Earlier network acquisition attempts in this response failed; no toolchain was downloaded. Portable Linux core builds are not Windows application builds."
+}

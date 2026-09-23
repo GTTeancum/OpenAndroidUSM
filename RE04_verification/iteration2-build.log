@@ -1,0 +1,19 @@
+[1/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/OggAudio.cpp.o
+[2/19] Building CXX object CMakeFiles/OpenAndroidUSM.PVRTC.dir/_deps/powervr-decompress/PVRTDecompress.cpp.o
+[3/19] Linking CXX static library libOpenAndroidUSM.PVRTC.a
+[4/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/assets/BtexTexture.cpp.o
+[5/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[6/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[7/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/reconstructed/input/XperiaKeyRouter.cpp.o
+[8/19] Building CXX object CMakeFiles/OpenAndroidUSM.Vorbis.dir/_deps/stb-vorbis/stb_vorbis.c.o
+[9/19] Linking CXX static library libOpenAndroidUSM.Vorbis.a
+[10/19] Building CXX object CMakeFiles/OpenAndroidUSM.QteParityTests.dir/tests/QteParityTests.cpp.o
+[11/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+[12/19] Linking CXX static library libOpenAndroidUSM.Core.a
+[13/19] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[14/19] Building CXX object CMakeFiles/OpenAndroidUSM.InputTransitionsTests.dir/tests/InputTransitionsTests.cpp.o
+[15/19] Linking CXX executable OpenAndroidUSM.QteParityTests
+[16/19] Linking CXX executable OpenAndroidUSM.InputParityTests
+[17/19] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[18/19] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+[19/19] Linking CXX executable OpenAndroidUSM.CoreTests

@@ -35,6 +35,7 @@
 #include "game/LevelOneBootstrap.hpp"
 #include "game/PlayerHudHealthState.hpp"
 #include "game/PlayerStateConfig.hpp"
+#include "platform/input/QteGamepadAdapter.hpp"
 #include "platform/windows/Window.hpp"
 #include "platform/windows/XInputController.hpp"
 #include "reconstructed/input/XperiaKeyRouter.hpp"
@@ -64,6 +65,7 @@ public:
 private:
     platform::Window window_;
     platform::XInputController controller_;
+    platform::QteGamepadAdapter qteGamepad_;
     reconstructed::XperiaKeyRouter keyRouter_;
     game::LevelOneBootstrap levelOne_;
     renderer::D3D11Renderer renderer_;

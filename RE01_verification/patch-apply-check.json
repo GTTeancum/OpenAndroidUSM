@@ -1,0 +1,10 @@
+{
+  "base_commit": "59903b8037945c24ad81a5f947d69f01dc4de5b7",
+  "patch_sha256": "541657b701a743729feb1c77d9e20233547de57e642c21c9e2ec713667d8002f",
+  "git_apply_check_exit": 0,
+  "git_apply_exit": 0,
+  "checked_source_files": 323,
+  "all_match_delivered_source": true,
+  "mismatches": [],
+  "git_diff_check_exit": 0
+}

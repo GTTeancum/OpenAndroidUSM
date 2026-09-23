@@ -1,0 +1,68 @@
+{
+  "binaries": [
+    {
+      "build": "re02-linux",
+      "filename": "OpenAndroidUSM.CoreTests",
+      "size": 3320424,
+      "sha256": "88efb4460d570b820e5d2df0de25febe53237cf3221be44e3bbc914076a877a4",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-linux",
+      "filename": "OpenAndroidUSM.InputParityTests",
+      "size": 1785792,
+      "sha256": "1faca3e3c17afda77e563bf826219f77160691a44fe6815c1d4b3aa219992482",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-linux",
+      "filename": "OpenAndroidUSM.InputTransitionsTests",
+      "size": 17928,
+      "sha256": "4c28232e4a7fd7eb8f63568714b71784aff0048eb55e1f2251fbf7a80ec30173",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-linux",
+      "filename": "OpenAndroidUSM.QteParityTests",
+      "size": 1955584,
+      "sha256": "26993ce9caa3c51d45b417943eb2aa2562851ef2f1ed9ec041a7add2d1a5c1a4",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-sanitized",
+      "filename": "OpenAndroidUSM.CoreTests",
+      "size": 23501912,
+      "sha256": "dfeae79887b7b271ae2a11c38dc1dafe0a9169e4aa03ac5eb1823e1efe52a3b2",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-sanitized",
+      "filename": "OpenAndroidUSM.InputParityTests",
+      "size": 13834200,
+      "sha256": "598a71157157873c7b0eda82191afa581afec66ecf67c99ae1392fab2cc9674d",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-sanitized",
+      "filename": "OpenAndroidUSM.InputTransitionsTests",
+      "size": 3407552,
+      "sha256": "e854dccbacbe3c5fbb7a8c97404cfba537de613ba02bacb727bdd095101659b7",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    },
+    {
+      "build": "re02-sanitized",
+      "filename": "OpenAndroidUSM.QteParityTests",
+      "size": 15411152,
+      "sha256": "ac82c4d19dda2f7f9e87d6173861b358db0b57b92ad4d507955e618cc0ac040c",
+      "format": "Linux native x86-64 ELF test executable; not the Windows game",
+      "included_in_delivery": false
+    }
+  ]
+}

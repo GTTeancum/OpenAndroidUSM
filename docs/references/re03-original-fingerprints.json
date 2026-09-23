@@ -1,0 +1,71 @@
+{
+  "size": 7713000,
+  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
+  "machine": "ELF32 little-endian ARM",
+  "symbols": [
+    {
+      "name": "_ZN11CQTEManagerC2EP13ControlScheme",
+      "elf_address": "0x0037b088",
+      "thumb": true,
+      "size": 420,
+      "sha256": "1aa015458b229994273d96f853ad49e105ec514dec76dec8e210efddfe65eab5"
+    },
+    {
+      "name": "_ZN11CQTEManager8BeginQTEEiiii",
+      "elf_address": "0x0037ab40",
+      "thumb": true,
+      "size": 120,
+      "sha256": "89d03744fb39e91be7bc7d7b1f8068499184181f755f3e6f8630534f1693d288"
+    },
+    {
+      "name": "_ZN11CQTEManager11BeginNowQTEEv",
+      "elf_address": "0x0037aa08",
+      "thumb": true,
+      "size": 312,
+      "sha256": "42fa12b37c92687f6b9b9b22654f693b3d11814ca7734baf1ebb114e42dd46b9"
+    },
+    {
+      "name": "_ZN11CQTEManager8SetStateEi",
+      "elf_address": "0x0037a67c",
+      "thumb": true,
+      "size": 332,
+      "sha256": "dcf6a85d3a724edb2428bb25a44d5d1024b7f5fec80372faebc4ccc49a9dc8f2"
+    },
+    {
+      "name": "_ZN11CQTEManager4DrawEv",
+      "elf_address": "0x0037a7c8",
+      "thumb": true,
+      "size": 540,
+      "sha256": "3547a2cca9cc7526786e36032e48fdbf28dd0ab2b20eb0cbb2f5e748253c9895"
+    },
+    {
+      "name": "_ZN7CSprite15GetAnimDurationEi",
+      "elf_address": "0x002d7c84",
+      "thumb": true,
+      "size": 36,
+      "sha256": "d4196baaae1485845e82ef13bf8e12158e8018c16226521457c507350263dd5c"
+    },
+    {
+      "name": "_ZN7CSprite11PaintAFrameEiiiijh",
+      "elf_address": "0x002d99f4",
+      "thumb": true,
+      "size": 198,
+      "sha256": "d7b9f0d562cc48142c2c02d97f1179149ebc96dec4dda3901d132f3767847c88"
+    },
+    {
+      "name": "_ZN15CSpriteInstance17PaintAnimOnScreenEiii",
+      "elf_address": "0x002d9e0c",
+      "thumb": true,
+      "size": 140,
+      "sha256": "687ea0a76aabeb66ed5d9011b4177062cdd5b0c7d89530ff2fef6c0c3a26532f"
+    },
+    {
+      "name": "_ZN15CSpriteInstance9PaintAnimEi",
+      "elf_address": "0x002d9e98",
+      "thumb": true,
+      "size": 18,
+      "sha256": "86d97b6edbf747af2e59854225ab3cb207e41816bdccc2a486e276f2ba8dd1a1"
+    }
+  ],
+  "ghidra_rebase_offset": "0x00010000"
+}

@@ -203,6 +203,9 @@ void LevelCinematicRuntime::bind(LevelTriggerRuntime& triggers,
     transportRequested_ = false;
     transport_ = {};
     controlsEnabled_ = true;
+    pauseButtonEnabled_ = true;
+    quickTimeControlEnabled_ = false;
+    pauseButtonResetCount_ = quickTimeButtonResetCount_ = 0;
     attributionEnabled_ = true;
     objectiveArrowEnabled_ = true;
     blackOverlayEnabled_ = false;
@@ -278,7 +281,7 @@ Result LevelCinematicRuntime::applyCommand(const CinematicThread& thread,
         // flags in command order. CLevel::Render2DInterface (0x00387a54)
         // gates the complete player/enemy HUD at CLevel+0x2d, the field fed
         // by AttributionEnable, while leaving cinematic subtitles active.
-        controlsEnabled_ = controlsEnabled;
+        enableControls(controlsEnabled, false);
         attributionEnabled_ = attributionEnabled;
         objectiveArrowEnabled_ = objectiveArrowEnabled;
         blackOverlayEnabled_ = blackOverlayEnabled;
@@ -771,27 +774,43 @@ void LevelCinematicRuntime::completeColladaPlayback(
 void LevelCinematicRuntime::setColladaMovieUi(bool active) noexcept {
     // OnOffDaeMovieUI writes CLevel+0x2d (HUD), +0x30 (bands), +0x31
     // (skip) and EnableControls(!active, false), but not the arrow flag.
-    controlsEnabled_ = !active;
+    enableControls(!active, false);
     attributionEnabled_ = !active;
     blackOverlayEnabled_ = active;
     skipEnabled_ = active;
 }
 
-void LevelCinematicRuntime::endQuickTimeEvent() noexcept {
-    // CQTEManager::EndQTE (0x0038a5b0) calls
-    // CLevel::EnableControls(true, false) after the QTE feedback state ends.
-    // That path does not rewrite the independently authored presentation
-    // flags from InterfaceControl.
-    controlsEnabled_ = true;
-    // EndQTE also calls Application::ResetSlowMotion (0x003e0598).
-    if (slowMotionDenominator_ > 1.0F && slowMotionSoundEnabled_) {
-        slowMotionSoundCues_.push_back(SlowMotionSoundCue::Exit);
+void LevelCinematicRuntime::enableControls(bool enabled, bool preservePauseButton) noexcept {
+    // CLevel::EnableControls ELF 0x36fe94: pause-button reset/enable (unless
+    // preserved), normal-interface enable, then GameEventKeyWrap::ResetAllKeys.
+    // The graphical touch widgets are represented by these state fields on PC;
+    // this must not generate physical gamepad releases or clear native globals.
+    if (!preservePauseButton) {
+        ++pauseButtonResetCount_;
+        pauseButtonEnabled_ = enabled;
     }
-    slowMotionDenominator_ = 1.0F;
-    slowMotionElapsedMilliseconds_ = 0.0F;
-    slowMotionHoldMilliseconds_ = 0.0F;
-    slowMotionRampMilliseconds_ = 0.0F;
-    slowMotionSoundEnabled_ = false;
+    controlsEnabled_ = enabled;
+    if (inputResetHandler_) { inputResetHandler_(); }
+}
+
+void LevelCinematicRuntime::beginQuickTimeEvent() noexcept {
+    enableControls(false, true);
+}
+
+void LevelCinematicRuntime::setQuickTimeControlEnabled(bool enabled) noexcept {
+    // ControlScheme::EnableQTEControl ELF 0x2ea990 always resets the button,
+    // including repeated requests for the same enabled value. The PC adapter
+    // keeps its physical stick/button history separate from this UI state.
+    ++quickTimeButtonResetCount_;
+    quickTimeControlEnabled_ = enabled;
+}
+
+void LevelCinematicRuntime::endQuickTimeEvent() noexcept {
+    // EndQTE ELF 0x37a5b0 calls ResetSlowMotion ONLY for a denominator > 1.
+    // In particular, do not erase a pending ratio-1 hold/ramp configuration.
+    // The reset precedes EnableControls and its synchronous keypad reset.
+    if (slowMotionDenominator_ > 1.0F) { resetSlowMotion(); }
+    enableControls(true, false);
 }
 
 void LevelCinematicRuntime::advanceBossProgress(
@@ -966,6 +985,9 @@ void LevelCinematicRuntime::resetTransientForCheckPointLoad() noexcept {
     transport_ = {};
     forcedVisibleRooms_.fill(false);
     controlsEnabled_ = true;
+    pauseButtonEnabled_ = true;
+    quickTimeControlEnabled_ = false;
+    pauseButtonResetCount_ = quickTimeButtonResetCount_ = 0;
     blackOverlayEnabled_ = false;
     skipEnabled_ = false;
     listenerOnMainCharacter_ = true;

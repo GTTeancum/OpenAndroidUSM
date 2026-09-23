@@ -1,0 +1,18 @@
+interface animations=40 frames=158
+a=1 step=0 duration=1 frame=34 flags=0 offset=0,0 modules=35:0:-28,-28 36:0:-5,-34 37:0:-31,-1 38:0:2,0 
+a=1 step=1 duration=1 frame=35 flags=0 offset=0,0 modules=35:0:-31,-24 36:0:-1,-37 37:0:-34,7 38:0:10,3 
+a=1 step=2 duration=2 frame=36 flags=0 offset=0,0 modules=35:0:-32,-15 36:0:7,-27 37:0:-33,30 38:0:19,22 
+a=1 step=3 duration=2 frame=37 flags=0 offset=0,0 modules=35:0:-32,-4 36:0:7,-17 37:0:-33,50 38:0:19,31 
+a=1 step=4 duration=2 frame=38 flags=0 offset=0,0 modules=35:0:-32,13 36:0:13,-6 37:0:-35,73 38:0:20,57 
+a=1 step=5 duration=2 frame=39 flags=0 offset=0,0 modules=35:0:-30,32 36:0:12,11 37:0:-31,93 38:0:20,70 
+sum=10
+a=7 step=0 duration=2 frame=33 flags=0 offset=0,0 modules=40:0:-25,-27 
+a=7 step=1 duration=2 frame=56 flags=0 offset=-1,-1 modules=41:0:-25,-27 
+a=7 step=2 duration=2 frame=33 flags=0 offset=0,0 modules=40:0:-25,-27 
+a=7 step=3 duration=2 frame=56 flags=0 offset=-1,-1 modules=41:0:-25,-27 
+sum=8
+a=29 step=0 duration=1 frame=95 flags=0 offset=0,0 modules=4:0:-23,-28 88:0:-15,-17 
+sum=1
+texture 1  size=1024,1024
+explosion animations=0 frames=1
+texture 0 DDS header is missing or invalid size=0,0

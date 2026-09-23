@@ -1,0 +1,23 @@
+Internal ctest changing into directory: /mnt/data/work/OpenAndroidUSM/build/re02-linux
+Test project /mnt/data/work/OpenAndroidUSM/build/re02-linux
+    Start 1: OpenAndroidUSM.CoreTests
+1/7 Test #1: OpenAndroidUSM.CoreTests .................   Passed   13.66 sec
+    Start 2: OpenAndroidUSM.InputParity.buttons
+2/7 Test #2: OpenAndroidUSM.InputParity.buttons .......   Passed    0.00 sec
+    Start 3: OpenAndroidUSM.InputParity.routing
+3/7 Test #3: OpenAndroidUSM.InputParity.routing .......   Passed    0.00 sec
+    Start 4: OpenAndroidUSM.InputParity.sticks
+4/7 Test #4: OpenAndroidUSM.InputParity.sticks ........   Passed    0.00 sec
+    Start 5: OpenAndroidUSM.InputParity.hostage
+5/7 Test #5: OpenAndroidUSM.InputParity.hostage .......   Passed    1.89 sec
+    Start 6: OpenAndroidUSM.InputParity.autoplay
+6/7 Test #6: OpenAndroidUSM.InputParity.autoplay ......   Passed    0.00 sec
+    Start 7: OpenAndroidUSM.InputParity.transitions
+7/7 Test #7: OpenAndroidUSM.InputParity.transitions ...   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+input-parity    =   1.91 sec*proc (6 tests)
+
+Total Test time (real) =  15.58 sec

@@ -1,0 +1,345 @@
+{
+  "size": 7713000,
+  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
+  "machine": "ELF32 little-endian ARM",
+  "symbols": [
+    {
+      "name": "_ZN8CHostage6UpdateEf",
+      "elf_address": "0x00328068",
+      "thumb": true,
+      "size": 1352,
+      "sha256": "602e73d58728990678567ae103d2ccf6b9103081eda16e01a7ed6fcc672cf782"
+    },
+    {
+      "name": "_ZN11CQTEManager8BeginQTEEiiii",
+      "elf_address": "0x0037ab40",
+      "thumb": true,
+      "size": 120,
+      "sha256": "89d03744fb39e91be7bc7d7b1f8068499184181f755f3e6f8630534f1693d288"
+    },
+    {
+      "name": "_ZN11CQTEManager11BeginNowQTEEv",
+      "elf_address": "0x0037aa08",
+      "thumb": true,
+      "size": 312,
+      "sha256": "42fa12b37c92687f6b9b9b22654f693b3d11814ca7734baf1ebb114e42dd46b9"
+    },
+    {
+      "name": "_ZN11CQTEManager12ForceFailQTEEv",
+      "elf_address": "0x0037a9fc",
+      "thumb": true,
+      "size": 10,
+      "sha256": "9af497dce9eb1b5f74f790a5ebcdfe20cbf0299d9b6ed9b46b2a222e7de32b7d"
+    },
+    {
+      "name": "_ZN11CQTEManager6UpdateEf",
+      "elf_address": "0x0037b240",
+      "thumb": true,
+      "size": 460,
+      "sha256": "b37b509937754778139e710d09a0ab2765c5720af3f39addf0bac66ba3e7cc90"
+    },
+    {
+      "name": "_ZN11CQTEManager8SetStateEi",
+      "elf_address": "0x0037a67c",
+      "thumb": true,
+      "size": 332,
+      "sha256": "dcf6a85d3a724edb2428bb25a44d5d1024b7f5fec80372faebc4ccc49a9dc8f2"
+    },
+    {
+      "name": "_ZN11CQTEManager13SuccessHandleEv",
+      "elf_address": "0x0037a5e4",
+      "thumb": true,
+      "size": 76,
+      "sha256": "186d171d9ae2b12b71a66f96916b88c9ee05fd388aafb1529ebe144cdd83be88"
+    },
+    {
+      "name": "_ZN11CQTEManager10FailHandleEv",
+      "elf_address": "0x0037a630",
+      "thumb": true,
+      "size": 76,
+      "sha256": "7ec93470cf683588f3f2f16083870b820d9d5b9c757b54694ffdbc171248fc74"
+    },
+    {
+      "name": "_ZN11CQTEManager4DrawEv",
+      "elf_address": "0x0037a7c8",
+      "thumb": true,
+      "size": 540,
+      "sha256": "3547a2cca9cc7526786e36032e48fdbf28dd0ab2b20eb0cbb2f5e748253c9895"
+    },
+    {
+      "name": "_ZN11CQTEManager6EndQTEEv",
+      "elf_address": "0x0037a5b0",
+      "thumb": true,
+      "size": 52,
+      "sha256": "79c93206f203f587d78388dae661d0dce6fe4521d95b8868a3e16527888dd37c"
+    },
+    {
+      "name": "_ZN6CLevel6UpdateEf",
+      "elf_address": "0x003720bc",
+      "thumb": true,
+      "size": 1688,
+      "sha256": "5ec788200423ab60e59b6adb9396cdcb08130ea57fd6d9cbfa7140106c343a89"
+    },
+    {
+      "name": "_ZN6CLevel10PauseTimerEv",
+      "elf_address": "0x0036f42c",
+      "thumb": true,
+      "size": 24,
+      "sha256": "68d88b01e7526d11544ce8223f077094b578b39994779cc5222b94c6f5b7c129"
+    },
+    {
+      "name": "_ZN6CLevel8ResumeItEv",
+      "elf_address": "0x0036f3e4",
+      "thumb": true,
+      "size": 72,
+      "sha256": "1e12545b2fbb0c6f844a66ae57cc8372195f661542d9a50caab1cab8259f5ca5"
+    },
+    {
+      "name": "_ZN11CQTEManager8SetPauseEb",
+      "elf_address": "0x0037a4fc",
+      "thumb": true,
+      "size": 96,
+      "sha256": "b1b71abc06a83baf49def169c20bf014ce724ae1cfe8d6124729a71e99b2bbc4"
+    },
+    {
+      "name": "_ZN6CLevel14EnableControlsEbb",
+      "elf_address": "0x0036fe94",
+      "thumb": true,
+      "size": 54,
+      "sha256": "cd098464dda664ac1bb5c708135371da04603a54b288c8b2d5c3cf9a78a468b7"
+    },
+    {
+      "name": "_ZN16GameEventKeyWrap12ResetAllKeysEv",
+      "elf_address": "0x002e8888",
+      "thumb": true,
+      "size": 32,
+      "sha256": "6d681472aa52914df38ec56d95c151b9ab3a8ae9834c3dc00f0bf0e0645d189b"
+    },
+    {
+      "name": "_ZN16CCinematicThread8StartQTEEPN3irr2io11IAttributesE",
+      "elf_address": "0x0036153c",
+      "thumb": true,
+      "size": 100,
+      "sha256": "48a2f5d76ce16e5ed9402a51bbe3f982a7fa5154f065b5e593d24c09de0e704b"
+    },
+    {
+      "name": "_ZN21CLevelInterfaceNormal14EnableControlsEb",
+      "elf_address": "0x00378730",
+      "thumb": true,
+      "size": 10,
+      "sha256": "d36c81af0d9902b5a06c216ae0a1c258a0334dd8af2c2c2a4df887b8677a7ed8"
+    },
+    {
+      "name": "_ZN13ControlScheme16EnableQTEControlEb",
+      "elf_address": "0x002ea990",
+      "thumb": true,
+      "size": 28,
+      "sha256": "31c30b79d9e07defd7ec6a32d10535643d9f4871b1d2c05259017016aa1dccd3"
+    },
+    {
+      "name": "_ZN13ControlScheme10SetEnabledEb",
+      "elf_address": "0x002ead8c",
+      "thumb": true,
+      "size": 208,
+      "sha256": "facf14ed259607487219ef7087bc50b69ebfa0df50895175959be3fbdf036127"
+    },
+    {
+      "name": "_ZN15CKeyPadCustomer9resetKeysEv",
+      "elf_address": "0x002e9b28",
+      "thumb": true,
+      "size": 44,
+      "sha256": "f767ebe2bb2e760ca8ede914e5cbf49b4344e3f72bf597bdbf2da4c90a57e5f9"
+    },
+    {
+      "name": "_ZN7CKeyPad9resetKeysEv",
+      "elf_address": "0x002e951c",
+      "thumb": true,
+      "size": 44,
+      "sha256": "f767ebe2bb2e760ca8ede914e5cbf49b4344e3f72bf597bdbf2da4c90a57e5f9"
+    },
+    {
+      "name": "_ZN7CButton5ResetEv",
+      "elf_address": "0x002e636c",
+      "thumb": true,
+      "size": 8,
+      "sha256": "ba908ad9669babfc851f1b44c9b1efce3211b00ca1dc72174e0e67ba49cc8b17"
+    },
+    {
+      "name": "_ZN7CButton10SetEnabledEb",
+      "elf_address": "0x002e6548",
+      "thumb": true,
+      "size": 76,
+      "sha256": "5dec17dbd5edbbad139f02a271075dab25e8cc0e1f00012ac9121d3c1399591c"
+    },
+    {
+      "name": "_ZN16GameEventKeyWrap9IsPressedEi",
+      "elf_address": "0x002e8a88",
+      "thumb": true,
+      "size": 50,
+      "sha256": "aeca669c48b59a5b0b6685471ea70ee4cd742673ee84586af4c998f86b35aa8b"
+    },
+    {
+      "name": "_ZN16GameEventKeyWrap6IsHoldEii",
+      "elf_address": "0x002e8a48",
+      "thumb": true,
+      "size": 10,
+      "sha256": "aaa6c43c7cf8379de6ef2c33b63b47459273fdca79f600f6279793fa895dea64"
+    },
+    {
+      "name": "_ZN16GameEventKeyWrap10IsReleasedEi",
+      "elf_address": "0x002e8a54",
+      "thumb": true,
+      "size": 50,
+      "sha256": "db68c4caa14627016771994f282def9f88fa63eaeae28af56ff013f16994bbae"
+    },
+    {
+      "name": "_ZN16CCinematicThread19InterfaceControlCmdEPN3irr2io11IAttributesE",
+      "elf_address": "0x003611e0",
+      "thumb": true,
+      "size": 280,
+      "sha256": "95bffafd61da4506be762dea53e9647be706c8b7bcc8d68a4cc3822e652cb3e7"
+    },
+    {
+      "name": "_ZN16CCinematicThread15OnOffDaeMovieUIEb",
+      "elf_address": "0x0036043c",
+      "thumb": true,
+      "size": 88,
+      "sha256": "4ed1083d7caa68d95509af187996980abb152253b3fbf11ad609d76047bb50b9"
+    },
+    {
+      "name": "_ZN7Audible9PlayAudioEibb",
+      "elf_address": "0x003bbf2c",
+      "thumb": true,
+      "size": 128,
+      "sha256": "b6b2f825472b7bfebfbd0546a28f60b2ea2fc91496146b5dd987e35f44b26b90"
+    },
+    {
+      "name": "_ZN7Audible9IsPlayingEib",
+      "elf_address": "0x003bbdd0",
+      "thumb": true,
+      "size": 72,
+      "sha256": "38904bf3b0c85b11d99b383b0be777a081169cd16e246b8bffa31dc3b387978d"
+    },
+    {
+      "name": "_ZN7Audible9StopAudioEii",
+      "elf_address": "0x003bbe50",
+      "thumb": true,
+      "size": 80,
+      "sha256": "bb0bd7e2c6849bff8f5f7b1e9714c940f07f1f820e718fb8fdc2be104502f5c6"
+    },
+    {
+      "name": "_ZN15VoxSoundManager6Play3DEiRKN3irr4core8vector3dIfEEbiffbi",
+      "elf_address": "0x003caf74",
+      "thumb": true,
+      "size": 52,
+      "sha256": "cf6f05d6b38c42fabc5ff1c9deab8fa511f124b6d818115041d6c462558e9476"
+    },
+    {
+      "name": "_ZN15VoxSoundManager9IsPlayingEii",
+      "elf_address": "0x003cac58",
+      "thumb": true,
+      "size": 16,
+      "sha256": "f783bc991df381c05ef20f0135335c574b3daa75a0c6e733ad2f883cf39d80f0"
+    },
+    {
+      "name": "_ZN15VoxSoundManager4StopEiii",
+      "elf_address": "0x003cace4",
+      "thumb": true,
+      "size": 16,
+      "sha256": "83ab6b10be3f1a073e25ac3242a6bad3fb9d25d770a47ba2d904d6f75882e4f5"
+    },
+    {
+      "name": "_ZN15VoxSoundManager11PlayEmitterEibi",
+      "elf_address": "0x003cadc0",
+      "thumb": true,
+      "size": 18,
+      "sha256": "a1d1e50d435ef2385823ef7cf979f2bcc80d30fc15930f7dc0d092901d4f4c24"
+    },
+    {
+      "name": "_ZN8CHostageC1Ev",
+      "elf_address": "0x00328c20",
+      "thumb": true,
+      "size": 372,
+      "sha256": "7555491c3e3c224c745cabf118434625adc9516dfafbb3209e135b672282ecfd"
+    },
+    {
+      "name": "_ZN7AudibleC1Ev",
+      "elf_address": "0x003bbfac",
+      "thumb": true,
+      "size": 116,
+      "sha256": "d9ed08fc0d799002e7828b2bc2f1029771578ead94f75e89293bd8c61149ff58"
+    },
+    {
+      "name": "_ZN8CHostage15ProcessUserAttrEPN3irr2io11IAttributesE",
+      "elf_address": "0x00328724",
+      "thumb": true,
+      "size": 676,
+      "sha256": "345863591bbdb8b0cee296bce789c8170e0950c7d0fb0b084fd6d6ce43aa877b"
+    },
+    {
+      "name": "_ZN8CHostage4InitEP5CRoom",
+      "elf_address": "0x003285e8",
+      "thumb": true,
+      "size": 308,
+      "sha256": "8188fe5f80ad024c39a19d57e3d94e51333c2bdd59200972d6228f534691711f"
+    },
+    {
+      "name": "_ZN8CHostage12OnEnterStateEi",
+      "elf_address": "0x00327de4",
+      "thumb": true,
+      "size": 528,
+      "sha256": "6253a4194f69d0f895d476ec2f64cd20fe5ebba75c91271fd292dd980a5719d8"
+    },
+    {
+      "name": "_ZN4UnitC1Ev",
+      "elf_address": "0x003159d8",
+      "thumb": true,
+      "size": 468,
+      "sha256": "526cd403826449d035dfbc74f9f7d7278db8620fc3e0ac8b0cb67ffadf44882c"
+    },
+    {
+      "name": "_ZN4UnitC2Ev",
+      "elf_address": "0x00315bac",
+      "thumb": true,
+      "size": 396,
+      "sha256": "7ec7ac89904e9259ba6fc99a4e3fb635fb02c9ffd9a17454805c50180948e8cf"
+    },
+    {
+      "name": "_ZN11CGameObjectC2Ev",
+      "elf_address": "0x002ffd08",
+      "thumb": true,
+      "size": 456,
+      "sha256": "3beddc9331ed9245d30683e708ca4bda01a7ffd9c91f49a2d0baf49835b5a2eb"
+    },
+    {
+      "name": "_ZN7AudibleC2Ev",
+      "elf_address": "0x003bbc40",
+      "thumb": true,
+      "size": 64,
+      "sha256": "9c91e5541da2f7a4b91765b40371c81aa5a3bc807441bb6170eb9081fe1874e0"
+    }
+  ],
+  "verified": true,
+  "vtable_slots": [
+    {
+      "offset": "0x1c",
+      "slot_elf": "0x004b27d4",
+      "pointer": "0x003bbf2d",
+      "name": "_ZN7Audible9PlayAudioEibb"
+    },
+    {
+      "offset": "0x20",
+      "slot_elf": "0x004b27d8",
+      "pointer": "0x003bbe51",
+      "name": "_ZN7Audible9StopAudioEii"
+    },
+    {
+      "offset": "0x24",
+      "slot_elf": "0x004b27dc",
+      "pointer": "0x003bbdd1",
+      "name": "_ZN7Audible9IsPlayingEib"
+    }
+  ],
+  "ghidra_rebase_offset": "0x00010000",
+  "note": "Identity and virtual-slot verification only; no ARM execution."
+}

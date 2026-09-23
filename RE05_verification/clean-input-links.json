@@ -1,0 +1,26 @@
+{
+  "game/data": {
+    "resolved_to": "/mnt/data/re05/OpenAndroidUSM/game/data",
+    "source_inputs_only": true
+  },
+  "game/original": {
+    "resolved_to": "/mnt/data/re05/OpenAndroidUSM/game/original",
+    "source_inputs_only": true
+  },
+  "build/windows-msvc/_deps/zlib-src": {
+    "resolved_to": "/mnt/data/re05/OpenAndroidUSM/build/windows-msvc/_deps/zlib-src",
+    "source_inputs_only": true
+  },
+  "build/windows-msvc/_deps/pugixml-src": {
+    "resolved_to": "/mnt/data/re05/OpenAndroidUSM/build/windows-msvc/_deps/pugixml-src",
+    "source_inputs_only": true
+  },
+  "build/windows-msvc/_deps/powervr-decompress": {
+    "resolved_to": "/mnt/data/re05/OpenAndroidUSM/build/windows-msvc/_deps/powervr-decompress",
+    "source_inputs_only": true
+  },
+  "build/windows-msvc/_deps/stb-vorbis": {
+    "resolved_to": "/mnt/data/re05/OpenAndroidUSM/build/windows-msvc/_deps/stb-vorbis",
+    "source_inputs_only": true
+  }
+}

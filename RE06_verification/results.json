@@ -1,0 +1,140 @@
+{
+  "runs": {
+    "baseline": {
+      "tests": 26,
+      "passed": 26,
+      "ctest_exit": 0,
+      "elapsed_seconds": 49.37,
+      "named_check_counts": {
+        "clock": 400033,
+        "cinematic": 54,
+        "hostage": 199,
+        "attributes": 7,
+        "gesture": 262187,
+        "sprite": 500011,
+        "sequence": 28,
+        "gamepad": 61,
+        "audio": 12,
+        "first_level": 129,
+        "controller_boundaries": 789461,
+        "controller_first_level": 212,
+        "feedback": 6326,
+        "shared_manager": 1281,
+        "consumption": 852076,
+        "handoff": 69,
+        "lifecycle": 607,
+        "integration": 138,
+        "keypad": 13434880
+      }
+    },
+    "release": {
+      "tests": 29,
+      "passed": 29,
+      "ctest_exit": 0,
+      "elapsed_seconds": 53.62,
+      "named_check_counts": {
+        "clock": 400033,
+        "cinematic": 54,
+        "hostage": 199,
+        "attributes": 7,
+        "gesture": 262187,
+        "sprite": 500011,
+        "sequence": 28,
+        "gamepad": 61,
+        "audio": 12,
+        "first_level": 129,
+        "controller_boundaries": 789461,
+        "controller_first_level": 212,
+        "feedback": 6326,
+        "shared_manager": 1281,
+        "consumption": 852076,
+        "handoff": 69,
+        "lifecycle": 607,
+        "integration": 138,
+        "keypad": 13434880,
+        "hostage_dispatch": 109,
+        "hostage_recovery": 164,
+        "hostage_controls": 140
+      }
+    },
+    "sanitize": {
+      "tests": 29,
+      "passed": 29,
+      "ctest_exit": 0,
+      "elapsed_seconds": 165.25,
+      "named_check_counts": {
+        "clock": 400033,
+        "cinematic": 54,
+        "hostage": 199,
+        "attributes": 7,
+        "gesture": 262187,
+        "sprite": 500011,
+        "sequence": 28,
+        "gamepad": 61,
+        "audio": 12,
+        "first_level": 129,
+        "controller_boundaries": 789461,
+        "controller_first_level": 212,
+        "feedback": 6326,
+        "shared_manager": 1281,
+        "consumption": 852076,
+        "handoff": 69,
+        "lifecycle": 607,
+        "integration": 138,
+        "keypad": 13434880,
+        "hostage_dispatch": 109,
+        "hostage_recovery": 164,
+        "hostage_controls": 140
+      }
+    },
+    "clean": {
+      "tests": 29,
+      "passed": 29,
+      "ctest_exit": 0,
+      "elapsed_seconds": 56.1,
+      "named_check_counts": {
+        "clock": 400033,
+        "cinematic": 54,
+        "hostage": 199,
+        "attributes": 7,
+        "gesture": 262187,
+        "sprite": 500011,
+        "sequence": 28,
+        "gamepad": 61,
+        "audio": 12,
+        "first_level": 129,
+        "controller_boundaries": 789461,
+        "controller_first_level": 212,
+        "feedback": 6326,
+        "shared_manager": 1281,
+        "consumption": 852076,
+        "handoff": 69,
+        "lifecycle": 607,
+        "integration": 138,
+        "keypad": 13434880,
+        "hostage_dispatch": 109,
+        "hostage_recovery": 164,
+        "hostage_controls": 140
+      }
+    }
+  },
+  "source_verification": {
+    "matched_selected_files": 333,
+    "rechecked_after_tests": true,
+    "baseline_archive_sha256": "6133209ac787a47272c653a6a84ab6a2da859a78433a4c2874dee49f5bd585f8",
+    "patch_sha256": "6ff1517d3058e37645801608206cd18943c0b71c50369de5da019ea28d835c86"
+  },
+  "original_material": {
+    "files": 599,
+    "bytes": 170642144,
+    "byte_compared_to_supplied_17_volume_archive_after_final_tests": true,
+    "original_library_sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679"
+  },
+  "reference": {
+    "functions": 45,
+    "virtual_slots": 3,
+    "modified_copy_rejected": true,
+    "wrong_virtual_target_rejected": true
+  },
+  "scope": "Native Linux portable core, rule, asset and injected-audio/control integration tests. No ARM differential execution; no Windows application/audio/renderer compilation, GPU output, audible audio, physical XInput, or complete normal first-level playthrough."
+}

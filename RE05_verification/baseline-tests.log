@@ -1,0 +1,218 @@
+Internal ctest changing into directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+UpdateCTestConfiguration  from :/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+Parse Config file:/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+Parse Config file:/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+Test project /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+      Start  1: OpenAndroidUSM.CoreTests
+
+1: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.CoreTests
+1: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+1: Test timeout computed to be: 1500
+ 1/23 Test  #1: OpenAndroidUSM.CoreTests ..........................   Passed   13.78 sec
+test 2
+      Start  2: OpenAndroidUSM.QteParity.clock
+
+2: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "clock"
+2: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+2: Test timeout computed to be: 120
+2: PASS clock: 400033 checks
+ 2/23 Test  #2: OpenAndroidUSM.QteParity.clock ....................   Passed    0.01 sec
+test 3
+      Start  3: OpenAndroidUSM.QteParity.cinematic
+
+3: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "cinematic"
+3: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+3: Test timeout computed to be: 120
+3: PASS cinematic: 54 checks
+ 3/23 Test  #3: OpenAndroidUSM.QteParity.cinematic ................   Passed    2.17 sec
+test 4
+      Start  4: OpenAndroidUSM.QteParity.hostage
+
+4: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "hostage"
+4: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+4: Test timeout computed to be: 120
+4: PASS hostage: 199 checks
+ 4/23 Test  #4: OpenAndroidUSM.QteParity.hostage ..................   Passed    2.07 sec
+test 5
+      Start  5: OpenAndroidUSM.QteParity.attributes
+
+5: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "attributes"
+5: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+5: Test timeout computed to be: 120
+5: PASS attributes: 7 checks
+ 5/23 Test  #5: OpenAndroidUSM.QteParity.attributes ...............   Passed    0.00 sec
+test 6
+      Start  6: OpenAndroidUSM.QteParity.gesture
+
+6: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "gesture"
+6: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+6: Test timeout computed to be: 120
+6: PASS gesture: 262187 checks
+ 6/23 Test  #6: OpenAndroidUSM.QteParity.gesture ..................   Passed    1.98 sec
+test 7
+      Start  7: OpenAndroidUSM.QteParity.sprite
+
+7: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "sprite"
+7: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+7: Test timeout computed to be: 120
+7: PASS sprite: 500011 checks
+ 7/23 Test  #7: OpenAndroidUSM.QteParity.sprite ...................   Passed    2.13 sec
+test 8
+      Start  8: OpenAndroidUSM.QteParity.sequence
+
+8: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "sequence"
+8: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+8: Test timeout computed to be: 120
+8: PASS sequence: 28 checks
+ 8/23 Test  #8: OpenAndroidUSM.QteParity.sequence .................   Passed    2.10 sec
+test 9
+      Start  9: OpenAndroidUSM.QteParity.gamepad
+
+9: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "gamepad"
+9: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+9: Test timeout computed to be: 120
+9: PASS gamepad: 61 checks
+ 9/23 Test  #9: OpenAndroidUSM.QteParity.gamepad ..................   Passed    3.94 sec
+test 10
+      Start 10: OpenAndroidUSM.QteParity.audio
+
+10: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "audio"
+10: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+10: Test timeout computed to be: 120
+10: Decoded original QTE sound 392: SFX_QTE_SUCCESS
+10: Decoded original QTE sound 393: SFX_QTE_FAIL
+10: Decoded original QTE sound 394: SFX_QTE_CLICK
+10: Decoded original QTE sound 395: SFX_QTE_UNTIE
+10: PASS audio: 12 checks
+10/23 Test #10: OpenAndroidUSM.QteParity.audio ....................   Passed    2.15 sec
+test 11
+      Start 11: OpenAndroidUSM.QteParity.first_level
+
+11: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "first_level"
+11: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+11: Test timeout computed to be: 120
+11: Loaded StartQTE: source 20004 / file cinematics/levelnew_01_20004_cinematic.cff
+11: Authored level 1 QTE: 20004 / config 6 -> 20010 failure; immediate cinematic step=50; commands=6
+11: Authored level 1 QTE: 20004 / config 6 -> 20006 success; immediate cinematic step=50; commands=6
+11: PASS first_level: 129 checks
+11/23 Test #11: OpenAndroidUSM.QteParity.first_level ..............   Passed    1.96 sec
+test 12
+      Start 12: OpenAndroidUSM.QteParity.controller_boundaries
+
+12: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "controller_boundaries"
+12: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+12: Test timeout computed to be: 120
+12: PASS controller_boundaries: 789461 checks
+12/23 Test #12: OpenAndroidUSM.QteParity.controller_boundaries ....   Passed    2.06 sec
+test 13
+      Start 13: OpenAndroidUSM.QteParity.controller_first_level
+
+13: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "controller_first_level"
+13: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+13: Test timeout computed to be: 120
+13: Loaded StartQTE: source 20004 / file cinematics/levelnew_01_20004_cinematic.cff
+13: Raw XInput level 1 QTE: 20004 / config 6 -> 20010 failure; immediate cinematic step=50; commands=6
+13: Raw XInput level 1 QTE: 20004 / config 6 -> 20006 success; immediate cinematic step=50; commands=6
+13: PASS controller_first_level: 212 checks
+13/23 Test #13: OpenAndroidUSM.QteParity.controller_first_level ...   Passed    1.96 sec
+test 14
+      Start 14: OpenAndroidUSM.QteParity.feedback
+
+14: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "feedback"
+14: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+14: Test timeout computed to be: 120
+14: PASS feedback: 6326 checks
+14/23 Test #14: OpenAndroidUSM.QteParity.feedback .................   Passed    1.91 sec
+test 15
+      Start 15: OpenAndroidUSM.QteParity.shared_manager
+
+15: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "shared_manager"
+15: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+15: Test timeout computed to be: 120
+15: PASS shared_manager: 1281 checks
+15/23 Test #15: OpenAndroidUSM.QteParity.shared_manager ...........   Passed    2.04 sec
+test 16
+      Start 16: OpenAndroidUSM.QteParity.consumption
+
+16: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "consumption"
+16: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+16: Test timeout computed to be: 120
+16: PASS consumption: 852076 checks
+16/23 Test #16: OpenAndroidUSM.QteParity.consumption ..............   Passed    2.01 sec
+test 17
+      Start 17: OpenAndroidUSM.QteParity.handoff
+
+17: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteParityTests "handoff"
+17: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+17: Test timeout computed to be: 120
+17: PASS handoff: 69 checks
+17/23 Test #17: OpenAndroidUSM.QteParity.handoff ..................   Passed    1.90 sec
+test 18
+      Start 18: OpenAndroidUSM.InputParity.buttons
+
+18: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.InputParityTests "buttons"
+18: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+18: Test timeout computed to be: 120
+18: PASS buttons
+18: 167944 checks passed
+18/23 Test #18: OpenAndroidUSM.InputParity.buttons ................   Passed    0.00 sec
+test 19
+      Start 19: OpenAndroidUSM.InputParity.routing
+
+19: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.InputParityTests "routing"
+19: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+19: Test timeout computed to be: 120
+19: PASS routing
+19: 88 checks passed
+19/23 Test #19: OpenAndroidUSM.InputParity.routing ................   Passed    0.00 sec
+test 20
+      Start 20: OpenAndroidUSM.InputParity.sticks
+
+20: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.InputParityTests "sticks"
+20: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+20: Test timeout computed to be: 120
+20: PASS sticks
+20: 1364 checks passed
+20/23 Test #20: OpenAndroidUSM.InputParity.sticks .................   Passed    0.00 sec
+test 21
+      Start 21: OpenAndroidUSM.InputParity.hostage
+
+21: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.InputParityTests "hostage"
+21: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+21: Test timeout computed to be: 120
+21: PASS hostage
+21: 126 checks passed
+21/23 Test #21: OpenAndroidUSM.InputParity.hostage ................   Passed    1.90 sec
+test 22
+      Start 22: OpenAndroidUSM.InputParity.autoplay
+
+22: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.InputParityTests "autoplay"
+22: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+22: Test timeout computed to be: 120
+22: PASS autoplay
+22: 3 checks passed
+22/23 Test #22: OpenAndroidUSM.InputParity.autoplay ...............   Passed    0.01 sec
+test 23
+      Start 23: OpenAndroidUSM.InputParity.transitions
+
+23: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.InputTransitionsTests
+23: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+23: Test timeout computed to be: 120
+23: PASS 100000 deterministic transition frames; 1200000 checks
+23/23 Test #23: OpenAndroidUSM.InputParity.transitions ............   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 23
+
+Label Time Summary:
+input-parity    =   1.93 sec*proc (6 tests)
+qte-parity      =  30.39 sec*proc (16 tests)
+
+Total Test time (real) =  46.11 sec

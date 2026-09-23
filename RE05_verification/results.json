@@ -1,0 +1,122 @@
+{
+  "baseline": {
+    "tests": 23,
+    "passed": 23,
+    "elapsed_seconds": 46.11,
+    "check_counts": {
+      "clock": 400033,
+      "cinematic": 54,
+      "hostage": 199,
+      "attributes": 7,
+      "gesture": 262187,
+      "sprite": 500011,
+      "sequence": 28,
+      "gamepad": 61,
+      "audio": 12,
+      "first_level": 129,
+      "controller_boundaries": 789461,
+      "controller_first_level": 212,
+      "feedback": 6326,
+      "shared_manager": 1281,
+      "consumption": 852076,
+      "handoff": 69
+    },
+    "ctest_exit": 0
+  },
+  "release": {
+    "tests": 26,
+    "passed": 26,
+    "elapsed_seconds": 78.3,
+    "check_counts": {
+      "clock": 400033,
+      "cinematic": 54,
+      "hostage": 199,
+      "attributes": 7,
+      "gesture": 262187,
+      "sprite": 500011,
+      "sequence": 28,
+      "gamepad": 61,
+      "audio": 12,
+      "first_level": 129,
+      "controller_boundaries": 789461,
+      "controller_first_level": 212,
+      "feedback": 6326,
+      "shared_manager": 1281,
+      "consumption": 852076,
+      "handoff": 69,
+      "lifecycle": 607,
+      "integration": 138,
+      "keypad": 13434880
+    },
+    "ctest_exit": 0
+  },
+  "sanitize": {
+    "tests": 26,
+    "passed": 26,
+    "elapsed_seconds": 149.68,
+    "check_counts": {
+      "clock": 400033,
+      "cinematic": 54,
+      "hostage": 199,
+      "attributes": 7,
+      "gesture": 262187,
+      "sprite": 500011,
+      "sequence": 28,
+      "gamepad": 61,
+      "audio": 12,
+      "first_level": 129,
+      "controller_boundaries": 789461,
+      "controller_first_level": 212,
+      "feedback": 6326,
+      "shared_manager": 1281,
+      "consumption": 852076,
+      "handoff": 69,
+      "lifecycle": 607,
+      "integration": 138,
+      "keypad": 13434880
+    },
+    "ctest_exit": 0
+  },
+  "clean": {
+    "tests": 26,
+    "passed": 26,
+    "elapsed_seconds": 53.19,
+    "check_counts": {
+      "clock": 400033,
+      "cinematic": 54,
+      "hostage": 199,
+      "attributes": 7,
+      "gesture": 262187,
+      "sprite": 500011,
+      "sequence": 28,
+      "gamepad": 61,
+      "audio": 12,
+      "first_level": 129,
+      "controller_boundaries": 789461,
+      "controller_first_level": 212,
+      "feedback": 6326,
+      "shared_manager": 1281,
+      "consumption": 852076,
+      "handoff": 69,
+      "lifecycle": 607,
+      "integration": 138,
+      "keypad": 13434880
+    },
+    "ctest_exit": 0
+  },
+  "source_verification": {
+    "baseline_archive_sha256": "e2f4507d2cc8993a4401ba0c4687ef5c58d235c558121de695af145a2965a16a",
+    "patch_sha256": "cc7ca22703c28f386238ae86b5b169391e9c942177b64941404353051862a31c",
+    "matched_code_reference_files": 330,
+    "rechecked_after_tests": true
+  },
+  "original_material": {
+    "files": 599,
+    "bytes": 170642144,
+    "sha256_original_library": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
+    "byte_compared_against_uploaded_zip": true,
+    "rechecked_after_tests": true
+  },
+  "reference_fingerprint_functions": 29,
+  "scope": "Native Linux portable source/asset/control tests. No original ARM differential execution; no Windows application compilation, GPU output, audible audio, physical XInputGetState execution or complete normal first-level playthrough."
+}

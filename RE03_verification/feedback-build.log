@@ -1,0 +1,25 @@
+[0/1] Re-running CMake...
+CMake Deprecation Warning at build/windows-msvc/_deps/pugixml-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Configuring done (0.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: /mnt/data/usm_re03/OpenAndroidUSM/build/re03-linux
+[1/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QteFeedbackGeometry.cpp.o
+[2/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/CinematicUiRuntime.cpp.o
+[3/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[4/13] Building CXX object CMakeFiles/OpenAndroidUSM.QteParityTests.dir/tests/QteParityTests.cpp.o
+[5/13] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[6/13] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+[7/13] Linking CXX static library libOpenAndroidUSM.Core.a
+[8/13] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[9/13] Linking CXX executable OpenAndroidUSM.InputParityTests
+[10/13] Linking CXX executable OpenAndroidUSM.QteParityTests
+[11/13] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+[12/13] Linking CXX executable OpenAndroidUSM.CoreTests

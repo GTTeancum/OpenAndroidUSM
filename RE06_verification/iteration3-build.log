@@ -1,0 +1,9 @@
+[1/9] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[2/9] Linking CXX static library libOpenAndroidUSM.Core.a
+[3/9] Linking CXX executable OpenAndroidUSM.QteParityTests
+[4/9] Linking CXX executable OpenAndroidUSM.CoreTests
+[5/9] Linking CXX executable OpenAndroidUSM.QteControlTests
+[6/9] Linking CXX executable OpenAndroidUSM.InputParityTests
+[7/9] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[8/9] Building CXX object CMakeFiles/OpenAndroidUSM.HostageIntegrationTests.dir/tests/HostageIntegrationTests.cpp.o
+[9/9] Linking CXX executable OpenAndroidUSM.HostageIntegrationTests

@@ -1,0 +1,88 @@
+Internal ctest changing into directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+UpdateCTestConfiguration  from :/mnt/data/usm_work/OpenAndroidUSM/build-linux/DartConfiguration.tcl
+Parse Config file:/mnt/data/usm_work/OpenAndroidUSM/build-linux/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/mnt/data/usm_work/OpenAndroidUSM/build-linux/DartConfiguration.tcl
+Parse Config file:/mnt/data/usm_work/OpenAndroidUSM/build-linux/DartConfiguration.tcl
+Test project /mnt/data/usm_work/OpenAndroidUSM/build-linux
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: OpenAndroidUSM.CoreTests
+
+1: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.CoreTests
+1: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+1: Test timeout computed to be: 1500
+1/7 Test #1: OpenAndroidUSM.CoreTests .................   Passed   37.94 sec
+test 2
+    Start 2: OpenAndroidUSM.InputParity.buttons
+
+2: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.InputParityTests "buttons"
+2: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+2: Test timeout computed to be: 120
+2: PASS buttons
+2: 167955 checks passed
+2/7 Test #2: OpenAndroidUSM.InputParity.buttons .......   Passed    0.02 sec
+test 3
+    Start 3: OpenAndroidUSM.InputParity.routing
+
+3: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.InputParityTests "routing"
+3: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+3: Test timeout computed to be: 120
+3: PASS routing
+3: 83 checks passed
+3/7 Test #3: OpenAndroidUSM.InputParity.routing .......   Passed    0.01 sec
+test 4
+    Start 4: OpenAndroidUSM.InputParity.sticks
+
+4: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.InputParityTests "sticks"
+4: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+4: Test timeout computed to be: 120
+4: PASS sticks
+4: 1364 checks passed
+4/7 Test #4: OpenAndroidUSM.InputParity.sticks ........   Passed    0.02 sec
+test 5
+    Start 5: OpenAndroidUSM.InputParity.hostage
+
+5: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.InputParityTests "hostage"
+5: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+5: Test timeout computed to be: 120
+5: PASS hostage
+5: 124 checks passed
+5/7 Test #5: OpenAndroidUSM.InputParity.hostage .......   Passed    6.02 sec
+test 6
+    Start 6: OpenAndroidUSM.InputParity.autoplay
+
+6: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.InputParityTests "autoplay"
+6: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+6: Test timeout computed to be: 120
+6: PASS autoplay
+6: 3 checks passed
+6/7 Test #6: OpenAndroidUSM.InputParity.autoplay ......   Passed    0.02 sec
+test 7
+    Start 7: OpenAndroidUSM.InputParity.transitions
+
+7: Test command: /mnt/data/usm_work/OpenAndroidUSM/build-linux/OpenAndroidUSM.InputTransitionsTests
+7: Working Directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+7: Test timeout computed to be: 120
+7: PASS 100000 deterministic transition frames; 1200000 checks
+7/7 Test #7: OpenAndroidUSM.InputParity.transitions ...   Passed    0.03 sec
+
+The following tests passed:
+	OpenAndroidUSM.CoreTests
+	OpenAndroidUSM.InputParity.buttons
+	OpenAndroidUSM.InputParity.routing
+	OpenAndroidUSM.InputParity.sticks
+	OpenAndroidUSM.InputParity.hostage
+	OpenAndroidUSM.InputParity.autoplay
+	OpenAndroidUSM.InputParity.transitions
+
+100% tests passed, 0 tests failed out of 7
+
+Label Time Summary:
+input-parity    =   6.13 sec*proc (6 tests)
+
+Total Test time (real) =  44.08 sec

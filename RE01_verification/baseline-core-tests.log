@@ -1,0 +1,8 @@
+Internal ctest changing into directory: /mnt/data/usm_work/OpenAndroidUSM/build-linux
+Test project /mnt/data/usm_work/OpenAndroidUSM/build-linux
+    Start 1: OpenAndroidUSM.CoreTests
+1/1 Test #1: OpenAndroidUSM.CoreTests .........   Passed   37.72 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =  37.73 sec

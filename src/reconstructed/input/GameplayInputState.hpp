@@ -34,12 +34,36 @@ struct ActionButtonState {
     }
 };
 
+// appKeyPressed (ELF 0x003cc75c; Ghidra 0x003dc75c) sets
+// m_pQTEPressed on Cross DOWN. CQTEManager::Update (ELF 0x0037b240;
+// Ghidra 0x0038b240) consumes that flag once, independently of CKeyPad.
+// In particular, holding Cross must not contribute a second QTE action on
+// the next update. A release in the same frame does not erase the press.
+struct EventButtonState {
+    bool held{};
+    bool pressed{};
+    bool released{};
+
+    void beginFrame() noexcept { pressed = false; released = false; }
+    void set(bool isHeld) noexcept {
+        if (held == isHeld) {
+            return;
+        }
+        held = isHeld;
+        if (isHeld) {
+            pressed = true;
+        } else {
+            released = true;
+        }
+    }
+};
+
 // Source-level replacement for the original m_p* gameplay input globals.
 // Keeping edge and held state together makes frame ownership explicit.
 struct GameplayInputState {
     ActionButtonState web;
     ActionButtonState jump;
-    ActionButtonState quickTimeEvent;
+    EventButtonState quickTimeEvent;
     ActionButtonState punch;
     ActionButtonState spiderSense;
     ActionButtonState superAttack;
@@ -51,6 +75,12 @@ struct GameplayInputState {
     ActionButtonState upgradeProceed;
     ActionButtonState pause;
     ActionButtonState menuSelected;
+    // R1 UP sets these separate native globals; it is neither a punch nor
+    // a QTE tap. The switch payload is retained without inventing a switch
+    // target or assigning meaning to the native literal 4.
+    bool rescueRequested{};
+    bool switchRequested{};
+    std::int32_t switchRequestValue{};
 
     void beginFrame() noexcept {
         web.beginFrame();
@@ -67,6 +97,8 @@ struct GameplayInputState {
         upgradeProceed.beginFrame();
         pause.beginFrame();
         menuSelected.beginFrame();
+        rescueRequested = false;
+        switchRequested = false;
     }
 };
 

@@ -11,6 +11,15 @@ void GameplayCinematicScheduler::bind(
     completions_.clear();
 }
 
+const LevelCinematicAsset* GameplayCinematicScheduler::findAsset(
+    std::int32_t cinematicId) const noexcept {
+    const auto asset = std::find_if(cinematics_.begin(), cinematics_.end(),
+        [cinematicId](const LevelCinematicAsset& candidate) {
+            return candidate.objectId == cinematicId;
+        });
+    return asset == cinematics_.end() ? nullptr : &*asset;
+}
+
 Result GameplayCinematicScheduler::start(std::int32_t cinematicId) {
     const auto existing = std::find_if(
         instances_.begin(), instances_.end(),

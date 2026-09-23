@@ -1,0 +1,23 @@
+[0/1] Re-running CMake...
+CMake Deprecation Warning at build/windows-msvc/_deps/pugixml-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+[1/3] Building CXX object CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o
+FAILED: CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o 
+/usr/bin/c++ -DUSM_TEST_GAME_DATA_ROOT=\"/mnt/data/re05/OpenAndroidUSM/game/data/gameloft/games/spiderman\" -I/mnt/data/re05/OpenAndroidUSM/src -O3 -DNDEBUG -std=gnu++20 -MD -MT CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o -MF CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o.d -o CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o -c /mnt/data/re05/OpenAndroidUSM/tests/QteControlTests.cpp
+/mnt/data/re05/OpenAndroidUSM/tests/QteControlTests.cpp: In function ‘usm::game::CinematicCommand {anonymous}::interfaceCommand(bool)’:
+/mnt/data/re05/OpenAndroidUSM/tests/QteControlTests.cpp:210:68: error: could not convert ‘{"InterfaceControl", {{"bool", "ControlEnable", (enabled ? ((const char*)"true") : ((const char*)"false"))}, {"bool", "AttributionEnable", "false"}, {"bool", "ArrowEnable", "false"}, {"bool", "BlackEnable", "true"}, {"bool", "SkipEnable", "true"}}}’ from ‘<brace-enclosed initializer list>’ to ‘usm::game::CinematicCommand’
+  210 |         {"bool","BlackEnable","true"},{"bool","SkipEnable","true"}}};
+      |                                                                    ^
+      |                                                                    |
+      |                                                                    <brace-enclosed initializer list>
+ninja: build stopped: subcommand failed.

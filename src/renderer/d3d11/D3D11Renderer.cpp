@@ -1,3 +1,4 @@
+#include "game/QteFeedbackGeometry.hpp"
 #include "renderer/d3d11/D3D11Renderer.hpp"
 
 #include "assets/ColladaSkinning.hpp"
@@ -4141,6 +4142,8 @@ Result D3D11Renderer::uploadHudTexture(const game::LevelHudAsset& hud) {
     cinematicUiTutorialTexture_.Reset();
     cinematicUiInterfaceEffectVertexBuffer_.Reset();
     cinematicUiInterfaceEffectVertexCount_ = 0;
+    cinematicQteFeedbackVertexBuffer_.Reset();
+    cinematicQteFeedbackVertexCount_ = 0;
     transportTexture_.Reset();
     transportSpriteVertexBuffer_.Reset();
     transportColorVertexBuffer_.Reset();
@@ -4560,6 +4563,8 @@ Result D3D11Renderer::updateCinematicUi(
     cinematicUiColorVertexCount_ = 0;
     cinematicUiInterfaceEffectVertexBuffer_.Reset();
     cinematicUiInterfaceEffectVertexCount_ = 0;
+    cinematicQteFeedbackVertexBuffer_.Reset();
+    cinematicQteFeedbackVertexCount_ = 0;
     if (!device_) {
         return Result::failure("Cinematic UI has no D3D11 device");
     }
@@ -4655,6 +4660,34 @@ Result D3D11Renderer::updateCinematicUi(
             }
             cinematicUiInterfaceEffectVertexCount_ =
                 static_cast<std::uint32_t>(effectVertices.size());
+        }
+    }
+
+    if (frame.quickTimeFeedback.count != 0) {
+        const auto& image = hud.interfaceTexture.image();
+        std::vector<game::QteFeedbackVertex> sourceVertices;
+        const auto geometryResult = game::buildQteFeedbackGeometry(
+            frame.quickTimeFeedback, hud.interfaceAtlas, image.width,
+            image.height, width_, height_, sourceVertices);
+        if (!geometryResult) { return geometryResult; }
+        std::vector<GpuVertex> vertices;
+        vertices.reserve(sourceVertices.size());
+        for (const auto& vertex : sourceVertices) {
+            vertices.push_back({{vertex.x, vertex.y, 0.0F}, {},
+                                {vertex.u, vertex.v}, vertex.rgba});
+        }
+        if (!vertices.empty()) {
+            D3D11_BUFFER_DESC description{};
+            description.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(GpuVertex));
+            description.Usage = D3D11_USAGE_IMMUTABLE;
+            description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            D3D11_SUBRESOURCE_DATA data{vertices.data(), 0, 0};
+            const HRESULT createResult = device_->CreateBuffer(
+                &description, &data, &cinematicQteFeedbackVertexBuffer_);
+            if (FAILED(createResult)) {
+                return hresultFailure("ID3D11Device::CreateBuffer(QTE feedback)", createResult);
+            }
+            cinematicQteFeedbackVertexCount_ = static_cast<std::uint32_t>(vertices.size());
         }
     }
 
@@ -7229,6 +7262,29 @@ void D3D11Renderer::renderFrame() {
         context_->RSSetState(noCullRasterizerState_.Get());
         context_->Draw(hudVertexCount_, 0);
     }
+
+    if (cinematicQteFeedbackVertexCount_ != 0 &&
+        cinematicQteFeedbackVertexBuffer_ && hudTexture_) {
+        constexpr UINT stride = sizeof(GpuVertex);
+        constexpr UINT offset = 0;
+        context_->IASetInputLayout(inputLayout_.Get());
+        context_->IASetVertexBuffers(
+            0, 1, cinematicQteFeedbackVertexBuffer_.GetAddressOf(),
+            &stride, &offset);
+        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+        context_->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
+        context_->PSSetShader(hudPixelShader_.Get(), nullptr, 0);
+        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
+        context_->PSSetShaderResources(0, 1, hudTexture_.GetAddressOf());
+        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
+                                  0xffffffffU);
+        context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
+        context_->RSSetState(noCullRasterizerState_.Get());
+        context_->Draw(cinematicQteFeedbackVertexCount_, 0);
+    }
+
 
     if (cinematicUiColorVertexCount_ != 0 &&
         cinematicUiColorVertexBuffer_) {

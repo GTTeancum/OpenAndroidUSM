@@ -1,0 +1,1653 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 22078c6fde0fb039167d4cc562d65ab12f3997c2..d296ea96559e2dc1476fbb051cff0c7465eaa8aa 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -150,6 +150,7 @@ add_library(OpenAndroidUSM.Core STATIC
+     src/game/WebSwingRuntime.cpp
+     src/diagnostics/AutoplayHarness.cpp
+     src/reconstructed/input/XperiaKeyRouter.cpp
++    src/platform/input/XInputStateTranslator.cpp
+ )
+ target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
+ target_include_directories(OpenAndroidUSM.Core PUBLIC src)
+@@ -245,6 +246,27 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+     endif()
+     add_test(NAME OpenAndroidUSM.CoreTests COMMAND OpenAndroidUSM.CoreTests)
+ 
++    add_executable(OpenAndroidUSM.InputParityTests tests/InputParityTests.cpp)
++    target_compile_features(OpenAndroidUSM.InputParityTests PRIVATE cxx_std_20)
++    target_link_libraries(OpenAndroidUSM.InputParityTests PRIVATE OpenAndroidUSM.Core)
++    target_compile_definitions(OpenAndroidUSM.InputParityTests PRIVATE
++        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman"
++    )
++    foreach(group IN ITEMS buttons routing sticks hostage autoplay)
++        add_test(NAME OpenAndroidUSM.InputParity.${group}
++            COMMAND OpenAndroidUSM.InputParityTests ${group})
++        set_tests_properties(OpenAndroidUSM.InputParity.${group} PROPERTIES
++            TIMEOUT 120 LABELS "input-parity")
++    endforeach()
++
++    add_executable(OpenAndroidUSM.InputTransitionsTests tests/InputTransitionsTests.cpp)
++    target_compile_features(OpenAndroidUSM.InputTransitionsTests PRIVATE cxx_std_20)
++    target_link_libraries(OpenAndroidUSM.InputTransitionsTests PRIVATE OpenAndroidUSM.Core)
++    add_test(NAME OpenAndroidUSM.InputParity.transitions
++        COMMAND OpenAndroidUSM.InputTransitionsTests)
++    set_tests_properties(OpenAndroidUSM.InputParity.transitions PROPERTIES
++        TIMEOUT 120 LABELS "input-parity")
++
+     add_executable(OpenAndroidUSM.RenderTests
+         tests/D3D11RenderTests.cpp
+     )
+diff --git a/RE01_README.md b/RE01_README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6679afbda730776231b1c457425084766ff5fd9d
+--- /dev/null
++++ b/RE01_README.md
+@@ -0,0 +1,43 @@
++# OpenAndroidUSM RE01
++
++**Source continuation, not a completed or newly verified playable Windows build.**
++
++Based on uploaded commit `59903b8037945c24ad81a5f947d69f01dc4de5b7`.
++
++This checkpoint routes the original R1-release rescue request from XInput RB,
++separates A/Cross QTE taps from X/Square punches, preserves the native two-update
++combat press window, and gives hostage mash decay the evidenced real-time delta.
++The production XInput translation code now has deterministic regression tests.
++
++## Apply
++
++Extract the overlay into your existing `OpenAndroidUSM` project directory.
++It contains source-file replacements; no second patch step is required.
++Alternatively apply `RE01.patch` to the unmodified base checkout.
++Keep your existing `game/` folder. The complete source ZIP is an alternative
++for a separate checkout, not an asset or dependency bundle.
++
++## Windows commands
++
++```powershell
++cmake --preset windows-msvc-release
++cmake --build --preset windows-msvc-release
++ctest --test-dir build/windows-msvc -C Release -R "^OpenAndroidUSM\.(CoreTests$|InputParity\.)" --output-on-failure
++.\build\windows-msvc\Release\OpenAndroidUSM.exe
++```
++
++## Verification boundary
++
++Seven selected native Linux CTest targets passed with the supplied game data.
++The adapter/router also passed 100,000 deterministic transition frames under
++address/undefined-behavior sanitizers. All 599 extracted original data/library
++files match the upload. No original ARM code was executed by these tests.
++
++No newly built Windows executable, rendered gameplay capture, audible-audio
++verification, or physical-controller verification is included. Timeout-clock
++parity, hostage sound start timing, switch consumption, disconnect cancellation,
++full input arbitration, and Sandman's uploaded WIP remain explicitly unresolved.
++
++Read `docs/RE01_RECONSTRUCTION_REPORT.md` for exact native addresses, tested
++scope, inherited limitations, and instructions. Actual logs and integrity
++records are in `RE01_verification/`.
+diff --git a/docs/RE01_RECONSTRUCTION_REPORT.md b/docs/RE01_RECONSTRUCTION_REPORT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..71126235a1f996f81ab70dbe27212e8c55f45699
+--- /dev/null
++++ b/docs/RE01_RECONSTRUCTION_REPORT.md
+@@ -0,0 +1,94 @@
++# OpenAndroidUSM RE01 — Input reconstruction checkpoint
++
++Date: September 21, 2026
++
++Base commit: `59903b8037945c24ad81a5f947d69f01dc4de5b7`
++
++Target: the existing source-level native Windows PC port of the Android/Xperia Play release of *Ultimate Spider-Man: Total Mayhem*.
++
++## Status
++
++This is a tested source continuation, not a finished port or a newly verified playable Windows build. The supplied project already contains substantial reconstructed C++, Direct3D 11, XAudio2, and an XInput adapter. RE01 repairs a concrete first-level input path using the supplied original library and data.
++
++No Windows executable is included. The portable production core and input tests were compiled and executed natively on Linux x86-64. The original ARM library was inspected but not executed. No emulator, binary hook, or original-library runtime bridge was introduced.
++
++## Reference identity
++
++The supplied `game/original/libspiderman.so` is 7,713,000 bytes, with SHA-256:
++
++```text
++f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679
++```
++
++All 599 extracted files under `game/data` and `game/original` were independently SHA-256-compared with their entries in the uploaded split archive: 170,642,144 bytes in total, unchanged. This verifies those used files, not every generated capture in the roughly 95 GB expanded archive. All 17 split volumes and the ZIP central directory were readable; the entire archive was not expanded or CRC-tested.
++
++The supplied Ghidra exports use addresses **0x10000 above the ELF image addresses**. The ARM Thumb-state bit is separate and must also be cleared when identifying the instruction address. The reference manifest retains ELF instruction addresses and function byte fingerprints for eight symbols. Existing source comments elsewhere may still use the imported Ghidra addresses.
++
++Run the new standard-library-only reference verifier from the project root:
++
++```powershell
++python tools/verify_re01_reference.py
++```
++
++It fails on a different library instead of silently accepting these addresses. Fingerprint verification establishes reference identity, not gameplay equivalence.
++
++## Native evidence and implemented changes
++
++| Original evidence | Source reconstruction in RE01 |
++| --- | --- |
++| `appKeyReleased`, ELF `0x003cbd5c`; R1 branch `0x003cc2b8–0x003cc2ea`: gameplay key 103, scan 311, on release writes rescue=1, switch=1, switch value=4. | The existing RB-to-Xperia-R1 adapter no longer terminates at an ignored router case. R1 release raises separate rescue/switch events. The switch value is retained; no unverified switch target or consumer was invented. |
++| `appKeyPressed`, ELF `0x003cc75c`: Cross key 23 / scan 304 down sets the QTE input flag. `CQTEManager::Update`, ELF `0x0037b240`, consumes it once. | QTE input has a single-update event state rather than reusing combat's two-update press window. Holding A no longer contributes a second QTE action in the tested active-QTE path. A down/up pair within one update retains one QTE tap. |
++| `CKeyPad::update`, ELF `0x002e9434`, and `wasKeyPressed(int)`, ELF `0x002e964c`: the gameplay press window covers keypad states 1 and 2. | The existing combat/jump two-update press semantics remain unchanged. Only the distinct QTE event uses the one-update representation. |
++| `CHostage::Update`, ELF `0x00328068`, starts rescue from the rescue flag and enters player states 27, 28, and 29 around the hostage QTE. | Rescue initiation and QTE progress are separate `HostageInput` fields. Punch no longer starts or advances rescue. The application, diagnostic autoplay, and displayed RB/A prompts use the same separation. |
++| `CQTEManager::Update`, state 2, consumes Cross taps and restores one remaining action after 500 ms without a tap. It reads `Application::GetRealTs`, ELF `0x003ce5d4`. | The hostage path uses the existing shared `ButtonMashProgress` implementation and the shipped configuration, including interaction type 3 and eight actions. `HostageTimeStep` carries simulation and real elapsed time separately; mash idle uses real elapsed time. The slow-motion/frozen-simulation fixture checks that 499+1 real milliseconds still trigger decay. |
++
++The Windows XInput polling call remains `XInputGetState`. Its existing button translation, ordering, stick deadzone, digital-direction threshold, and disconnect release policy were factored into portable production code so they can be tested directly. The Windows shim contains compile-time comparisons with the actual Windows SDK constants; this shim was not compiled here.
++
++The stick calibration is an **inherited PC-adapter policy**, not newly asserted Android behavior. Renderer, audio backend, movement/combat algorithms, level assets, and Sandman logic were not changed by this checkpoint. A missing `<charconv>` include in the uploaded smoke test was also repaired so that the existing test compiles with the available compiler.
++
++## Verification actually performed
++
++The unchanged baseline core suite passed after the header-only portability fix. After all RE01 code changes, the final selected CTest run passed **7/7 tests**, in 44.08 seconds:
++
++| Test | Observed result |
++| --- | --- |
++| `OpenAndroidUSM.CoreTests` | Passed; the existing monolithic native core regression suite ran with the supplied game data. |
++| `OpenAndroidUSM.InputParity.buttons` | Passed; all 4,096 combinations of the 12 mapped buttons, press/hold/release ordering, unmapped bits, disconnect, and reconnect. |
++| `OpenAndroidUSM.InputParity.routing` | Passed; R1 release and value 4, wrong-scan/context rejection, distinct punch/rescue/QTE inputs, held A, same-update down/up, and the inherited disconnect policy. |
++| `OpenAndroidUSM.InputParity.sticks` | Passed; 225 axis-boundary pairs, finite/unit-bounded normalization, deadzone, and strict digital-direction thresholds. |
++| `OpenAndroidUSM.InputParity.hostage` | Passed; the actual first-level asset 30018, rejected X/A rescue initiation, RB-release initiation, player states 27/28/29, one count for held A, 500 ms decay, eight distinct taps, authored release/thanks/freed animation sequence, ten reward orbs, failure/reset/retry, and independent real-time idle decay. |
++| `OpenAndroidUSM.InputParity.autoplay` | Passed; the existing `rescue_hostage` goal emits the same separated rescue and QTE actions instead of punch. |
++| `OpenAndroidUSM.InputParity.transitions` | Passed; 100,000 deterministic connected/disconnected button-state frames through the production translator and router. |
++
++The same 100,000-frame transition test also passed with Clang AddressSanitizer and UndefinedBehaviorSanitizer enabled, with no reported sanitizer error. **That sanitizer run covers the adapter/router stress test, not the entire game or hostage runtime.**
++
++The hostage fixture places the diagnostic player at the authored hostage location and directly advances the existing runtime and animations. It does not demonstrate playing from the title screen to that location, rendering it, hearing it, or operating a physical controller. The tests check these reconstructed paths; they are not a side-by-side execution comparison with the original ARM game.
++
++## Known limitations retained explicitly
++
++1. **No new Windows build/run or physical XInput test.** Direct3D presentation, audible audio, real controller operation, and the full normal first-level player flow were not verified here. The available environment lacked the Windows SDK/runtime; a cross-toolchain download attempt did not succeed. No old executable is relabeled as a new build.
++2. **QTE timeout is not fully reconstructed.** Direct disassembly of `CQTEManager::IsOutTime`, ELF `0x0037a4b8`, shows an absolute `irr::os::Timer::getTime` comparison with start/pause offsets and a strict `>` duration test. The inherited hostage timeout still accumulates simulation time and uses `>=`. RE01 fixes the separately evidenced real-time *mash-idle* clock; it does not substitute an unverified clock for the timeout. The 4001 ms failure fixture is not proof of the 4000 ms native boundary. Cinematic QTE timeout/caller timing also needs the same clock audit.
++3. **Hostage cutting-loop sound timing remains inherited.** The uploaded reconstruction starts its loop when entering the QTE. The native hostage update tests for seven remaining actions before starting it. The existing sound-cue regression does not establish this start-frame parity. This is a concrete remaining audio issue, not a verified match.
++4. **The native switch request has no verified consumer in this change.** Its value 4 is exposed but not given invented meaning or behavior.
++5. **Disconnect policy is inherited, not native Android evidence.** A disconnected controller emits releases for previously held buttons. With R1 now routed, disconnecting while holding RB can raise the rescue request. The test records that behavior rather than hiding it. Host cancellation policy remains to be resolved explicitly.
++6. **Full input arbitration/lifetime parity is not established.** These tests cover the stated active gameplay/QTE paths. Cross-context input ownership, activation-boundary flag lifetime, simultaneous-action arbitration, and other menus/modes have not all been compared against the original.
++7. **Sandman remains the uploaded WIP.** Its unfinished task sequence/sand-hand behavior and the existing untested phase/combo work were not replaced or declared correct. The project's first-level graphics/audio review milestone has not been reached.
++
++## Apply and build
++
++The overlay contains replacement source files relative to the existing project root. Extract it into the uploaded `OpenAndroidUSM` checkout. It is based on the exact commit above; preserve any additional local edits before applying it. The included unified patch is an alternative to the replacement files, not an additional step after overlaying them.
++
++The complete source archive includes the inherited tracked source plus RE01. Neither archive contains original game binaries/assets, Ghidra databases, generated decompiler dumps, vendor build caches, or a game executable. Continue using the supplied `game/` material.
++
++Use the existing Windows build commands from the project root:
++
++```powershell
++cmake --preset windows-msvc-release
++cmake --build --preset windows-msvc-release
++ctest --test-dir build/windows-msvc -C Release -R "^OpenAndroidUSM\.(CoreTests$|InputParity\.)" --output-on-failure
++.\build\windows-msvc\Release\OpenAndroidUSM.exe
++```
++
++These are the existing project build/run interfaces, updated only to include the new test selection. Their Windows execution was not verified in this session. Building and running them locally is the remaining platform check.
++
++The `RE01_verification` directory in the downloads contains the actual baseline/final logs, reference fingerprints, original-material integrity record, source-change manifest, and clean-base patch-application check. `RE01.patch` can be independently checked with `git apply --check` against the unmodified base commit.
+diff --git a/docs/references/re01-original-fingerprints.json b/docs/references/re01-original-fingerprints.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..4f242d416ab860c03292fb5d3dbcc5a3b9f33431
+--- /dev/null
++++ b/docs/references/re01-original-fingerprints.json
+@@ -0,0 +1,65 @@
++{
++  "size": 7713000,
++  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
++  "machine": "ELF32 little-endian ARM",
++  "symbols": [
++    {
++      "name": "appKeyPressed",
++      "elf_address": "0x003cc75c",
++      "thumb": true,
++      "size": 424,
++      "sha256": "14c28da418a40afd56b8ee069a5ccc84d2b712311a1c5e0e3c3155be5c1f4966"
++    },
++    {
++      "name": "appKeyReleased",
++      "elf_address": "0x003cbd5c",
++      "thumb": true,
++      "size": 2560,
++      "sha256": "b2916599043cee7ca7fdd61dd778a08e971694b52e28ef4a0dd2608f3e44a445"
++    },
++    {
++      "name": "_ZN7CKeyPad6updateEf",
++      "elf_address": "0x002e9434",
++      "thumb": true,
++      "size": 192,
++      "sha256": "f5c0517e3579d309f26de44d90757b627b422f60444a292ad3f09224eb795962"
++    },
++    {
++      "name": "_ZN7CKeyPad13wasKeyPressedEi",
++      "elf_address": "0x002e964c",
++      "thumb": true,
++      "size": 24,
++      "sha256": "e07bd0c6c3e02952cc66dc35e157153762852abec2eef055b1dc2a7e52aa7d00"
++    },
++    {
++      "name": "_ZN8CHostage6UpdateEf",
++      "elf_address": "0x00328068",
++      "thumb": true,
++      "size": 1352,
++      "sha256": "602e73d58728990678567ae103d2ccf6b9103081eda16e01a7ed6fcc672cf782"
++    },
++    {
++      "name": "_ZN11CQTEManager6UpdateEf",
++      "elf_address": "0x0037b240",
++      "thumb": true,
++      "size": 460,
++      "sha256": "b37b509937754778139e710d09a0ab2765c5720af3f39addf0bac66ba3e7cc90"
++    },
++    {
++      "name": "_ZN11CQTEManager9IsOutTimeEv",
++      "elf_address": "0x0037a4b8",
++      "thumb": true,
++      "size": 68,
++      "sha256": "756f989ef1fcdf4822abe1d7734cf34a4bff710ee3936d085b792847242db2fd"
++    },
++    {
++      "name": "_ZN11Application9GetRealTsEv",
++      "elf_address": "0x003ce5d4",
++      "thumb": true,
++      "size": 6,
++      "sha256": "f78d91149676a372a853c5a27e3cad21cbbf0491abe786f995158982ceb1b0cf"
++    }
++  ],
++  "ghidra_rebase_offset": "0x00010000",
++  "note": "Fingerprints of the original supplied reference. No original executable bytes are included."
++}
+diff --git a/src/app/Application.cpp b/src/app/Application.cpp
+index 26e9e5d6e299ba933bc77155100cad739517a318..e2f2e280538ee475faf5116b97a20624afca5078 100644
+--- a/src/app/Application.cpp
++++ b/src/app/Application.cpp
+@@ -3176,11 +3176,16 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             const bool superAttackPressed = autoplay
+                 ? autoplayInput.superAttackPressed
+                 : keyRouter_.state().superAttack.pressed;
++            // Original R1 release starts CHostage rescue. Cross DOWN is
++            // the separate CQTEManager action; neither is a punch alias.
+             const bool rescuePressed =
+-                punchPressed &&
+-                (controlsEnabled || hostageRuntime_.quickTimeActive()) &&
+-                (hostageRuntime_.quickTimeActive() ||
+-                 hostageRuntime_.canStartRescue(gameplayPlayer_));
++                (autoplay ? autoplayInput.rescueRequested
++                          : keyRouter_.state().rescueRequested) &&
++                controlsEnabled &&
++                hostageRuntime_.canStartRescue(gameplayPlayer_);
++            const bool hostageQuickTimePressed =
++                autoplay ? autoplayInput.quickTimeEventPressed
++                         : keyRouter_.state().quickTimeEvent.pressed;
+             const auto cameraBeforeMovement =
+                 gameplayCamera_.sample(gameplayPlayer_.position());
+             const auto attackDirection =
+@@ -3981,7 +3986,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             }
+             result = hostageRuntime_.update(
+                 gameplayPlayer_, objectRuntime_, levelBonusRuntime_,
+-                gameDeltaMilliseconds, rescuePressed);
++                {gameDeltaMilliseconds, realDeltaMilliseconds},
++                {rescuePressed, hostageQuickTimePressed});
+             if (!result) {
+                 return fail(result.message());
+             }
+@@ -5842,14 +5848,14 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                 qteVisible, qteProgress);
+             if (hostageRuntime_.quickTimeActive() &&
+                 !uiFrame.messagePanelVisible) {
+-                uiFrame.text = u"Press [X]";
++                uiFrame.text = u"Press [A]";
+                 uiFrame.textVisible = true;
+                 uiFrame.tutorialPanelVisible = true;
+                 uiFrame.tutorialButton = -1;
+                 uiFrame.dimBackground = false;
+             } else if (hostageRuntime_.contextPromptVisible() &&
+                        !uiFrame.textVisible) {
+-                uiFrame.text = u"Press [X] to rescue";
++                uiFrame.text = u"Press [RB] to rescue";
+                 uiFrame.textVisible = true;
+                 uiFrame.tutorialPanelVisible = true;
+                 uiFrame.tutorialButton = -1;
+diff --git a/src/diagnostics/AutoplayHarness.cpp b/src/diagnostics/AutoplayHarness.cpp
+index c21d2589ff69c6d5697376f122ea1f5ff08f076c..2ba16fdc370df6635542e8edad2f1802ff12ea74 100644
+--- a/src/diagnostics/AutoplayHarness.cpp
++++ b/src/diagnostics/AutoplayHarness.cpp
+@@ -1296,6 +1296,8 @@ AutoplayFrameInput AutoplayHarness::update(
+             input.superAttackPressed || stepInput.superAttackPressed;
+         input.quickTimeEventPressed =
+             input.quickTimeEventPressed || stepInput.quickTimeEventPressed;
++        input.rescueRequested =
++            input.rescueRequested || stepInput.rescueRequested;
+         input.menuUpReleased =
+             input.menuUpReleased || stepInput.menuUpReleased;
+         input.menuDownReleased =
+@@ -1332,8 +1334,8 @@ AutoplayFrameInput AutoplayHarness::update(
+              (snapshot.tutorialVisible && !snapshot.controlsEnabled &&
+               step.kind == StepKind::WaitControls)) &&
+             step.kind != StepKind::Capture);
+-        input.punchPressed =
+-            input.punchPressed ||
++        input.quickTimeEventPressed =
++            input.quickTimeEventPressed ||
+             (autoQuickTimeActions_ &&
+              snapshot.hostageQuickTimeEventActive &&
+              step.kind != StepKind::Capture);
+@@ -2160,7 +2162,7 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
+                          std::to_string(hostage->requiredActions));
+         } else if (hostage->phase == game::HostageRescuePhase::Tied) {
+             if (hostage->promptVisible) {
+-                input.punchPressed = true;
++                input.rescueRequested = true;
+             } else if (snapshot.controlsEnabled) {
+                 input.motion = steerToward(snapshot,
+                                            hostage->asset->position);
+@@ -2168,7 +2170,7 @@ AutoplayFrameInput AutoplayHarness::updateActiveStep(
+         } else if (hostage->phase ==
+                        game::HostageRescuePhase::QuickTime &&
+                    autoQuickTimeActions_) {
+-            input.punchPressed = true;
++            input.quickTimeEventPressed = true;
+         }
+         break;
+     }
+diff --git a/src/diagnostics/AutoplayHarness.hpp b/src/diagnostics/AutoplayHarness.hpp
+index 6c0d438f3b1de249b5dd66e1f68141f2216d5abe..4594a905f5e18982e163a85edc7c8fa1fc6352a2 100644
+--- a/src/diagnostics/AutoplayHarness.hpp
++++ b/src/diagnostics/AutoplayHarness.hpp
+@@ -158,6 +158,7 @@ struct AutoplayFrameInput {
+     bool spiderSensePressed{};
+     bool superAttackPressed{};
+     bool quickTimeEventPressed{};
++    bool rescueRequested{};
+     bool menuUpReleased{};
+     bool menuDownReleased{};
+     bool menuSelectedReleased{};
+diff --git a/src/game/LevelHostageRuntime.cpp b/src/game/LevelHostageRuntime.cpp
+index 91711ea796626ea7013502de1356d6f0d3fca999..23ed77c6a708c4233f1bd3046e8e4d9b2b4c01d5 100644
+--- a/src/game/LevelHostageRuntime.cpp
++++ b/src/game/LevelHostageRuntime.cpp
+@@ -73,8 +73,9 @@ Result LevelHostageRuntime::initialize(const LevelOneBootstrap& level,
+ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                                    LevelObjectRuntime& objects,
+                                    LevelBonusRuntime& bonuses,
+-                                   std::uint32_t elapsedMilliseconds,
+-                                   bool rescuePressed) {
++                                   HostageTimeStep time,
++                                   HostageInput input) {
++    const std::uint32_t elapsedMilliseconds = time.simulationMilliseconds;
+     for (LevelHostageState& hostage : states_) {
+         if (hostage.asset == nullptr) {
+             return Result::failure("Hostage runtime lost its authored asset");
+@@ -93,7 +94,7 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+ 
+         switch (hostage.phase) {
+         case HostageRescuePhase::Tied:
+-            if (hostage.promptVisible && rescuePressed) {
++            if (hostage.promptVisible && input.rescueRequested) {
+                 const assets::Vector3 direction{
+                     hostage.asset->position.x - player.position().x,
+                     hostage.asset->position.y - player.position().y, 0.0F};
+@@ -124,25 +125,35 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                 hostage.phaseElapsedMilliseconds = 0;
+                 hostage.quickTimeElapsedMilliseconds = 0;
+                 hostage.completedActions = 0;
++                hostage.buttonProgress.reset();
+                 soundCues_.push_back({hostage.asset->objectId,
+                                       kRescueCuttingLoopSound,
+                                       HostageSoundAction::StartLoop});
+             }
+             break;
+-        case HostageRescuePhase::QuickTime:
++        case HostageRescuePhase::QuickTime: {
++            // Existing timeout bookkeeping remains separate from mash idle.
++            // RE01 follow-up: native IsOutTime (ELF 0x0037a4b8) uses an
++            // absolute, pause-adjusted irr::os::Timer and strict > duration.
++            // Do not confuse fixing GetRealTs below with timeout parity.
+             hostage.quickTimeElapsedMilliseconds =
+                 static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                     static_cast<std::uint64_t>(
+                         hostage.quickTimeElapsedMilliseconds) +
+                         elapsedMilliseconds,
+                     hostage.quickTimeDurationMilliseconds));
+-            if (rescuePressed) {
+-                hostage.completedActions = std::min<std::int16_t>(
+-                    hostage.requiredActions,
+-                    static_cast<std::int16_t>(
+-                        hostage.completedActions + 1));
+-            }
+-            if (hostage.completedActions >= hostage.requiredActions) {
++            // CQTEManager::Update, ELF 0x0037b240 (Ghidra 0x0038b240),
++            // state 2: ignore rescue requests; consume Cross once, and
++            // restore one remaining action after 500 ms without a tap.
++            // Use the shipped interaction type, not a new rescue-specific
++            // count or timer. This is also used by cinematic QTEs.
++            const bool succeeded = hostage.buttonProgress.update(
++                time.realMilliseconds, input.quickTimeActionPressed,
++                hostage.requiredActions,
++                quickTimeConfig_ != nullptr &&
++                    quickTimeConfig_->interactionType == 3);
++            hostage.completedActions = hostage.buttonProgress.completed();
++            if (succeeded) {
+                 soundCues_.push_back({hostage.asset->objectId,
+                                       kRescueCuttingLoopSound,
+                                       HostageSoundAction::StopLoop});
+@@ -165,6 +176,7 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                 }
+             }
+             break;
++        }
+         case HostageRescuePhase::RescueEnd:
+             if (player.activeStateId() != kRescueEndPlayerState ||
+                 player.scriptedStateAnimationFinished()) {
+@@ -285,6 +297,7 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+         player.clearScriptedState();
+         hostage.quickTimeElapsedMilliseconds = 0;
+         hostage.completedActions = 0;
++        hostage.buttonProgress.reset();
+         return objects.setAnimation(hostage.asset->objectId,
+                                     hostage.asset->hostageAnimations[0], true);
+     case HostageRescuePhase::Release:
+diff --git a/src/game/LevelHostageRuntime.hpp b/src/game/LevelHostageRuntime.hpp
+index 74c25c614961fd67914b350f36a1c8d13830139c..7c10778d8b36e6753beb87e82a18a5259e0ea1bc 100644
+--- a/src/game/LevelHostageRuntime.hpp
++++ b/src/game/LevelHostageRuntime.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "core/Result.hpp"
++#include "game/ButtonMashProgress.hpp"
+ #include "game/GameplayPlayer.hpp"
+ #include "game/LevelBonusRuntime.hpp"
+ #include "game/LevelObjectRuntime.hpp"
+@@ -34,6 +35,21 @@ struct HostageSoundCue {
+     HostageSoundAction action{HostageSoundAction::PlayOnce};
+ };
+ 
++// CHostage::Update starts from m_pRescuePressed (R1 release);
++// CQTEManager::Update counts m_pQTEPressed (Cross press). They must not
++// be represented by a shared contextual punch input.
++// The mash-idle timer reads Application::GetRealTs, not the scaled
++// simulation delta. Keep the two clocks explicit at the call boundary.
++struct HostageTimeStep {
++    std::uint32_t simulationMilliseconds{};
++    std::uint32_t realMilliseconds{};
++};
++
++struct HostageInput {
++    bool rescueRequested{};
++    bool quickTimeActionPressed{};
++};
++
+ struct LevelHostageState {
+     const LevelObjectAsset* asset{};
+     HostageRescuePhase phase{HostageRescuePhase::Tied};
+@@ -43,6 +59,7 @@ struct LevelHostageState {
+     std::int16_t completedActions{};
+     std::int16_t requiredActions{1};
+     bool promptVisible{};
++    ButtonMashProgress buttonProgress;
+ };
+ 
+ // Portable reconstruction of CHostage::Update/OnEnterState/OnExitState at
+@@ -56,8 +73,8 @@ public:
+     [[nodiscard]] Result update(GameplayPlayer& player,
+                                 LevelObjectRuntime& objects,
+                                 LevelBonusRuntime& bonuses,
+-                                std::uint32_t elapsedMilliseconds,
+-                                bool rescuePressed);
++                                HostageTimeStep time,
++                                HostageInput input);
+ 
+     [[nodiscard]] bool canStartRescue(
+         const GameplayPlayer& player) const noexcept;
+diff --git a/src/platform/input/XInputStateTranslator.cpp b/src/platform/input/XInputStateTranslator.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..361919b17e714c482a00d4d0b75082b9d196bd50
+--- /dev/null
++++ b/src/platform/input/XInputStateTranslator.cpp
+@@ -0,0 +1,114 @@
++#include "platform/input/XInputStateTranslator.hpp"
++
++#include <array>
++
++#include <algorithm>
++#include <cmath>
++
++namespace usm::platform {
++namespace {
++
++using reconstructed::XperiaKeyCode;
++using reconstructed::XperiaScanCode;
++
++struct Binding {
++    std::uint16_t mask;
++    XperiaKeyCode keyCode;
++    XperiaScanCode scanCode;
++};
++
++constexpr std::array<Binding, 12> kBindings{{
++    {xinput::A, XperiaKeyCode::Cross, XperiaScanCode::Cross},
++    {xinput::B, XperiaKeyCode::Circle, XperiaScanCode::Circle},
++    {xinput::X, XperiaKeyCode::Square, XperiaScanCode::Square},
++    {xinput::Y, XperiaKeyCode::Triangle, XperiaScanCode::Triangle},
++    {xinput::LeftShoulder, XperiaKeyCode::L1, XperiaScanCode::L1},
++    {xinput::RightShoulder, XperiaKeyCode::R1, XperiaScanCode::R1},
++    {xinput::Back, XperiaKeyCode::Select, XperiaScanCode::Select},
++    {xinput::Start, XperiaKeyCode::Start, XperiaScanCode::Start},
++    {xinput::DpadUp, XperiaKeyCode::DpadUp, XperiaScanCode::DpadUp},
++    {xinput::DpadDown, XperiaKeyCode::DpadDown, XperiaScanCode::DpadDown},
++    {xinput::DpadLeft, XperiaKeyCode::DpadLeft, XperiaScanCode::DpadLeft},
++    {xinput::DpadRight, XperiaKeyCode::DpadRight, XperiaScanCode::DpadRight},
++}};
++
++// Existing PC-adapter calibration from the uploaded checkpoint; unchanged.
++constexpr std::int16_t kStickDirectionThreshold = 9000;
++
++ControllerStick normalizeLeftStick(std::int16_t x, std::int16_t y) noexcept {
++    constexpr float kMaximumAxis = 32767.0F;
++    constexpr float kDeadZone =
++        static_cast<float>(xinput::LeftThumbDeadzone) / kMaximumAxis;
++    float normalizedX = std::clamp(static_cast<float>(x) / kMaximumAxis,
++                                   -1.0F, 1.0F);
++    float normalizedY = std::clamp(static_cast<float>(y) / kMaximumAxis,
++                                   -1.0F, 1.0F);
++    const float magnitude =
++        std::sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
++    if (magnitude <= kDeadZone) {
++        return {};
++    }
++    const float remappedMagnitude =
++        std::min((magnitude - kDeadZone) / (1.0F - kDeadZone), 1.0F);
++    normalizedX = normalizedX / magnitude * remappedMagnitude;
++    normalizedY = normalizedY / magnitude * remappedMagnitude;
++    return {normalizedX, normalizedY};
++}
++
++std::uint16_t addLeftStickDirections(std::uint16_t buttons, std::int16_t x, std::int16_t y) noexcept {
++    if (x < -kStickDirectionThreshold) {
++        buttons |= xinput::DpadLeft;
++    } else if (x > kStickDirectionThreshold) {
++        buttons |= xinput::DpadRight;
++    }
++    if (y < -kStickDirectionThreshold) {
++        buttons |= xinput::DpadDown;
++    } else if (y > kStickDirectionThreshold) {
++        buttons |= xinput::DpadUp;
++    }
++    return buttons;
++}
++
++} // namespace
++
++void XInputStateTranslator::update(bool connected, std::uint16_t buttons,
++                                   std::int16_t leftX, std::int16_t leftY,
++                                   const EventHandler& handler) noexcept {
++    if (!connected) {
++        if (connected_) {
++            for (const Binding& binding : kBindings) {
++                emitTransition((previousButtons_ & binding.mask) != 0, false,
++                               binding.keyCode, binding.scanCode, handler);
++            }
++        }
++        previousButtons_ = 0;
++        leftStick_ = {};
++        connected_ = false;
++        return;
++    }
++
++    connected_ = true;
++    leftStick_ = normalizeLeftStick(leftX,
++                                    leftY);
++    const std::uint16_t currentButtons = addLeftStickDirections(
++        buttons, leftX, leftY);
++
++    for (const Binding& binding : kBindings) {
++        emitTransition((previousButtons_ & binding.mask) != 0,
++                       (currentButtons & binding.mask) != 0, binding.keyCode,
++                       binding.scanCode, handler);
++    }
++    previousButtons_ = currentButtons;
++}
++
++void XInputStateTranslator::emitTransition(bool wasPressed, bool isPressed,
++                                      XperiaKeyCode keyCode,
++                                      XperiaScanCode scanCode,
++                                      const EventHandler& handler) const {
++    if (wasPressed == isPressed || !handler) {
++        return;
++    }
++    handler({keyCode, scanCode, isPressed});
++}
++
++} // namespace usm::platform
+diff --git a/src/platform/input/XInputStateTranslator.hpp b/src/platform/input/XInputStateTranslator.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..debdb7649dc13fb35304089f9ca1e152b9c06c50
+--- /dev/null
++++ b/src/platform/input/XInputStateTranslator.hpp
+@@ -0,0 +1,58 @@
++#pragma once
++
++#include "reconstructed/input/XperiaKeyEvent.hpp"
++
++#include <cstdint>
++#include <functional>
++
++namespace usm::platform {
++
++struct ControllerStick {
++    float x{};
++    float y{};
++};
++
++// These are XINPUT_GAMEPAD API constants, not guessed Android controls.
++// XInputController.cpp statically checks every value against the Windows SDK.
++namespace xinput {
++inline constexpr std::uint16_t DpadUp = 0x0001;
++inline constexpr std::uint16_t DpadDown = 0x0002;
++inline constexpr std::uint16_t DpadLeft = 0x0004;
++inline constexpr std::uint16_t DpadRight = 0x0008;
++inline constexpr std::uint16_t Start = 0x0010;
++inline constexpr std::uint16_t Back = 0x0020;
++inline constexpr std::uint16_t LeftShoulder = 0x0100;
++inline constexpr std::uint16_t RightShoulder = 0x0200;
++inline constexpr std::uint16_t A = 0x1000;
++inline constexpr std::uint16_t B = 0x2000;
++inline constexpr std::uint16_t X = 0x4000;
++inline constexpr std::uint16_t Y = 0x8000;
++inline constexpr std::int16_t LeftThumbDeadzone = 7849;
++} // namespace xinput
++
++// Production XInput-state translation shared by the Windows poller and
++// deterministic tests. It never calls the original ARM binary.
++class XInputStateTranslator final {
++public:
++    using EventHandler =
++        std::function<void(const reconstructed::XperiaKeyEvent&)>;
++
++    void update(bool connected, std::uint16_t buttons,
++                std::int16_t leftX, std::int16_t leftY,
++                const EventHandler& handler) noexcept;
++    [[nodiscard]] bool connected() const noexcept { return connected_; }
++    [[nodiscard]] ControllerStick leftStick() const noexcept {
++        return leftStick_;
++    }
++
++private:
++    void emitTransition(bool wasPressed, bool isPressed,
++                        reconstructed::XperiaKeyCode keyCode,
++                        reconstructed::XperiaScanCode scanCode,
++                        const EventHandler& handler) const;
++    std::uint16_t previousButtons_{};
++    bool connected_{};
++    ControllerStick leftStick_;
++};
++
++} // namespace usm::platform
+diff --git a/src/platform/windows/XInputController.cpp b/src/platform/windows/XInputController.cpp
+index b613a55cbbbac0dddd4cb252de94bf1df3ee0645..17e5288e15259142ba22f32831a35a23f77e9a44 100644
+--- a/src/platform/windows/XInputController.cpp
++++ b/src/platform/windows/XInputController.cpp
+@@ -1,110 +1,31 @@
+ #include "platform/windows/XInputController.hpp"
+ 
+-#include <algorithm>
+-#include <cmath>
++#include <Windows.h>
++#include <Xinput.h>
+ 
+ namespace usm::platform {
+-namespace {
+ 
+-using reconstructed::XperiaKeyCode;
+-using reconstructed::XperiaScanCode;
+-
+-struct Binding {
+-    WORD mask;
+-    XperiaKeyCode keyCode;
+-    XperiaScanCode scanCode;
+-};
+-
+-constexpr std::array<Binding, 12> kBindings{{
+-    {XINPUT_GAMEPAD_A, XperiaKeyCode::Cross, XperiaScanCode::Cross},
+-    {XINPUT_GAMEPAD_B, XperiaKeyCode::Circle, XperiaScanCode::Circle},
+-    {XINPUT_GAMEPAD_X, XperiaKeyCode::Square, XperiaScanCode::Square},
+-    {XINPUT_GAMEPAD_Y, XperiaKeyCode::Triangle, XperiaScanCode::Triangle},
+-    {XINPUT_GAMEPAD_LEFT_SHOULDER, XperiaKeyCode::L1, XperiaScanCode::L1},
+-    {XINPUT_GAMEPAD_RIGHT_SHOULDER, XperiaKeyCode::R1, XperiaScanCode::R1},
+-    {XINPUT_GAMEPAD_BACK, XperiaKeyCode::Select, XperiaScanCode::Select},
+-    {XINPUT_GAMEPAD_START, XperiaKeyCode::Start, XperiaScanCode::Start},
+-    {XINPUT_GAMEPAD_DPAD_UP, XperiaKeyCode::DpadUp, XperiaScanCode::DpadUp},
+-    {XINPUT_GAMEPAD_DPAD_DOWN, XperiaKeyCode::DpadDown, XperiaScanCode::DpadDown},
+-    {XINPUT_GAMEPAD_DPAD_LEFT, XperiaKeyCode::DpadLeft, XperiaScanCode::DpadLeft},
+-    {XINPUT_GAMEPAD_DPAD_RIGHT, XperiaKeyCode::DpadRight, XperiaScanCode::DpadRight},
+-}};
+-
+-constexpr SHORT kStickDirectionThreshold = 9000;
+-
+-ControllerStick normalizeLeftStick(SHORT x, SHORT y) noexcept {
+-    constexpr float kMaximumAxis = 32767.0F;
+-    constexpr float kDeadZone =
+-        static_cast<float>(XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) / kMaximumAxis;
+-    float normalizedX = std::clamp(static_cast<float>(x) / kMaximumAxis,
+-                                   -1.0F, 1.0F);
+-    float normalizedY = std::clamp(static_cast<float>(y) / kMaximumAxis,
+-                                   -1.0F, 1.0F);
+-    const float magnitude =
+-        std::sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+-    if (magnitude <= kDeadZone) {
+-        return {};
+-    }
+-    const float remappedMagnitude =
+-        std::min((magnitude - kDeadZone) / (1.0F - kDeadZone), 1.0F);
+-    normalizedX = normalizedX / magnitude * remappedMagnitude;
+-    normalizedY = normalizedY / magnitude * remappedMagnitude;
+-    return {normalizedX, normalizedY};
+-}
+-
+-WORD addLeftStickDirections(WORD buttons, SHORT x, SHORT y) noexcept {
+-    if (x < -kStickDirectionThreshold) {
+-        buttons |= XINPUT_GAMEPAD_DPAD_LEFT;
+-    } else if (x > kStickDirectionThreshold) {
+-        buttons |= XINPUT_GAMEPAD_DPAD_RIGHT;
+-    }
+-    if (y < -kStickDirectionThreshold) {
+-        buttons |= XINPUT_GAMEPAD_DPAD_DOWN;
+-    } else if (y > kStickDirectionThreshold) {
+-        buttons |= XINPUT_GAMEPAD_DPAD_UP;
+-    }
+-    return buttons;
+-}
+-
+-} // namespace
++static_assert(xinput::A == XINPUT_GAMEPAD_A);
++static_assert(xinput::B == XINPUT_GAMEPAD_B);
++static_assert(xinput::X == XINPUT_GAMEPAD_X);
++static_assert(xinput::Y == XINPUT_GAMEPAD_Y);
++static_assert(xinput::LeftShoulder == XINPUT_GAMEPAD_LEFT_SHOULDER);
++static_assert(xinput::RightShoulder == XINPUT_GAMEPAD_RIGHT_SHOULDER);
++static_assert(xinput::Back == XINPUT_GAMEPAD_BACK);
++static_assert(xinput::Start == XINPUT_GAMEPAD_START);
++static_assert(xinput::DpadUp == XINPUT_GAMEPAD_DPAD_UP);
++static_assert(xinput::DpadDown == XINPUT_GAMEPAD_DPAD_DOWN);
++static_assert(xinput::DpadLeft == XINPUT_GAMEPAD_DPAD_LEFT);
++static_assert(xinput::DpadRight == XINPUT_GAMEPAD_DPAD_RIGHT);
++static_assert(xinput::LeftThumbDeadzone == XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+ 
+ void XInputController::poll(const EventHandler& handler) noexcept {
+     XINPUT_STATE state{};
+-    if (XInputGetState(playerIndex_, &state) != ERROR_SUCCESS) {
+-        if (connected_) {
+-            for (const Binding& binding : kBindings) {
+-                emitTransition((previousButtons_ & binding.mask) != 0, false,
+-                               binding.keyCode, binding.scanCode, handler);
+-            }
+-        }
+-        previousButtons_ = 0;
+-        leftStick_ = {};
+-        connected_ = false;
+-        return;
+-    }
+-
+-    connected_ = true;
+-    leftStick_ = normalizeLeftStick(state.Gamepad.sThumbLX,
+-                                    state.Gamepad.sThumbLY);
+-    const WORD currentButtons = addLeftStickDirections(
+-        state.Gamepad.wButtons, state.Gamepad.sThumbLX, state.Gamepad.sThumbLY);
+-
+-    for (const Binding& binding : kBindings) {
+-        emitTransition((previousButtons_ & binding.mask) != 0,
+-                       (currentButtons & binding.mask) != 0, binding.keyCode,
+-                       binding.scanCode, handler);
+-    }
+-    previousButtons_ = currentButtons;
+-}
+-
+-void XInputController::emitTransition(bool wasPressed, bool isPressed,
+-                                      XperiaKeyCode keyCode,
+-                                      XperiaScanCode scanCode,
+-                                      const EventHandler& handler) const {
+-    if (wasPressed == isPressed || !handler) {
+-        return;
+-    }
+-    handler({keyCode, scanCode, isPressed});
++    const bool connected =
++        XInputGetState(playerIndex_, &state) == ERROR_SUCCESS;
++    translator_.update(connected, state.Gamepad.wButtons,
++                       state.Gamepad.sThumbLX, state.Gamepad.sThumbLY,
++                       handler);
+ }
+ 
+ } // namespace usm::platform
+diff --git a/src/platform/windows/XInputController.hpp b/src/platform/windows/XInputController.hpp
+index cbc5c43afb7102caf4169da9f9e8057d022e85dc..51e772b2a1e30b32b4a11e46eb63d61342bec9ff 100644
+--- a/src/platform/windows/XInputController.hpp
++++ b/src/platform/windows/XInputController.hpp
+@@ -1,45 +1,29 @@
+ #pragma once
+ 
+-#include "reconstructed/input/XperiaKeyEvent.hpp"
++#include "platform/input/XInputStateTranslator.hpp"
+ 
+-#include <Windows.h>
+-#include <Xinput.h>
+-
+-#include <array>
+ #include <cstdint>
+-#include <functional>
+ 
+ namespace usm::platform {
+ 
+-struct ControllerStick {
+-    float x{};
+-    float y{};
+-};
+-
+ class XInputController final {
+ public:
+-    using EventHandler =
+-        std::function<void(const reconstructed::XperiaKeyEvent&)>;
++    using EventHandler = XInputStateTranslator::EventHandler;
+ 
+     explicit XInputController(std::uint32_t playerIndex = 0) noexcept
+         : playerIndex_(playerIndex) {}
+ 
+     void poll(const EventHandler& handler) noexcept;
+-    [[nodiscard]] bool connected() const noexcept { return connected_; }
++    [[nodiscard]] bool connected() const noexcept {
++        return translator_.connected();
++    }
+     [[nodiscard]] ControllerStick leftStick() const noexcept {
+-        return leftStick_;
++        return translator_.leftStick();
+     }
+ 
+ private:
+-    void emitTransition(bool wasPressed, bool isPressed,
+-                        reconstructed::XperiaKeyCode keyCode,
+-                        reconstructed::XperiaScanCode scanCode,
+-                        const EventHandler& handler) const;
+-
+     std::uint32_t playerIndex_{};
+-    WORD previousButtons_{};
+-    bool connected_{};
+-    ControllerStick leftStick_;
++    XInputStateTranslator translator_;
+ };
+ 
+ } // namespace usm::platform
+diff --git a/src/reconstructed/input/GameplayInputState.hpp b/src/reconstructed/input/GameplayInputState.hpp
+index 08c53ec742bd0ea1c420a439f0ef790a12556ded..85bdc18b24d25ab43004c10d5eaefe4bb8e73226 100644
+--- a/src/reconstructed/input/GameplayInputState.hpp
++++ b/src/reconstructed/input/GameplayInputState.hpp
+@@ -34,12 +34,36 @@ struct ActionButtonState {
+     }
+ };
+ 
++// appKeyPressed (ELF 0x003cc75c; Ghidra 0x003dc75c) sets
++// m_pQTEPressed on Cross DOWN. CQTEManager::Update (ELF 0x0037b240;
++// Ghidra 0x0038b240) consumes that flag once, independently of CKeyPad.
++// In particular, holding Cross must not contribute a second QTE action on
++// the next update. A release in the same frame does not erase the press.
++struct EventButtonState {
++    bool held{};
++    bool pressed{};
++    bool released{};
++
++    void beginFrame() noexcept { pressed = false; released = false; }
++    void set(bool isHeld) noexcept {
++        if (held == isHeld) {
++            return;
++        }
++        held = isHeld;
++        if (isHeld) {
++            pressed = true;
++        } else {
++            released = true;
++        }
++    }
++};
++
+ // Source-level replacement for the original m_p* gameplay input globals.
+ // Keeping edge and held state together makes frame ownership explicit.
+ struct GameplayInputState {
+     ActionButtonState web;
+     ActionButtonState jump;
+-    ActionButtonState quickTimeEvent;
++    EventButtonState quickTimeEvent;
+     ActionButtonState punch;
+     ActionButtonState spiderSense;
+     ActionButtonState superAttack;
+@@ -51,6 +75,12 @@ struct GameplayInputState {
+     ActionButtonState upgradeProceed;
+     ActionButtonState pause;
+     ActionButtonState menuSelected;
++    // R1 UP sets these separate native globals; it is neither a punch nor
++    // a QTE tap. The switch payload is retained without inventing a switch
++    // target or assigning meaning to the native literal 4.
++    bool rescueRequested{};
++    bool switchRequested{};
++    std::int32_t switchRequestValue{};
+ 
+     void beginFrame() noexcept {
+         web.beginFrame();
+@@ -67,6 +97,8 @@ struct GameplayInputState {
+         upgradeProceed.beginFrame();
+         pause.beginFrame();
+         menuSelected.beginFrame();
++        rescueRequested = false;
++        switchRequested = false;
+     }
+ };
+ 
+diff --git a/src/reconstructed/input/XperiaKeyRouter.cpp b/src/reconstructed/input/XperiaKeyRouter.cpp
+index db6c9348980e03dae5d51dac0b5a82658c11e152..018fa7d05fb31e2b0523c33df60de370e59e3842 100644
+--- a/src/reconstructed/input/XperiaKeyRouter.cpp
++++ b/src/reconstructed/input/XperiaKeyRouter.cpp
+@@ -41,6 +41,17 @@ void XperiaKeyRouter::route(const XperiaKeyEvent& event,
+             state_.spiderSense.set(event.pressed);
+         }
+         break;
++    case XperiaKeyCode::R1:
++        // appKeyReleased, ELF 0x003cc2b8-0x003cc2ea:
++        // key 0x67 + scan 0x137 in gameplay writes rescue=1, switch=1,
++        // switch payload=4. appKeyPressed has no corresponding R1 action.
++        if (event.scanCode == XperiaScanCode::R1 && gameplay &&
++            !event.pressed) {
++            state_.rescueRequested = true;
++            state_.switchRequested = true;
++            state_.switchRequestValue = 4;
++        }
++        break;
+     case XperiaKeyCode::DpadUp:
+         if (gameplay || context == InputContext::Menu) {
+             state_.moveUp.set(event.pressed);
+diff --git a/src/reconstructed/input/XperiaKeyRouter.hpp b/src/reconstructed/input/XperiaKeyRouter.hpp
+index 98c9898607a94f21a0773cdf6cecffb11c4a3804..86d17cdc19028f1cfa5bdff5b0b0633a285d0fcd 100644
+--- a/src/reconstructed/input/XperiaKeyRouter.hpp
++++ b/src/reconstructed/input/XperiaKeyRouter.hpp
+@@ -11,8 +11,9 @@ enum class InputContext {
+     Menu,
+ };
+ 
+-// Reconstructed from appKeyPressed (0x003dc75c) and appKeyReleased
+-// (0x003dbd5c). This is native C++ behavior, not a hook or binary bridge.
++// Reconstructed from appKeyPressed (ELF 0x003cc75c) and appKeyReleased
++// (ELF 0x003cbd5c). The supplied Ghidra project rebases both by +0x10000.
++// This is native C++ behavior, not a hook or binary bridge.
+ class XperiaKeyRouter final {
+ public:
+     void beginFrame() noexcept { state_.beginFrame(); }
+diff --git a/tests/InputParityTests.cpp b/tests/InputParityTests.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..adbb6a718d743cf228b19839a917a7fcc8381f7c
+--- /dev/null
++++ b/tests/InputParityTests.cpp
+@@ -0,0 +1,386 @@
++#include "diagnostics/AutoplayHarness.hpp"
++#include "game/LevelHostageRuntime.hpp"
++#include "game/LevelOneBootstrap.hpp"
++#include "game/PlayerStateConfig.hpp"
++#include "platform/input/XInputStateTranslator.hpp"
++#include "reconstructed/input/XperiaKeyRouter.hpp"
++
++#include <algorithm>
++#include <array>
++#include <chrono>
++#include <cmath>
++#include <cstdint>
++#include <filesystem>
++#include <fstream>
++#include <iostream>
++#include <stdexcept>
++#include <string>
++#include <string_view>
++#include <vector>
++
++namespace {
++using namespace usm::reconstructed;
++using usm::platform::XInputStateTranslator;
++namespace xi = usm::platform::xinput;
++std::uint64_t checks = 0;
++
++void check(bool condition, const char* expression, int line) {
++    ++checks;
++    if (!condition) {
++        throw std::runtime_error("line " + std::to_string(line) + ": " + expression);
++    }
++}
++#define CHECK(expression) check(static_cast<bool>(expression), #expression, __LINE__)
++
++struct Binding {
++    std::uint16_t mask;
++    XperiaKeyCode key;
++    XperiaScanCode scan;
++};
++constexpr std::array<Binding, 12> bindings{{
++    {0x1000, XperiaKeyCode::Cross, XperiaScanCode::Cross},
++    {0x2000, XperiaKeyCode::Circle, XperiaScanCode::Circle},
++    {0x4000, XperiaKeyCode::Square, XperiaScanCode::Square},
++    {0x8000, XperiaKeyCode::Triangle, XperiaScanCode::Triangle},
++    {0x0100, XperiaKeyCode::L1, XperiaScanCode::L1},
++    {0x0200, XperiaKeyCode::R1, XperiaScanCode::R1},
++    {0x0020, XperiaKeyCode::Select, XperiaScanCode::Select},
++    {0x0010, XperiaKeyCode::Start, XperiaScanCode::Start},
++    {0x0001, XperiaKeyCode::DpadUp, XperiaScanCode::DpadUp},
++    {0x0002, XperiaKeyCode::DpadDown, XperiaScanCode::DpadDown},
++    {0x0004, XperiaKeyCode::DpadLeft, XperiaScanCode::DpadLeft},
++    {0x0008, XperiaKeyCode::DpadRight, XperiaScanCode::DpadRight},
++}};
++
++void buttons() {
++    // Exhaust every combination, including contradictory D-pad directions.
++    // These assertions preserve the uploaded PC-adapter policy, not Android
++    // hardware calibration. Values are independently written SDK constants.
++    for (std::uint32_t combination = 0; combination < 4096; ++combination) {
++        XInputStateTranslator translator;
++        std::vector<XperiaKeyEvent> events;
++        const auto emit = [&](const XperiaKeyEvent& event) { events.push_back(event); };
++        std::uint16_t mask = 0;
++        std::vector<Binding> expected;
++        for (std::size_t i = 0; i < bindings.size(); ++i) {
++            if ((combination & (1U << i)) != 0) {
++                mask |= bindings[i].mask;
++                expected.push_back(bindings[i]);
++            }
++        }
++        translator.update(true, mask, 0, 0, emit);
++        CHECK(translator.connected());
++        CHECK(events.size() == expected.size());
++        for (std::size_t i = 0; i < expected.size(); ++i) {
++            CHECK(events[i].keyCode == expected[i].key);
++            CHECK(events[i].scanCode == expected[i].scan);
++            CHECK(events[i].pressed);
++        }
++        events.clear();
++        translator.update(true, mask, 0, 0, emit);
++        CHECK(events.empty());
++        translator.update(true, 0, 0, 0, emit);
++        CHECK(events.size() == expected.size());
++        for (std::size_t i = 0; i < expected.size(); ++i) {
++            CHECK(events[i].keyCode == expected[i].key);
++            CHECK(events[i].scanCode == expected[i].scan);
++            CHECK(!events[i].pressed);
++        }
++        events.clear();
++        translator.update(true, 0, 0, 0, emit);
++        CHECK(events.empty());
++    }
++    XInputStateTranslator translator;
++    std::vector<XperiaKeyEvent> events;
++    const auto emit = [&](const XperiaKeyEvent& event) { events.push_back(event); };
++    translator.update(true, 0x0cc0, 0, 0, emit); // Unmapped API bits.
++    CHECK(events.empty());
++    translator.update(true, 0xffff, 32000, -32000, emit);
++    CHECK(events.size() == bindings.size());
++    events.clear();
++    translator.update(false, 0xffff, 32000, -32000, emit);
++    CHECK(!translator.connected());
++    CHECK(translator.leftStick().x == 0.0F && translator.leftStick().y == 0.0F);
++    CHECK(events.size() == bindings.size());
++    for (const auto& event : events) { CHECK(!event.pressed); }
++    events.clear();
++    translator.update(false, 0, 0, 0, emit);
++    CHECK(events.empty());
++    translator.update(true, xi::A, 0, 0, emit);
++    CHECK(events.size() == 1 && events.front().pressed);
++    translator.update(true, xi::A, 0, 0, {}); // Empty callback is supported.
++}
++
++void routing() {
++    XperiaKeyRouter router;
++    XInputStateTranslator translator;
++    auto frame = [&](std::uint16_t mask, bool connected = true) {
++        router.beginFrame();
++        translator.update(connected, mask, 0, 0, [&](const XperiaKeyEvent& event) {
++            router.route(event, InputContext::Gameplay);
++        });
++    };
++    frame(xi::RightShoulder);
++    CHECK(!router.state().rescueRequested && !router.state().switchRequested);
++    frame(xi::RightShoulder);
++    CHECK(!router.state().rescueRequested);
++    frame(0);
++    CHECK(router.state().rescueRequested && router.state().switchRequested);
++    CHECK(router.state().switchRequestValue == 4);
++    CHECK(!router.state().punch.pressed && !router.state().quickTimeEvent.pressed);
++    frame(0);
++    CHECK(!router.state().rescueRequested && !router.state().switchRequested);
++    frame(xi::X);
++    CHECK(router.state().punch.pressed && !router.state().rescueRequested);
++    frame(0);
++    frame(xi::A);
++    CHECK(router.state().jump.pressed && router.state().quickTimeEvent.pressed);
++    frame(xi::A);
++    CHECK(router.state().jump.pressed && !router.state().quickTimeEvent.pressed);
++    for (int i = 0; i < 32; ++i) {
++        frame(xi::A);
++        CHECK(router.state().jump.held && !router.state().jump.pressed);
++        CHECK(router.state().quickTimeEvent.held && !router.state().quickTimeEvent.pressed);
++    }
++    frame(0);
++    CHECK(router.state().quickTimeEvent.released);
++    frame(xi::A);
++    CHECK(router.state().quickTimeEvent.pressed);
++    frame(0);
++
++    // Native m_pQTEPressed survives a same-update Cross DOWN / UP pair.
++    router.beginFrame();
++    router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, true}, InputContext::Gameplay);
++    router.route({XperiaKeyCode::Cross, XperiaScanCode::Cross, false}, InputContext::Gameplay);
++    CHECK(router.state().quickTimeEvent.pressed);
++    CHECK(router.state().quickTimeEvent.released && !router.state().quickTimeEvent.held);
++    router.beginFrame();
++    CHECK(!router.state().quickTimeEvent.pressed);
++    router.route({XperiaKeyCode::R1, XperiaScanCode::L1, false}, InputContext::Gameplay);
++    CHECK(!router.state().rescueRequested);
++    for (const auto context : {InputContext::Menu, InputContext::UpgradeMenu}) {
++        router.route({XperiaKeyCode::R1, XperiaScanCode::R1, false}, context);
++        CHECK(!router.state().rescueRequested);
++    }
++
++    // This is explicitly the inherited PC disconnect policy: it emits UP,
++    // including R1 UP. Do not silently present this as original Android RE.
++    frame(xi::RightShoulder);
++    frame(0, false);
++    CHECK(router.state().rescueRequested);
++    frame(0, false);
++    CHECK(!router.state().rescueRequested);
++}
++
++void sticks() {
++    constexpr std::array<std::int16_t, 15> values{{
++        -32768, -32767, -9001, -9000, -7849, -1, 0, 1,
++        7848, 7849, 7850, 9000, 9001, 32766, 32767}};
++    for (const auto x : values) {
++        for (const auto y : values) {
++            XInputStateTranslator translator;
++            std::vector<XperiaKeyEvent> events;
++            translator.update(true, 0, x, y, [&](const XperiaKeyEvent& event) {
++                events.push_back(event);
++            });
++            const auto stick = translator.leftStick();
++            CHECK(std::isfinite(stick.x) && std::isfinite(stick.y));
++            CHECK(stick.x * stick.x + stick.y * stick.y <= 1.000001F);
++            const auto has = [&](XperiaKeyCode key) {
++                return std::any_of(events.begin(), events.end(), [&](const auto& event) {
++                    return event.keyCode == key && event.pressed;
++                });
++            };
++            CHECK(has(XperiaKeyCode::DpadLeft) == (x < -9000));
++            CHECK(has(XperiaKeyCode::DpadRight) == (x > 9000));
++            CHECK(has(XperiaKeyCode::DpadDown) == (y < -9000));
++            CHECK(has(XperiaKeyCode::DpadUp) == (y > 9000));
++            if (x == 0 && std::abs(static_cast<int>(y)) <= 7849) {
++                CHECK(stick.x == 0.0F && stick.y == 0.0F);
++            }
++            if (y == 0 && std::abs(static_cast<int>(x)) <= 7849) {
++                CHECK(stick.x == 0.0F && stick.y == 0.0F);
++            }
++        }
++    }
++    XInputStateTranslator translator;
++    translator.update(true, 0, 32767, 0, {});
++    CHECK(translator.leftStick().x == 1.0F && translator.leftStick().y == 0.0F);
++    translator.update(true, 0, -32768, 0, {});
++    CHECK(translator.leftStick().x == -1.0F && translator.leftStick().y == 0.0F);
++}
++
++struct HostageFixture {
++    usm::game::LevelObjectRuntime objects;
++    usm::game::LevelBonusRuntime bonuses;
++    usm::game::LevelHostageRuntime hostage;
++    usm::game::GameplayPlayer player;
++    XperiaKeyRouter router;
++    XInputStateTranslator translator;
++    std::size_t initialBonusCount{};
++    HostageFixture(const usm::game::LevelOneBootstrap& level,
++                   const usm::game::PlayerStateConfigDatabase& configs) {
++        CHECK(objects.initialize(level));
++        CHECK(bonuses.initialize(level.bonuses()));
++        CHECK(hostage.initialize(level, &objects));
++        CHECK(player.initialize(level.player(), nullptr, &configs));
++        const auto* state = hostage.find(30018);
++        CHECK(state != nullptr && state->asset != nullptr);
++        CHECK(state->asset->roomId == 2);
++        player.restoreAt(state->asset->position, {1.0F, 0.0F, 0.0F});
++        initialBonusCount = bonuses.states().size();
++        frame(0);
++        CHECK(hostage.contextPromptVisible());
++    }
++    void frame(std::uint16_t buttons, std::uint32_t elapsed = 0) {
++        frameClocks(buttons, {elapsed, elapsed});
++    }
++    void frameClocks(std::uint16_t buttons, usm::game::HostageTimeStep time) {
++        router.beginFrame();
++        translator.update(true, buttons, 0, 0, [&](const XperiaKeyEvent& event) {
++            router.route(event, InputContext::Gameplay);
++        });
++        CHECK(hostage.update(player, objects, bonuses, time,
++              {router.state().rescueRequested, router.state().quickTimeEvent.pressed}));
++    }
++    const usm::game::LevelHostageState& state() const { return *hostage.find(30018); }
++    void start() {
++        frame(xi::RightShoulder);
++        CHECK(state().phase == usm::game::HostageRescuePhase::Tied);
++        frame(0);
++        CHECK(player.activeStateId() == 27);
++        CHECK(player.activeAnimation() == "stand_to_unhitch");
++        player.update({}, {}, 1000);
++        frame(0);
++        CHECK(hostage.quickTimeActive());
++        CHECK(player.activeStateId() == 28);
++        CHECK(state().requiredActions == 8);
++        CHECK(state().quickTimeDurationMilliseconds == 4000);
++    }
++};
++
++void hostage() {
++    const std::filesystem::path dataRoot = USM_TEST_GAME_DATA_ROOT;
++    // Fail, rather than skip the substantive test, if original data is absent.
++    CHECK(std::filesystem::is_regular_file(dataRoot / "configs.pack"));
++    usm::game::LevelOneBootstrap level;
++    CHECK(level.load(dataRoot));
++    usm::game::PlayerStateConfigDatabase configs;
++    CHECK(configs.load(dataRoot));
++    CHECK(level.buttonConfigs().find(11)->interactionType == 3);
++    {
++        HostageFixture f(level, configs);
++        f.frame(xi::X); f.frame(0);
++        f.frame(xi::A); f.frame(0);
++        CHECK(f.state().phase == usm::game::HostageRescuePhase::Tied);
++        f.start();
++        f.frame(xi::RightShoulder); f.frame(0);
++        f.frame(xi::X); f.frame(0);
++        CHECK(f.state().completedActions == 0);
++        f.frame(xi::A);
++        CHECK(f.state().completedActions == 1);
++        for (int i = 0; i < 8; ++i) { f.frame(xi::A, 50); }
++        CHECK(f.state().completedActions == 1); // Not nine taps.
++        f.frame(0, 99);
++        CHECK(f.state().completedActions == 1);
++        f.frame(0, 1);
++        CHECK(f.state().completedActions == 0); // Exactly 500 ms idle.
++        for (int i = 0; i < 8; ++i) {
++            f.frame(xi::A, 1);
++            if (i < 7) { CHECK(f.state().completedActions == i + 1); }
++            f.frame(0, 1);
++        }
++        CHECK(f.state().phase == usm::game::HostageRescuePhase::RescueEnd);
++        CHECK(f.player.activeStateId() == 29);
++        CHECK(f.player.activeAnimation() == "unhitch_to_stand");
++        f.player.update({}, {}, 1000);
++        f.frame(0);
++        CHECK(f.state().phase == usm::game::HostageRescuePhase::Release);
++        CHECK(f.bonuses.states().size() == f.initialBonusCount + 10);
++        f.objects.advanceAnimations(100000); f.frame(0);
++        CHECK(f.state().phase == usm::game::HostageRescuePhase::Thank);
++        f.objects.advanceAnimations(100000); f.frame(0);
++        CHECK(f.state().phase == usm::game::HostageRescuePhase::Freed);
++        CHECK(f.objects.find(30018)->activeAnimation == "idle_watching_idle");
++    }
++    {
++        HostageFixture f(level, configs);
++        f.start();
++        f.frame(xi::A); f.frame(0);
++        f.frame(0, 4001);
++        CHECK(f.state().phase == usm::game::HostageRescuePhase::Tied);
++        CHECK(f.state().completedActions == 0);
++        CHECK(f.player.activeStateId() == 0);
++        CHECK(f.bonuses.states().size() == f.initialBonusCount);
++        f.start();
++        CHECK(f.state().completedActions == 0);
++        f.frame(xi::A);
++        CHECK(f.state().completedActions == 1);
++        // Native GetRealTs is independent of simulation slow motion.
++        f.frameClocks(0, {0, 499});
++        CHECK(f.state().completedActions == 1);
++        f.frameClocks(0, {0, 1});
++        CHECK(f.state().completedActions == 0);
++        CHECK(f.state().quickTimeElapsedMilliseconds == 0);
++    }
++}
++
++struct TemporaryDirectory {
++    std::filesystem::path path = std::filesystem::temp_directory_path() /
++        ("usm-re01-autoplay-" + std::to_string(
++            std::chrono::steady_clock::now().time_since_epoch().count()));
++    TemporaryDirectory() { std::filesystem::create_directories(path); }
++    ~TemporaryDirectory() { std::error_code error; std::filesystem::remove_all(path, error); }
++};
++
++void autoplay() {
++    TemporaryDirectory temporary;
++    const auto script = temporary.path / "rescue.usmauto";
++    { std::ofstream stream(script); stream << "auto_qte 1\nrescue_hostage 10000 30018 freed\nfinish\n"; }
++    usm::diagnostics::AutoplayHarness harness;
++    CHECK(harness.initialize(script, temporary.path / "trace"));
++    usm::game::LevelObjectAsset asset;
++    asset.objectId = 30018;
++    std::array<usm::game::LevelHostageState, 1> states{};
++    states[0].asset = &asset;
++    states[0].promptVisible = true;
++    usm::diagnostics::AutoplaySnapshot snapshot;
++    snapshot.gameplayActive = true;
++    snapshot.controlsEnabled = true;
++    snapshot.hostages = states;
++    auto input = harness.update(snapshot);
++    CHECK(input.rescueRequested && !input.punchPressed && !input.quickTimeEventPressed);
++    states[0].phase = usm::game::HostageRescuePhase::QuickTime;
++    snapshot.hostageQuickTimeEventActive = true;
++    snapshot.controlsEnabled = false;
++    snapshot.frameIndex = 1;
++    snapshot.realTimeMilliseconds = 50;
++    input = harness.update(snapshot);
++    CHECK(!input.rescueRequested && !input.punchPressed && input.quickTimeEventPressed);
++}
++} // namespace
++
++int main(int argc, char** argv) {
++    try {
++        const std::string_view group = argc == 2 ? argv[1] : "all";
++        bool matched = false;
++        const auto run = [&](std::string_view name, auto function) {
++            if (group == "all" || group == name) {
++                matched = true;
++                function();
++                std::cout << "PASS " << name << '\n';
++            }
++        };
++        run("buttons", buttons);
++        run("routing", routing);
++        run("sticks", sticks);
++        run("hostage", hostage);
++        run("autoplay", autoplay);
++        if (!matched) { throw std::runtime_error("Unknown test group"); }
++        std::cout << checks << " checks passed\n";
++        return 0;
++    } catch (const std::exception& error) {
++        std::cerr << "FAIL after " << checks << " checks: " << error.what() << '\n';
++        return 1;
++    }
++}
+diff --git a/tests/InputTransitionsTests.cpp b/tests/InputTransitionsTests.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..fb592f41a1dc3381192753ef78a51447fe0c7a7f
+--- /dev/null
++++ b/tests/InputTransitionsTests.cpp
+@@ -0,0 +1,65 @@
++// Deterministic transition stress test of the production PC adapter/router.
++// This checks inherited PC mapping and lifecycle behavior; it is not an
++// execution or visual comparison against the ARM game.
++#include "platform/input/XInputStateTranslator.hpp"
++#include "reconstructed/input/XperiaKeyRouter.hpp"
++
++#include <cstdint>
++#include <iostream>
++
++int main() {
++    using namespace usm::reconstructed;
++    namespace xi = usm::platform::xinput;
++    usm::platform::XInputStateTranslator translator;
++    XperiaKeyRouter router;
++    std::uint32_t random = 0x55534d01;
++    std::uint16_t previous = 0;
++    bool previousJumpEdge = false;
++    bool previousPunchEdge = false;
++    std::uint64_t checks = 0;
++    const auto check = [&](bool condition, std::uint32_t frame, const char* name) {
++        ++checks;
++        if (!condition) {
++            std::cerr << "FAIL frame=" << frame << " property=" << name << '\n';
++        }
++        return condition;
++    };
++    for (std::uint32_t frame = 0; frame < 100000; ++frame) {
++        random ^= random << 13;
++        random ^= random >> 17;
++        random ^= random << 5;
++        const bool connected = (random & 0x1f0000U) != 0;
++        const auto raw = static_cast<std::uint16_t>(random);
++        const std::uint16_t current = connected ? raw : 0;
++        const std::uint16_t down = static_cast<std::uint16_t>(current & ~previous);
++        const std::uint16_t up = static_cast<std::uint16_t>(previous & ~current);
++        router.beginFrame();
++        translator.update(connected, raw, 0, 0, [&](const XperiaKeyEvent& event) {
++            router.route(event, InputContext::Gameplay);
++        });
++        const auto& state = router.state();
++        const bool jumpHeld = (current & xi::A) != 0;
++        const bool punchHeld = (current & xi::X) != 0;
++        const bool jumpEdge = (down & xi::A) != 0;
++        const bool punchEdge = (down & xi::X) != 0;
++        if (!check(translator.connected() == connected, frame, "connected") ||
++            !check(state.jump.held == jumpHeld, frame, "jump held") ||
++            !check(state.punch.held == punchHeld, frame, "punch held") ||
++            !check(state.quickTimeEvent.held == jumpHeld, frame, "QTE held") ||
++            !check(state.quickTimeEvent.pressed == jumpEdge, frame, "single QTE edge") ||
++            !check(state.jump.pressed == (jumpHeld && (jumpEdge || previousJumpEdge)), frame, "two-update jump window") ||
++            !check(state.punch.pressed == (punchHeld && (punchEdge || previousPunchEdge)), frame, "two-update punch window") ||
++            !check(state.rescueRequested == ((up & xi::RightShoulder) != 0), frame, "R1 release") ||
++            !check(state.switchRequested == state.rescueRequested, frame, "switch event") ||
++            !check(!state.switchRequested || state.switchRequestValue == 4, frame, "switch value") ||
++            !check(state.web.held == ((current & xi::B) != 0), frame, "web held") ||
++            !check(state.spiderSense.held == ((current & xi::LeftShoulder) != 0), frame, "sense held")) {
++            return 1;
++        }
++        previous = current;
++        previousJumpEdge = jumpEdge;
++        previousPunchEdge = punchEdge;
++    }
++    std::cout << "PASS 100000 deterministic transition frames; " << checks << " checks\n";
++    return 0;
++}
+diff --git a/tests/SmokeTests.cpp b/tests/SmokeTests.cpp
+index c40a00cedb45496ae57473aad01953f88e9046ce..6fd646c84c2fdfb97f6a597157b62aedb25897c7 100644
+--- a/tests/SmokeTests.cpp
++++ b/tests/SmokeTests.cpp
+@@ -60,6 +60,7 @@
+ 
+ #include <algorithm>
+ #include <cassert>
++#include <charconv>
+ #include <array>
+ #include <cmath>
+ #include <filesystem>
+@@ -6000,22 +6001,22 @@ int main() {
+         hostagePlayer.restoreAt(roomTwoHostageAsset->position,
+                                 {1.0F, 0.0F, 0.0F});
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, 0, false));
++                                     hostageBonuses, {0, 0}, {}));
+         assert(hostageRuntime.contextPromptVisible());
+         assert(hostageRuntime.canStartRescue(hostagePlayer));
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, 0, true));
++                                     hostageBonuses, {0, 0}, {true, false}));
+         assert(hostagePlayer.activeStateId() == 27);
+         assert(hostagePlayer.activeAnimation() == "stand_to_unhitch");
+         hostagePlayer.update({}, {}, 1000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, 0, false));
++                                     hostageBonuses, {0, 0}, {}));
+         assert(hostageRuntime.quickTimeActive());
+         assert(hostagePlayer.activeStateId() == 28);
+         assert(hostagePlayer.activeAnimation() == "unhitch_to_unhitch");
+         for (std::int32_t action = 0; action < 8; ++action) {
+             assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                         hostageBonuses, 1, true));
++                                         hostageBonuses, {1, 1}, {false, true}));
+         }
+         assert(!hostageRuntime.quickTimeActive());
+         assert(hostagePlayer.activeStateId() == 29);
+@@ -6029,7 +6030,7 @@ int main() {
+                usm::game::HostageSoundAction::StopLoop);
+         hostagePlayer.update({}, {}, 1000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, 0, false));
++                                     hostageBonuses, {0, 0}, {}));
+         assert(hostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Release);
+         assert(hostageBonuses.states().size() ==
+@@ -6039,12 +6040,12 @@ int main() {
+                        roomTwoHostageAsset->hostageSkillPointOrbCount));
+         objectRuntime.advanceAnimations(100000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, 0, false));
++                                     hostageBonuses, {0, 0}, {}));
+         assert(hostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Thank);
+         objectRuntime.advanceAnimations(100000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+-                                     hostageBonuses, 0, false));
++                                     hostageBonuses, {0, 0}, {}));
+         assert(hostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Freed);
+         assert(objectRuntime.find(30018)->activeAnimation ==
+@@ -6073,18 +6074,18 @@ int main() {
+                                       {1.0F, 0.0F, 0.0F});
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, 0, false));
++            failedHostageBonuses, {0, 0}, {}));
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, 0, true));
++            failedHostageBonuses, {0, 0}, {true, false}));
+         failedHostagePlayer.update({}, {}, 1000);
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, 0, false));
++            failedHostageBonuses, {0, 0}, {}));
+         assert(failedHostageRuntime.quickTimeActive());
+         assert(failedHostageRuntime.update(
+             failedHostagePlayer, failedHostageObjects,
+-            failedHostageBonuses, 4000, false));
++            failedHostageBonuses, {4000, 4000}, {}));
+         assert(failedHostageRuntime.find(30018)->phase ==
+                usm::game::HostageRescuePhase::Tied);
+         assert(failedHostagePlayer.activeStateId() == 0);
+diff --git a/tools/verify_re01_reference.py b/tools/verify_re01_reference.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f844676feb3c11ac0007fbd1fe84de98b198724
+--- /dev/null
++++ b/tools/verify_re01_reference.py
+@@ -0,0 +1,116 @@
++#!/usr/bin/env python3
++"""Verify the user-supplied ARM reference without executing or distributing it.
++
++Uses only Python's standard library. Symbol/byte fingerprints establish the
++reference identity; they do not establish gameplay equivalence by themselves.
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import struct
++import sys
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++DEFAULT_MANIFEST = ROOT / "docs/references/re01-original-fingerprints.json"
++
++
++def inspect_elf(path: Path, names: list[str]) -> dict:
++    data = path.read_bytes()
++    if len(data) < 52:
++        raise ValueError("Reference is too small for an ELF32 header")
++    header = struct.unpack_from("<16sHHIIIIIHHHHHH", data)
++    ident, machine = header[0], header[2]
++    if ident[:7] != b"\x7fELF\x01\x01\x01" or machine != 40:
++        raise ValueError("Reference must be a little-endian ELF32 ARM image")
++    shoff, shentsize, shnum = header[6], header[11], header[12]
++    if shentsize < 40 or shnum == 0 or shoff + shentsize * shnum > len(data):
++        raise ValueError("Invalid or unsupported ELF section table")
++    sections = [struct.unpack_from("<IIIIIIIIII", data, shoff + i * shentsize)
++                for i in range(shnum)]
++
++    def section_bytes(section: tuple) -> bytes:
++        offset, size = section[4], section[5]
++        if offset + size > len(data):
++            raise ValueError("Section extends past reference image")
++        return data[offset:offset + size]
++
++    wanted = set(names)
++    found: dict[str, dict] = {}
++    for section in sections:
++        # SHT_DYNSYM only: retained exported symbols from the supplied image.
++        if section[1] != 11:
++            continue
++        if section[6] >= len(sections) or section[9] < 16:
++            raise ValueError("Invalid ELF dynamic symbol table")
++        strings = section_bytes(sections[section[6]])
++        symbols = section_bytes(section)
++        for offset in range(0, len(symbols) - 15, section[9]):
++            name_offset, value, size, info, _, index = struct.unpack_from(
++                "<IIIBBH", symbols, offset)
++            if name_offset >= len(strings):
++                raise ValueError("Invalid symbol-name offset")
++            end = strings.find(b"\0", name_offset)
++            if end < 0:
++                raise ValueError("Unterminated symbol name")
++            name = strings[name_offset:end].decode("utf-8", errors="strict")
++            if name not in wanted:
++                continue
++            if info & 0xf != 2 or index == 0 or index >= len(sections):
++                raise ValueError(f"Reference symbol is not a defined function: {name}")
++            target = sections[index]
++            address = value & ~1  # Clear Thumb-state bit, not the Ghidra rebase.
++            relative = address - target[3]
++            if relative < 0 or size <= 0 or relative + size > target[5]:
++                raise ValueError(f"Function has invalid byte extent: {name}")
++            raw = section_bytes(target)[relative:relative + size]
++            found[name] = {
++                "name": name,
++                "elf_address": f"0x{address:08x}",
++                "thumb": bool(value & 1),
++                "size": size,
++                "sha256": hashlib.sha256(raw).hexdigest(),
++            }
++    missing = wanted - found.keys()
++    if missing:
++        raise ValueError("Missing symbols: " + ", ".join(sorted(missing)))
++    return {
++        "size": len(data),
++        "sha256": hashlib.sha256(data).hexdigest(),
++        "machine": "ELF32 little-endian ARM",
++        "symbols": [found[name] for name in names],
++    }
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("reference", nargs="?", type=Path,
++                        default=ROOT / "game/original/libspiderman.so")
++    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
++    parser.add_argument("--output", type=Path,
++                        help="Also save the verified identity as JSON")
++    args = parser.parse_args()
++    try:
++        expected = json.loads(args.manifest.read_text(encoding="utf-8"))
++        actual = inspect_elf(args.reference, [s["name"] for s in expected["symbols"]])
++        for key in ("size", "sha256", "machine", "symbols"):
++            if actual[key] != expected[key]:
++                raise ValueError(f"Reference mismatch in {key}; do not reuse RE01 addresses")
++        actual["verified"] = True
++        actual["ghidra_rebase_offset"] = expected["ghidra_rebase_offset"]
++        actual["note"] = "Identity verification only; no ARM code was executed."
++        text = json.dumps(actual, indent=2) + "\n"
++        if args.output:
++            args.output.parent.mkdir(parents=True, exist_ok=True)
++            args.output.write_text(text, encoding="utf-8")
++        print(text, end="")
++        return 0
++    except (OSError, ValueError, KeyError, struct.error) as error:
++        print(f"Reference verification failed: {error}", file=sys.stderr)
++        return 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

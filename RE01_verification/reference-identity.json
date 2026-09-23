@@ -1,0 +1,66 @@
+{
+  "size": 7713000,
+  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
+  "machine": "ELF32 little-endian ARM",
+  "symbols": [
+    {
+      "name": "appKeyPressed",
+      "elf_address": "0x003cc75c",
+      "thumb": true,
+      "size": 424,
+      "sha256": "14c28da418a40afd56b8ee069a5ccc84d2b712311a1c5e0e3c3155be5c1f4966"
+    },
+    {
+      "name": "appKeyReleased",
+      "elf_address": "0x003cbd5c",
+      "thumb": true,
+      "size": 2560,
+      "sha256": "b2916599043cee7ca7fdd61dd778a08e971694b52e28ef4a0dd2608f3e44a445"
+    },
+    {
+      "name": "_ZN7CKeyPad6updateEf",
+      "elf_address": "0x002e9434",
+      "thumb": true,
+      "size": 192,
+      "sha256": "f5c0517e3579d309f26de44d90757b627b422f60444a292ad3f09224eb795962"
+    },
+    {
+      "name": "_ZN7CKeyPad13wasKeyPressedEi",
+      "elf_address": "0x002e964c",
+      "thumb": true,
+      "size": 24,
+      "sha256": "e07bd0c6c3e02952cc66dc35e157153762852abec2eef055b1dc2a7e52aa7d00"
+    },
+    {
+      "name": "_ZN8CHostage6UpdateEf",
+      "elf_address": "0x00328068",
+      "thumb": true,
+      "size": 1352,
+      "sha256": "602e73d58728990678567ae103d2ccf6b9103081eda16e01a7ed6fcc672cf782"
+    },
+    {
+      "name": "_ZN11CQTEManager6UpdateEf",
+      "elf_address": "0x0037b240",
+      "thumb": true,
+      "size": 460,
+      "sha256": "b37b509937754778139e710d09a0ab2765c5720af3f39addf0bac66ba3e7cc90"
+    },
+    {
+      "name": "_ZN11CQTEManager9IsOutTimeEv",
+      "elf_address": "0x0037a4b8",
+      "thumb": true,
+      "size": 68,
+      "sha256": "756f989ef1fcdf4822abe1d7734cf34a4bff710ee3936d085b792847242db2fd"
+    },
+    {
+      "name": "_ZN11Application9GetRealTsEv",
+      "elf_address": "0x003ce5d4",
+      "thumb": true,
+      "size": 6,
+      "sha256": "f78d91149676a372a853c5a27e3cad21cbbf0491abe786f995158982ceb1b0cf"
+    }
+  ],
+  "verified": true,
+  "ghidra_rebase_offset": "0x00010000",
+  "note": "Identity verification only; no ARM code was executed."
+}

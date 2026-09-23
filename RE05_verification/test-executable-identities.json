@@ -1,0 +1,52 @@
+{
+  "re05-release/OpenAndroidUSM.CoreTests": {
+    "size": 3338320,
+    "sha256": "5a33057cadbe7d09d2e259249c6eaf23b68eeb18307483c96f4ef4a7f9cf1a19",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-release/OpenAndroidUSM.QteParityTests": {
+    "size": 2089200,
+    "sha256": "e51a60c4e16baf5d9f4d585dd4d027a76e3ece7082e629855215db20f2b31ca5",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-release/OpenAndroidUSM.QteControlTests": {
+    "size": 1495392,
+    "sha256": "d1274da57e6a376f698e25f9a8762b362b4250768d8ccef34b9e8b38c8fe2767",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-release/OpenAndroidUSM.InputParityTests": {
+    "size": 1806000,
+    "sha256": "1a8da73bb7f6405d90e03335d419e285ceaa4c4a34c376015a663776897e1151",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-release/OpenAndroidUSM.InputTransitionsTests": {
+    "size": 22024,
+    "sha256": "cc530b5fd48e41c1c3b1acac9106c0fced56111b26fbe7ddb1bd2bc960bfd00e",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-sanitize/OpenAndroidUSM.CoreTests": {
+    "size": 41912992,
+    "sha256": "2ce5a690c32aac6f586fa3d516f86778921364d8b74ba8a267fbc6951d89db59",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-sanitize/OpenAndroidUSM.QteParityTests": {
+    "size": 29312424,
+    "sha256": "4385dc1ef6a1246897da75717bc511e449abb05828a92d2f0727d9b6629a419b",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-sanitize/OpenAndroidUSM.QteControlTests": {
+    "size": 22310704,
+    "sha256": "1a8bd5f13141a1058ae174833eddecce18ec9db9cc83c947ac946ecf2ae13537",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-sanitize/OpenAndroidUSM.InputParityTests": {
+    "size": 25910432,
+    "sha256": "5cf478af6ff728f1a6a4e30b6640e9f48cc5f88f2c943b086638389ce938b352",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  },
+  "re05-sanitize/OpenAndroidUSM.InputTransitionsTests": {
+    "size": 3457288,
+    "sha256": "3226e2d260a64cc87fb24b8c9c746867af678610ea9eb2fa1852145f4b0719a9",
+    "kind": "native Linux test executable; not packaged or a graphical game port"
+  }
+}

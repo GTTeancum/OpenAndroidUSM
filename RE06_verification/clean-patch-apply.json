@@ -1,0 +1,27 @@
+{
+  "baseline_archive_sha256": "6133209ac787a47272c653a6a84ab6a2da859a78433a4c2874dee49f5bd585f8",
+  "patch_sha256": "6ff1517d3058e37645801608206cd18943c0b71c50369de5da019ea28d835c86",
+  "check_exit": 0,
+  "apply_exit": 0,
+  "changed_existing": [
+    "CMakeLists.txt",
+    "src/app/Application.cpp",
+    "src/audio/xaudio2/XAudio2System.cpp",
+    "src/audio/xaudio2/XAudio2System.hpp",
+    "src/game/LevelHostageRuntime.cpp",
+    "src/game/LevelHostageRuntime.hpp",
+    "tests/QteParityTests.cpp",
+    "tests/SmokeTests.cpp"
+  ],
+  "new_code_files": [
+    "docs/references/re06-original-fingerprints.json",
+    "src/game/HostageSound.cpp",
+    "src/game/HostageSound.hpp",
+    "tests/HostageIntegrationTests.cpp",
+    "tools/verify_re06_reference.py"
+  ],
+  "matched_selected_files": 333,
+  "selected_scope": "CMakeLists.txt, AGENTS.md, src/, tests/, tools/, cmake/, docs/references/; excludes Python caches.",
+  "clean_source_directory": "/mnt/data/re06-clean/OpenAndroidUSM",
+  "rechecked_after_final_tests": true
+}

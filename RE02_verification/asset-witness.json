@@ -1,0 +1,86 @@
+{
+  "reference": "Supplied original resources, SHA256 of uncompressed GBMP members; no original binary/asset payload copied.",
+  "resources": [
+    {
+      "pack": "configs.pack",
+      "entry": "BCONFIG.bin",
+      "size": 1075,
+      "sha256": "91c95ad824a93c6f8b199be259539536886c226a904c4bcfa6986cbb41fc440c"
+    },
+    {
+      "pack": "sprites.pack",
+      "entry": "interface.bsprite",
+      "size": 4820,
+      "sha256": "2688153c1dccdd231e2cc8bf088529698336f3d067a7ac7db70d9c37a55ec758"
+    },
+    {
+      "pack": "sprites.pack",
+      "entry": "interface.tga",
+      "size": 1048704,
+      "sha256": "73130a13b8f73053b80d26b4e47f5b57e1daba01d74c623970d8088710da0757"
+    },
+    {
+      "pack": "levelnew_01.pack",
+      "entry": "cinematics/levelnew_01_20004_cinematic.cff",
+      "size": 12172,
+      "sha256": "4b38d30d9c6ff271cc814ee62541b667fd6e935b7c864af5797e9cde3cc3cbcc"
+    },
+    {
+      "pack": "levelnew_01.pack",
+      "entry": "cinematics/levelnew_01_20006_cinematic.cff",
+      "size": 15510,
+      "sha256": "a7d27725874c65d75154c073105f30a23e2a198e09b8c5603e7dc3e298e7c21f"
+    },
+    {
+      "pack": "levelnew_01.pack",
+      "entry": "cinematics/levelnew_01_20010_cinematic.cff",
+      "size": 15468,
+      "sha256": "6ce26d58f08d808b9fa8c92978558227a99e317446484a8c16458a11344733eb"
+    },
+    {
+      "pack": "levelnew_01.pack",
+      "entry": "levelnew_01.irr",
+      "size": 458810,
+      "sha256": "898effdb104e77cf5ba0642575def9685ec7cebb3d2d1f5be82798c0523f178e"
+    }
+  ],
+  "linked_room_files": [
+    "levelnew_01_0_Room1.irr",
+    "levelnew_01_1_Room2.irr",
+    "levelnew_01_2_Room3.irr",
+    "levelnew_01_3_Room4.irr",
+    "levelnew_01_4_Room5.irr",
+    "levelnew_01_5_Room6.irr",
+    "levelnew_01_6_Room7.irr",
+    "levelnew_01_8_Room8.irr",
+    "levelnew_01_9_Room9.irr",
+    "levelnew_01_10_Room10.irr",
+    "levelnew_01_11_Room11.irr",
+    "levelnew_01_12_Room12.irr",
+    "levelnew_01_13_Room13.irr"
+  ],
+  "active_first_level_qte_source": 20004,
+  "active_first_level_qte_commands": [
+    {
+      "timestamp_ms": 2000,
+      "thread": {
+        "type": "3",
+        "name": "Player Thread",
+        "object": "288"
+      },
+      "attributes": {
+        "QTEID": "6",
+        "^ID^Cinematic^Success": "20006",
+        "^ID^Cinematic^Fail": "20010"
+      }
+    }
+  ],
+  "unlinked_pack_cff_with_qte": [
+    20016,
+    20045,
+    20051,
+    20062,
+    20081
+  ],
+  "note": "Additional packed resources are not proof of live gameplay reachability. Runtime integration tests use only the main scene's linked assets."
+}

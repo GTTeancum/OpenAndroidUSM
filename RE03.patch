@@ -1,0 +1,1196 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 1bd4564..4dc96c3 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -29,3 +29,11 @@
+ - The current stopping milestone is verified first-level gameplay with no
+   known graphical or audio issues. At that point, stop changing the project
+   and request user review without marking the durable goal complete.
++
++## Explicit PC control adaptation (RE03 user instruction)
++
++- Drag QTEs use left-thumbstick movement in the general requested direction,
++  with no A hold and no touch emulation. Tap/mash use their separate A input.
++- Keep controller thresholds/gesture lifecycle documented as PC policies, not
++  Android reverse-engineering facts. Preserve recovered QTE timing, compound
++  sequences, outcome sounds, control release, and cinematic consequences.
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5cf934a..58b734b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -149,6 +149,7 @@ add_library(OpenAndroidUSM.Core STATIC
+     src/game/PlayerStateConfig.cpp
+     src/game/QteGesturePath.cpp
+     src/game/QteSpriteAnimation.cpp
++    src/game/QteFeedbackGeometry.cpp
+     src/game/QuickTimeEventRuntime.cpp
+     src/game/WallWebRuntime.cpp
+     src/game/WebGrabPointRuntime.cpp
+@@ -259,7 +260,7 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+     target_link_libraries(OpenAndroidUSM.QteParityTests PRIVATE OpenAndroidUSM.Core)
+     target_compile_definitions(OpenAndroidUSM.QteParityTests PRIVATE
+         USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
+-    foreach(group IN ITEMS clock cinematic hostage attributes gesture sprite sequence gamepad audio first_level)
++    foreach(group IN ITEMS clock cinematic hostage attributes gesture sprite sequence gamepad audio first_level controller_boundaries controller_first_level feedback)
+         add_test(NAME OpenAndroidUSM.QteParity.${group}
+             COMMAND OpenAndroidUSM.QteParityTests ${group})
+         set_tests_properties(OpenAndroidUSM.QteParity.${group} PROPERTIES
+diff --git a/src/app/Application.cpp b/src/app/Application.cpp
+index 7f0a0c4..2895478 100644
+--- a/src/app/Application.cpp
++++ b/src/app/Application.cpp
+@@ -5046,7 +5046,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             game::QteInput cinematicQteInput;
+             if (autoplay) {
+                 // qte_tap is still a tap; it no longer forces drag success.
+-                // Automatic gestures traverse original samples explicitly.
++                // Automatic gestures use the same directional adapter as XInput.
+                 cinematicQteInput = autoplay->quickTimeInput(
+                     quickTimeEvent_, autoplayInput.quickTimeEventPressed);
+             } else {
+@@ -5054,7 +5054,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                 const auto stick = controller_.leftStick();
+                 cinematicQteInput = qteGamepad_.translate(
+                     quickTimeEvent_, controller_.connected(), action.pressed,
+-                    action.held, action.released, stick.x, stick.y);
++                    stick.x, stick.y);
+             }
+             quickTimeEvent_.update(
+                 {nativeTimerMilliseconds, realDeltaMilliseconds}, cinematicQteInput);
+@@ -5901,13 +5901,13 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+         if (result) {
+             game::CinematicUiFrame uiFrame = cinematicUi_.frame(
+                 qteVisible, qteProgress);
++            // Snapshot the upcoming Draw before drawStep mutates fade/count.
++            // Catch-up updates may prepare this repeatedly, but do not fade.
++            uiFrame.quickTimeFeedback = quickTimeEvent_.feedbackFrame();
+             if (quickTimeEvent_.state() == game::QteState::Drag &&
+                 !uiFrame.messagePanelVisible) {
+-                const auto& path = quickTimeEvent_.gesturePath();
+-                const auto start = path.start(), end = path.end();
+-                uiFrame.text = path.horizontal()
+-                    ? (end.x > start.x ? u"Hold [A] + left stick RIGHT" : u"Hold [A] + left stick LEFT")
+-                    : (end.y > start.y ? u"Hold [A] + left stick DOWN" : u"Hold [A] + left stick UP");
++                uiFrame.text = platform::QteGamepadAdapter::prompt(
++                    quickTimeEvent_.gesturePath().direction());
+                 uiFrame.textVisible = true;
+                 uiFrame.tutorialPanelVisible = true;
+                 uiFrame.tutorialButton = -1;
+diff --git a/src/diagnostics/AutoplayHarness.cpp b/src/diagnostics/AutoplayHarness.cpp
+index 3a781e5..40da960 100644
+--- a/src/diagnostics/AutoplayHarness.cpp
++++ b/src/diagnostics/AutoplayHarness.cpp
+@@ -5210,19 +5210,22 @@ std::string AutoplayHarness::csv(std::string_view value) {
+ 
+ game::QteInput AutoplayHarness::quickTimeInput(
+     const game::QuickTimeEventRuntime& runtime, bool actionPressed) noexcept {
+-    game::QteInput input{actionPressed, std::nullopt, false};
+-    if (qteGestureGeneration_ != runtime.generation()) {
+-        qteGestureGeneration_ = runtime.generation(); qteGestureSample_ = 0;
+-    }
+-    if (!autoQuickTimeActions_ || runtime.state() != game::QteState::Drag) {
+-        return input;
+-    }
+-    const auto path = runtime.gesturePath().samples();
+-    if (!path.empty()) {
+-        input.dragPosition = path[std::min(qteGestureSample_, path.size() - 1)];
+-        if (qteGestureSample_ < path.size()) { ++qteGestureSample_; }
+-    }
+-    return input;
++    float x = 0.0F, y = 0.0F;
++    const bool newGesture = qteGestureGeneration_ != runtime.generation();
++    qteGestureGeneration_ = runtime.generation();
++    // One neutral observation per new gesture, then the same stick intent a
++    // player supplies. No asset-coordinate traversal or forced-success path.
++    if (autoQuickTimeActions_ && !newGesture &&
++        runtime.state() == game::QteState::Drag) {
++        switch (runtime.gesturePath().direction()) {
++        case game::QteDirection::Left: x = -1.0F; break;
++        case game::QteDirection::Right: x = 1.0F; break;
++        case game::QteDirection::Up: y = 1.0F; break;
++        case game::QteDirection::Down: y = -1.0F; break;
++        case game::QteDirection::None: break;
++        }
++    }
++    return qteGamepad_.translate(runtime, true, actionPressed, x, y);
+ }
+ 
+ } // namespace usm::diagnostics
+diff --git a/src/diagnostics/AutoplayHarness.hpp b/src/diagnostics/AutoplayHarness.hpp
+index c678b4a..0aab88e 100644
+--- a/src/diagnostics/AutoplayHarness.hpp
++++ b/src/diagnostics/AutoplayHarness.hpp
+@@ -1,5 +1,8 @@
+ #pragma once
+ 
++#include "platform/input/QteGamepadAdapter.hpp"
++
++
+ #include "assets/ColladaMesh.hpp"
+ #include "core/Result.hpp"
+ #include "game/CinematicCamera.hpp"
+@@ -237,7 +240,7 @@ public:
+ 
+ private:
+     std::uint64_t qteGestureGeneration_{};
+-    std::size_t qteGestureSample_{};
++    platform::QteGamepadAdapter qteGamepad_;
+     enum class StepKind {
+         WaitGameplay,
+         WaitIntro,
+diff --git a/src/game/CinematicUiRuntime.hpp b/src/game/CinematicUiRuntime.hpp
+index eb6c8b8..c1011e2 100644
+--- a/src/game/CinematicUiRuntime.hpp
++++ b/src/game/CinematicUiRuntime.hpp
+@@ -3,6 +3,7 @@
+ #include "core/Result.hpp"
+ #include "game/CinematicScript.hpp"
+ #include "game/LocalizedStringTable.hpp"
++#include "game/QteFeedbackFrame.hpp"
+ 
+ #include <cstdint>
+ #include <string>
+@@ -29,6 +30,7 @@ struct CinematicUiFrame {
+     bool dimBackground{};
+     bool quickTimeEventVisible{};
+     float quickTimeEventProgress{};
++    QteFeedbackFrame quickTimeFeedback;
+     float blackOverlayAlpha{};
+     std::uint8_t interfaceEffectAlpha{};
+     std::int32_t interfaceEffectFrame{-1};
+diff --git a/src/game/QteFeedbackFrame.hpp b/src/game/QteFeedbackFrame.hpp
+new file mode 100644
+index 0000000..89ddf02
+--- /dev/null
++++ b/src/game/QteFeedbackFrame.hpp
+@@ -0,0 +1,20 @@
++#pragma once
++
++#include <array>
++#include <cstdint>
++
++namespace usm::game {
++// Paint requests for the recovered CQTEManager result display, in original
++// draw order. These are output sprites, not interactive touch targets.
++struct QteFeedbackPosition { std::int32_t x{}, y{}; };
++struct QteFeedbackSprite {
++    std::uint16_t frameIndex{};
++    QteFeedbackPosition position{};
++    std::uint8_t flags{};
++    std::uint8_t alpha{255};
++};
++struct QteFeedbackFrame {
++    std::array<QteFeedbackSprite, 3> sprites{};
++    std::uint8_t count{};
++};
++} // namespace usm::game
+diff --git a/src/game/QteFeedbackGeometry.cpp b/src/game/QteFeedbackGeometry.cpp
+new file mode 100644
+index 0000000..b11b830
+--- /dev/null
++++ b/src/game/QteFeedbackGeometry.cpp
+@@ -0,0 +1,57 @@
++#include "game/QteFeedbackGeometry.hpp"
++
++#include <algorithm>
++
++namespace usm::game {
++Result buildQteFeedbackGeometry(
++    const QteFeedbackFrame& frame, const assets::SpriteAtlas& atlas,
++    std::uint32_t textureWidth, std::uint32_t textureHeight,
++    std::uint32_t viewportWidth, std::uint32_t viewportHeight,
++    std::vector<QteFeedbackVertex>& output) {
++    output.clear();
++    if (frame.count > frame.sprites.size()) { return Result::failure("Invalid QTE feedback sprite count"); }
++    if (frame.count == 0 || viewportWidth == 0 || viewportHeight == 0) { return Result::success(); }
++    if (textureWidth == 0 || textureHeight == 0) { return Result::failure("QTE feedback has no texture"); }
++    // Same aspect-preserving 480x320 PC viewport mapping as the HUD. This is
++    // host presentation, not a change to original frame coordinates/UVs.
++    const float scale = std::min(viewportWidth / 480.0F, viewportHeight / 320.0F);
++    const float dx = (viewportWidth - 480.0F * scale) * 0.5F;
++    const float dy = (viewportHeight - 320.0F * scale) * 0.5F;
++    std::vector<QteFeedbackVertex> vertices;
++    for (std::size_t i = 0; i < frame.count; ++i) {
++        const auto& draw = frame.sprites[i];
++        if (draw.frameIndex >= atlas.frames().size() || draw.flags != 0) {
++            return Result::failure("Unsupported native QTE feedback frame/transform");
++        }
++        for (const auto& fm : atlas.modulesForFrame(draw.frameIndex)) {
++            if (fm.moduleIndex >= atlas.modules().size() || fm.flags != 0) {
++                return Result::failure("Unsupported native QTE feedback module/transform");
++            }
++            const auto& module = atlas.modules()[fm.moduleIndex];
++            if (module.imageIndex != 0 || module.width == 0 || module.height == 0 ||
++                static_cast<std::uint32_t>(module.x) + module.width > textureWidth ||
++                static_cast<std::uint32_t>(module.y) + module.height > textureHeight) {
++                return Result::failure("Native QTE feedback module exceeds texture");
++            }
++            const float left = dx + static_cast<float>(static_cast<std::int64_t>(draw.position.x) + fm.x) * scale;
++            const float top = dy + static_cast<float>(static_cast<std::int64_t>(draw.position.y) + fm.y) * scale;
++            const float right = left + module.width * scale;
++            const float bottom = top + module.height * scale;
++            const float x0 = 2.0F * left / viewportWidth - 1.0F;
++            const float x1 = 2.0F * right / viewportWidth - 1.0F;
++            const float y0 = 1.0F - 2.0F * top / viewportHeight;
++            const float y1 = 1.0F - 2.0F * bottom / viewportHeight;
++            const float u0 = static_cast<float>(module.x) / textureWidth;
++            const float u1 = static_cast<float>(module.x + module.width) / textureWidth;
++            const float v0 = static_cast<float>(module.y) / textureHeight;
++            const float v1 = static_cast<float>(module.y + module.height) / textureHeight;
++            const std::uint32_t rgba = 0x00ffffffU | (static_cast<std::uint32_t>(draw.alpha) << 24U);
++            const QteFeedbackVertex tl{x0,y0,u0,v0,rgba}, tr{x1,y0,u1,v0,rgba};
++            const QteFeedbackVertex bl{x0,y1,u0,v1,rgba}, br{x1,y1,u1,v1,rgba};
++            vertices.insert(vertices.end(), {tl,tr,bl,tr,br,bl});
++        }
++    }
++    output.swap(vertices); // No half-built geometry after an unsupported case.
++    return Result::success();
++}
++} // namespace usm::game
+diff --git a/src/game/QteFeedbackGeometry.hpp b/src/game/QteFeedbackGeometry.hpp
+new file mode 100644
+index 0000000..ddfbe92
+--- /dev/null
++++ b/src/game/QteFeedbackGeometry.hpp
+@@ -0,0 +1,22 @@
++#pragma once
++
++#include "assets/SpriteAtlas.hpp"
++#include "core/Result.hpp"
++#include "game/QteFeedbackFrame.hpp"
++
++#include <cstdint>
++#include <vector>
++
++namespace usm::game {
++struct QteFeedbackVertex {
++    float x{}, y{}, u{}, v{}; // clip-space XY and original atlas UV
++    std::uint32_t rgba{};
++};
++// Backend-independent extraction for the native result frames actually used
++// by the shipped interface atlas. Unsupported transforms fail, never guess.
++[[nodiscard]] Result buildQteFeedbackGeometry(
++    const QteFeedbackFrame& frame, const assets::SpriteAtlas& atlas,
++    std::uint32_t textureWidth, std::uint32_t textureHeight,
++    std::uint32_t viewportWidth, std::uint32_t viewportHeight,
++    std::vector<QteFeedbackVertex>& output);
++} // namespace usm::game
+diff --git a/src/game/QteGesturePath.hpp b/src/game/QteGesturePath.hpp
+index 677d0ad..2b165a5 100644
+--- a/src/game/QteGesturePath.hpp
++++ b/src/game/QteGesturePath.hpp
+@@ -9,6 +9,10 @@
+ #include <vector>
+ 
+ namespace usm::game {
++// Screen-relative intent. XInput Y is converted by the PC adapter, not by
++// generating virtual touch coordinates. None is never a successful gesture.
++enum class QteDirection : std::uint8_t { None, Left, Right, Up, Down };
++
+ struct QtePoint {
+     std::int16_t x{};
+     std::int16_t y{};
+@@ -26,6 +30,14 @@ public:
+     [[nodiscard]] bool horizontal() const noexcept { return horizontal_; }
+     [[nodiscard]] QtePoint start() const noexcept { return samples_.empty() ? QtePoint{} : samples_.front(); }
+     [[nodiscard]] QtePoint end() const noexcept { return samples_.empty() ? QtePoint{} : samples_.back(); }
++    [[nodiscard]] QteDirection direction() const noexcept {
++        if (samples_.empty()) { return QteDirection::None; }
++        const int delta = horizontal_ ? static_cast<int>(end().x) - start().x
++                                      : static_cast<int>(end().y) - start().y;
++        if (delta == 0) { return QteDirection::None; }
++        return horizontal_ ? (delta > 0 ? QteDirection::Right : QteDirection::Left)
++                           : (delta > 0 ? QteDirection::Down : QteDirection::Up);
++    }
+     [[nodiscard]] std::size_t nearest(QtePoint input) const noexcept;
+     [[nodiscard]] bool releaseSucceeded(QtePoint input) const noexcept;
+ private:
+diff --git a/src/game/QuickTimeEventRuntime.cpp b/src/game/QuickTimeEventRuntime.cpp
+index 04d9026..4a61917 100644
+--- a/src/game/QuickTimeEventRuntime.cpp
++++ b/src/game/QuickTimeEventRuntime.cpp
+@@ -31,11 +31,23 @@ void QuickTimeEventRuntime::bind(const ButtonConfigDatabase& configs,
+     elapsedMilliseconds_ = durationMilliseconds_ = 0;
+     cinematicRequest_.reset(); compound_ = nullptr; sequenceIndex_ = 0;
+     state_ = QteState::Inactive; path_.clear(); remaining_ = 0; idle_ = 0;
+-    clock_ = {}; position_ = {}; releaseEnd_ = {}; releaseControl_ = false; sounds_.clear();
++    clock_ = {}; position_ = {}; origin_ = {}; resultPosition_ = {}; releaseEnd_ = {}; releaseControl_ = false; sounds_.clear();
+     ++generation_;
+     resultSprite_.bind(atlas); promptSprite_.bind(atlas);
+     promptSprite_.setAnimation(6);
+     successDrawCount_ = successDrawLimit_ = 0;
++    failureAlpha_ = 255; failureFadeStep_ = 0;
++    if (atlas.animations().size() > 1) {
++        const auto& anim = atlas.animations()[1];
++        std::uint32_t duration = 0;
++        for (std::size_t i = 0; i < anim.frameCount &&
++             anim.firstFrameIndex + i < atlas.animationFrames().size(); ++i) {
++            duration += atlas.animationFrames()[anim.firstFrameIndex + i].duration;
++        }
++        // CQTEManager::Draw ELF 0x37a8ba..0x37a8ca: integer 255 /
++        // GetAnimDuration(1), including the special value-16 result.
++        failureFadeStep_ = duration == 0 ? 0 : 255 / duration;
++    }
+     if (atlas.animations().size() > 7) {
+         const auto& anim = atlas.animations()[7];
+         for (std::size_t i = 0; i < anim.frameCount &&
+@@ -96,6 +108,7 @@ Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command,
+     }
+     // BeginQTE uses an unsigned state >3 guard (inactive -1 is accepted).
+     if (state_ >= QteState::Tap && state_ <= QteState::SuccessDisplay) { return Result::success(); }
++    failureAlpha_ = 255; // BeginQTE ELF 0x37ab5e, NOT per compound child.
+     sourceCinematicId_ = sourceId; successCinematicId_ = success; failureCinematicId_ = failure;
+     cinematicRequest_.reset(); compound_ = d->interactionType == 2 ? d : nullptr;
+     sequenceIndex_ = 0;
+@@ -114,6 +127,7 @@ void QuickTimeEventRuntime::beginNow(std::int32_t id, QteTimeStep time) noexcept
+         y = (y + static_cast<float>(randomizer_->range(0, 160))) - 80.0F;
+     }
+     position_ = {shortWord(static_cast<int>(x)), shortWord(static_cast<int>(y))};
++    origin_ = position_;
+     promptSprite_.setAnimation(d.interactionValue == 16 ? 28 : 6);
+     successDrawCount_ = 0;
+     ++generation_;
+@@ -132,11 +146,13 @@ void QuickTimeEventRuntime::setState(QteState next) noexcept {
+     switch (next) {
+     case QteState::Drag:
+         releaseEnd_ = path_.end();
++        resultPosition_ = origin_;
+         resultSprite_.setAnimation(static_cast<std::int16_t>(d->interactionValue - 9));
+         break;
+     case QteState::Mash: idle_ = 0; break;
+     case QteState::SuccessDisplay:
+     case QteState::FailureDisplay:
++        resultPosition_ = position_; // Captured at SetState, before later snapping.
+         sounds_.push_back(next == QteState::SuccessDisplay ? 0x188 : 0x189);
+         resultSprite_.setAnimation(d && d->interactionValue == 16 ? 29 :
+                                   next == QteState::SuccessDisplay ? 7 : 1, true);
+@@ -197,11 +213,22 @@ void QuickTimeEventRuntime::update(QteTimeStep time, const QteInput& input) noex
+         resultSprite_.update(time.realMilliseconds);
+         // Native state 1 tests timeout FIRST, then still calls UpdateDragState.
+         if (clock_.expired(time.timerMilliseconds, d->durationMilliseconds)) { setState(QteState::FailureDisplay); }
+-        const auto nearest = path_.nearest(position_);
+-        const auto samples = path_.samples();
+-        if (!samples.empty()) {
+-            position_ = samples[nearest];
+-            if (nearest == samples.size() - 1) { checkSuccess(time); }
++        if (input.dragDirection != QteDirection::None &&
++            input.dragDirection == path_.direction()) {
++            // PC adaptation: a matching stick gesture replaces touch tracing.
++            // Keep the native completion point in UpdateDragState's ordering:
++            // timeout first, then completion, with no timer reset or extra tap.
++            // The final position is the result sprite's location, not a
++            // synthesized series of touch/mouse events.
++            position_ = path_.end();
++            checkSuccess(time);
++        } else {
++            const auto nearest = path_.nearest(position_);
++            const auto samples = path_.samples();
++            if (!samples.empty()) {
++                position_ = samples[nearest];
++                if (nearest == samples.size() - 1) { checkSuccess(time); }
++            }
+         }
+         break;
+     }
+@@ -221,9 +248,39 @@ void QuickTimeEventRuntime::drawStep() noexcept {
+         // animation 7 has duration sum 8, therefore nine draws, not eight.
+         if (successDrawCount_ >= successDrawLimit_) { setState(QteState::SuccessHandled); }
+         ++successDrawCount_;
+-    } else if (state_ == QteState::FailureDisplay && resultSprite_.ended()) {
+-        setState(QteState::FailureHandled);
++    } else if (state_ == QteState::FailureDisplay) {
++        if (resultSprite_.ended()) { setState(QteState::FailureHandled); }
++        else {
++            // ELF 0x37a8d2..0x37a8e4: decrement/clamp BEFORE PaintAnim.
++            failureAlpha_ = static_cast<std::uint8_t>(std::max(
++                0, static_cast<int>(failureAlpha_) - static_cast<int>(failureFadeStep_)));
++        }
++    }
++}
++QteFeedbackFrame QuickTimeEventRuntime::feedbackFrame() const noexcept {
++    QteFeedbackFrame output;
++    if (state_ != QteState::SuccessDisplay && state_ != QteState::FailureDisplay) { return output; }
++    const bool failure = state_ == QteState::FailureDisplay;
++    if (failure && resultSprite_.ended()) { return output; }
++    const auto* frame = resultSprite_.frame();
++    if (!frame) { return output; }
++    // CSprite::PaintAFrame ELF 0x2d99f4: unit-scale animation offsets,
++    // then XOR animation flags into the frame's draw flags. QTE instances
++    // have zero parent flags and unit scale.
++    const auto alpha = failure ? static_cast<std::uint8_t>(std::max(
++        0, static_cast<int>(failureAlpha_) - static_cast<int>(failureFadeStep_))) : std::uint8_t{255};
++    output.sprites[output.count++] = {frame->frameIndex,
++        {static_cast<int>(resultPosition_.x) + frame->x,
++         static_cast<int>(resultPosition_.y) + frame->y}, frame->flags, alpha};
++    if (!failure && definition() && definition()->interactionType == 3) {
++        // Draw state 3: finished mash ring and full progress frame, after
++        // the result sprite. No invented percentage/smooth interpolation.
++        output.sprites[output.count++] = {85, {origin_.x, origin_.y}, 0, 255};
++        output.sprites[output.count++] = {93, {origin_.x, origin_.y}, 0, 255};
+     }
++    // Explosion sprite's scaled, differently flagged draw is not silently
++    // approximated here; its renderer/material reconstruction is still open.
++    return output;
+ }
+ std::int16_t QuickTimeEventRuntime::completedActionCount() const noexcept {
+     const auto* d = definition();
+diff --git a/src/game/QuickTimeEventRuntime.hpp b/src/game/QuickTimeEventRuntime.hpp
+index fa42144..4de9440 100644
+--- a/src/game/QuickTimeEventRuntime.hpp
++++ b/src/game/QuickTimeEventRuntime.hpp
+@@ -7,6 +7,7 @@
+ #include "game/NativeRandomizer.hpp"
+ #include "game/QteClock.hpp"
+ #include "game/QteGesturePath.hpp"
++#include "game/QteFeedbackFrame.hpp"
+ #include "game/QteSpriteAnimation.hpp"
+ 
+ #include <cstdint>
+@@ -22,6 +23,10 @@ struct QteInput {
+     bool actionPressed{}; // Original Cross flag; does NOT complete a drag.
+     std::optional<QtePoint> dragPosition;
+     bool dragReleased{};  // Original event 0x1f, before the manager update.
++    // User-authorized PC control adaptation, NOT an Android input field.
++    // The adapter supplies intent only; this manager still owns timing,
++    // compound sequencing, result audio, control release and outcome dispatch.
++    QteDirection dragDirection{QteDirection::None};
+ };
+ 
+ // Native reconstruction of CQTEManager, original ELF 0x0037a3f8..0x0037b40c.
+@@ -40,6 +45,8 @@ public:
+         update(time, QteInput{actionPressed, std::nullopt, false});
+     }
+     void drawStep() noexcept;
++    [[nodiscard]] QteFeedbackFrame feedbackFrame() const noexcept;
++    [[nodiscard]] std::uint8_t failureAlpha() const noexcept { return failureAlpha_; }
+     void setPause(bool paused, std::uint32_t timerMilliseconds) noexcept {
+         clock_.setPause(paused, timerMilliseconds);
+     }
+@@ -82,6 +89,9 @@ private:
+     QteSpriteAnimation resultSprite_, promptSprite_;
+     QteState state_{QteState::Inactive};
+     QtePoint position_;
++    QtePoint origin_, resultPosition_;
++    std::uint8_t failureAlpha_{255};
++    std::uint32_t failureFadeStep_{};
+     QtePoint releaseEnd_;
+     std::int16_t remaining_{};
+     float idle_{};
+diff --git a/src/platform/input/QteGamepadAdapter.hpp b/src/platform/input/QteGamepadAdapter.hpp
+index 85fd8c7..92f0a4c 100644
+--- a/src/platform/input/QteGamepadAdapter.hpp
++++ b/src/platform/input/QteGamepadAdapter.hpp
+@@ -5,46 +5,95 @@
+ #include <algorithm>
+ #include <cmath>
+ #include <cstdint>
++#include <string_view>
+ 
+ namespace usm::platform {
+-// PC input adaptation, NOT a claimed Xperia hardware mapping. A is a virtual
+-// touch hold; left-stick displacement supplies a position on the original
+-// screen. The recovered manager alone judges the gesture and its release.
+-// There is no velocity, arbitrary success percentage, or force-success call.
++// User-authorized PC adaptation: move the left stick in the requested general
++// direction. NO A hold, virtual touch coordinates, path tracing or touch-up.
++//
++// These are explicit host-input policies, not constants recovered from ARM:
++// - the production XInput translator has already applied its radial dead zone;
++// - engage at 0.55 of the remaining range, rearm at/below 0.25;
++// - accept a +/-60 degree cone, including diagonal movement;
++// - a held stick at entry/reconnection needs neutral before it is a new gesture;
++// - an incorrect direction is ignored (the original deadline continues), and
++//   may be corrected without releasing A or tracing anything;
++// - an accepted gesture cannot complete another child until a fresh movement.
+ class QteGamepadAdapter final {
+ public:
++    static constexpr float EngageMagnitude = 0.55F;
++    static constexpr float NeutralMagnitude = 0.25F;
++
++    [[nodiscard]] static bool matchesDirection(game::QteDirection direction,
++                                               float x, float y) noexcept {
++        if (!std::isfinite(x) || !std::isfinite(y)) { return false; }
++        x = std::clamp(x, -1.0F, 1.0F);
++        y = std::clamp(y, -1.0F, 1.0F);
++        const float squared = x * x + y * y;
++        if (squared < EngageMagnitude * EngageMagnitude) { return false; }
++        float along = 0.0F;
++        switch (direction) {
++        case game::QteDirection::Left: along = -x; break;
++        case game::QteDirection::Right: along = x; break;
++        case game::QteDirection::Up: along = y; break; // XInput up is positive
++        case game::QteDirection::Down: along = -y; break;
++        case game::QteDirection::None: return false;
++        }
++        // cos(60 degrees) = 1/2; no atan2 or platform-dependent angle wrap.
++        return along > 0.0F && 4.0F * along * along >= squared;
++    }
++
+     [[nodiscard]] game::QteInput translate(
+         const game::QuickTimeEventRuntime& runtime, bool connected,
+-        bool pressed, bool held, bool released, float stickX, float stickY) noexcept {
+-        game::QteInput input{connected && pressed, std::nullopt, false};
++        bool actionPressed, float stickX, float stickY) noexcept {
++        game::QteInput input{connected && actionPressed &&
++            runtime.state() != game::QteState::Drag, std::nullopt, false};
+         if (generation_ != runtime.generation()) {
+-            generation_ = runtime.generation(); dragging_ = false;
++            generation_ = runtime.generation();
++            // Observing the previous neutral frame lets a fresh movement on
++            // the first active frame count, but not gameplay carry-in.
++            armed_ = wasConnected_ && previousNeutral_;
++        }
++        const bool valid = connected && std::isfinite(stickX) && std::isfinite(stickY);
++        if (!valid) {
++            armed_ = false; wasConnected_ = false; previousNeutral_ = false;
++            return input;
+         }
+-        if (!connected || runtime.state() != game::QteState::Drag) {
+-            dragging_ = false; return input;
++        const float x = std::clamp(stickX, -1.0F, 1.0F);
++        const float y = std::clamp(stickY, -1.0F, 1.0F);
++        const bool neutral = x * x + y * y <= NeutralMagnitude * NeutralMagnitude;
++        wasConnected_ = true; previousNeutral_ = neutral;
++        if (runtime.state() != game::QteState::Drag) {
++            armed_ = false;
++            return input; // Original A/Cross tap/mash route stays separate.
++        }
++        input.actionPressed = false; // A cannot also act on a compound child.
++        if (neutral) { armed_ = true; }
++        const auto direction = runtime.gesturePath().direction();
++        if (armed_ && matchesDirection(direction, x, y)) {
++            input.dragDirection = direction;
++            armed_ = false;
+         }
+-        if (pressed) { dragging_ = true; }
+-        if (!dragging_ || (!held && !released)) { return input; }
+-        const auto& path = runtime.gesturePath();
+-        const auto start = path.start(), end = path.end();
+-        const float extent = static_cast<float>(std::abs(path.horizontal()
+-            ? static_cast<int>(end.x) - start.x : static_cast<int>(end.y) - start.y));
+-        const auto axis = [](float v) { return std::isfinite(v) ? std::clamp(v, -1.0F, 1.0F) : 0.0F; };
+-        // Same scale on both axes; XInput up is positive, screen down positive.
+-        // Truncate toward zero, as the native screen-coordinate conversions do.
+-        const auto coordinate = [](float v) {
+-            return static_cast<std::int16_t>(std::clamp(v, -32768.0F, 32767.0F));
+-        };
+-        input.dragPosition = game::QtePoint{
+-            coordinate(static_cast<float>(start.x) + axis(stickX) * extent),
+-            coordinate(static_cast<float>(start.y) - axis(stickY) * extent)};
+-        input.dragReleased = released;
+-        if (released) { dragging_ = false; }
+         return input;
+     }
+-    [[nodiscard]] bool dragging() const noexcept { return dragging_; }
++    [[nodiscard]] bool armed() const noexcept { return armed_; }
++    void reset() noexcept { *this = {}; }
++
++    [[nodiscard]] static constexpr std::u16string_view prompt(
++        game::QteDirection direction) noexcept {
++        switch (direction) {
++        case game::QteDirection::Left: return u"Move left stick LEFT";
++        case game::QteDirection::Right: return u"Move left stick RIGHT";
++        case game::QteDirection::Up: return u"Move left stick UP";
++        case game::QteDirection::Down: return u"Move left stick DOWN";
++        case game::QteDirection::None: return u"";
++        }
++        return u"";
++    }
+ private:
+     std::uint64_t generation_{};
+-    bool dragging_{};
++    bool armed_{};
++    bool wasConnected_{};
++    bool previousNeutral_{};
+ };
+ } // namespace usm::platform
+diff --git a/src/renderer/d3d11/D3D11Renderer.cpp b/src/renderer/d3d11/D3D11Renderer.cpp
+index 15a82b5..2a750cd 100644
+--- a/src/renderer/d3d11/D3D11Renderer.cpp
++++ b/src/renderer/d3d11/D3D11Renderer.cpp
+@@ -1,3 +1,4 @@
++#include "game/QteFeedbackGeometry.hpp"
+ #include "renderer/d3d11/D3D11Renderer.hpp"
+ 
+ #include "assets/ColladaSkinning.hpp"
+@@ -4141,6 +4142,8 @@ Result D3D11Renderer::uploadHudTexture(const game::LevelHudAsset& hud) {
+     cinematicUiTutorialTexture_.Reset();
+     cinematicUiInterfaceEffectVertexBuffer_.Reset();
+     cinematicUiInterfaceEffectVertexCount_ = 0;
++    cinematicQteFeedbackVertexBuffer_.Reset();
++    cinematicQteFeedbackVertexCount_ = 0;
+     transportTexture_.Reset();
+     transportSpriteVertexBuffer_.Reset();
+     transportColorVertexBuffer_.Reset();
+@@ -4560,6 +4563,8 @@ Result D3D11Renderer::updateCinematicUi(
+     cinematicUiColorVertexCount_ = 0;
+     cinematicUiInterfaceEffectVertexBuffer_.Reset();
+     cinematicUiInterfaceEffectVertexCount_ = 0;
++    cinematicQteFeedbackVertexBuffer_.Reset();
++    cinematicQteFeedbackVertexCount_ = 0;
+     if (!device_) {
+         return Result::failure("Cinematic UI has no D3D11 device");
+     }
+@@ -4658,6 +4663,34 @@ Result D3D11Renderer::updateCinematicUi(
+         }
+     }
+ 
++    if (frame.quickTimeFeedback.count != 0) {
++        const auto& image = hud.interfaceTexture.image();
++        std::vector<game::QteFeedbackVertex> sourceVertices;
++        const auto geometryResult = game::buildQteFeedbackGeometry(
++            frame.quickTimeFeedback, hud.interfaceAtlas, image.width,
++            image.height, width_, height_, sourceVertices);
++        if (!geometryResult) { return geometryResult; }
++        std::vector<GpuVertex> vertices;
++        vertices.reserve(sourceVertices.size());
++        for (const auto& vertex : sourceVertices) {
++            vertices.push_back({{vertex.x, vertex.y, 0.0F}, {},
++                                {vertex.u, vertex.v}, vertex.rgba});
++        }
++        if (!vertices.empty()) {
++            D3D11_BUFFER_DESC description{};
++            description.ByteWidth = static_cast<UINT>(vertices.size() * sizeof(GpuVertex));
++            description.Usage = D3D11_USAGE_IMMUTABLE;
++            description.BindFlags = D3D11_BIND_VERTEX_BUFFER;
++            D3D11_SUBRESOURCE_DATA data{vertices.data(), 0, 0};
++            const HRESULT createResult = device_->CreateBuffer(
++                &description, &data, &cinematicQteFeedbackVertexBuffer_);
++            if (FAILED(createResult)) {
++                return hresultFailure("ID3D11Device::CreateBuffer(QTE feedback)", createResult);
++            }
++            cinematicQteFeedbackVertexCount_ = static_cast<std::uint32_t>(vertices.size());
++        }
++    }
++
+     const bool informationPanelVisible =
+         frame.informationPanel != game::InformationPanel::None;
+     const bool centeredPanel =
+@@ -7230,6 +7263,29 @@ void D3D11Renderer::renderFrame() {
+         context_->Draw(hudVertexCount_, 0);
+     }
+ 
++    if (cinematicQteFeedbackVertexCount_ != 0 &&
++        cinematicQteFeedbackVertexBuffer_ && hudTexture_) {
++        constexpr UINT stride = sizeof(GpuVertex);
++        constexpr UINT offset = 0;
++        context_->IASetInputLayout(inputLayout_.Get());
++        context_->IASetVertexBuffers(
++            0, 1, cinematicQteFeedbackVertexBuffer_.GetAddressOf(),
++            &stride, &offset);
++        context_->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
++        context_->IASetPrimitiveTopology(
++            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++        context_->VSSetShader(hudVertexShader_.Get(), nullptr, 0);
++        context_->PSSetShader(hudPixelShader_.Get(), nullptr, 0);
++        context_->PSSetSamplers(0, 1, sampler_.GetAddressOf());
++        context_->PSSetShaderResources(0, 1, hudTexture_.GetAddressOf());
++        context_->OMSetBlendState(alphaBlendState_.Get(), nullptr,
++                                  0xffffffffU);
++        context_->OMSetDepthStencilState(depthDisabledState_.Get(), 0);
++        context_->RSSetState(noCullRasterizerState_.Get());
++        context_->Draw(cinematicQteFeedbackVertexCount_, 0);
++    }
++
++
+     if (cinematicUiColorVertexCount_ != 0 &&
+         cinematicUiColorVertexBuffer_) {
+         constexpr UINT stride = sizeof(GpuVertex);
+diff --git a/src/renderer/d3d11/D3D11Renderer.hpp b/src/renderer/d3d11/D3D11Renderer.hpp
+index 97bec6b..9ac626d 100644
+--- a/src/renderer/d3d11/D3D11Renderer.hpp
++++ b/src/renderer/d3d11/D3D11Renderer.hpp
+@@ -302,6 +302,8 @@ private:
+     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
+     Microsoft::WRL::ComPtr<ID3D11Buffer>
+         cinematicUiInterfaceEffectVertexBuffer_;
++    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicQteFeedbackVertexBuffer_;
++    std::uint32_t cinematicQteFeedbackVertexCount_{};
+     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
+     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cinematicUiTextTexture_;
+     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiMessagePanelVertexBuffer_;
+diff --git a/tests/QteParityTests.cpp b/tests/QteParityTests.cpp
+index 7a25fb9..2739c7a 100644
+--- a/tests/QteParityTests.cpp
++++ b/tests/QteParityTests.cpp
+@@ -1,7 +1,10 @@
+ #include "game/GameplayCinematicScheduler.hpp"
+ #include "game/HostageAttributes.hpp"
+ #include "game/QteSpriteAnimation.hpp"
++#include "game/QteFeedbackGeometry.hpp"
+ #include "platform/input/QteGamepadAdapter.hpp"
++#include "platform/input/XInputStateTranslator.hpp"
++#include "reconstructed/input/XperiaKeyRouter.hpp"
+ #include "diagnostics/AutoplayHarness.hpp"
+ #include "audio/VoxSoundTable.hpp"
+ #include "audio/SoundEventCatalog.hpp"
+@@ -374,49 +377,231 @@ void sequenceTests(const LevelOneBootstrap& level) {
+ }
+ 
+ void gamepadTests(const LevelOneBootstrap& level) {
++    using Pad = usm::platform::QteGamepadAdapter;
+     QuickTimeEventRuntime qte;
+-    qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
+-    usm::platform::QteGamepadAdapter pad;
+-    CHECK(qte.applyCommand(startCommand(6),{1000,0}));
+-    auto input=pad.translate(qte,true,true,true,false,0,0);
+-    CHECK((input.dragPosition==QtePoint{360,101}));
+-    qte.update({1050,50},input); CHECK(qte.active());
+-    input=pad.translate(qte,true,false,true,false,0,1); // wrong direction
+-    qte.update({1100,50},input); CHECK(qte.active());
+-    input=pad.translate(qte,true,false,true,false,0,-0.5F);
+-    qte.update({1150,50},input); CHECK(qte.active());
+-    input=pad.translate(qte,true,false,false,true,0,-0.5F);
+-    CHECK(input.dragReleased);
+-    qte.update({1200,50},input); CHECK(qte.state()==QteState::FailureDisplay);
+-    finishFeedback(qte,1200);(void)qte.consumeCinematicRequest();
+-    CHECK(qte.applyCommand(startCommand(6),{2000,0}));
+-    input=pad.translate(qte,true,false,true,false,0,-1); // held across activation is not a fresh touch
+-    CHECK(!input.dragPosition);
+-    qte.update({2050,50},input); CHECK(qte.active());
+-    input=pad.translate(qte,true,true,true,false,0,0);
+-    qte.update({2100,50},input);
+-    input=pad.translate(qte,true,false,true,false,0,-1);
+-    qte.update({2150,50},input); CHECK(qte.state()==QteState::SuccessDisplay);
+-    finishFeedback(qte,2150);(void)qte.consumeCinematicRequest();
+-    CHECK(qte.applyCommand(startCommand(6),{3000,0}));
+-    (void)pad.translate(qte,true,true,true,false,0,0);
+-    input=pad.translate(qte,false,false,false,true,0,-1);
++    qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++    Pad pad;
++    CHECK(qte.applyCommand(startCommand(6), {1000,0}));
++    auto input = pad.translate(qte, true, true, 0, 0);
++    CHECK(!input.actionPressed && !input.dragPosition && !input.dragReleased);
++    CHECK(input.dragDirection == QteDirection::None);
++    qte.update({1050,50}, input); CHECK(qte.active());
++    input = pad.translate(qte, true, true, 0, 1); // opposite direction and A ignored
++    qte.update({1100,50}, input); CHECK(qte.active());
++    input = pad.translate(qte, true, false, 0.7F, -0.7F); // diagonal, no A
++    CHECK(input.dragDirection == QteDirection::Down);
++    CHECK(!input.dragPosition && !input.dragReleased && !input.actionPressed);
++    qte.update({1150,50}, input); CHECK(qte.state() == QteState::SuccessDisplay);
++    CHECK((qte.consumeSoundCues() == std::vector<std::uint16_t>{0x188}));
++    finishFeedback(qte,1150); CHECK(qte.consumeCinematicRequest() == 20006);
++    CHECK(qte.applyCommand(startCommand(6), {2000,0}));
++    input = pad.translate(qte, true, false, 0, -1); // held across activation is not new
++    CHECK(input.dragDirection == QteDirection::None);
++    qte.update({2050,50}, input); CHECK(qte.active());
++    (void)pad.translate(qte, true, false, 0, 0);
++    input = pad.translate(qte, true, false, 0, -0.75F);
++    qte.update({2100,50}, input); CHECK(qte.state() == QteState::SuccessDisplay);
++    finishFeedback(qte,2100); (void)qte.consumeCinematicRequest();
++    CHECK(qte.applyCommand(startCommand(6), {3000,0}));
++    (void)pad.translate(qte, true, false, 0, 0);
++    input = pad.translate(qte, false, true, 0, -1);
+     CHECK(!input.dragPosition && !input.dragReleased && !input.actionPressed);
+-    qte.update({3050,50},input); CHECK(qte.active());
+-    input=pad.translate(qte,true,false,true,false,0,-1);
+-    CHECK(!input.dragPosition); // reconnect does not inherit a held gesture
+-    qte.update({3100,50},input); CHECK(qte.active());
+-    // Diagnostic autoplay also sends positions; it cannot force success by A.
++    CHECK(input.dragDirection == QteDirection::None);
++    input = pad.translate(qte, true, false, 0, -1);
++    CHECK(input.dragDirection == QteDirection::None); // reconnect needs neutral
++    input = pad.translate(qte, true, false, 0, 0);
++    CHECK(input.dragDirection == QteDirection::None);
++    input = pad.translate(qte, true, false, 0, -1);
++    CHECK(input.dragDirection == QteDirection::Down);
++
++    // The application diagnostic harness now uses exactly this adapter too.
+     usm::diagnostics::AutoplayHarness autoplay;
+-    for(int i=0;i<14;++i) {
+-        input=autoplay.quickTimeInput(qte,true);
+-        CHECK(input.dragPosition==qte.gesturePath().samples()[i]);
+-        qte.update({static_cast<std::uint32_t>(3150+i*50),50},input);
+-        CHECK((i==13)==(qte.state()==QteState::SuccessDisplay));
++    input = autoplay.quickTimeInput(qte, true);
++    CHECK(!input.dragPosition && !input.dragReleased && !input.actionPressed);
++    CHECK(input.dragDirection == QteDirection::None);
++    qte.update({3050,50}, input); CHECK(qte.active());
++    input = autoplay.quickTimeInput(qte, false);
++    CHECK(input.dragDirection == QteDirection::Down);
++    CHECK(!input.dragPosition && !input.dragReleased && !input.actionPressed);
++    qte.update({3100,50}, input); CHECK(qte.state() == QteState::SuccessDisplay);
++
++    // All shipped drag records, not just the first-level DOWN instruction.
++    int directions = 0;
++    for (const int id : {0,4,10,6}) {
++        QuickTimeEventRuntime directional;
++        directional.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++        CHECK(directional.applyCommand(startCommand(id),{10000,0}));
++        Pad controller;
++        (void)controller.translate(directional,true,false,0,0);
++        float x=0,y=0;
++        const auto direction=directional.gesturePath().direction();
++        switch(direction) {
++        case QteDirection::Left: x=-0.8F; y=0.4F; directions|=1; break;
++        case QteDirection::Right: x=0.8F; y=-0.4F; directions|=2; break;
++        case QteDirection::Up: x=0.4F; y=0.8F; directions|=4; break;
++        case QteDirection::Down: x=-0.4F; y=-0.8F; directions|=8; break;
++        case QteDirection::None: CHECK(false); break;
++        }
++        const auto prompt=Pad::prompt(direction);
++        CHECK(!prompt.empty() && prompt.find(u"[A]")==std::u16string_view::npos);
++        CHECK(prompt.find(u"Hold")==std::u16string_view::npos);
++        input=controller.translate(directional,true,false,x,y);
++        CHECK(input.dragDirection==direction && !input.dragPosition);
++        directional.update({10050,50},input);
++        CHECK(directional.state()==QteState::SuccessDisplay);
++    }
++    CHECK(directions==15);
++
++    // A remains required for tap/mash; stick intent cannot decrement actions.
++    for (const int id : {11,14}) {
++        NativeRandomizer random;
++        QuickTimeEventRuntime tap;
++        tap.bind(level.buttonConfigs(),level.hud().interfaceAtlas,&random);
++        CHECK(tap.applyCommand(startCommand(id),{20000,0}));
++        Pad controller;
++        input=controller.translate(tap,true,false,0,-1);
++        CHECK(input.dragDirection==QteDirection::None && !input.actionPressed);
++        tap.update({20050,50},input); CHECK(tap.completedActionCount()==0);
++        input=controller.translate(tap,true,true,0,-1);
++        CHECK(input.actionPressed && input.dragDirection==QteDirection::None);
++        tap.update({20100,50},input); CHECK(tap.completedActionCount()==1);
++    }
++}
++
++void controllerBoundaryTests(const LevelOneBootstrap& level) {
++    using Pad=usm::platform::QteGamepadAdapter;
++    CHECK(!Pad::matchesDirection(QteDirection::None,1,0));
++    CHECK(Pad::matchesDirection(QteDirection::Right,Pad::EngageMagnitude,0));
++    CHECK(!Pad::matchesDirection(QteDirection::Right,
++        std::nextafter(Pad::EngageMagnitude,0.0F),0));
++    for (const float invalid : {std::numeric_limits<float>::infinity(),
++            -std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN()}) {
++        CHECK(!Pad::matchesDirection(QteDirection::Right,invalid,0));
++        CHECK(!Pad::matchesDirection(QteDirection::Down,0,invalid));
++    }
++    // Analytical angle oracle, independent of the squared-dot implementation.
++    constexpr double pi=3.14159265358979323846;
++    const std::array<QteDirection,4> dirs{QteDirection::Right,QteDirection::Up,
++                                        QteDirection::Left,QteDirection::Down};
++    for (int d=0;d<4;++d) {
++        for (int halfDegrees=-360;halfDegrees<=360;++halfDegrees) {
++            const double relative=halfDegrees*0.5;
++            if(std::abs(std::abs(relative)-60.0)<0.001) {continue;}
++            const double angle=(d*90.0+relative)*pi/180.0;
++            CHECK(Pad::matchesDirection(dirs[d],
++                static_cast<float>(0.9*std::cos(angle)),
++                static_cast<float>(0.9*std::sin(angle)))==(std::abs(relative)<60));
++        }
++    }
++    QuickTimeEventRuntime qte;
++    qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++    CHECK(qte.applyCommand(startCommand(6),{1000,0}));
++    Pad pad;
++    (void)pad.translate(qte,true,false,0,-1); // never observed neutral
++    CHECK(!pad.armed());
++    (void)pad.translate(qte,true,false,0,Pad::NeutralMagnitude+0.001F);
++    CHECK(!pad.armed());
++    (void)pad.translate(qte,true,false,0,Pad::NeutralMagnitude);
++    CHECK(pad.armed());
++    auto input=pad.translate(qte,true,false,0,-Pad::EngageMagnitude);
++    CHECK(input.dragDirection==QteDirection::Down && !pad.armed());
++    for(int i=0;i<100;++i) {
++        input=pad.translate(qte,true,true,0,-1);
++        CHECK(input.dragDirection==QteDirection::None && !input.actionPressed);
++    }
++    // Invalid data must not manufacture the neutral observation needed to rearm.
++    CHECK(!pad.translate(qte,true,true,std::numeric_limits<float>::quiet_NaN(),0).actionPressed);
++    CHECK(pad.translate(qte,true,false,0,-1).dragDirection==QteDirection::None);
++    (void)pad.translate(qte,true,false,0,0);
++    CHECK(pad.translate(qte,true,false,0,-1).dragDirection==QteDirection::Down);
++
++    // A fresh movement at activation counts when the immediately prior sample
++    // was neutral, even though BeginNowQTE changed the generation meanwhile.
++    QuickTimeEventRuntime newQte; newQte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++    Pad fresh;
++    (void)fresh.translate(newQte,true,false,0,0);
++    CHECK(newQte.applyCommand(startCommand(6),{5000,0}));
++    CHECK(fresh.translate(newQte,true,false,0,-1).dragDirection==QteDirection::Down);
++
++    // All 65,536 raw signed axis values for each authored direction. This
++    // drives the production radial-deadzone translator and intent adapter;
++    // 21,554 is the first integer above 7,849 + .55*(32,767-7,849).
++    for (const int id : {0,4,10,6}) {
++        QuickTimeEventRuntime axisQte;
++        axisQte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(axisQte.applyCommand(startCommand(id),{25000,0}));
++        const auto direction=axisQte.gesturePath().direction();
++        const bool horizontal=direction==QteDirection::Left||direction==QteDirection::Right;
++        const bool positive=direction==QteDirection::Right||direction==QteDirection::Up;
++        usm::platform::XInputStateTranslator raw;
++        Pad axisPad;
++        for (int value=-32768; value<=32767; ++value) {
++            (void)axisPad.translate(axisQte,true,false,0,0);
++            raw.update(true,0,horizontal?static_cast<std::int16_t>(value):0,
++                horizontal?0:static_cast<std::int16_t>(value),{});
++            const auto stick=raw.leftStick();
++            const auto event=axisPad.translate(axisQte,raw.connected(),true,stick.x,stick.y);
++            const bool expected=positive?value>=21554:value<=-21554;
++            CHECK((event.dragDirection==direction)==expected);
++            CHECK(!event.actionPressed && !event.dragPosition && !event.dragReleased);
++            // A held deflection, even after the first accepted event, is not
++            // another gesture. An incorrect/weak deflection also stays inert.
++            const auto held=axisPad.translate(axisQte,true,true,stick.x,stick.y);
++            CHECK(held.dragDirection==QteDirection::None);
++        }
++    }
++
++    // Original strict timeout and input order are unchanged by adaptation.
++    for(const std::uint32_t elapsed:{3899U,3900U,3901U}) {
++        QuickTimeEventRuntime timed; timed.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(timed.applyCommand(startCommand(6),{10000,0}));
++        Pad controller; (void)controller.translate(timed,true,false,0,0);
++        timed.update({10000+elapsed,50},controller.translate(timed,true,false,0,-1));
++        CHECK(timed.state()==QteState::SuccessDisplay);
++        const auto sounds=timed.consumeSoundCues();
++        CHECK(sounds==(elapsed>3900?std::vector<std::uint16_t>{0x189,0x188}
++                                  :std::vector<std::uint16_t>{0x188}));
+     }
++    // No gesture has a time extension, including device loss.
++    for(const bool connected:{true,false}) {
++        QuickTimeEventRuntime timed; timed.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(timed.applyCommand(startCommand(6),{10000,0}));
++        Pad controller;
++        timed.update({13900,50},controller.translate(timed,connected,true,0,1));
++        CHECK(timed.state()==QteState::Drag);
++        timed.update({13901,1},controller.translate(timed,connected,true,0,1));
++        CHECK(timed.state()==QteState::FailureDisplay);
++    }
++
++    // Compound [0,3,1]: retained held direction, A, and native same-state
++    // animation quirks cannot complete a second child without another gesture.
++    QuickTimeEventRuntime sequence;sequence.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++    CHECK(sequence.applyCommand(startCommand(2),{20000,0}));
++    Pad controller; std::uint32_t now=20000;
++    for(const int child:{0,3,1}) {
++        CHECK(sequence.configId()==child && sequence.state()==QteState::Drag);
++        // A fresh neutral frame is necessary for each authored child.
++        sequence.update({++now,0},controller.translate(sequence,true,true,0,0));
++        const auto target=sequence.gesturePath().direction();
++        float x=0,y=0;
++        if(target==QteDirection::Left)x=-1;
++        if(target==QteDirection::Right)x=1;
++        if(target==QteDirection::Up)y=1;
++        if(target==QteDirection::Down)y=-1;
++        input=controller.translate(sequence,true,true,x,y);
++        CHECK(input.dragDirection==target && !input.actionPressed);
++        sequence.update({++now,0},input);
++        input=controller.translate(sequence,true,true,x,y);
++        CHECK(input.dragDirection==QteDirection::None);
++        if(sequence.active()) {
++            const auto before=sequence.configId();
++            sequence.update({++now,0},input); CHECK(sequence.configId()==before);
++        }
++    }
++    CHECK(sequence.state()==QteState::SuccessDisplay);
+ }
+ 
+-void firstLevelFlowTests(const LevelOneBootstrap& level) {
++void firstLevelFlowTests(const LevelOneBootstrap& level, bool controllerInput = false) {
+     // This tuple comes from the actual linked first-level CFF, not the
+     // inherited smoke fixture's synthetic source ID 20005. Five further CFFs
+     // containing StartQTE exist in the pack but their rooms are NOT linked by
+@@ -481,10 +666,30 @@ void firstLevelFlowTests(const LevelOneBootstrap& level) {
+             CHECK(qte.sourceCinematicId()==record.source && qte.configId()==record.config);
+             const auto started=now;
+             const auto duration=qte.durationMilliseconds();
++            usm::platform::XInputStateTranslator raw;
++            usm::reconstructed::XperiaKeyRouter router;
++            usm::platform::QteGamepadAdapter controller;
++            int directionalEvents=0;
+             for(int frame=0;frame<100 && qte.active();++frame) {
+                 now+=50;
+                 QteInput input;
+-                if(qte.state()==QteState::Drag) {
++                if(controllerInput) {
++                    router.beginFrame();
++                    // Same raw XINPUT_GAMEPAD fields and translator used by the
++                    // Windows poller. Success: diagonal DOWN without A; failure:
++                    // UP plus A never becomes a drag or a virtual-touch release.
++                    raw.update(true,succeed?0:usm::platform::xinput::A,
++                        frame==0?0:static_cast<std::int16_t>(succeed?22000:0),
++                        frame==0?0:static_cast<std::int16_t>(succeed?-22000:32767),
++                        [&](const auto& event) {
++                            router.route(event,usm::reconstructed::InputContext::Gameplay);
++                        });
++                    const auto stick=raw.leftStick();
++                    input=controller.translate(qte,raw.connected(),
++                        router.state().quickTimeEvent.pressed,stick.x,stick.y);
++                    CHECK(!input.dragPosition && !input.dragReleased && !input.actionPressed);
++                    if(input.dragDirection!=QteDirection::None) {++directionalEvents;}
++                } else if(qte.state()==QteState::Drag) {
+                     // A alone cannot win a drag even in the failure scenario.
+                     input.actionPressed=true;
+                     if(succeed) {
+@@ -495,6 +700,7 @@ void firstLevelFlowTests(const LevelOneBootstrap& level) {
+                 qte.update({now,50},input);
+             }
+             CHECK(!qte.active());
++            if(controllerInput) {CHECK(directionalEvents==(succeed?1:0));}
+             CHECK(qte.state()==(succeed?QteState::SuccessDisplay:QteState::FailureDisplay));
+             CHECK(succeed || now==started+(duration/50+1)*50);
+             CHECK(qte.consumeControlRelease());
+@@ -505,7 +711,7 @@ void firstLevelFlowTests(const LevelOneBootstrap& level) {
+             scheduler.remove(qte.sourceCinematicId()); CHECK(!scheduler.active(record.source));
+             CHECK(scheduler.start(*next)); CHECK(scheduler.active(*next));
+             CHECK(scheduler.playback(*next)->asset->scriptAvailable);
+-            std::cout << "Authored level 1 QTE: " << record.source << " / config "
++            std::cout << (controllerInput?"Raw XInput level 1 QTE: ":"Authored level 1 QTE: ") << record.source << " / config "
+                 << record.config << " -> " << *next << (succeed?" success":" failure") << '\n';
+         }
+     }
+@@ -677,6 +883,140 @@ void hostageTests(const LevelOneBootstrap& level, const PlayerStateConfigDatabas
+ 
+ }
+ 
++void feedbackTests(const LevelOneBootstrap& level) {
++    const auto& atlas = level.hud().interfaceAtlas;
++    const auto& image = level.hud().interfaceTexture.image();
++    QuickTimeEventRuntime qte;
++    qte.bind(level.buttonConfigs(), atlas);
++    CHECK(qte.feedbackFrame().count == 0);
++    CHECK(qte.applyCommand(startCommand(6), {1000,0}));
++    CHECK(qte.feedbackFrame().count == 0); // Never resurrect touch UI for active sticks.
++    QteInput gesture;
++    gesture.dragDirection = qte.gesturePath().direction();
++    qte.update({1001,0}, gesture);
++    CHECK(qte.state() == QteState::SuccessDisplay);
++    for (int draw = 0; draw < 9; ++draw) {
++        const auto frame = qte.feedbackFrame();
++        CHECK(frame.count == 1);
++        CHECK(frame.sprites[0].frameIndex == 33);
++        CHECK(frame.sprites[0].alpha == 255);
++        CHECK(frame.sprites[0].position.x == 360);
++        CHECK(frame.sprites[0].position.y == 251);
++        qte.drawStep();
++    }
++    CHECK(qte.feedbackFrame().count == 0);
++    CHECK(qte.consumeCinematicRequest() == 20006);
++    CHECK(!qte.consumeCinematicRequest());
++
++    CHECK(qte.applyCommand(startCommand(6), {2000,0}));
++    qte.update({5901,0}, false);
++    CHECK(qte.state() == QteState::FailureDisplay);
++    CHECK(qte.failureAlpha() == 255);
++    // Shipped animation 1 duration sum is 10; ARM signed integer division
++    // produces 25, not 25.5. Draw subtracts before painting, down to zero.
++    for (int draw = 1; draw <= 14; ++draw) {
++        const auto snapshot = qte.feedbackFrame();
++        const auto again = qte.feedbackFrame();
++        CHECK(snapshot.count == 1 && again.count == 1);
++        CHECK(snapshot.sprites[0].frameIndex == 34);
++        CHECK(snapshot.sprites[0].alpha == std::max(0,255-25*draw));
++        CHECK(again.sprites[0].alpha == snapshot.sprites[0].alpha);
++        CHECK(snapshot.sprites[0].position.x == 360);
++        CHECK(snapshot.sprites[0].position.y == 101);
++        qte.drawStep();
++        CHECK(qte.failureAlpha() == snapshot.sprites[0].alpha);
++        CHECK(qte.state() == QteState::FailureDisplay); // Draw is not the animation clock.
++    }
++    // Re-entry from failure resets alpha, as BeginQTE does, not BeginNowQTE.
++    CHECK(qte.applyCommand(startCommand(6), {6000,0}));
++    CHECK(qte.failureAlpha() == 255);
++    qte.update({9901,0}, false);
++    std::vector<usm::game::QteFeedbackVertex> vertices;
++    std::array<bool,6> seen{};
++    for (int n = 0; n < 30 && qte.visible(); ++n) {
++        const auto frame = qte.feedbackFrame();
++        if (frame.count != 0) {
++            const auto& draw = frame.sprites[0];
++            CHECK(draw.frameIndex >= 34 && draw.frameIndex <= 39);
++            seen[draw.frameIndex-34] = true;
++            CHECK(draw.alpha == std::max(0,255-25*(n+1)));
++            for (auto size : {std::pair{480U,320U}, {1280U,720U}, {1920U,1080U}, {1000U,1000U}, {3440U,1440U}}) {
++                CHECK(buildQteFeedbackGeometry(frame,atlas,image.width,image.height,size.first,size.second,vertices));
++                CHECK(vertices.size() == 24);
++                // Independent coordinate/UV reference using long-double
++                // host viewport mapping and the original module facts.
++                const long double sx = std::min(size.first/480.0L,size.second/320.0L);
++                const long double ox = (size.first - 480.0L*sx)/2;
++                const long double oy = (size.second - 320.0L*sx)/2;
++                std::size_t at=0;
++                for (const auto& fm : atlas.modulesForFrame(draw.frameIndex)) {
++                    const auto& m=atlas.modules()[fm.moduleIndex];
++                    for (const auto corner : {std::pair{0,0},{1,0},{0,1},{1,0},{1,1},{0,1}}) {
++                        const long double px=ox+(draw.position.x+fm.x+corner.first*m.width)*sx;
++                        const long double py=oy+(draw.position.y+fm.y+corner.second*m.height)*sx;
++                        const auto& v=vertices[at++];
++                        CHECK(std::abs(v.x-(2*px/size.first-1)) < 0.000002L);
++                        CHECK(std::abs(v.y-(1-2*py/size.second)) < 0.000002L);
++                        CHECK(std::abs(v.u-(m.x+corner.first*m.width)/static_cast<long double>(image.width)) < 0.000002L);
++                        CHECK(std::abs(v.v-(m.y+corner.second*m.height)/static_cast<long double>(image.height)) < 0.000002L);
++                        CHECK(v.rgba == (0xffffffU | (static_cast<std::uint32_t>(draw.alpha)<<24)));
++                    }
++                }
++            }
++        }
++        qte.drawStep();
++        qte.update({9901,50},false);
++    }
++    for (const bool observed : seen) { CHECK(observed); }
++    CHECK(!qte.visible());
++    CHECK(qte.feedbackFrame().count == 0);
++    CHECK(qte.consumeCinematicRequest() == 20010);
++
++    // Completed mash adds the original two fixed full-ring frames in order.
++    CHECK(qte.applyCommand(startCommand(11),{20000,0}));
++    for(int i=0;i<8;++i){qte.update({20000,0},true);}
++    auto full=qte.feedbackFrame();
++    CHECK(full.count==3);
++    CHECK(full.sprites[0].frameIndex==33);
++    CHECK(full.sprites[1].frameIndex==85);
++    CHECK(full.sprites[2].frameIndex==93);
++    CHECK(buildQteFeedbackGeometry(full,atlas,image.width,image.height,480,320,vertices));
++    CHECK(!vertices.empty());
++    // Authored photo config 19 uses value 16. Its one-frame animation 29
++    // has duration 1, so the native IsAnimEnded test is already true at
++    // tick zero: failure dispatches without painting a made-up fade.
++    finishFeedback(qte,20000);
++    NativeRandomizer random;
++    qte.bind(level.buttonConfigs(),atlas,&random);
++    CHECK(qte.applyCommand(startCommand(19),{30000,0}));
++    CHECK(level.buttonConfigs().find(19)->interactionValue==16);
++    qte.update({40000,0},false);
++    CHECK(qte.resultSprite().animationId()==29);
++    full=qte.feedbackFrame();
++    CHECK(full.count==0 && qte.resultSprite().ended());
++    qte.drawStep();
++    CHECK(qte.state()==QteState::FailureHandled && qte.failureAlpha()==255);
++    CHECK(qte.consumeCinematicRequest()==20010);
++    // Valid baseline for the following host-side bounds checks.
++    full.count=1; full.sprites[0]={34,{360,101},0,230};
++    CHECK(buildQteFeedbackGeometry(full,atlas,image.width,image.height,480,320,vertices));
++
++    auto invalid=full; invalid.count=4;
++    CHECK(!buildQteFeedbackGeometry(invalid,atlas,image.width,image.height,480,320,vertices));
++    CHECK(vertices.empty());
++    invalid=full; invalid.sprites[0].flags=0x80;
++    CHECK(!buildQteFeedbackGeometry(invalid,atlas,image.width,image.height,480,320,vertices));
++    CHECK(vertices.empty());
++    invalid=full; invalid.sprites[0].frameIndex=65535;
++    CHECK(!buildQteFeedbackGeometry(invalid,atlas,image.width,image.height,480,320,vertices));
++    CHECK(vertices.empty());
++    CHECK(!buildQteFeedbackGeometry(full,atlas,0,image.height,480,320,vertices));
++    CHECK(!buildQteFeedbackGeometry(full,atlas,1,1,480,320,vertices));
++    CHECK(vertices.empty());
++    CHECK(buildQteFeedbackGeometry(full,atlas,image.width,image.height,0,0,vertices));
++    CHECK(vertices.empty());
++}
++
+ void attributesTests() {
+     CHECK(hostageButtonHeight(-1) == 85);
+     CHECK(hostageButtonHeight(-100) == 85);
+@@ -703,7 +1043,10 @@ int main(int argc, char** argv) {
+             else if (group == "gesture") { gestureTests(level); }
+             else if (group == "sprite") { spriteTests(level); }
+             else if (group == "sequence") { sequenceTests(level); }
++            else if (group == "feedback") { feedbackTests(level); }
+             else if (group == "gamepad") { gamepadTests(level); }
++            else if (group == "controller_boundaries") { controllerBoundaryTests(level); }
++            else if (group == "controller_first_level") { firstLevelFlowTests(level, true); }
+             else if (group == "audio") { audioTests(root); }
+             else if (group == "first_level") { firstLevelFlowTests(level); }
+             else if (group == "hostage") {

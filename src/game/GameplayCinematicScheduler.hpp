@@ -30,6 +30,7 @@ class GameplayCinematicScheduler final {
 public:
     void bind(std::span<const LevelCinematicAsset> cinematics) noexcept;
     [[nodiscard]] Result start(std::int32_t cinematicId);
+    [[nodiscard]] const LevelCinematicAsset* findAsset(std::int32_t cinematicId) const noexcept;
     [[nodiscard]] Result update(
         std::uint32_t deltaMilliseconds,
         const GameplayCinematicCommandHandler& handler);

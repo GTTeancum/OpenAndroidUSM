@@ -1,0 +1,1535 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 58b734b..44c6be6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -151,6 +151,7 @@ add_library(OpenAndroidUSM.Core STATIC
+     src/game/QteSpriteAnimation.cpp
+     src/game/QteFeedbackGeometry.cpp
+     src/game/QuickTimeEventRuntime.cpp
++    src/game/QteCinematicHandoff.cpp
+     src/game/WallWebRuntime.cpp
+     src/game/WebGrabPointRuntime.cpp
+     src/game/WebLineGeometry.cpp
+@@ -260,7 +261,7 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+     target_link_libraries(OpenAndroidUSM.QteParityTests PRIVATE OpenAndroidUSM.Core)
+     target_compile_definitions(OpenAndroidUSM.QteParityTests PRIVATE
+         USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
+-    foreach(group IN ITEMS clock cinematic hostage attributes gesture sprite sequence gamepad audio first_level controller_boundaries controller_first_level feedback)
++    foreach(group IN ITEMS clock cinematic hostage attributes gesture sprite sequence gamepad audio first_level controller_boundaries controller_first_level feedback shared_manager consumption handoff)
+         add_test(NAME OpenAndroidUSM.QteParity.${group}
+             COMMAND OpenAndroidUSM.QteParityTests ${group})
+         set_tests_properties(OpenAndroidUSM.QteParity.${group} PROPERTIES
+diff --git a/docs/references/re04-original-fingerprints.json b/docs/references/re04-original-fingerprints.json
+new file mode 100644
+index 0000000..5ce5877
+--- /dev/null
++++ b/docs/references/re04-original-fingerprints.json
+@@ -0,0 +1,127 @@
++{
++  "size": 7713000,
++  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
++  "machine": "ELF32 little-endian ARM",
++  "symbols": [
++    {
++      "name": "_ZN8CHostage6UpdateEf",
++      "elf_address": "0x00328068",
++      "thumb": true,
++      "size": 1352,
++      "sha256": "602e73d58728990678567ae103d2ccf6b9103081eda16e01a7ed6fcc672cf782"
++    },
++    {
++      "name": "_ZN11CQTEManager8BeginQTEEiiii",
++      "elf_address": "0x0037ab40",
++      "thumb": true,
++      "size": 120,
++      "sha256": "89d03744fb39e91be7bc7d7b1f8068499184181f755f3e6f8630534f1693d288"
++    },
++    {
++      "name": "_ZN11CQTEManager11BeginNowQTEEv",
++      "elf_address": "0x0037aa08",
++      "thumb": true,
++      "size": 312,
++      "sha256": "42fa12b37c92687f6b9b9b22654f693b3d11814ca7734baf1ebb114e42dd46b9"
++    },
++    {
++      "name": "_ZN11CQTEManager12ForceFailQTEEv",
++      "elf_address": "0x0037a9fc",
++      "thumb": true,
++      "size": 10,
++      "sha256": "9af497dce9eb1b5f74f790a5ebcdfe20cbf0299d9b6ed9b46b2a222e7de32b7d"
++    },
++    {
++      "name": "_ZN11CQTEManager6UpdateEf",
++      "elf_address": "0x0037b240",
++      "thumb": true,
++      "size": 460,
++      "sha256": "b37b509937754778139e710d09a0ab2765c5720af3f39addf0bac66ba3e7cc90"
++    },
++    {
++      "name": "_ZN11CQTEManager8SetStateEi",
++      "elf_address": "0x0037a67c",
++      "thumb": true,
++      "size": 332,
++      "sha256": "dcf6a85d3a724edb2428bb25a44d5d1024b7f5fec80372faebc4ccc49a9dc8f2"
++    },
++    {
++      "name": "_ZN11CQTEManager13SuccessHandleEv",
++      "elf_address": "0x0037a5e4",
++      "thumb": true,
++      "size": 76,
++      "sha256": "186d171d9ae2b12b71a66f96916b88c9ee05fd388aafb1529ebe144cdd83be88"
++    },
++    {
++      "name": "_ZN11CQTEManager10FailHandleEv",
++      "elf_address": "0x0037a630",
++      "thumb": true,
++      "size": 76,
++      "sha256": "7ec93470cf683588f3f2f16083870b820d9d5b9c757b54694ffdbc171248fc74"
++    },
++    {
++      "name": "_ZN11CQTEManager4DrawEv",
++      "elf_address": "0x0037a7c8",
++      "thumb": true,
++      "size": 540,
++      "sha256": "3547a2cca9cc7526786e36032e48fdbf28dd0ab2b20eb0cbb2f5e748253c9895"
++    },
++    {
++      "name": "_ZN11CQTEManager6EndQTEEv",
++      "elf_address": "0x0037a5b0",
++      "thumb": true,
++      "size": 52,
++      "sha256": "79c93206f203f587d78388dae661d0dce6fe4521d95b8868a3e16527888dd37c"
++    },
++    {
++      "name": "_ZN6CLevel6UpdateEf",
++      "elf_address": "0x003720bc",
++      "thumb": true,
++      "size": 1688,
++      "sha256": "5ec788200423ab60e59b6adb9396cdcb08130ea57fd6d9cbfa7140106c343a89"
++    },
++    {
++      "name": "_ZN6CLevel10PauseTimerEv",
++      "elf_address": "0x0036f42c",
++      "thumb": true,
++      "size": 24,
++      "sha256": "68d88b01e7526d11544ce8223f077094b578b39994779cc5222b94c6f5b7c129"
++    },
++    {
++      "name": "_ZN6CLevel8ResumeItEv",
++      "elf_address": "0x0036f3e4",
++      "thumb": true,
++      "size": 72,
++      "sha256": "1e12545b2fbb0c6f844a66ae57cc8372195f661542d9a50caab1cab8259f5ca5"
++    },
++    {
++      "name": "_ZN11CQTEManager8SetPauseEb",
++      "elf_address": "0x0037a4fc",
++      "thumb": true,
++      "size": 96,
++      "sha256": "b1b71abc06a83baf49def169c20bf014ce724ae1cfe8d6124729a71e99b2bbc4"
++    },
++    {
++      "name": "_ZN6CLevel14EnableControlsEbb",
++      "elf_address": "0x0036fe94",
++      "thumb": true,
++      "size": 54,
++      "sha256": "cd098464dda664ac1bb5c708135371da04603a54b288c8b2d5c3cf9a78a468b7"
++    },
++    {
++      "name": "_ZN16GameEventKeyWrap12ResetAllKeysEv",
++      "elf_address": "0x002e8888",
++      "thumb": true,
++      "size": 32,
++      "sha256": "6d681472aa52914df38ec56d95c151b9ab3a8ae9834c3dc00f0bf0e0645d189b"
++    },
++    {
++      "name": "_ZN16CCinematicThread8StartQTEEPN3irr2io11IAttributesE",
++      "elf_address": "0x0036153c",
++      "thumb": true,
++      "size": 100,
++      "sha256": "48a2f5d76ce16e5ed9402a51bbe3f982a7fa5154f065b5e593d24c09de0e704b"
++    }
++  ],
++  "ghidra_rebase_offset": "0x00010000"
++}
+diff --git a/src/app/Application.cpp b/src/app/Application.cpp
+index 2895478..862878f 100644
+--- a/src/app/Application.cpp
++++ b/src/app/Application.cpp
+@@ -13,6 +13,7 @@
+ #include <chrono>
+ #include <cmath>
+ #include <filesystem>
++#include <functional>
+ #include <iostream>
+ #include <limits>
+ #include <optional>
+@@ -1915,7 +1916,8 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+     if (!result) {
+         return fail(result.message());
+     }
+-    result = hostageRuntime_.initialize(levelOne_, &objectRuntime_);
++    quickTimeEvent_.bind(levelOne_.buttonConfigs(), levelOne_.hud().interfaceAtlas, &nativeRandomizer_);
++    result = hostageRuntime_.initialize(levelOne_, quickTimeEvent_, &objectRuntime_);
+     if (!result) {
+         return fail(result.message());
+     }
+@@ -1975,7 +1977,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             return saveResult;
+         };
+     gameplayCinematics_.bind(levelOne_.cinematics());
+-    quickTimeEvent_.bind(levelOne_.buttonConfigs(), levelOne_.hud().interfaceAtlas, &nativeRandomizer_);
+     cinematicUi_.bind(levelOne_.textCatalog());
+     result = deathConfirmationRuntime_.bind(levelOne_.textCatalog());
+     if (!result) {
+@@ -2396,30 +2397,38 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             }
+             return Result::success();
+         };
+-        Result effects = playCues(hostageRuntime_.consumeQuickTimeSoundCues());
+-        if (effects) { effects = playCues(quickTimeEvent_.consumeSoundCues()); }
+-        const bool hostageEnded = hostageRuntime_.consumeControlRelease();
+-        const bool cinematicEnded = quickTimeEvent_.consumeControlRelease();
+-        if (hostageEnded || cinematicEnded) { levelCinematicRuntime_.endQuickTimeEvent(); }
++        // One level manager, one drain: no duplicated cinematic/hostage cues.
++        Result effects = playCues(quickTimeEvent_.consumeSoundCues());
++        if (quickTimeEvent_.consumeControlRelease()) {
++            levelCinematicRuntime_.endQuickTimeEvent();
++        }
+         return effects;
+     };
++    std::function<Result(std::uint32_t)> advanceGameplayCinematics;
++    Result qteHandoffResult = Result::success();
++    const game::QteHandoffHandler dispatchQteHandoff =
++        [&](const game::QteCinematicHandoff& handoff) {
++        // SetState ELF 0x37a7a0..0x37a7b2 clears IGM before removal/add/update.
++        keyRouter_.consumePausePress();
++        if (!qteHandoffResult) { return; }
++        qteHandoffResult = game::dispatchQteCinematicHandoff(
++            handoff, gameplayCinematics_,
++            [&](const game::GameplayCinematicPlayback& source) {
++                releaseGameplayCollada(*source.asset, source.elapsedMilliseconds);
++            },
++            startGameplayCinematic,
++            advanceGameplayCinematics);
++        if (autoplay && handoff.sourceCinematicId != -1) {
++            autoplay->recordEvent(traceTimeMilliseconds, "qte_cinematic_handoff",
++                "source=" + std::to_string(handoff.sourceCinematicId) +
++                ";outcome=" + std::to_string(handoff.outcomeCinematicId));
++        }
++    };
+     const auto handleQteCinematic = [&]() -> Result {
+         const Result effects = applyQteEffects();
+         if (!effects) { return effects; }
+-        if (const auto qteCinematic = quickTimeEvent_.consumeCinematicRequest()) {
+-            const std::int32_t sourceId = quickTimeEvent_.sourceCinematicId();
+-            if (const auto* source = gameplayCinematics_.playback(sourceId)) {
+-                releaseGameplayCollada(*source->asset, source->elapsedMilliseconds);
+-                gameplayCinematics_.remove(sourceId);
+-                if (autoplay) {
+-                    autoplay->recordEvent(traceTimeMilliseconds, "qte_cinematic_handoff",
+-                        "source=" + std::to_string(sourceId) +
+-                        ";outcome=" + std::to_string(*qteCinematic));
+-                }
+-            }
+-            return startGameplayCinematic(*qteCinematic);
+-        }
+-        return Result::success();
++        // Live update/draw uses synchronous dispatch, not detached queues.
++        return qteHandoffResult;
+     };
+     if (!hasIntroCinematic && levelOne_.player().linkedCinematicId >= 0) {
+         // Later levels author their opening as an ordinary CFF cinematic
+@@ -2613,6 +2622,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                         : window_.pumpMessages();
+     };
+     while (shouldRunFrame()) {
++        // The cinematic step captures this frame's live dispatch context.
++        // Never retain references into a previous iteration (intro/death/UI).
++        advanceGameplayCinematics = {};
++        qteHandoffResult = Result::success();
+         std::uint32_t realDeltaMilliseconds = 0;
+         bool presentThisFrame = true;
+         if (autoplay) {
+@@ -3232,9 +3245,6 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                           : keyRouter_.state().rescueRequested) &&
+                 controlsEnabled &&
+                 hostageRuntime_.canStartRescue(gameplayPlayer_);
+-            const bool hostageQuickTimePressed =
+-                autoplay ? autoplayInput.quickTimeEventPressed
+-                         : keyRouter_.state().quickTimeEvent.pressed;
+             const auto cameraBeforeMovement =
+                 gameplayCamera_.sample(gameplayPlayer_.position());
+             const auto attackDirection =
+@@ -4782,11 +4792,20 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                     }
+                 }
+             }
+-            if (result && !gameplayPlayer_.dead()) {
++            // All captures outlive the gameplay block: this callback also
++            // runs during the current frame's QTE Draw, below that block.
++            advanceGameplayCinematics =
++                [this, &playSpatialSound, &autoplay, &traceTimeMilliseconds,
++                 &playNamedAudio, &stopNamedAudio, &saveCinematicCheckPoint,
++                 &nativeTimerMilliseconds, &realDeltaMilliseconds,
++                 &playGameplaySound, &stopPlayerStateSound,
++                 &releaseGameplayCollada, &exitAfterPresent,
++                 &startGameplayCinematic](std::uint32_t cinematicDeltaMilliseconds) -> Result {
++                Result stepResult = Result::success();
+                 Result commandResult = Result::success();
+                 bool cinematicDamageApplied = false;
+-                result = gameplayCinematics_.update(
+-                    gameDeltaMilliseconds,
++                stepResult = gameplayCinematics_.update(
++                    cinematicDeltaMilliseconds,
+                     [this, &commandResult, &cinematicDamageApplied,
+                      &playSpatialSound, &autoplay, &traceTimeMilliseconds,
+                      &playNamedAudio, &stopNamedAudio,
+@@ -4988,11 +5007,11 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                         }
+                         return true;
+                     });
+-                if (result && !commandResult) {
+-                    result = commandResult;
++                if (stepResult && !commandResult) {
++                    stepResult = commandResult;
+                 }
+-                if (result && cinematicDamageApplied) {
+-                    result = playerSounds_.dispatchStateEnter(
++                if (stepResult && cinematicDamageApplied) {
++                    stepResult = playerSounds_.dispatchStateEnter(
+                         "k_state_hurt_light", playGameplaySound,
+                         stopPlayerStateSound);
+                 }
+@@ -5022,27 +5041,28 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                     }
+                     if (!terminalCinematic &&
+                         completedCinematic->nextCinematicId >= 0) {
+-                        result = startGameplayCinematic(
++                        stepResult = startGameplayCinematic(
+                             completedCinematic->nextCinematicId);
+-                        if (!result) {
++                        if (!stepResult) {
+                             break;
+                         }
+                     }
+                 }
+                 for (const std::int32_t requestedCinematic :
+                      levelCinematicRuntime_.consumeCinematicStartRequests()) {
+-                    if (result) {
+-                        result = startGameplayCinematic(requestedCinematic);
++                    if (stepResult) {
++                        stepResult = startGameplayCinematic(requestedCinematic);
+                     }
+                 }
++                return stepResult;
++            };
++            if (result && !gameplayPlayer_.dead()) {
++                result = advanceGameplayCinematics(gameDeltaMilliseconds);
+             }
+             if (result) {
+                 result = dispatchObjectEvents();
+             }
+             if (!result) { return fail(result.message()); }
+-            hostageRuntime_.updateQuickTime(
+-                {nativeTimerMilliseconds, realDeltaMilliseconds},
+-                hostageQuickTimePressed);
+             game::QteInput cinematicQteInput;
+             if (autoplay) {
+                 // qte_tap is still a tap; it no longer forces drag success.
+@@ -5056,8 +5076,25 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                     quickTimeEvent_, controller_.connected(), action.pressed,
+                     stick.x, stick.y);
+             }
+-            quickTimeEvent_.update(
+-                {nativeTimerMilliseconds, realDeltaMilliseconds}, cinematicQteInput);
++            const game::QteInputConsumption qteConsumed = quickTimeEvent_.update(
++                {nativeTimerMilliseconds, realDeltaMilliseconds}, cinematicQteInput,
++                dispatchQteHandoff);
++            // CQTEManager precedes QTEActionManager in CLevel::Update. A
++            // consumed Cross press must not advance both managers, nor leak
++            // through to later UI consumers. Keep keypad hold/history intact.
++            if (qteConsumed.quickTimePress) {
++                keyRouter_.consumeQuickTimePress();
++                autoplayInput.quickTimeEventPressed = false;
++            }
++            if (qteConsumed.jumpPress) {
++                keyRouter_.consumeJumpPress();
++                autoplayInput.jumpPressed = false;
++            }
++            if (qteConsumed.rescuePress) {
++                keyRouter_.consumeRescueRequest();
++                autoplayInput.rescueRequested = false;
++            }
++            hostageRuntime_.observeQuickTime();
+             result = handleQteCinematic();
+             if (!result) { return fail(result.message()); }
+             if (!gameplayPlayer_.dead() &&
+@@ -5991,7 +6028,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+             presentThisFrame = true;
+         }
+         if (presentThisFrame) {
+-            quickTimeEvent_.drawStep();
++            quickTimeEvent_.drawStep(dispatchQteHandoff);
+             result = handleQteCinematic();
+             if (!result) { return fail(result.message()); }
+             renderer_.renderFrame();
+diff --git a/src/game/GameplayCinematicScheduler.cpp b/src/game/GameplayCinematicScheduler.cpp
+index c33a054..f7f003d 100644
+--- a/src/game/GameplayCinematicScheduler.cpp
++++ b/src/game/GameplayCinematicScheduler.cpp
+@@ -11,6 +11,15 @@ void GameplayCinematicScheduler::bind(
+     completions_.clear();
+ }
+ 
++const LevelCinematicAsset* GameplayCinematicScheduler::findAsset(
++    std::int32_t cinematicId) const noexcept {
++    const auto asset = std::find_if(cinematics_.begin(), cinematics_.end(),
++        [cinematicId](const LevelCinematicAsset& candidate) {
++            return candidate.objectId == cinematicId;
++        });
++    return asset == cinematics_.end() ? nullptr : &*asset;
++}
++
+ Result GameplayCinematicScheduler::start(std::int32_t cinematicId) {
+     const auto existing = std::find_if(
+         instances_.begin(), instances_.end(),
+diff --git a/src/game/GameplayCinematicScheduler.hpp b/src/game/GameplayCinematicScheduler.hpp
+index 30490e3..8bb6684 100644
+--- a/src/game/GameplayCinematicScheduler.hpp
++++ b/src/game/GameplayCinematicScheduler.hpp
+@@ -30,6 +30,7 @@ class GameplayCinematicScheduler final {
+ public:
+     void bind(std::span<const LevelCinematicAsset> cinematics) noexcept;
+     [[nodiscard]] Result start(std::int32_t cinematicId);
++    [[nodiscard]] const LevelCinematicAsset* findAsset(std::int32_t cinematicId) const noexcept;
+     [[nodiscard]] Result update(
+         std::uint32_t deltaMilliseconds,
+         const GameplayCinematicCommandHandler& handler);
+diff --git a/src/game/LevelHostageRuntime.cpp b/src/game/LevelHostageRuntime.cpp
+index c07e806..1f56868 100644
+--- a/src/game/LevelHostageRuntime.cpp
++++ b/src/game/LevelHostageRuntime.cpp
+@@ -26,11 +26,11 @@ float distanceSquared(const assets::Vector3& first,
+ } // namespace
+ 
+ Result LevelHostageRuntime::initialize(const LevelOneBootstrap& level,
++                                       QuickTimeEventRuntime& sharedQte,
+                                        LevelObjectRuntime* objects) {
+     states_.clear();
+     soundCues_.clear();
+-    quickTimeSoundCues_.clear();
+-    quickTimeControlRelease_ = false;
++    sharedQte_ = &sharedQte;
+     quickTimeConfig_ = level.buttonConfigs().find(11);
+     if (quickTimeConfig_ == nullptr ||
+         quickTimeConfig_->durationMilliseconds <= 0.0F ||
+@@ -94,6 +94,11 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                                           LevelBonusRuntime& bonuses,
+                                           HostageTimeStep time,
+                                           bool rescueRequested) {
++    if (sharedQte_ == nullptr) {
++        return Result::failure("Hostage runtime has no shared level QTE manager");
++    }
++    // CHostage reads the level manager BEFORE its later CLevel update.
++    observeQuickTime();
+     const std::uint32_t elapsedMilliseconds = time.simulationMilliseconds;
+     for (LevelHostageState& hostage : states_) {
+         if (hostage.asset == nullptr) {
+@@ -149,14 +154,13 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                 if (!result) {
+                     return result;
+                 }
++                result = sharedQte_->begin(11,
++                    {time.timerMilliseconds, time.realMilliseconds}, -1, -1, -1);
++                if (!result) { return result; }
+                 hostage.phase = HostageRescuePhase::QuickTime;
+                 hostage.phaseElapsedMilliseconds = 0;
+-                hostage.quickTimeElapsedMilliseconds = 0;
+-                hostage.completedActions = 0;
+-                hostage.buttonProgress.reset();
+-                hostage.quickTimeClock.begin(time.timerMilliseconds);
+-                hostage.quickTimeOutcome = HostageQteOutcome::Running;
+                 hostage.cuttingLoopRequested = false;
++                observeQuickTime();
+             }
+             break;
+         case HostageRescuePhase::QuickTime: {
+@@ -187,9 +191,7 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+             } else if (player.activeStateId() != kRescueQuickTimePlayerState) {
+                 // An interrupted rescue fails; it must not replace the
+                 // interrupting player state with idle or grant rescue rewards.
+-                hostage.quickTimeOutcome = HostageQteOutcome::Failure;
+-                quickTimeSoundCues_.push_back(0x189); // ForceFailQTE -> SetState(4)
+-                quickTimeControlRelease_ = true;
++                sharedQte_->forceFail(); // CHostage ELF 0x32840e -> manager state 4
+                 soundCues_.push_back({hostage.asset->objectId,
+                                       kRescueCuttingLoopSound,
+                                       HostageSoundAction::StopLoop});
+@@ -197,7 +199,7 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                 Result result = setPhase(hostage, HostageRescuePhase::Tied,
+                                          player, objects, bonuses);
+                 if (!result) { return result; }
+-            } else if (hostage.requiredActions - hostage.completedActions == 7 &&
++            } else if (sharedQte_->remainingActionCount() == 7 &&
+                        !hostage.cuttingLoopRequested) {
+                 // ELF 0x0032844c compares remaining actions to literal 7.
+                 // It does not start this loop at QTE entry, or for any
+@@ -260,48 +262,40 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+ 
+ void LevelHostageRuntime::updateQuickTime(QteTimeStep time,
+                                           bool actionPressed) noexcept {
+-    for (LevelHostageState& hostage : states_) {
+-        if (hostage.phase != HostageRescuePhase::QuickTime ||
+-            hostage.quickTimeOutcome != HostageQteOutcome::Running ||
+-            quickTimeConfig_ == nullptr) {
+-            continue;
+-        }
+-        hostage.quickTimeElapsedMilliseconds =
+-            hostage.quickTimeClock.displayElapsed(
+-                time.timerMilliseconds, quickTimeConfig_->durationMilliseconds);
+-        if (actionPressed) { quickTimeSoundCues_.push_back(0x18a); }
+-        const bool succeeded = hostage.buttonProgress.updateManager(
+-            time.realMilliseconds, actionPressed, hostage.requiredActions,
+-            quickTimeConfig_->interactionType == 3);
+-        actionPressed = false; // CQTEManager consumes the Cross flag once.
+-        hostage.completedActions = hostage.buttonProgress.completed();
+-        if (succeeded) {
+-            quickTimeSoundCues_.push_back(0x188);
+-            quickTimeControlRelease_ = true;
+-        }
+-        if (hostage.quickTimeClock.expired(
+-                time.timerMilliseconds, quickTimeConfig_->durationMilliseconds)) {
+-            quickTimeSoundCues_.push_back(0x189);
+-            quickTimeControlRelease_ = true;
+-            hostage.quickTimeOutcome = HostageQteOutcome::Failure;
+-        } else if (succeeded) {
+-            hostage.quickTimeOutcome = HostageQteOutcome::Success;
+-        }
++    if (sharedQte_ == nullptr) { return; }
++    sharedQte_->update(time, actionPressed);
++    observeQuickTime();
++}
++
++void LevelHostageRuntime::observeQuickTime() noexcept {
++    if (sharedQte_ == nullptr) { return; }
++    for (auto& hostage : states_) {
++        if (hostage.phase != HostageRescuePhase::QuickTime) { continue; }
++        hostage.quickTimeElapsedMilliseconds = sharedQte_->elapsedMilliseconds();
++        hostage.quickTimeDurationMilliseconds = sharedQte_->durationMilliseconds();
++        hostage.completedActions = sharedQte_->completedActionCount();
++        const auto state = sharedQte_->state();
++        // CHostage::Update (ELF 0x3283ba onward) explicitly accepts both
++        // displayed and handled result states. No owner/config-ID guard.
++        hostage.quickTimeOutcome =
++            state == QteState::SuccessDisplay || state == QteState::SuccessHandled
++                ? HostageQteOutcome::Success
++            : state == QteState::FailureDisplay || state == QteState::FailureHandled
++                ? HostageQteOutcome::Failure
++                : HostageQteOutcome::Running;
+     }
+ }
+ 
+ std::vector<std::uint16_t> LevelHostageRuntime::consumeQuickTimeSoundCues() noexcept {
+-    return std::exchange(quickTimeSoundCues_, {});
++    return sharedQte_ ? sharedQte_->consumeSoundCues() : std::vector<std::uint16_t>{};
+ }
+ bool LevelHostageRuntime::consumeControlRelease() noexcept {
+-    return std::exchange(quickTimeControlRelease_, false);
++    return sharedQte_ && sharedQte_->consumeControlRelease();
+ }
+ 
+ void LevelHostageRuntime::setPause(bool paused,
+                                   std::uint32_t timerMilliseconds) noexcept {
+-    for (auto& hostage : states_) {
+-        hostage.quickTimeClock.setPause(paused, timerMilliseconds);
+-    }
++    if (sharedQte_) { sharedQte_->setPause(paused, timerMilliseconds); }
+ }
+ 
+ bool LevelHostageRuntime::canStartRescue(
+@@ -390,7 +384,6 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+         hostage.cuttingLoopRequested = false;
+         hostage.quickTimeElapsedMilliseconds = 0;
+         hostage.completedActions = 0;
+-        hostage.buttonProgress.reset();
+         return objects.setAnimation(hostage.asset->objectId,
+                                     hostage.asset->hostageAnimations[0], true);
+     case HostageRescuePhase::Release:
+diff --git a/src/game/LevelHostageRuntime.hpp b/src/game/LevelHostageRuntime.hpp
+index 57681b8..e48a0e5 100644
+--- a/src/game/LevelHostageRuntime.hpp
++++ b/src/game/LevelHostageRuntime.hpp
+@@ -1,7 +1,7 @@
+ #pragma once
+ 
+ #include "core/Result.hpp"
+-#include "game/ButtonMashProgress.hpp"
++#include "game/QuickTimeEventRuntime.hpp"
+ #include "game/QteClock.hpp"
+ #include "game/GameplayPlayer.hpp"
+ #include "game/LevelBonusRuntime.hpp"
+@@ -69,8 +69,6 @@ struct LevelHostageState {
+     std::int16_t completedActions{};
+     std::int16_t requiredActions{1};
+     bool promptVisible{};
+-    ButtonMashProgress buttonProgress;
+-    QteClock quickTimeClock;
+     HostageQteOutcome quickTimeOutcome{HostageQteOutcome::Inactive};
+     bool cuttingLoopRequested{};
+ };
+@@ -81,7 +79,10 @@ struct LevelHostageState {
+ // health/skill reward-orb creation.
+ class LevelHostageRuntime final {
+ public:
++    // sharedQte is the level-owned manager, already bound to this level's
++    // original configs/atlas. It must outlive this runtime and its snapshots.
+     [[nodiscard]] Result initialize(const LevelOneBootstrap& level,
++                                    QuickTimeEventRuntime& sharedQte,
+                                     LevelObjectRuntime* objects = nullptr);
+     [[nodiscard]] Result update(GameplayPlayer& player,
+                                 LevelObjectRuntime& objects,
+@@ -97,7 +98,11 @@ public:
+                                        LevelBonusRuntime& bonuses,
+                                        HostageTimeStep time,
+                                        bool rescueRequested);
++    // Composed test/headless entry: advances the SAME shared manager once.
++    // Application updates that manager directly and calls observeQuickTime;
++    // it must not also call updateQuickTime during that update.
+     void updateQuickTime(QteTimeStep time, bool actionPressed) noexcept;
++    void observeQuickTime() noexcept; // diagnostics only, no gameplay effects
+     void setPause(bool paused, std::uint32_t timerMilliseconds) noexcept;
+     // CQTEManager cues are global Play2D events, unlike CHostage's spatial
+     // cutting/thanks voices. They are drained at the manager update stage.
+@@ -118,8 +123,6 @@ public:
+     [[nodiscard]] std::vector<HostageSoundCue> consumeSoundCues();
+     void clearTransientCues() noexcept {
+         soundCues_.clear();
+-        quickTimeSoundCues_.clear();
+-        quickTimeControlRelease_ = false;
+         // Snapshot restoration stops the host audio voices before copying
+         // this runtime. Do not retain a stale "loop is playing" latch.
+         for (auto& state : states_) { state.cuttingLoopRequested = false; }
+@@ -135,11 +138,10 @@ private:
+         const LevelHostageState& hostage,
+         const GameplayPlayer& player) const noexcept;
+ 
++    QuickTimeEventRuntime* sharedQte_{};
+     const ButtonConfigDefinition* quickTimeConfig_{};
+     std::vector<LevelHostageState> states_;
+     std::vector<HostageSoundCue> soundCues_;
+-    std::vector<std::uint16_t> quickTimeSoundCues_;
+-    bool quickTimeControlRelease_{};
+ };
+ 
+ } // namespace usm::game
+diff --git a/src/game/QteCinematicHandoff.cpp b/src/game/QteCinematicHandoff.cpp
+new file mode 100644
+index 0000000..d7a45a8
+--- /dev/null
++++ b/src/game/QteCinematicHandoff.cpp
+@@ -0,0 +1,31 @@
++#include "game/QteCinematicHandoff.hpp"
++#include "game/GameplayCinematicScheduler.hpp"
++
++namespace usm::game {
++Result dispatchQteCinematicHandoff(
++    const QteCinematicHandoff& handoff,
++    GameplayCinematicScheduler& scheduler,
++    const std::function<void(const GameplayCinematicPlayback&)>& releaseSource,
++    const std::function<Result(std::int32_t)>& startOutcome,
++    const std::function<Result(std::uint32_t)>& advanceCinematics) {
++    if (handoff.sourceCinematicId != -1) {
++        if (const auto* source = scheduler.playback(handoff.sourceCinematicId)) {
++            if (releaseSource) { releaseSource(*source); }
++        }
++        scheduler.remove(handoff.sourceCinematicId);
++    }
++    // Original FindCinematic miss is a no-op, not an invented fallback ID.
++    if (handoff.outcomeCinematicId == -1 ||
++        scheduler.findAsset(handoff.outcomeCinematicId) == nullptr) {
++        return Result::success();
++    }
++    if (!startOutcome || !advanceCinematics) {
++        return Result::failure("QTE outcome has no bound cinematic dispatch callbacks");
++    }
++    Result result = startOutcome(handoff.outcomeCinematicId);
++    if (!result) { return result; }
++    // ARM literal 0x42480000. Do not substitute scaled game delta, real delta,
++    // next-frame scheduling, or an update of only the newly added outcome.
++    return advanceCinematics(50);
++}
++} // namespace usm::game
+diff --git a/src/game/QteCinematicHandoff.hpp b/src/game/QteCinematicHandoff.hpp
+new file mode 100644
+index 0000000..a90ca17
+--- /dev/null
++++ b/src/game/QteCinematicHandoff.hpp
+@@ -0,0 +1,29 @@
++#pragma once
++
++#include "core/Result.hpp"
++
++#include <cstdint>
++#include <functional>
++
++namespace usm::game {
++class GameplayCinematicScheduler;
++struct GameplayCinematicPlayback;
++
++struct QteCinematicHandoff {
++    std::int32_t sourceCinematicId{-1};
++    std::int32_t outcomeCinematicId{-1};
++};
++using QteHandoffHandler = std::function<void(const QteCinematicHandoff&)>;
++
++// SuccessHandle/FailHandle, ELF 0x37a5e4/0x37a630: remove source,
++// find/add outcome, then update the WHOLE cinematic manager with float 50.0.
++// The caller clears m_pIGMPressed BEFORE this and commits handled state AFTER.
++// Callbacks execute synchronously and must not throw. Their lifetime need only
++// span this call; no callbacks or world pointers are retained by the manager.
++[[nodiscard]] Result dispatchQteCinematicHandoff(
++    const QteCinematicHandoff& handoff,
++    GameplayCinematicScheduler& scheduler,
++    const std::function<void(const GameplayCinematicPlayback&)>& releaseSource,
++    const std::function<Result(std::int32_t)>& startOutcome,
++    const std::function<Result(std::uint32_t)>& advanceCinematics);
++} // namespace usm::game
+diff --git a/src/game/QuickTimeEventRuntime.cpp b/src/game/QuickTimeEventRuntime.cpp
+index 4a61917..608fb78 100644
+--- a/src/game/QuickTimeEventRuntime.cpp
++++ b/src/game/QuickTimeEventRuntime.cpp
+@@ -29,7 +29,7 @@ void QuickTimeEventRuntime::bind(const ButtonConfigDatabase& configs,
+     configs_ = &configs; atlas_ = &atlas; randomizer_ = randomizer;
+     configId_ = sourceCinematicId_ = successCinematicId_ = failureCinematicId_ = -1;
+     elapsedMilliseconds_ = durationMilliseconds_ = 0;
+-    cinematicRequest_.reset(); compound_ = nullptr; sequenceIndex_ = 0;
++    cinematicRequest_.reset(); sourceRemoval_.reset(); compound_ = nullptr; sequenceIndex_ = 0;
+     state_ = QteState::Inactive; path_.clear(); remaining_ = 0; idle_ = 0;
+     clock_ = {}; position_ = {}; origin_ = {}; resultPosition_ = {}; releaseEnd_ = {}; releaseControl_ = false; sounds_.clear();
+     ++generation_;
+@@ -92,6 +92,19 @@ Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command,
+         !integerAttribute(command, "^ID^Cinematic^Fail", failure)) {
+         return Result::failure("StartQTE has invalid attributes");
+     }
++    return begin(id, time, success, failure, sourceId);
++}
++Result QuickTimeEventRuntime::begin(std::int32_t id, QteTimeStep time,
++                                    std::int32_t success, std::int32_t failure,
++                                    std::int32_t sourceId) {
++    if (!configs_ || !atlas_ || atlas_->animations().size() <= 29) {
++        return Result::failure("QTE manager is not bound to original sprite metadata");
++    }
++    // The ARM guard precedes config lookup. Even a second, invalid request
++    // does not replace an active QTE. There is no priority based on caller.
++    if (state_ >= QteState::Tap && state_ <= QteState::SuccessDisplay) {
++        return Result::success();
++    }
+     const auto* d = configs_->find(id);
+     if (!d) { return Result::failure("StartQTE references a missing button config"); }
+     if (d->interactionType == 2) {
+@@ -106,15 +119,18 @@ Result QuickTimeEventRuntime::applyCommand(const CinematicCommand& command,
+         const auto result = validate(*d);
+         if (!result) { return result; }
+     }
+-    // BeginQTE uses an unsigned state >3 guard (inactive -1 is accepted).
+-    if (state_ >= QteState::Tap && state_ <= QteState::SuccessDisplay) { return Result::success(); }
+     failureAlpha_ = 255; // BeginQTE ELF 0x37ab5e, NOT per compound child.
+     sourceCinematicId_ = sourceId; successCinematicId_ = success; failureCinematicId_ = failure;
+-    cinematicRequest_.reset(); compound_ = d->interactionType == 2 ? d : nullptr;
++    // Pending host delivery represents calls that already occurred in native
++    // code; a later BeginQTE must not erase those side effects.
++    compound_ = d->interactionType == 2 ? d : nullptr;
+     sequenceIndex_ = 0;
+     beginNow(compound_ ? compound_->sequence[0] : id, time);
+     return Result::success();
+ }
++void QuickTimeEventRuntime::forceFail() noexcept {
++    setState(QteState::FailureDisplay);
++}
+ void QuickTimeEventRuntime::beginNow(std::int32_t id, QteTimeStep time) noexcept {
+     configId_ = id;
+     const auto& d = *definition();
+@@ -140,7 +156,7 @@ void QuickTimeEventRuntime::beginNow(std::int32_t id, QteTimeStep time) noexcept
+     } else { path_.clear(); }
+     setState(next);
+ }
+-void QuickTimeEventRuntime::setState(QteState next) noexcept {
++void QuickTimeEventRuntime::setState(QteState next, const QteHandoffHandler& handoff) noexcept {
+     if (state_ == next) { return; }
+     const auto* d = definition();
+     switch (next) {
+@@ -158,8 +174,24 @@ void QuickTimeEventRuntime::setState(QteState next) noexcept {
+                                   next == QteState::SuccessDisplay ? 7 : 1, true);
+         releaseControl_ = true;
+         break;
+-    case QteState::SuccessHandled: cinematicRequest_ = successCinematicId_; break;
+-    case QteState::FailureHandled: cinematicRequest_ = failureCinematicId_; break;
++    case QteState::SuccessHandled:
++    case QteState::FailureHandled: {
++        // SuccessHandle/FailHandle, ELF 0x37a5e4/0x37a630: removal is
++        // independent of the optional outcome. -1 is not a cinematic ID.
++        const auto id = next == QteState::SuccessHandled
++            ? successCinematicId_ : failureCinematicId_;
++        if (handoff) {
++            // SetState stores +0x7c at ELF 0x37a7b6, AFTER calling the
++            // native handler. Do not publish state 5/6 early: a StartQTE
++            // command executed by its immediate 50-ms cinematic update
++            // must see the old state, including original nested-write order.
++            handoff({sourceCinematicId_, id});
++        } else {
++            if (sourceCinematicId_ != -1) { sourceRemoval_ = sourceCinematicId_; }
++            if (id != -1) { cinematicRequest_ = id; }
++        }
++        break;
++    }
+     default: break;
+     }
+     state_ = next;
+@@ -169,10 +201,12 @@ void QuickTimeEventRuntime::checkSuccess(QteTimeStep time) noexcept {
+         beginNow(compound_->sequence[++sequenceIndex_], time);
+     } else { setState(QteState::SuccessDisplay); }
+ }
+-void QuickTimeEventRuntime::update(QteTimeStep time, const QteInput& input) noexcept {
+-    if (!visible()) { return; }
++QteInputConsumption QuickTimeEventRuntime::update(QteTimeStep time, const QteInput& input,
++                                                  const QteHandoffHandler& handoff) noexcept {
++    QteInputConsumption consumed;
++    if (!visible()) { return consumed; }
+     const auto* d = definition();
+-    if (!d) { return; }
++    if (!d) { return consumed; }
+     // The CButton release event is delivered before CQTEManager::Update.
+     if (state_ == QteState::Drag) {
+         if (input.dragPosition) { position_ = *input.dragPosition; }
+@@ -188,7 +222,14 @@ void QuickTimeEventRuntime::update(QteTimeStep time, const QteInput& input) noex
+     case QteState::Tap:
+     case QteState::Mash: {
+         const bool mash = state_ == QteState::Mash;
++        // ELF 0x37b2c0..0x37b2d4: mash clears rescue unconditionally,
++        // then clears QTE and jump on a press. Tap clears QTE alone
++        // (0x37b27e..0x37b286). Evaluate the state BEFORE CheckSuccess
++        // can advance a compound child or enter result feedback.
++        consumed.rescuePress = mash;
+         if (input.actionPressed) {
++            consumed.quickTimePress = true;
++            consumed.jumpPress = mash;
+             sounds_.push_back(0x18a);
+             remaining_ = shortWord(static_cast<int>(remaining_) - 1);
+             if (remaining_ <= 0) { checkSuccess(time); }
+@@ -233,23 +274,24 @@ void QuickTimeEventRuntime::update(QteTimeStep time, const QteInput& input) noex
+         break;
+     }
+     case QteState::SuccessDisplay:
+-        if (resultSprite_.ended()) { setState(QteState::SuccessHandled); }
++        if (resultSprite_.ended()) { setState(QteState::SuccessHandled, handoff); }
+         break;
+     case QteState::FailureDisplay:
+-        if (resultSprite_.ended()) { setState(QteState::FailureHandled); }
++        if (resultSprite_.ended()) { setState(QteState::FailureHandled, handoff); }
+         else { resultSprite_.update(time.realMilliseconds); }
+         break;
+     default: break;
+     }
++    return consumed;
+ }
+-void QuickTimeEventRuntime::drawStep() noexcept {
++void QuickTimeEventRuntime::drawStep(const QteHandoffHandler& handoff) noexcept {
+     if (state_ == QteState::SuccessDisplay) {
+         // CQTEManager::Draw +0xb6: compare before increment. The shipped
+         // animation 7 has duration sum 8, therefore nine draws, not eight.
+-        if (successDrawCount_ >= successDrawLimit_) { setState(QteState::SuccessHandled); }
++        if (successDrawCount_ >= successDrawLimit_) { setState(QteState::SuccessHandled, handoff); }
+         ++successDrawCount_;
+     } else if (state_ == QteState::FailureDisplay) {
+-        if (resultSprite_.ended()) { setState(QteState::FailureHandled); }
++        if (resultSprite_.ended()) { setState(QteState::FailureHandled, handoff); }
+         else {
+             // ELF 0x37a8d2..0x37a8e4: decrement/clamp BEFORE PaintAnim.
+             failureAlpha_ = static_cast<std::uint8_t>(std::max(
+@@ -286,6 +328,9 @@ std::int16_t QuickTimeEventRuntime::completedActionCount() const noexcept {
+     const auto* d = definition();
+     return d ? shortWord(static_cast<int>(d->requiredActionCount) - remaining_) : 0;
+ }
++std::optional<std::int32_t> QuickTimeEventRuntime::consumeSourceRemoval() noexcept {
++    return std::exchange(sourceRemoval_, std::nullopt);
++}
+ bool QuickTimeEventRuntime::consumeControlRelease() noexcept { return std::exchange(releaseControl_, false); }
+ std::vector<std::uint16_t> QuickTimeEventRuntime::consumeSoundCues() noexcept { return std::exchange(sounds_, {}); }
+ std::optional<std::int32_t> QuickTimeEventRuntime::consumeCinematicRequest() noexcept {
+diff --git a/src/game/QuickTimeEventRuntime.hpp b/src/game/QuickTimeEventRuntime.hpp
+index 4de9440..0c8ca2a 100644
+--- a/src/game/QuickTimeEventRuntime.hpp
++++ b/src/game/QuickTimeEventRuntime.hpp
+@@ -6,6 +6,7 @@
+ #include "game/CinematicScript.hpp"
+ #include "game/NativeRandomizer.hpp"
+ #include "game/QteClock.hpp"
++#include "game/QteCinematicHandoff.hpp"
+ #include "game/QteGesturePath.hpp"
+ #include "game/QteFeedbackFrame.hpp"
+ #include "game/QteSpriteAnimation.hpp"
+@@ -29,10 +30,20 @@ struct QteInput {
+     QteDirection dragDirection{QteDirection::None};
+ };
+ 
++// Writes performed by the native manager to the shared input globals in THIS
++// update. Carry these to later consumers; do not fake key-up events or erase
++// the independent CKeyPad two-update press history.
++struct QteInputConsumption {
++    bool quickTimePress{};
++    bool jumpPress{};
++    bool rescuePress{};
++};
++
+ // Native reconstruction of CQTEManager, original ELF 0x0037a3f8..0x0037b40c.
+ // Draw has gameplay side effects; drawStep is called once per presented frame,
+-// not once per simulation catch-up update. Hostage/enemy ownership is separate
+-// in the inherited application and is NOT asserted unified by this class.
++// not once per simulation catch-up update. Cinematics and hostages share this
++// one level-owned instance (CLevel+0x54); there is no per-owner priority rule.
++// Wall-web/QTEAction paths have not yet been migrated to the shared manager.
+ class QuickTimeEventRuntime final {
+ public:
+     void bind(const ButtonConfigDatabase& configs, const assets::SpriteAtlas& atlas,
+@@ -40,11 +51,21 @@ public:
+     [[nodiscard]] Result applyCommand(const CinematicCommand& command,
+                                       QteTimeStep time,
+                                       std::int32_t sourceCinematicId = -1);
+-    void update(QteTimeStep time, const QteInput& input) noexcept;
+-    void update(QteTimeStep time, bool actionPressed) noexcept {
+-        update(time, QteInput{actionPressed, std::nullopt, false});
++    // CQTEManager::BeginQTE (ELF 0x37ab40), also called directly by
++    // CHostage::Update with (11,-1,-1,-1). A refused begin leaves the current
++    // QTE intact. No fake cinematic command or owner-specific queue is used.
++    [[nodiscard]] Result begin(std::int32_t configId, QteTimeStep time,
++                               std::int32_t successCinematicId = -1,
++                               std::int32_t failureCinematicId = -1,
++                               std::int32_t sourceCinematicId = -1);
++    void forceFail() noexcept; // ELF 0x37a9fc: unconditional SetState(4)
++    QteInputConsumption update(QteTimeStep time, const QteInput& input,
++                               const QteHandoffHandler& handoff = {}) noexcept;
++    QteInputConsumption update(QteTimeStep time, bool actionPressed,
++                               const QteHandoffHandler& handoff = {}) noexcept {
++        return update(time, QteInput{actionPressed, std::nullopt, false}, handoff);
+     }
+-    void drawStep() noexcept;
++    void drawStep(const QteHandoffHandler& handoff = {}) noexcept;
+     [[nodiscard]] QteFeedbackFrame feedbackFrame() const noexcept;
+     [[nodiscard]] std::uint8_t failureAlpha() const noexcept { return failureAlpha_; }
+     void setPause(bool paused, std::uint32_t timerMilliseconds) noexcept {
+@@ -65,6 +86,12 @@ public:
+     [[nodiscard]] const QteSpriteAnimation& resultSprite() const noexcept { return resultSprite_; }
+     [[nodiscard]] const QteSpriteAnimation& promptSprite() const noexcept { return promptSprite_; }
+     [[nodiscard]] std::uint32_t successDrawCount() const noexcept { return successDrawCount_; }
++    // A live host supplies handoff to update/drawStep: it runs BEFORE the
++    // handled-state write, preserving reentrant BeginQTE's original guard.
++    // These queues are for detached fixtures/observation only when no handler
++    // is supplied; they do not emulate synchronous reentrant world execution.
++    // Handled state may remove a source cinematic even with no outcome ID.
++    [[nodiscard]] std::optional<std::int32_t> consumeSourceRemoval() noexcept;
+     [[nodiscard]] bool consumeControlRelease() noexcept;
+     [[nodiscard]] std::vector<std::uint16_t> consumeSoundCues() noexcept;
+     [[nodiscard]] std::optional<std::int32_t> consumeCinematicRequest() noexcept;
+@@ -72,7 +99,7 @@ private:
+     [[nodiscard]] Result validate(const ButtonConfigDefinition& definition) const;
+     void beginNow(std::int32_t id, QteTimeStep time) noexcept;
+     void checkSuccess(QteTimeStep time) noexcept;
+-    void setState(QteState state) noexcept;
++    void setState(QteState state, const QteHandoffHandler& handoff = {}) noexcept;
+     [[nodiscard]] const ButtonConfigDefinition* definition() const noexcept;
+     const ButtonConfigDatabase* configs_{};
+     const assets::SpriteAtlas* atlas_{};
+@@ -84,6 +111,7 @@ private:
+     std::uint32_t elapsedMilliseconds_{};
+     std::uint32_t durationMilliseconds_{};
+     std::optional<std::int32_t> cinematicRequest_;
++    std::optional<std::int32_t> sourceRemoval_;
+     QteClock clock_;
+     QteGesturePath path_;
+     QteSpriteAnimation resultSprite_, promptSprite_;
+diff --git a/src/reconstructed/input/XperiaKeyRouter.hpp b/src/reconstructed/input/XperiaKeyRouter.hpp
+index 86d17cd..7602c7e 100644
+--- a/src/reconstructed/input/XperiaKeyRouter.hpp
++++ b/src/reconstructed/input/XperiaKeyRouter.hpp
+@@ -19,6 +19,14 @@ public:
+     void beginFrame() noexcept { state_.beginFrame(); }
+     void route(const XperiaKeyEvent& event, InputContext context) noexcept;
+ 
++    // Native global writes by CQTEManager::Update. These are NOT physical
++    // releases: held state and CKeyPad's separate history remain untouched.
++    void consumeQuickTimePress() noexcept { state_.quickTimeEvent.pressed = false; }
++    void consumeJumpPress() noexcept { state_.jump.pressed = false; }
++    void consumeRescueRequest() noexcept { state_.rescueRequested = false; }
++    // CQTEManager::SetState clears m_pIGMPressed before success/fail handoff.
++    void consumePausePress() noexcept { state_.pause.pressed = false; }
++
+     [[nodiscard]] const GameplayInputState& state() const noexcept {
+         return state_;
+     }
+diff --git a/tests/InputParityTests.cpp b/tests/InputParityTests.cpp
+index 19804b4..c4c0f0b 100644
+--- a/tests/InputParityTests.cpp
++++ b/tests/InputParityTests.cpp
+@@ -220,6 +220,7 @@ void sticks() {
+ struct HostageFixture {
+     usm::game::LevelObjectRuntime objects;
+     usm::game::LevelBonusRuntime bonuses;
++    usm::game::QuickTimeEventRuntime qte;
+     usm::game::LevelHostageRuntime hostage;
+     usm::game::GameplayPlayer player;
+     XperiaKeyRouter router;
+@@ -230,7 +231,8 @@ struct HostageFixture {
+                    const usm::game::PlayerStateConfigDatabase& configs) {
+         CHECK(objects.initialize(level));
+         CHECK(bonuses.initialize(level.bonuses()));
+-        CHECK(hostage.initialize(level, &objects));
++        qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++        CHECK(hostage.initialize(level, qte, &objects));
+         CHECK(player.initialize(level.player(), nullptr, &configs));
+         const auto* state = hostage.find(30018);
+         CHECK(state != nullptr && state->asset != nullptr);
+diff --git a/tests/QteParityTests.cpp b/tests/QteParityTests.cpp
+index 2739c7a..e90cbeb 100644
+--- a/tests/QteParityTests.cpp
++++ b/tests/QteParityTests.cpp
+@@ -133,10 +133,11 @@ CinematicCommand startCommand(int id) {
+     return command;
+ }
+ 
+-void finishFeedback(QuickTimeEventRuntime& qte, std::uint32_t now) {
++void finishFeedback(QuickTimeEventRuntime& qte, std::uint32_t now,
++                    const QteHandoffHandler& handoff = {}) {
+     for (int i = 0; i < 40 && qte.visible(); ++i) {
+-        qte.update({now, 50}, false);
+-        qte.drawStep();
++        qte.update({now, 50}, false, handoff);
++        qte.drawStep(handoff);
+     }
+     CHECK(!qte.visible());
+ }
+@@ -704,15 +705,34 @@ void firstLevelFlowTests(const LevelOneBootstrap& level, bool controllerInput =
+             CHECK(qte.state()==(succeed?QteState::SuccessDisplay:QteState::FailureDisplay));
+             CHECK(succeed || now==started+(duration/50+1)*50);
+             CHECK(qte.consumeControlRelease());
+-            finishFeedback(qte,now);
+-            const auto next=qte.consumeCinematicRequest();
+-            CHECK(next==(succeed?record.success:record.failure));
++            const int next=succeed?record.success:record.failure;
+             CHECK(scheduler.active(record.source));
+-            scheduler.remove(qte.sourceCinematicId()); CHECK(!scheduler.active(record.source));
+-            CHECK(scheduler.start(*next)); CHECK(scheduler.active(*next));
+-            CHECK(scheduler.playback(*next)->asset->scriptAvailable);
++            usm::Result handoffResult=usm::Result::failure("No handoff");
++            QteState stateDuringHandoff=QteState::Inactive;
++            int handoffs=0,step=0,earlyCommands=0,removed=-1;
++            bool idsMatch=false;
++            const QteHandoffHandler handoff=[&](const QteCinematicHandoff& h) {
++                ++handoffs; stateDuringHandoff=qte.state();
++                idsMatch=h.sourceCinematicId==record.source && h.outcomeCinematicId==next;
++                handoffResult=dispatchQteCinematicHandoff(h,scheduler,
++                    [&](const auto& source){removed=source.asset->objectId;},
++                    [&](int id){return scheduler.start(id);},
++                    [&](unsigned delta){
++                        step=static_cast<int>(delta);
++                        return scheduler.update(delta,[&](const auto&,const auto&,const auto&){++earlyCommands;return true;});
++                    });
++            };
++            finishFeedback(qte,now,handoff);
++            CHECK(handoffResult && handoffs==1 && idsMatch && removed==record.source);
++            CHECK(step==50 && earlyCommands>0);
++            CHECK(stateDuringHandoff==(succeed?QteState::SuccessDisplay:QteState::FailureDisplay));
++            CHECK(!scheduler.active(record.source) && scheduler.active(next));
++            CHECK(scheduler.playback(next)->asset->scriptAvailable);
++            CHECK(scheduler.playback(next)->elapsedMilliseconds==50);
++            CHECK(!qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
+             std::cout << (controllerInput?"Raw XInput level 1 QTE: ":"Authored level 1 QTE: ") << record.source << " / config "
+-                << record.config << " -> " << *next << (succeed?" success":" failure") << '\n';
++                << record.config << " -> " << next << (succeed?" success":" failure")
++                << "; immediate cinematic step=" << step << "; commands=" << earlyCommands << '\n';
+         }
+     }
+ }
+@@ -734,6 +754,7 @@ void audioTests(const std::filesystem::path& root) {
+ struct HostageFixture {
+     LevelObjectRuntime objects;
+     LevelBonusRuntime bonuses;
++    QuickTimeEventRuntime qte;
+     LevelHostageRuntime hostages;
+     GameplayPlayer player;
+     std::uint32_t now{10000};
+@@ -741,7 +762,8 @@ struct HostageFixture {
+     HostageFixture(const LevelOneBootstrap& level, const PlayerStateConfigDatabase& configs) {
+         CHECK(objects.initialize(level));
+         CHECK(bonuses.initialize(level.bonuses()));
+-        CHECK(hostages.initialize(level, &objects));
++        qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++        CHECK(hostages.initialize(level, qte, &objects));
+         CHECK(player.initialize(level.player(), nullptr, &configs));
+         const auto* captive = hostages.find(30018);
+         CHECK(captive && captive->asset);
+@@ -883,6 +905,414 @@ void hostageTests(const LevelOneBootstrap& level, const PlayerStateConfigDatabas
+ 
+ }
+ 
++// RE04: direct use of the single CLevel+0x54 manager by cinematic commands
++// and CHostage. This is source/asset integration, not an ARM execution oracle.
++void prepareManagerState(QuickTimeEventRuntime& qte,
++                         const LevelOneBootstrap& level, QteState state) {
++    qte.bind(level.buttonConfigs(), level.hud().interfaceAtlas);
++    if (state == QteState::Inactive) { return; }
++    const int config = state == QteState::Drag ? 6 : state == QteState::Mash ? 11 : 9;
++    CHECK(qte.begin(config, {10000,0}, 20006, 20010, 20004));
++    if (state == QteState::SuccessDisplay || state == QteState::SuccessHandled) {
++        qte.update({10000,0},true);
++        if (state == QteState::SuccessHandled) {
++            for (int i=0;i<9;++i) { qte.drawStep(); }
++        }
++    } else if (state == QteState::FailureDisplay || state == QteState::FailureHandled) {
++        qte.forceFail();
++        if (state == QteState::FailureHandled) { finishFeedback(qte,10000); }
++    }
++    CHECK(qte.state() == state);
++    (void)qte.consumeSoundCues();
++    (void)qte.consumeControlRelease();
++    (void)qte.consumeSourceRemoval();
++    (void)qte.consumeCinematicRequest();
++}
++
++void sharedManagerTests(const LevelOneBootstrap& level,
++                        const PlayerStateConfigDatabase& configs) {
++    for (int nativeState=-1;nativeState<=6;++nativeState) {
++        for (const int request : {6,9,11}) {
++            QuickTimeEventRuntime qte;
++            const auto before = static_cast<QteState>(nativeState);
++            prepareManagerState(qte,level,before);
++            const auto generation = qte.generation();
++            const auto previousConfig = qte.configId();
++            const auto previousRemaining = qte.remainingActionCount();
++            const auto previousSource = qte.sourceCinematicId();
++            CHECK(qte.begin(request,{12000,50},21000,21001,21002));
++            // Native unsigned-state >3: -1 and 4..6 can start; 0..3 cannot.
++            const bool accepted = nativeState < 0 || nativeState > 3;
++            CHECK(qte.generation() == generation + (accepted ? 1 : 0));
++            if (accepted) {
++                CHECK(qte.configId() == request);
++                CHECK(qte.sourceCinematicId() == 21002);
++                CHECK(qte.completedActionCount() == 0);
++                CHECK(qte.elapsedMilliseconds() == 0);
++            } else {
++                CHECK(qte.configId() == previousConfig);
++                CHECK(qte.remainingActionCount() == previousRemaining);
++                CHECK(qte.sourceCinematicId() == previousSource);
++                CHECK(qte.state() == before);
++                // Lookup follows the native guard, so even an unknown request
++                // is ignored while these states own the slot.
++                CHECK(qte.begin(32000,{19000,500},7,8,9));
++                CHECK(qte.generation() == generation);
++            }
++            CHECK(qte.consumeSoundCues().empty());
++            CHECK(!qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
++        }
++    }
++    // The -1 sentinel applies separately to removal and each outcome. These
++    // combinations are valid calls, not malformed authoring experiments.
++    for (const bool success : {false,true}) {
++        for (const int source : {-1,20004}) {
++            for (const int outcome : {-1,20006}) {
++                QuickTimeEventRuntime qte;
++                qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++                CHECK(qte.begin(9,{10000,0},outcome,outcome,source));
++                if (success) { qte.update({10000,0},true); }
++                else { qte.forceFail(); }
++                CHECK(qte.consumeControlRelease());
++                finishFeedback(qte,10000);
++                const auto removed=qte.consumeSourceRemoval();
++                const auto next=qte.consumeCinematicRequest();
++                CHECK(removed == (source == -1 ? std::optional<int>{} : source));
++                CHECK(next == (outcome == -1 ? std::optional<int>{} : outcome));
++                CHECK(!qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
++                qte.drawStep(); qte.update({10000,0},true);
++                CHECK(!qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
++            }
++        }
++    }
++    {
++        // Host-delivery queues describe side effects already issued in native
++        // code. Begin of another request cannot erase an undrained handoff.
++        QuickTimeEventRuntime qte;
++        qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(qte.begin(9,{10000,0},20006,20010,20004));
++        qte.update({10000,0},true);
++        for(int i=0;i<9;++i){qte.drawStep();}
++        CHECK(qte.begin(11,{11000,0}));
++        CHECK(qte.consumeSourceRemoval()==20004);
++        CHECK(qte.consumeCinematicRequest()==20006);
++        CHECK(qte.configId()==11 && qte.state()==QteState::Mash);
++        CHECK(!qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
++    }
++    {
++        HostageFixture f(level,configs);
++        f.start(true);
++        CHECK(f.qte.configId()==11 && f.qte.sourceCinematicId()==-1);
++        CHECK(f.qte.completedActionCount()==1 && f.state().completedActions==1);
++        CHECK((f.qte.consumeSoundCues()==std::vector<std::uint16_t>{0x18a}));
++        CHECK(f.hostages.consumeQuickTimeSoundCues().empty()); // Same queue.
++        f.objectStep();
++        const auto cut=f.hostages.consumeSoundCues();
++        CHECK(cut.size()==1 && cut[0].action==HostageSoundAction::StartLoop);
++        const auto generation=f.qte.generation();
++        for(int attempt=0;attempt<256;++attempt) {
++            CHECK(f.qte.applyCommand(startCommand(6),{12000,50},20004));
++            CHECK(f.qte.generation()==generation && f.qte.configId()==11);
++            CHECK(f.qte.remainingActionCount()==7 && f.qte.sourceCinematicId()==-1);
++        }
++        // Live application phase order: one object step, one manager step,
++        // diagnostic observation. Observation itself never ticks the manager.
++        for(int press=2;press<=8;++press) {
++            f.objectStep();
++            const auto consumed=f.qte.update({10000,0},true);
++            CHECK(consumed.quickTimePress && consumed.jumpPress && consumed.rescuePress);
++            CHECK(f.state().completedActions==press-1);
++            f.hostages.observeQuickTime();
++            CHECK(f.state().completedActions==press);
++            f.hostages.observeQuickTime();
++            CHECK(f.qte.completedActionCount()==press);
++            CHECK(f.player.activeStateId()==28);
++        }
++        CHECK(f.qte.state()==QteState::SuccessDisplay);
++        CHECK(f.qte.feedbackFrame().count==3); // Result + original full mash ring.
++        CHECK(f.state().phase==HostageRescuePhase::QuickTime);
++        CHECK(f.hostages.consumeControlRelease() && !f.qte.consumeControlRelease());
++        f.objectStep();
++        CHECK(f.player.activeStateId()==29 && f.state().phase==HostageRescuePhase::RescueEnd);
++        for(int draw=0;draw<8;++draw) {
++            f.qte.drawStep();
++            CHECK(f.qte.state()==QteState::SuccessDisplay);
++        }
++        f.qte.drawStep();
++        CHECK(f.qte.state()==QteState::SuccessHandled);
++        CHECK(!f.qte.consumeSourceRemoval() && !f.qte.consumeCinematicRequest());
++        CHECK(f.bonuses.states().size()==f.initialBonuses); // Award after release, not QTE.
++    }
++    {
++        HostageFixture f(level,configs);
++        f.start(true);
++        (void)f.qte.consumeSoundCues();
++        f.now=14001; f.qteStep();
++        CHECK(f.qte.state()==QteState::FailureDisplay);
++        CHECK(f.qte.feedbackFrame().count==1);
++        f.objectStep();
++        CHECK(f.state().phase==HostageRescuePhase::Tied);
++        CHECK(f.qte.state()==QteState::FailureDisplay); // Reset hostage is not reset manager.
++        const auto stop=f.hostages.consumeSoundCues();
++        CHECK(stop.size()==1 && stop[0].action==HostageSoundAction::StopLoop);
++        const auto generation=f.qte.generation();
++        f.start();
++        CHECK(f.qte.generation()==generation+1 && f.qte.state()==QteState::Mash);
++        CHECK(f.qte.failureAlpha()==255 && f.qte.completedActionCount()==0);
++        CHECK(!f.qte.consumeCinematicRequest());
++    }
++    {
++        HostageFixture f(level,configs);
++        f.start();
++        CHECK(f.player.enterScriptedState(27,false));
++        f.objectStep();
++        CHECK(f.qte.state()==QteState::FailureDisplay);
++        CHECK(f.player.activeStateId()==27 && f.state().phase==HostageRescuePhase::Tied);
++        CHECK((f.qte.consumeSoundCues()==std::vector<std::uint16_t>{0x189}));
++        CHECK(f.hostages.consumeQuickTimeSoundCues().empty());
++        CHECK(f.qte.consumeControlRelease());
++        f.qte.forceFail(); // Same-state return prevents duplicate failure audio.
++        CHECK(f.qte.consumeSoundCues().empty() && !f.qte.consumeControlRelease());
++    }
++    {
++        // Reverse collision: hostage's void BeginQTE request is refused while
++        // a cinematic is active. Native CHostage still reads that singleton's
++        // state, without inventing an owner-ID check or priority override.
++        HostageFixture f(level,configs);
++        CHECK(f.qte.begin(6,{10000,0},20006,20010,20004));
++        const auto generation=f.qte.generation();
++        f.start();
++        CHECK(f.qte.generation()==generation && f.qte.configId()==6);
++        CHECK(f.qte.sourceCinematicId()==20004 && f.player.activeStateId()==28);
++        QteInput gesture; gesture.dragDirection=f.qte.gesturePath().direction();
++        f.qte.update({10001,0},gesture);
++        f.hostages.observeQuickTime();
++        CHECK(f.state().quickTimeOutcome==HostageQteOutcome::Success);
++        f.objectStep();
++        CHECK(f.player.activeStateId()==29);
++        for(int i=0;i<9;++i){f.qte.drawStep();}
++        CHECK(f.qte.consumeSourceRemoval()==20004 && f.qte.consumeCinematicRequest()==20006);
++    }
++    {
++        // Checkpoint host snapshots retain a reference to the level manager;
++        // copying a hostage does not clone clocks, queues or gesture ownership.
++        HostageFixture f(level,configs);
++        const auto before=f.hostages;
++        f.start(true);
++        f.qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        f.hostages=before;
++        f.player.clearScriptedState();
++        f.start(true);
++        CHECK(f.qte.completedActionCount()==1 && f.state().completedActions==1);
++        CHECK((f.qte.consumeSoundCues()==std::vector<std::uint16_t>{0x18a}));
++        CHECK(f.hostages.consumeQuickTimeSoundCues().empty());
++        f.hostages.setPause(true,10900); f.hostages.setPause(false,13000);
++        f.qte.update({17000,0},false); f.hostages.observeQuickTime();
++        CHECK(f.state().quickTimeOutcome==HostageQteOutcome::Running);
++        f.qte.update({17001,0},false); f.hostages.observeQuickTime();
++        CHECK(f.state().quickTimeOutcome==HostageQteOutcome::Failure);
++    }
++}
++
++void consumptionTests(const LevelOneBootstrap& level) {
++    for (int nativeState=-1;nativeState<=6;++nativeState) {
++        for (const bool pressed : {false,true}) {
++            QuickTimeEventRuntime qte;
++            prepareManagerState(qte,level,static_cast<QteState>(nativeState));
++            const auto used=qte.update({10000,0},pressed);
++            CHECK(used.quickTimePress==(pressed && (nativeState==0 || nativeState==2)));
++            CHECK(used.jumpPress==(pressed && nativeState==2));
++            CHECK(used.rescuePress==(nativeState==2));
++        }
++    }
++    using usm::platform::XInputStateTranslator;
++    using usm::reconstructed::XperiaKeyRouter;
++    using usm::reconstructed::InputContext;
++    namespace xi=usm::platform::xinput;
++    const auto apply=[](XperiaKeyRouter& router, QteInputConsumption used) {
++        if(used.quickTimePress){router.consumeQuickTimePress();}
++        if(used.jumpPress){router.consumeJumpPress();}
++        if(used.rescuePress){router.consumeRescueRequest();}
++    };
++    // All raw wButtons values, including unmapped bits. Verify a consumed tap
++    // does not become a synthetic key-up, erase other controls, clear switch=4,
++    // or advance a later QTEAction consumer in the same update.
++    for (unsigned bits=0;bits<=65535;++bits) {
++        XperiaKeyRouter router;
++        XInputStateTranslator raw;
++        const auto route=[&](const auto& event){router.route(event,InputContext::Gameplay);};
++        raw.update(true,xi::RightShoulder,0,0,route);
++        router.beginFrame();
++        raw.update(true,static_cast<std::uint16_t>(bits),0,0,route);
++        const auto before=router.state();
++        const bool cross=(bits & xi::A)!=0;
++        apply(router,{cross,cross,true});
++        const auto& after=router.state();
++        CHECK(!after.quickTimeEvent.pressed && !after.jump.pressed && !after.rescueRequested);
++        CHECK(after.quickTimeEvent.held==before.quickTimeEvent.held);
++        CHECK(after.quickTimeEvent.released==before.quickTimeEvent.released);
++        CHECK(after.jump.held==before.jump.held && after.jump.released==before.jump.released);
++        CHECK(after.jump.pressedFramesRemaining==before.jump.pressedFramesRemaining);
++        CHECK(after.punch.pressed==before.punch.pressed && after.web.pressed==before.web.pressed);
++        CHECK(after.spiderSense.pressed==before.spiderSense.pressed && after.superAttack.pressed==before.superAttack.pressed);
++        CHECK(after.pause.pressed==before.pause.pressed);
++        CHECK(after.switchRequested==before.switchRequested && after.switchRequestValue==before.switchRequestValue);
++        CHECK(after.moveUp.pressed==before.moveUp.pressed && after.moveDown.pressed==before.moveDown.pressed);
++        CHECK(after.moveLeft.pressed==before.moveLeft.pressed && after.moveRight.pressed==before.moveRight.pressed);
++        router.beginFrame();
++        raw.update(true,static_cast<std::uint16_t>(bits),0,0,route);
++        CHECK(!router.state().quickTimeEvent.pressed); // Hold is not another QTE action.
++        CHECK(router.state().jump.pressed==cross); // Independent CKeyPad history preserved.
++    }
++    {
++        QuickTimeEventRuntime qte;
++        qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(qte.begin(11,{10000,0}));
++        XperiaKeyRouter router; XInputStateTranslator raw;
++        usm::platform::QteGamepadAdapter adapter;
++        int laterActions=0;
++        for(int frame=0;frame<16;++frame) {
++            router.beginFrame();
++            raw.update(true,(frame%2==0)?xi::A:0,0,0,[&](const auto& event){router.route(event,InputContext::Gameplay);});
++            const auto stick=raw.leftStick();
++            const auto input=adapter.translate(qte,true,router.state().quickTimeEvent.pressed,stick.x,stick.y);
++            const auto used=qte.update({10000+static_cast<unsigned>(50*frame),50},input);
++            apply(router,used);
++            if(router.state().quickTimeEvent.pressed){++laterActions;}
++            CHECK(qte.completedActionCount()==(frame/2+1));
++        }
++        CHECK(qte.state()==QteState::SuccessDisplay && laterActions==0);
++        const auto sounds=qte.consumeSoundCues();
++        CHECK(sounds.size()==9 && sounds.back()==0x188);
++        for(std::size_t i=0;i<8;++i){CHECK(sounds[i]==0x18a);}
++        CHECK(qte.consumeControlRelease() && !qte.consumeControlRelease());
++    }
++}
++
++void handoffTests(const LevelOneBootstrap& level) {
++    using usm::Result;
++    for(const bool success : {false,true}) {
++        QuickTimeEventRuntime qte;
++        prepareManagerState(qte,level,success?QteState::SuccessDisplay:QteState::FailureDisplay);
++        GameplayCinematicScheduler scheduler;
++        scheduler.bind(level.cinematics()); CHECK(scheduler.start(20004));
++        const auto oldGeneration=qte.generation();
++        QteState during=QteState::Inactive;
++        QteState afterNestedBegin=QteState::Inactive;
++        std::vector<std::string> order;
++        Result dispatch=Result::failure("Callback not executed");
++        Result nested=Result::failure("Nested request not executed");
++        unsigned callbackCount=0, suppliedStep=0;
++        const QteHandoffHandler handoff=[&](const QteCinematicHandoff& h) {
++            ++callbackCount; during=qte.state();
++            dispatch=dispatchQteCinematicHandoff(h,scheduler,
++                [&](const auto& old) { order.push_back("remove:"+std::to_string(old.asset->objectId)); },
++                [&](int id) { order.push_back("start:"+std::to_string(id)); return scheduler.start(id); },
++                [&](unsigned delta) {
++                    suppliedStep=delta; order.push_back("advance");
++                    // Synthetic reentrant BeginQTE at the real native handoff
++                    // callback point. This is NOT claimed to be a command in
++                    // the first-level outcome assets.
++                    nested=qte.begin(11,{12000,0});
++                    afterNestedBegin=qte.state();
++                    return scheduler.update(delta,[](const auto&,const auto&,const auto&){return true;});
++                });
++        };
++        finishFeedback(qte,10000,handoff);
++        CHECK(dispatch && nested);
++        CHECK(callbackCount==1 && suppliedStep==50);
++        CHECK(during==(success?QteState::SuccessDisplay:QteState::FailureDisplay));
++        CHECK(afterNestedBegin==(success?QteState::SuccessDisplay:QteState::Mash));
++        CHECK(qte.generation()==oldGeneration+(success?0:1));
++        CHECK(qte.state()==(success?QteState::SuccessHandled:QteState::FailureHandled));
++        CHECK(qte.configId()==(success?9:11));
++        CHECK((order==std::vector<std::string>{"remove:20004",success?"start:20006":"start:20010","advance"}));
++        CHECK(!scheduler.active(20004));
++        CHECK(scheduler.active(success?20006:20010));
++        CHECK(!qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
++    }
++    for(const int target : {-1,32000}) {
++        GameplayCinematicScheduler scheduler;
++        scheduler.bind(level.cinematics()); CHECK(scheduler.start(20004));
++        int removes=0,starts=0,advances=0;
++        CHECK(dispatchQteCinematicHandoff({20004,target},scheduler,
++            [&](const auto&){++removes;},
++            [&](int){++starts;return Result::success();},
++            [&](unsigned){++advances;return Result::success();}));
++        CHECK(removes==1 && starts==0 && advances==0 && !scheduler.active(20004));
++        CHECK(dispatchQteCinematicHandoff({20004,target},scheduler,{},{},{}));
++        CHECK(dispatchQteCinematicHandoff({-1,target},scheduler,{},{},{}));
++    }
++    {
++        // The fixed step advances all active cinematic instances, including
++        // existing background commands and an already-active outcome.
++        GameplayCinematicScheduler scheduler;
++        scheduler.bind(level.cinematics());
++        CHECK(scheduler.start(20004)); CHECK(scheduler.start(20006));
++        const auto* a=scheduler.findAsset(20004);
++        const auto* b=scheduler.findAsset(20006);
++        CHECK(a && b && scheduler.findAsset(32000)==nullptr);
++        int commands=0;
++        const auto advance=[&](unsigned delta) {
++            CHECK(delta==50);
++            return scheduler.update(delta,[&](const auto&,const auto&,const auto&){++commands;return true;});
++        };
++        const auto start=[&](int id){return scheduler.start(id);};
++        CHECK(dispatchQteCinematicHandoff({-1,20006},scheduler,{},start,advance));
++        CHECK(scheduler.playback(20004)->elapsedMilliseconds==50);
++        CHECK(scheduler.playback(20006)->elapsedMilliseconds==50);
++        CHECK(commands>0);
++        CHECK(dispatchQteCinematicHandoff({-1,20006},scheduler,{},start,advance));
++        CHECK(scheduler.playback(20004)->elapsedMilliseconds==100);
++        CHECK(scheduler.playback(20006)->elapsedMilliseconds==100);
++        CHECK(scheduler.activeIds().size()==2);
++    }
++    {
++        GameplayCinematicScheduler scheduler;
++        scheduler.bind(level.cinematics()); CHECK(scheduler.start(20004));
++        CHECK(!dispatchQteCinematicHandoff({20004,20006},scheduler,{},{},{}));
++        CHECK(!scheduler.active(20004) && !scheduler.active(20006));
++        int advances=0;
++        CHECK(!dispatchQteCinematicHandoff({-1,20006},scheduler,{},
++            [](int){return Result::failure("test start error");},
++            [&](unsigned){++advances;return Result::success();}));
++        CHECK(advances==0);
++        CHECK(!dispatchQteCinematicHandoff({-1,20006},scheduler,{},
++            [&](int id){return scheduler.start(id);},
++            [&](unsigned){++advances;return Result::failure("test update error");}));
++        CHECK(advances==1 && scheduler.active(20006));
++    }
++    {
++        // No cinematic sentinels still invoke SetState's IGM-clear host hook;
++        // held Start/CKeyPad history are not turned into a physical key-up.
++        QuickTimeEventRuntime qte;
++        qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas);
++        CHECK(qte.begin(11,{10000,0}));
++        for(int i=0;i<8;++i){qte.update({10000,0},true);}
++        usm::reconstructed::XperiaKeyRouter router;
++        usm::platform::XInputStateTranslator raw;
++        raw.update(true,usm::platform::xinput::Start,0,0,[&](const auto& event) {
++            router.route(event,usm::reconstructed::InputContext::Gameplay);
++        });
++        CHECK(router.state().pause.pressed && router.state().pause.held);
++        int calls=0;
++        bool idsValid=false,oldStateVisible=false;
++        const QteHandoffHandler handoff=[&](const QteCinematicHandoff& h) {
++            ++calls;router.consumePausePress();
++            idsValid=h.sourceCinematicId==-1 && h.outcomeCinematicId==-1;
++            oldStateVisible=qte.state()==QteState::SuccessDisplay;
++        };
++        for(int i=0;i<8;++i){qte.drawStep(handoff);}
++        CHECK(calls==0 && router.state().pause.pressed);
++        qte.drawStep(handoff);
++        CHECK(calls==1 && idsValid && oldStateVisible);
++        CHECK(!router.state().pause.pressed && router.state().pause.held && !router.state().pause.released);
++        CHECK(router.state().pause.pressedFramesRemaining==1);
++        qte.drawStep(handoff);qte.update({10000,0},true,handoff);
++        CHECK(calls==1 && !qte.consumeSourceRemoval() && !qte.consumeCinematicRequest());
++    }
++}
++
+ void feedbackTests(const LevelOneBootstrap& level) {
+     const auto& atlas = level.hud().interfaceAtlas;
+     const auto& image = level.hud().interfaceTexture.image();
+@@ -1043,16 +1473,19 @@ int main(int argc, char** argv) {
+             else if (group == "gesture") { gestureTests(level); }
+             else if (group == "sprite") { spriteTests(level); }
+             else if (group == "sequence") { sequenceTests(level); }
++            else if (group == "consumption") { consumptionTests(level); }
++            else if (group == "handoff") { handoffTests(level); }
+             else if (group == "feedback") { feedbackTests(level); }
+             else if (group == "gamepad") { gamepadTests(level); }
+             else if (group == "controller_boundaries") { controllerBoundaryTests(level); }
+             else if (group == "controller_first_level") { firstLevelFlowTests(level, true); }
+             else if (group == "audio") { audioTests(root); }
+             else if (group == "first_level") { firstLevelFlowTests(level); }
+-            else if (group == "hostage") {
++            else if (group == "hostage" || group == "shared_manager") {
+                 PlayerStateConfigDatabase configs;
+                 CHECK(configs.load(root));
+-                hostageTests(level, configs);
++                if (group == "shared_manager") { sharedManagerTests(level, configs); }
++                else { hostageTests(level, configs); }
+             } else { throw std::runtime_error("Unknown QTE parity group"); }
+         }
+         std::cout << "PASS " << group << ": " << checks << " checks\n";
+diff --git a/tests/SmokeTests.cpp b/tests/SmokeTests.cpp
+index 1ce1225..c0edd56 100644
+--- a/tests/SmokeTests.cpp
++++ b/tests/SmokeTests.cpp
+@@ -5990,8 +5990,10 @@ int main() {
+         assert(hostageBonuses.initialize(bootstrap.bonuses()));
+         const std::size_t hostageInitialBonusCount =
+             hostageBonuses.states().size();
++        usm::game::QuickTimeEventRuntime hostageQte;
++        hostageQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
+         usm::game::LevelHostageRuntime hostageRuntime;
+-        assert(hostageRuntime.initialize(bootstrap, &objectRuntime));
++        assert(hostageRuntime.initialize(bootstrap, hostageQte, &objectRuntime));
+         assert(hostageRuntime.states().size() == 4);
+         assert(objectRuntime.find(30018)->activeAnimation == "tied");
+         assert(objectRuntime.find(30018)->animationLoops);
+@@ -6071,8 +6073,10 @@ int main() {
+         assert(failedHostageObjects.initialize(bootstrap));
+         usm::game::LevelBonusRuntime failedHostageBonuses;
+         assert(failedHostageBonuses.initialize(bootstrap.bonuses()));
++        usm::game::QuickTimeEventRuntime failedHostageQte;
++        failedHostageQte.bind(bootstrap.buttonConfigs(), bootstrap.hud().interfaceAtlas);
+         usm::game::LevelHostageRuntime failedHostageRuntime;
+-        assert(failedHostageRuntime.initialize(bootstrap,
++        assert(failedHostageRuntime.initialize(bootstrap, failedHostageQte,
+                                                &failedHostageObjects));
+         usm::game::GameplayPlayer failedHostagePlayer;
+         assert(failedHostagePlayer.initialize(bootstrap.player(), nullptr,

@@ -41,6 +41,8 @@ struct XperiaKeyEvent {
     XperiaKeyCode keyCode{};
     XperiaScanCode scanCode{};
     bool pressed{};
+    // PC transport notification, not an Android key or a synthetic key-up.
+    bool deviceCancelled{};
 };
 
 } // namespace usm::reconstructed

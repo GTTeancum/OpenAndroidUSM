@@ -1,0 +1,55 @@
+[1/2] Building CXX object CMakeFiles/OpenAndroidUSM.QteControlTests.dir/tests/QteControlTests.cpp.o
+[2/2] Linking CXX executable OpenAndroidUSM.QteControlTests
+Internal ctest changing into directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+UpdateCTestConfiguration  from :/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+Parse Config file:/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+Parse Config file:/mnt/data/re05/OpenAndroidUSM/build/re05-baseline/DartConfiguration.tcl
+Test project /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 18
+    Start 18: OpenAndroidUSM.QteControl.lifecycle
+
+18: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteControlTests "lifecycle"
+18: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+18: Test timeout computed to be: 120
+18: PASS lifecycle: 589 checks
+1/3 Test #18: OpenAndroidUSM.QteControl.lifecycle .....   Passed    1.91 sec
+test 19
+    Start 19: OpenAndroidUSM.QteControl.integration
+
+19: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteControlTests "integration"
+19: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+19: Test timeout computed to be: 120
+19: PASS integration: 79 checks
+2/3 Test #19: OpenAndroidUSM.QteControl.integration ...   Passed    1.93 sec
+test 20
+    Start 20: OpenAndroidUSM.QteControl.keypad
+
+20: Test command: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/OpenAndroidUSM.QteControlTests "keypad"
+20: Working Directory: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline
+20: Test timeout computed to be: 120
+20: FAIL: line 326: a.rescueRequested==b.rescueRequested && a.switchRequested==b.switchRequested && a.switchRequestValue==b.switchRequestValue
+3/3 Test #20: OpenAndroidUSM.QteControl.keypad ........***Failed    0.00 sec
+
+The following tests passed:
+	OpenAndroidUSM.QteControl.lifecycle
+	OpenAndroidUSM.QteControl.integration
+
+67% tests passed, 1 tests failed out of 3
+
+Label Time Summary:
+qte-control    =   3.85 sec*proc (3 tests)
+
+Total Test time (real) =   3.85 sec
+
+The following tests FAILED:
+	 20 - OpenAndroidUSM.QteControl.keypad (Failed)         qte-control
+Errors while running CTest
+Output from these tests are in: /mnt/data/re05/OpenAndroidUSM/build/re05-baseline/Testing/Temporary/LastTest.log
+Use "--rerun-failed --output-on-failure" to re-run the failed cases verbosely.

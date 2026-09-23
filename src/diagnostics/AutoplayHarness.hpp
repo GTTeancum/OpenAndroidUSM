@@ -1,5 +1,8 @@
 #pragma once
 
+#include "platform/input/QteGamepadAdapter.hpp"
+
+
 #include "assets/ColladaMesh.hpp"
 #include "core/Result.hpp"
 #include "game/CinematicCamera.hpp"
@@ -13,6 +16,7 @@
 #include "game/LevelObjectRuntime.hpp"
 #include "game/LevelOneBootstrap.hpp"
 #include "game/PlayerStateConfig.hpp"
+#include "game/QuickTimeEventRuntime.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -158,6 +162,7 @@ struct AutoplayFrameInput {
     bool spiderSensePressed{};
     bool superAttackPressed{};
     bool quickTimeEventPressed{};
+    bool rescueRequested{};
     bool menuUpReleased{};
     bool menuDownReleased{};
     bool menuSelectedReleased{};
@@ -179,6 +184,8 @@ public:
                                     const std::filesystem::path& outputPath);
     [[nodiscard]] AutoplayFrameInput update(
         const AutoplaySnapshot& snapshot);
+    [[nodiscard]] game::QteInput quickTimeInput(
+        const game::QuickTimeEventRuntime& runtime, bool actionPressed) noexcept;
     void recordFrame(const AutoplaySnapshot& snapshot);
     void recordEvent(std::uint64_t timeMilliseconds, std::string_view type,
                      std::string_view detail);
@@ -232,6 +239,8 @@ public:
     }
 
 private:
+    std::uint64_t qteGestureGeneration_{};
+    platform::QteGamepadAdapter qteGamepad_;
     enum class StepKind {
         WaitGameplay,
         WaitIntro,

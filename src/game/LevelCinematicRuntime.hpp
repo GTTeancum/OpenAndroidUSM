@@ -4,9 +4,12 @@
 #include "game/CinematicScript.hpp"
 #include "game/GameplayCamera.hpp"
 #include "game/LevelTriggerRuntime.hpp"
+#include "game/QteControlHost.hpp"
 
 #include <array>
 #include <cstdint>
+#include <functional>
+#include <utility>
 #include <span>
 #include <vector>
 
@@ -69,7 +72,7 @@ struct RoomMotionState {
 // Portable command-state reconstruction for the global commands issued by
 // CCinematicThread. Object-specific animation and AI commands remain owned by
 // their corresponding gameplay runtimes.
-class LevelCinematicRuntime final {
+class LevelCinematicRuntime final : public QteControlHost {
 public:
     void bind(LevelTriggerRuntime& triggers, GameplayCamera& camera,
               std::span<const LevelWayPointAsset> waypoints = {},
@@ -105,7 +108,20 @@ public:
     // CQTEManager::EndQTE (0x0038a5b0) restores player control through
     // CLevel::EnableControls(true, false). The other InterfaceControl flags
     // remain owned by their authored cinematic commands.
-    void endQuickTimeEvent() noexcept;
+    void beginQuickTimeEvent() noexcept override;
+    void setQuickTimeControlEnabled(bool enabled) noexcept override;
+    void endQuickTimeEvent() noexcept override;
+    // CLevel::EnableControls ELF 0x36fe94. Repeated calls still reset keys.
+    // preservePauseButton is native parameter 2, NOT a whole-game pause.
+    void enableControls(bool enabled, bool preservePauseButton = false) noexcept;
+    void setInputResetHandler(std::function<void()> handler) {
+        inputResetHandler_ = std::move(handler);
+    }
+    [[nodiscard]] bool pauseButtonEnabled() const noexcept { return pauseButtonEnabled_; }
+    [[nodiscard]] bool quickTimeControlEnabled() const noexcept { return quickTimeControlEnabled_; }
+    // Diagnostic counts of native reset calls, not gameplay timers.
+    [[nodiscard]] std::uint64_t pauseButtonResetCount() const noexcept { return pauseButtonResetCount_; }
+    [[nodiscard]] std::uint64_t quickTimeButtonResetCount() const noexcept { return quickTimeButtonResetCount_; }
 
     // Application::UpdateSlowMotion (0x003e05f0) scales the complete game
     // update, while leaving audio and rendering on real time.
@@ -234,6 +250,11 @@ private:
     bool transportRequested_{};
     TransportFrame transport_;
     bool controlsEnabled_{true};
+    bool pauseButtonEnabled_{true};
+    bool quickTimeControlEnabled_{};
+    std::uint64_t pauseButtonResetCount_{};
+    std::uint64_t quickTimeButtonResetCount_{};
+    std::function<void()> inputResetHandler_;
     bool attributionEnabled_{true};
     bool objectiveArrowEnabled_{true};
     bool blackOverlayEnabled_{};

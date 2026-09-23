@@ -3,6 +3,7 @@
 #include "core/Result.hpp"
 #include "game/CinematicScript.hpp"
 #include "game/LocalizedStringTable.hpp"
+#include "game/QteFeedbackFrame.hpp"
 
 #include <cstdint>
 #include <string>
@@ -29,6 +30,7 @@ struct CinematicUiFrame {
     bool dimBackground{};
     bool quickTimeEventVisible{};
     float quickTimeEventProgress{};
+    QteFeedbackFrame quickTimeFeedback;
     float blackOverlayAlpha{};
     std::uint8_t interfaceEffectAlpha{};
     std::int32_t interfaceEffectFrame{-1};

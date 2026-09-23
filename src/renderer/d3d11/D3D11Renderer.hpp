@@ -302,6 +302,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiColorVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11Buffer>
         cinematicUiInterfaceEffectVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicQteFeedbackVertexBuffer_;
+    std::uint32_t cinematicQteFeedbackVertexCount_{};
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiTextVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> cinematicUiTextTexture_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> cinematicUiMessagePanelVertexBuffer_;

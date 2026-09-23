@@ -1,5 +1,18 @@
 # OpenAndroidUSM
 
+> **Local source continuation: RE04 (September 22, 2026).** Shared cinematic/
+> hostage QTE manager, consumed-input flags and synchronous native outcome
+> handoff. Drag QTEs still use the left stick without A or virtual touch.
+> See [RE04_README.md](RE04_README.md) and
+> [RE04_VERIFICATION.md](RE04_VERIFICATION.md). This is a development source
+> checkpoint, not a new verified Windows executable or near-final test build.
+
+## Historical uploaded project overview
+
+The original 0.3b description, screenshots and public-project status below
+predate the RE01–RE04 continuation; they are not new test evidence for RE04.
+
+
 OpenAndroidUSM is a source-level C++ reconstruction of the Android/Xperia Play
 release of *Ultimate Spider-Man: Total Mayhem*. The project rebuilds the game
 systems from reverse-engineered native code and shipped data; it is not an

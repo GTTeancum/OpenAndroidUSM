@@ -1,0 +1,3005 @@
+{
+  "file_count": 599,
+  "total_bytes": 170642144,
+  "byte_compared_against_uploaded_zip": true,
+  "zip_crc_for_read_members": "PASS",
+  "scope": "Only 599 original game data/reference members; not the full expanded project archive.",
+  "files": [
+    {
+      "path": "game/data/gameloft/games/spiderman/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/comic1.pack",
+      "size": 7894179,
+      "sha256": "4a6ceaadd1d68ef13735899a6c9df0a35154386e4dd2bf53ff855b322c3d0a03"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/comic2.pack",
+      "size": 22241923,
+      "sha256": "60938966daa5ed323aae79ad90110869b5e49f63b014a1d192307382e167650b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/configs.pack",
+      "size": 55732,
+      "sha256": "ccd7737e78075557ec2ce8b6912e01e5c26fe10bedc87853e4efca4bcb9a935a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/editor.pack",
+      "size": 41465,
+      "sha256": "32d9f8dd3173865eb58dff15b9915192fca993e2ea5d49ace2efb0eee9eaa45b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/entities.pack",
+      "size": 15196106,
+      "sha256": "d3587d9ce4925392950af74257c3125aebb6450fb55a65ee080e58715f81d87c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/FontMapping_JP.map",
+      "size": 2582,
+      "sha256": "31eec8193d01b02244007d2feb25ecb5012102be99a522757e8bd4140e361a4c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/FontMapping_KR.map",
+      "size": 1216,
+      "sha256": "72f990d8fc3e2b9f3caecb6e16b5d234c0f141400bc191fdad09d4b57c00de67"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/IGPConfig",
+      "size": 1240,
+      "sha256": "c4399cc34b7775257125c396842b900559f0ed08ddcaf29077a7ff8517d86bce"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/demodata",
+      "size": 4,
+      "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_hud_image.mp3",
+      "size": 58832,
+      "sha256": "a0652620b1212d88207aef92b67c5993f85f3916b9213edcc6c3da46ee98d42b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_hud_jp_image.mp3",
+      "size": 24001,
+      "sha256": "9d039ef090a1b2397971a284d587ef1cea792e9fbb32ae84da7157ac88346550"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_hud_jp_sprite.bsprite",
+      "size": 22573,
+      "sha256": "8fc0be26d1a2dd9ad490bb815c3e09c6267e189bbebc351abf9a4e9818d9f6ea"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_hud_kr_image.mp3",
+      "size": 24183,
+      "sha256": "5dd6bb2c45a6efed19aa44e0232bab85ada65ceb0863be0c7ad00ec9163b77c0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_hud_kr_sprite.bsprite",
+      "size": 10981,
+      "sha256": "0aebbf0b2d92e9d5c715224fff449f767de4a3cf49ccfd7ff307347be3d570c5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_hud_sprite.bsprite",
+      "size": 2777,
+      "sha256": "f11970d2d7127dad4516eb4c43f36347ac8409d8a1e91d027dc3fcf208889d60"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_info_image.mp3",
+      "size": 10382,
+      "sha256": "4b981d4e842625c51f32738116585fbc270e2e01ba1ae3a5cfbded98a5ba10cf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_info_jp_image.mp3",
+      "size": 30908,
+      "sha256": "59e1ddc780943d4cc12f9c8d871d98f84c2652eeab005244aa173baa33e67329"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_info_jp_sprite.bsprite",
+      "size": 22575,
+      "sha256": "227ae111e0958224651ba86cb71e3cdcc4525b8e2b33d43c7d7304c3d8169136"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_info_kr_image.mp3",
+      "size": 33507,
+      "sha256": "cbcce9520214c8cbaaa2cc28174f30947ecc9f7ae30f6f30ff1c8e07459172af"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_info_kr_sprite.bsprite",
+      "size": 10983,
+      "sha256": "19a8756a7ac5c634665a236b3be4915168bb7d1611683fee36a699cb205cf6a8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_info_sprite.bsprite",
+      "size": 2791,
+      "sha256": "75e516c097d2d746e90a53b6f428d4849f83f67d58249be621afadd64627831f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_title_image.mp3",
+      "size": 17896,
+      "sha256": "e4acb707836bdcf51a093069c80a35104a15859fffa9c08db9a8d4e3d1035066"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_title_jp_image.mp3",
+      "size": 75636,
+      "sha256": "ebee587a581b634193067b20970710608922b79b486ba91965d8a2b35b79aa26"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_title_jp_sprite.bsprite",
+      "size": 22577,
+      "sha256": "ca7e833e935bf70bc6be446c969a2ae61c503c3b24e4627315e8e8c3280ee4e5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_title_kr_image.mp3",
+      "size": 44813,
+      "sha256": "65dfee9a7981c67f858027501874d7ab55953eb9850f5459579765889144244f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_title_kr_sprite.bsprite",
+      "size": 10985,
+      "sha256": "ea9cd1f30704bc4c76db5c946c0103dc7a10815fc99872e542e43f33f4efd08c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/font_title_sprite.bsprite",
+      "size": 2753,
+      "sha256": "ed145eeabd9eb3f328a4c9e24803757441d1e3c18b58807861e2cdab2fccec6b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/igp_hud_image.mp3",
+      "size": 96458,
+      "sha256": "2bc7fdfe5d6043e69a48d36370bae99e4f70b01620f0fa2a6f153611598ffcb5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/igp_hud_sprite.bsprite",
+      "size": 1801,
+      "sha256": "2d92fe804fb431f6df59bbfc73fe3f684ca814206da7ec8beb212ceb1efff293"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/igpdata",
+      "size": 26,
+      "sha256": "b9f1ae0e0425f8cec355d98903e73316596510d4118387e3b0eabf052dc18e45"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/strings.bar",
+      "size": 13324,
+      "sha256": "f329260271bd8ca6bbe71bc43425b28137433406973c7d27c564ccae5dec79ce"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/sub_title_image.mp3",
+      "size": 11063,
+      "sha256": "bfe521f4f8b4769a107fd1df2c2ad349150c48611f1aa3499c812342887e2e52"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/sub_title_jp_image.mp3",
+      "size": 38267,
+      "sha256": "146a29fa7704c776e4089d7c716fdeed3d997759f63af9dee75e37113ff7e628"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/sub_title_jp_sprite.bsprite",
+      "size": 22575,
+      "sha256": "ec0c688305765744b44695cdffcc1da021b7652f45c5b60a936091688aa633f3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/sub_title_kr_image.mp3",
+      "size": 31579,
+      "sha256": "eb9f802eade5282b7c4ba6696f16dbce200b48967d6515b2a70147b180d84153"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/sub_title_kr_sprite.bsprite",
+      "size": 10983,
+      "sha256": "6e11c3b1a95d59ff7207d532309557e49eac53dae03ad208bc747a51ffd66447"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/sub_title_sprite.bsprite",
+      "size": 2783,
+      "sha256": "0035c1b083559125498a0baa98451955c3dbdc4669b86e611e972762830b1cab"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/textures",
+      "size": 10498578,
+      "sha256": "fd0f25859a0bfd45f1860dade08113a5b11648777395fc30b58a762192511fc8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/igp/window",
+      "size": 55489,
+      "sha256": "060886b6298cc59219fe669fcf20bb547d0a88b27d8534a30956b7f1fc9c177d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_01.pack",
+      "size": 5971508,
+      "sha256": "239885353902df237e1bb83ac0ec3bbf27398ee2245ee4b4cad65be0f5073fa5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_02.pack",
+      "size": 2956225,
+      "sha256": "8a0d382210d14df52934440c89b1fbe18eda4d90177fe84d59032200f67545aa"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_03.pack",
+      "size": 2493803,
+      "sha256": "7933994e170732087884753b2b5540b5a267082be9833baecfef3d55219f813a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_04.pack",
+      "size": 3550936,
+      "sha256": "69a369c887ca2aac4c1ff01034232d50517eb64d0fc980476fc1f6f2165c3789"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_05.pack",
+      "size": 3551674,
+      "sha256": "7b47ced10231cda563f6145b129eb50ee1a045972401ffa9daae7a3756c0393e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_06.pack",
+      "size": 5417537,
+      "sha256": "20794bc2312dcb55ee7cfa935b0ac9c3b59e049692e90d0829b54cb1caa4e0ca"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_07.pack",
+      "size": 3223163,
+      "sha256": "47ae80548bbca3679f795d0532b3df43d04000d4b055609ac9ee7293406d147f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_08.pack",
+      "size": 2075231,
+      "sha256": "5d2c34e00f6fcbd69a216769308be6e68aeeca4a0c049b3ceaa09c0a3df01b97"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_09.pack",
+      "size": 1978711,
+      "sha256": "c05b22495abc021fbe6f1f5ca3bfa5901e150a0ace39d46076fedd4951301344"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_10.pack",
+      "size": 3043093,
+      "sha256": "fa16b0625834c8f0e096c4ee86412d8be672eeb32ae8606d41d28f8a4ddf7dd0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_11.pack",
+      "size": 1706525,
+      "sha256": "b8048e8494f8af3d8c62ec9f48e07262fca53730150cb31ab160fbd4fe0d33bd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/levelnew_12.pack",
+      "size": 1182324,
+      "sha256": "2daa3ce60e9bc7810ebffa69d65bfbacb129f53c6a3d108da40cf333e1def1a0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/logo.mp4",
+      "size": 7674488,
+      "sha256": "b08fbcd4f6db6d55af6cc683d145057b6b5cb997acc0170804df6ac5ec0a20d6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/photo2.pack",
+      "size": 3208788,
+      "sha256": "241bbd1b1ac03eab8bf90bfe20967140bf5eb02add6d56a3958c16d58f02fd52"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_carnage.ogg",
+      "size": 487291,
+      "sha256": "b21e0a4c84290a82d942825d140002ec4f415b7cf457a857912d0c914b2815a9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_electro.ogg",
+      "size": 754708,
+      "sha256": "6a6bf11449e91384f2896433dfdc5fef4bc3dec113d659371a892992973fd29d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_green_goblin.ogg",
+      "size": 281355,
+      "sha256": "756807fb217df693ee47eeafce6964364d0b3977fe80f8d466b240b426aae7a7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_octopus.ogg",
+      "size": 703292,
+      "sha256": "389d310589e218bad5035e4c9393519a231855f4b15d533c260d40b2792ecd4c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_rhino.ogg",
+      "size": 599633,
+      "sha256": "6201fb4f86e4b8a368d049b110dcf3404fb2a14a5b7673aacedd924440111156"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_sandman.ogg",
+      "size": 713148,
+      "sha256": "f8d320c37d0efbcb0d74df89fc172eba3e9fde1f15e897a6e9642e1a97b07274"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_boss_venom.ogg",
+      "size": 294048,
+      "sha256": "ccf47e46aa5175b522ea1efcd11662146e0cf03114631588394f305f68adb6f9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_bridge_action.ogg",
+      "size": 442519,
+      "sha256": "5285c69ecb7b3b5868337451a5e8c9983daa0784c603cf339f30983f97286c7a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_bridge_calm.ogg",
+      "size": 442519,
+      "sha256": "5d9e94575b0192e575c5eb88dbad1e83cb780cdf2eb0700eee5987e9f497e30d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_bridge_mixed.ogg",
+      "size": 442492,
+      "sha256": "66b1971edd3b0af2e4084cd7204724aa470698720a71cd0509d1652f34c39b76"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_cathedral_mixed.ogg",
+      "size": 887645,
+      "sha256": "0aae5d08217657e1db73c901dba034a4593c9a384f9bde90010c949c768ba70b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_downtown_action.ogg",
+      "size": 506870,
+      "sha256": "54b104a880203bd4f8c6d8191c2a883436506b578ce7bf20e4278323a50570e0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_downtown_calm.ogg",
+      "size": 507319,
+      "sha256": "d7e64074aa033bb325b437a68cea8bdde6323fcd33b361e1811d7cfbb81ef181"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_downtown_mixed.ogg",
+      "size": 506986,
+      "sha256": "28d4f660c8a51b852275127e2b4ec4778549f19b21ae51db1703a6309107ff4b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_laboratory_action.ogg",
+      "size": 306629,
+      "sha256": "755728109f76be2e70fa3790b413690a292577ad230f02aa00c2eac0fd490d23"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_laboratory_calm.ogg",
+      "size": 307055,
+      "sha256": "2b296fe7df00c365fde2a0b6ed66d186087ad5ab990d1197ce72df05f4fc9297"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_laboratory_mixed.ogg",
+      "size": 612047,
+      "sha256": "3f564ac0ad47e7cac89e5df05e5d99956ad963f03abe76037bc52e4399ea0097"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_lose.ogg",
+      "size": 103375,
+      "sha256": "1837d2a595e78f599e3d53b780cd284eca926b2ca5993ce552e800f177d59e8b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_park_mixed.ogg",
+      "size": 444192,
+      "sha256": "5f533d01cd23e1f5e557508d44c2025e9b5915fbf94894c7fad76dc644ba0588"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_powerplant_action.ogg",
+      "size": 473543,
+      "sha256": "2b2245217eedc9ebbef65e03f73f281457dbf0cb864446d3ffc871e1e6df58d4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_powerplant_calm.ogg",
+      "size": 473775,
+      "sha256": "f2ef1b69cf395c160b608534661ab2430032a1d159701d4c610994604fb35375"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_powerplant_mixed.ogg",
+      "size": 473631,
+      "sha256": "0302f1cd3ba375bad430ed6fd550e6084a4ba1b510ab41c5856470cecac66258"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_score_screen.ogg",
+      "size": 231663,
+      "sha256": "7e4e991776e402ae9df51307aef3aa3445fd8629e82025285887ed818396554d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_skyscraper_action.ogg",
+      "size": 463058,
+      "sha256": "274a85ecaad66ce37c0bf51b848e4a4f5e232825c1fbca373333037c63a96cbc"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_skyscraper_calm.ogg",
+      "size": 462604,
+      "sha256": "2188441a943954d4909f52177f29f96d277b73064c99ddee03706b2ce030a921"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_skyscraper_mixed.ogg",
+      "size": 462814,
+      "sha256": "e40207e18888a56d36563cf0fe9668ce2d4222fd284313fb9a58de33d4081b25"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_stadium_action.ogg",
+      "size": 491201,
+      "sha256": "d91fac18b27fcdd6096bc719189af5319819a30a11fcbd3c955650cd6e4b3418"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_stadium_calm.ogg",
+      "size": 491093,
+      "sha256": "cfb68c4015af62b227eaebab135713e58034f2a099bf8b1da5c923e0669644bd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_stadium_mixed.ogg",
+      "size": 491150,
+      "sha256": "d2edb432419adb305eb4521fb0b1b263d8f767de4c9efd1c89c17740bc58a4f9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_subway_action.ogg",
+      "size": 534746,
+      "sha256": "6c92f7081379bef19725ca2b07ef9fd033a090c846c4e2713f41956d85e63c4b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_subway_calm.ogg",
+      "size": 535072,
+      "sha256": "3d492a5c86b3c50961870a254d28b1fe92011a4da2ec84ea4697b67341d6dd53"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_subway_mixed.ogg",
+      "size": 534919,
+      "sha256": "ae947e0362243e94936fdfdc75924849828fdc02b057a703f4de6e6dd9bd38a5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_title.ogg",
+      "size": 588677,
+      "sha256": "63bb2628911a3832a179195c7bf6f3150513b916b235dc847b5ddb0de104d4a7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/MUSIC/m_win.ogg",
+      "size": 76106,
+      "sha256": "6bb83fee9d53af313079ada6780fad00dd4db72272ab786109317a6fd4b2503e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_battery_cell_explosion.ogg",
+      "size": 27299,
+      "sha256": "dc96ba1d46405bb4839f1968797e99e616490e226d3f8bb80bdb35877413bfe6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_battery_cell_fall.ogg",
+      "size": 16875,
+      "sha256": "7c56a328ac7201cf751039c0d89a26ac0bdd411f9cf483bedab217e04e0d725c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv10_beat_airplane_1.ogg",
+      "size": 8592,
+      "sha256": "de5806ffa5c7137695bef419b270d328c4796c2dfc0f3f8aa1fa4df4274686ba"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv10_beat_airplane_2.ogg",
+      "size": 10326,
+      "sha256": "7df7da634241f8a5fade0918b81202891c0d5f29908be7b6aa020f690f7ff0b5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv10_beat_airplane_3.ogg",
+      "size": 10334,
+      "sha256": "d0f8c770f63ffc1373f77fc003ba9de647ffdd990bc6a9626fffbbdf79de9092"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv10_goblin_scream_1.ogg",
+      "size": 20273,
+      "sha256": "d6f741895f801e2b2f9abcb3d8de12f551c6934da855d40e4ad3b81b8541bb5c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv10_goblin_scream_2.ogg",
+      "size": 23212,
+      "sha256": "76f40ddfb1d466b8f449c71e2ffee444d82abd3ab291a18300f5f66fa14222cd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv10_goblin_scream_3.ogg",
+      "size": 26944,
+      "sha256": "23a33faf4a949c85ad6d77882c2606219993da7b62ad14c35176060f03e963d4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_camera_woosh.ogg",
+      "size": 13905,
+      "sha256": "e26bb6f92e7dd138a618d05748ca4a8490f856b07553fc91a31753a1b60a25f5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_earthquake.ogg",
+      "size": 23241,
+      "sha256": "956e0d5d1a044abfd7844c359aef0fdf8244286ad3ba645068a101f84f2f0d47"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_goblin_down.ogg",
+      "size": 9404,
+      "sha256": "674f8e2fdfc7a6aca31e9e0c50eac814b63bdfe1e1aec7d158f8618e1fd66bc7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_goblin_jump.ogg",
+      "size": 9416,
+      "sha256": "e8f71be8beb3936423ea166af77269dfb7d7c04eae342226bb2a98c49d2657b2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_human_cheers.ogg",
+      "size": 88877,
+      "sha256": "f84c51f35814c8202ed560f74527c500514651e50556a0f77fd69282c0515cb1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_jump_out_rail.ogg",
+      "size": 35223,
+      "sha256": "d8f0da42817c768442ddde2a254866a9a8b0d9fce53662ad6b69e3952d47c527"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv11_spidey_swing.ogg",
+      "size": 24547,
+      "sha256": "4d65ee863a94dc422d95d89bcf170e8b3fda7da7a7b637698d5e6c3a8b9b5f3e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv12_green_goblin_gasp.ogg",
+      "size": 36497,
+      "sha256": "1a238d071148ea8acc804a28058bb1087a4d047d2043f5789c70694e5994449f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv1_earthquake.ogg",
+      "size": 36821,
+      "sha256": "11a3c7f63fdf5f5ea0853ea89ba9b7d507e1a44a7f43480519066133ca783451"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv1_sandman_land.ogg",
+      "size": 15296,
+      "sha256": "6a8c49da0b9f2bf8938791acd364f23f154246c4daaad6cd04dd61b398d8ddc4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv1_sandman_out.ogg",
+      "size": 23020,
+      "sha256": "fef48f99f9f29c851accb6b712a0121ac0a5007dcad1d3e0fb23107502a5480c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv2_police_car.ogg",
+      "size": 32511,
+      "sha256": "281da275db2774ee270074d728d0340c2b320e362b6f084d2dd23021d4659a22"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv3_spidey_arrives.ogg",
+      "size": 18659,
+      "sha256": "7ab64664c689792ddb86ba0b65891537f8ee489b7426bb07cbfff2493a7bb900"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv3_spidey_lands.ogg",
+      "size": 21898,
+      "sha256": "e5e218a27863bbcb0c917f9fe7e41b23fada8825834d98b3c69a0b19cf5f3e3e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv7_security_bot_action.ogg",
+      "size": 16170,
+      "sha256": "bb7051fe4e312c0917b2a3453b9613efd86d27578c943534ab24ab127f8005a3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv7_spidey_arrives.ogg",
+      "size": 29069,
+      "sha256": "fc0cf8dc93dc39d8aeabbc58b8eeee08b60fa2088252c1df40f0664203df886a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv7_zombie_scream.ogg",
+      "size": 19861,
+      "sha256": "f04bf3f49a00eb495007f90f9d0415a264315a64612cd9df543b9eb9b3abacf2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv7_zombie_swing_1.ogg",
+      "size": 10975,
+      "sha256": "2c7a64f6959c3a28db2da3c9f10882d89eafa51202cc6ba11000923edd829b8d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv7_zombie_swing_2.ogg",
+      "size": 10745,
+      "sha256": "e07680e462ed00f39f40669d56b5be845871b6b0a4f698cd551ea1f9d9b6a641"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_spidey_arm_swing_1.ogg",
+      "size": 5064,
+      "sha256": "cadd96485d0447f66644ff1d550e43aaf04ae4b689e6b3eaa9e9712ea90ca05d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_spidey_arm_swing_2.ogg",
+      "size": 5418,
+      "sha256": "e2f3d5388e646a2d75526a93e113de41fcf1074d64e39a48dfb4e3ca4b14f34a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_spidey_arm_swing_3.ogg",
+      "size": 6124,
+      "sha256": "f64a3b9ad0cb38c572346cd9d15a103ba8f17b839374d4e4e5cf9c57750ce2f2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_spidey_arm_swing_4.ogg",
+      "size": 6426,
+      "sha256": "fc9d9f24e7969d7c5be7023e3555af31514674ae9a6f64e7a0bbfb4fd9909242"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_stone_impact.ogg",
+      "size": 18938,
+      "sha256": "a33c7f2ca7cebd65f4f4dc9754b4d8fabe1b0c138d09eb6a3ef7964bb15812c4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_venom_tentacles.ogg",
+      "size": 115659,
+      "sha256": "5c28a4627e3acab32fab1ccd536c75820ece6b013d7c31ebbd1da775caddcf3f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_venom_tentacles_exits.ogg",
+      "size": 15459,
+      "sha256": "7db5bb372d37e02db20060336cb6ab0994fc329233fbef358213e5f33aa89337"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_cutscene_lv8_venom_tentacles_returns.ogg",
+      "size": 19178,
+      "sha256": "c042d6a0d05b2c2bfb9e3870d3da937066a606efd02d30b5b614bbeedd37cb74"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_door_open.ogg",
+      "size": 21170,
+      "sha256": "9ba2d6b860a72ad9022ad72c7c6322583573ee43f6a3f5d288702adb79404abf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_electro_sparkle_1.ogg",
+      "size": 10813,
+      "sha256": "258bc26b5c0ed2382f848bb0ab30135dc2463957ceb23b329d3a1ff3fe2a63eb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_electro_sparkle_2.ogg",
+      "size": 10822,
+      "sha256": "6b3a622991959c876ecc160f11a2ace26a1fb6c49380ff24142f577ec4e01a07"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_electro_sparkle_3.ogg",
+      "size": 11953,
+      "sha256": "a8e81b34258e52b36d7f10c8f57d0749a89ca0b9f0545009414d8a6d765ac3d8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_police_arriving.ogg",
+      "size": 42804,
+      "sha256": "ece64ce56be0246c00596ff21cabcf8fa368ec78a34b7ca14bc47ff9d33eb1e4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_rhino_bust.ogg",
+      "size": 20782,
+      "sha256": "cc684992e5515bd633833bfe459453bb2efb3c883858f75e4b1206d7b8509d1a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_rhino_fs_1.ogg",
+      "size": 10181,
+      "sha256": "b0abed5549c9774b253f0ee5b95f566e440c616279f2613b62364ce6cd33f240"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_rhino_fs_2.ogg",
+      "size": 10698,
+      "sha256": "9e0ce23646006dbbfe498220f542920df02baf3319b4ac916f7752b1b86d3a16"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_subway_leaving.ogg",
+      "size": 36222,
+      "sha256": "3b93844c957e80a158df6c1a2a00603f1ec55327aa642741686f28987bb19680"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_truck_arrives.ogg",
+      "size": 58283,
+      "sha256": "059afa472d07bf96761560cf90fd100ff75597eb888e2bfd11dc63a7a5689ae8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_truck_ends.ogg",
+      "size": 52408,
+      "sha256": "cf2257764d5ac612c5cd3753cdf120cdece38d630dd7a09392d47a3f0da332e5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_truck_hit.ogg",
+      "size": 27120,
+      "sha256": "881174875385f43c235d620575f171bd81ca4c082d6018e38d3fc7cb2f995208"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_venom_end_cutscene.ogg",
+      "size": 71766,
+      "sha256": "57563da542bd13f9b688377d4d5b2e2d86963b6657ce3b0ef86e84d0c9063b95"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_venom_hits_ground.ogg",
+      "size": 19685,
+      "sha256": "7e6bf1346b2577d46511969d72bef3a7751e329d4fcb181df7131db8ebc31487"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_venom_jump_sea.ogg",
+      "size": 15568,
+      "sha256": "016394d829207f47e12a65203a46acd398cd65c00b26ba430f2babcf097e9586"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_venom_kicked_face.ogg",
+      "size": 12808,
+      "sha256": "8df7e95b53be36c685b6a9ba06b720c5019868ea44367c48771170c89956d883"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/CUTSCENES/sfx_venom_on_ground.ogg",
+      "size": 20407,
+      "sha256": "7361b5495ef13dd9e65f92c390fda6d291273e0aa11f4bee31d33696a4064ca4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_copper_rank.ogg",
+      "size": 21141,
+      "sha256": "08c50aaca797cec353611b83078c82b587e959d61c070d87721dcc51d7dd0d6f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_counter.ogg",
+      "size": 4408,
+      "sha256": "df9199518a3492f0ad8ac4fa04aa90cc64c477636ab8e12e82778a0951ee88b3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_gold_rank.ogg",
+      "size": 27300,
+      "sha256": "ed1b20be935d22455c4d2f1aa15495f68391e7514c60d77b1493b72548f6beaa"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_interface_back.ogg",
+      "size": 22283,
+      "sha256": "34cb97336885b09fef1861e784416dba50433c8cd3b4262ffce35d08b78a03ad"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_interface_browse.ogg",
+      "size": 7992,
+      "sha256": "f0a3245a5467b18ee29e6c0da09ec48365c1f253ce68a50032d5e2ceedd08e12"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_interface_confirm.ogg",
+      "size": 23231,
+      "sha256": "38b1c308e144e5b0632da45d9ef991f2c4cb612955062ff8829e11b166b0aee8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_interface_continue.ogg",
+      "size": 6237,
+      "sha256": "e257e5038bdf17f53621b5b7b54f5ef3fc83414bc4289f4c1af69703239000e3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_point_spend.ogg",
+      "size": 3508,
+      "sha256": "1485d93b337cb97e7325becaac56df0b0d9a8c29ca71634bfd2a6fbe248fc743"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_point_spend_no_points.ogg",
+      "size": 6197,
+      "sha256": "356e414fcac559b1eca3596787e58cd935e53b3768f56351d5a0243665bbc629"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_score_whoosh.ogg",
+      "size": 6890,
+      "sha256": "9dd3a0f4c73969d1216b5504da6b9d4607a27f73d341279b35bda1943fdd191f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_silver_rank.ogg",
+      "size": 26644,
+      "sha256": "7e7e65cb8dbd536db337613cd82faaf64a8ad86521d4c7a9bbc698f5fe1bdc0b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_stone_rank.ogg",
+      "size": 21685,
+      "sha256": "19e203f440a362ad9e9c7b2a6a0ffff593a62c933b204b6ac4443615eb37a148"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/INTERFACE/sfx_upgrade.ogg",
+      "size": 21093,
+      "sha256": "4971ac958274e4c0403517f476fecc808d571ab93319fb41536dfbc90e5eb64f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_aerial_suspend.ogg",
+      "size": 21231,
+      "sha256": "8276e3806b876057354eea070f545aa5254c587ed56de5e763fe647d01b232b0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_air_circle.ogg",
+      "size": 14100,
+      "sha256": "aaf42981516790c1905148bc809e513ed80857f8613bcee36fb30eeb56854a0c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_critical_hit_1.ogg",
+      "size": 5994,
+      "sha256": "96d5805ff65e63cd160ffce91e18cd31544e10107b0e433dadc2de81a2dc65b6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_critical_hit_2.ogg",
+      "size": 6073,
+      "sha256": "8752daa5567273234e4ff5d3229addcaa21faa37aae7d58d2d4da49f9744f2a7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_critical_hit_3.ogg",
+      "size": 5860,
+      "sha256": "0f5bf13f83d5a04ff70a6df857551c36ab03e89a25a1c96937dbd6986843ffc4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_die.ogg",
+      "size": 16362,
+      "sha256": "70eeb54afe1f10b55e24a9d1171ac1f0938c34fffe551ef53a3cdad24bf9b813"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_double_flip_throw.ogg",
+      "size": 20171,
+      "sha256": "03f4c17c76d24ad21be773f4f9a4a9c9d7c240691b73e8d3610a1d261cd19b1a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_double_spin_kick.ogg",
+      "size": 8583,
+      "sha256": "42f9e16a1424ad7d557584b797dbc48cea207a92ec178c5630a1cc452e5bb7c3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_drop_floor.ogg",
+      "size": 9817,
+      "sha256": "b895ddf7e4f4dc9fb2a4d3ce45db3edbd5c689213f4befef968981272c57d2dd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_enemy_pull.ogg",
+      "size": 15156,
+      "sha256": "c2decd52d2639751622c1f8a1f6940d75ccbc36ad07803cd06165eb54f290042"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_flip.ogg",
+      "size": 6639,
+      "sha256": "3804c3a1b9ecaf50fe2b9dcfe07d11ca16735d8dd133360f8f4bf61963d5e756"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_horizontal_web_slam_impact.ogg",
+      "size": 11570,
+      "sha256": "8cdb6f3e8ea44680c2691f6ba9a83b43850d8a5d053185e35655d13015f836ce"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_horizontal_web_slam_swing.ogg",
+      "size": 18208,
+      "sha256": "c84004432ae8125c5c9c148155c3f814e094e5663d848f83d92b92e9108e6204"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_hurt_1.ogg",
+      "size": 10141,
+      "sha256": "f92a571cabc321b4843e236ba042d7e6aed545d24a1fd6cffaa5c4cb3a3aa3e1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_hurt_2.ogg",
+      "size": 9931,
+      "sha256": "ed8c7c3d559bf59e2912bdbbd6ca1f7ff6d1570773f91633e3eba969ce91ab0e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_hurt_3.ogg",
+      "size": 8929,
+      "sha256": "ee8d12bf9be9ee5d3321cafc5d8e5e9f23a60fabafabc99a61643e0094343d8b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_jump_1.ogg",
+      "size": 10090,
+      "sha256": "52474503aed35028903414b61210f5bcbea0b944dff816a019314b1350bd22fb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_jump_2.ogg",
+      "size": 9763,
+      "sha256": "18f175dbb1b3aeb2fb6948b2fa687af962b0cae27d168af37f4eb2cffbcca439"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_jump_3.ogg",
+      "size": 10166,
+      "sha256": "1f8f347710ccf7bc898d3c30e8b0381327241f8b8e993282a663893a57a91ff5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_jump_4.ogg",
+      "size": 6846,
+      "sha256": "cfe04acd0895c96751e97e65f0d446111d6b316902783b66ffaf35d01ab2c77c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_jump_5.ogg",
+      "size": 6703,
+      "sha256": "3e1a8ffe3874ab69c8a029e57653065f8c0aa6f07bce9ddd8fabb32fd4ab8b6c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_jump_6.ogg",
+      "size": 6809,
+      "sha256": "d2f74d61bb20a5f2a6723fd254a19034ba50966d6a508938522132e048a50c79"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_kick_impact_1.ogg",
+      "size": 7787,
+      "sha256": "18ebb2f0190541f6237b12fe69153e07245a478d55218cbabbb3deda70f5381c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_kick_impact_2.ogg",
+      "size": 7499,
+      "sha256": "92fd4e3c847e03146fc8efd868d49987a87d257cb834cf62938ac9160265c2a2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_kick_swoosh_1.ogg",
+      "size": 8405,
+      "sha256": "8206d21951858eb768eabac3a00f99e2694b7d47a43347ccb5917d1f464c8384"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_kick_swoosh_2.ogg",
+      "size": 8269,
+      "sha256": "6626f07f79ff3714b4ae6e76f115ef8a00526f42528d665f99fba3110c1d3456"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_knock_wall.ogg",
+      "size": 6366,
+      "sha256": "564ca0f25186ca3c9df87fa3906185308392bd5922fbca3ae2544636e05b97aa"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_land.ogg",
+      "size": 10712,
+      "sha256": "f79a394ce954823f4dadac68e0d854500984a7d23d4578ff8499e91aa691e673"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_multikick_hit.ogg",
+      "size": 15680,
+      "sha256": "62cb9ec9e7f5ba34690ffa66cb7ac1fc1ff6217a58d7f8c843d9f445b91335e7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_multikick_hit_1.ogg",
+      "size": 5986,
+      "sha256": "5780da9e5676aa6930fc518216fc5be01a1bb0d6db963818900f4a1b83144838"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_multikick_hit_2.ogg",
+      "size": 6862,
+      "sha256": "d673a7d09e207a891f5d65058b13ffa35ad410d1d436cac9b86fee4db2d306b3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_multikick_hit_3.ogg",
+      "size": 7355,
+      "sha256": "a01f7d487be22f71e7a137325e69c577d7bc5df3fb7669b87df8bbf456b20fee"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_multikick_hit_4.ogg",
+      "size": 6713,
+      "sha256": "f8d98479fbe489754ecfd9bef9ef2ab7745caa4d1cb11be974dbb7109a539868"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_multikick_miss.ogg",
+      "size": 13831,
+      "sha256": "4cfd57da3f9d0f9811561b33092ac8da1939532c08339339a28c618d2a67f83e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_pellet_impact_1.ogg",
+      "size": 9522,
+      "sha256": "422e32bec95656c57a58017c5f018aa170eb0030f1b82a8d1c4ec05ec81ba578"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_pellet_shoot_1.ogg",
+      "size": 10172,
+      "sha256": "ee8eaf1f5b8bc1892d965f7a842723c37b875c0ad98d171f5cba3f0887d56e3b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_pellet_shoot_2.ogg",
+      "size": 10136,
+      "sha256": "a7e24ba5b18b6244f1675a5aa6e6e32c4709d37c4e54c53f54ff3e97f80327d6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_pellet_shoot_3.ogg",
+      "size": 9644,
+      "sha256": "eac7074024fcb18ad326ee4980714ce0095f28b93bc8e2ebc771f15b440e1f01"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_punch_impact_1.ogg",
+      "size": 9682,
+      "sha256": "0e03068661fc6cc09f394986903353669f63330094f227f34964a1f02a6d75f7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_punch_impact_2.ogg",
+      "size": 9176,
+      "sha256": "99d1f8c042f046ee4cb896802a94818243d76623f83c6e6f682f8b3e3ff9adcf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_punch_swoosh_1.ogg",
+      "size": 6607,
+      "sha256": "7ffd2ea634bd2d5772db636b0a4ff521e0fab04a71c61d06b0e4467c1f7c8ee5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_punch_swoosh_2.ogg",
+      "size": 7237,
+      "sha256": "7f3c670e1183e339ad574f756a44aa9e66a95831d4728c277c3d911ba90e54e3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_sliding.ogg",
+      "size": 28885,
+      "sha256": "ab2f4734dd1fd4219bac7797d3a915e2a4fda95fa83f1b8bd4c30f3f87dc2ae3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_stunt_1.ogg",
+      "size": 17040,
+      "sha256": "eeb88ee0d8bba3717379f98cd5440206aeb4c6def7a7f9aa2398e0da146275b0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_stunt_2.ogg",
+      "size": 12664,
+      "sha256": "3e747774ef7e4aa32f61591c1051e6a66766232b4be6c77bffcfceadb96d73a2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_stunt_3.ogg",
+      "size": 9287,
+      "sha256": "4eca3438caa59c7cd35b2be0dc5e12f60563ce0c02fc5c8e42871e1684df670f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_suit_switch.ogg",
+      "size": 17553,
+      "sha256": "b6cab56796c68807209caf5a8783be32f6f7e2854cda4393890bda6f46b043c0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_torpedo_attack.ogg",
+      "size": 10189,
+      "sha256": "7c81d445022d81e647ad4b0b8d13a5ae49f39c8b84a664467b0b6fb80dd27a51"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_vertical_web_slam.ogg",
+      "size": 13841,
+      "sha256": "69d1a02bb29d0ff96581a33b33a23551c14be8ae1531960642625db95708eabf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_vertical_web_slam_swing.ogg",
+      "size": 14228,
+      "sha256": "674033c2d32963b5fe1ac6b5827dd47bc56f8b91df5d404585ccb10961a443a5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_wall_climb_start.ogg",
+      "size": 7733,
+      "sha256": "537cf3cb74aa94a49a3be471b2daf69512fa880b63b8ae8a75175535551b4f2b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_web_swing_end.ogg",
+      "size": 21010,
+      "sha256": "bfc5de0a0d0e18f76ea828735e9f1940d999502eaf7f59edbb34b8e19a6f7105"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_web_swing_start.ogg",
+      "size": 31733,
+      "sha256": "382b3cb10b2f0a9366bac4983ba4e64ef8dab821155b4bbade176ba6916783cd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_web_throw_1.ogg",
+      "size": 10987,
+      "sha256": "07244f320502d6100854ca5b7ffa73410730fa4892bd3c99a4d9bddd17b56e77"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_web_throw_2.ogg",
+      "size": 12476,
+      "sha256": "fb7cf3c5bfbdb5e682526e5e84d0301029c975fd19d52ef5074b2bd79a69ff0d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BASIC_MOVES/sfx_web_throw_3.ogg",
+      "size": 12686,
+      "sha256": "4f1ad086f76c8c59a640c3246cf1df10d77fef72821c1531387e692b08f61012"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BLACK_SUIT_MOVES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BLACK_SUIT_MOVES/sfx_black_suit_special_swirl.ogg",
+      "size": 17074,
+      "sha256": "5e36d5fd9cac3403339d55ef6b25db907c6223d72226ee8878a1c357f2cb64e8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BLACK_SUIT_MOVES/sfx_tentacle_shoot.ogg",
+      "size": 12674,
+      "sha256": "c595b3bdd88d748de88832904003f88b13ab05a454b82eae60ebd497d55ae014"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BLACK_SUIT_MOVES/sfx_tentacle_spike.ogg",
+      "size": 12005,
+      "sha256": "2fde8c5ac6a39775c862abda70a726facdb3db8ea3d1954abd9cf12a0fad7d95"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/BLACK_SUIT_MOVES/sfx_tentacle_whip.ogg",
+      "size": 11506,
+      "sha256": "0f0fd5a04c033797ca868de1c2184cb549ab6156d2c14d73818917e5835f7f73"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/sfx_air_diagonal_kick.ogg",
+      "size": 7689,
+      "sha256": "712a9ca46fe3fef0905cd9e31f7dd6424f4a5489dd54466e8eeb1f08492318c6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/sfx_super_web_attack.ogg",
+      "size": 11827,
+      "sha256": "a9a58ec329a80b7a86ed9bd088f016e0607fbb2ce89d7dfebcf06f54b2d8e2f4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/sfx_super_web_final_attack.ogg",
+      "size": 15846,
+      "sha256": "0e2fd45599e9a73e60356b48227c40decc1d25a804d123db258ba52e0e4e7cc7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/sfx_super_web_ready.ogg",
+      "size": 19154,
+      "sha256": "319f736cd395598ba66c1bd4f1845039b79143f4b4057be21b34a3aadfbb9d2e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/sfx_up_punch_attack.ogg",
+      "size": 7544,
+      "sha256": "fff97f0bbf5594fd316d5f51a4e1c5830e6c4a08818ca0ee708096dde18079a6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/MAIN_CHARACTER/RED_SUIT_MOVES/sfx_whirlwind.ogg",
+      "size": 66996,
+      "sha256": "c28d7f2f7013a6789635d425af146b22e8dff0f8a613e39ae125ffb22bff0fe5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_charge.ogg",
+      "size": 42806,
+      "sha256": "2b9e33ef8bb75cd138bbb1b6ccc1c8bd88353b4103ada5b1f993be3c124de0c7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_dies.ogg",
+      "size": 16215,
+      "sha256": "435b033f7f70e28f1f4bcc5bb79c3287322534de953886372d6ae8a3be8df326"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_diving.ogg",
+      "size": 11121,
+      "sha256": "7859d310938be3aa46bb2839b307c2a0073761d010fd7b29c3672bb6f7936dea"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_hurt_1.ogg",
+      "size": 9236,
+      "sha256": "9c383f633a6e5fa8e855bcdaba5e0f767b78538909691035a3996b576140d3db"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_hurt_2.ogg",
+      "size": 8131,
+      "sha256": "36da102a8ba37fbc72104e38ce21e99031c97b4a93b45b4fe810efdb28b61999"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_hurt_3.ogg",
+      "size": 8970,
+      "sha256": "63d0d19ba0db69579705096e6cacf97ef3b67c413f7a2e635e2f1cac35590b79"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_lightning.ogg",
+      "size": 28290,
+      "sha256": "ab534a27932a604252d19a5388893c80200ed68ab1a04cdbe83707c619e8910b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_nova_charge.ogg",
+      "size": 29736,
+      "sha256": "3b5edd3deb0b043d5c6a05b407cf8e9f5289fd01b90f2aed5e5e94daa6d69265"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_nova_release.ogg",
+      "size": 27821,
+      "sha256": "b27e0cfa4e1d7deb309b628135b81a454bde4b5d0761a391745483945f51fead"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/ELECTRO/sfx_electro_whirlwind.ogg",
+      "size": 43339,
+      "sha256": "6b735869b63f4d16dde810577c8a36f6b5250dcd07245f232792fc97a88e6738"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GOBLIN/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GOBLIN/sfx_goblin_dies.ogg",
+      "size": 21268,
+      "sha256": "af1c83336720d34c640a5b83d0bcbfbfe381e49ddf856a8743c2d8f73219b819"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GOBLIN/sfx_goblin_hurt_1.ogg",
+      "size": 6655,
+      "sha256": "ba3806dfef8671a9d92d2e9c7c6ec9cdc94d23d7c1c9f09f153d20074c1626b6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GOBLIN/sfx_goblin_hurt_2.ogg",
+      "size": 6400,
+      "sha256": "e8b5b14b483347576f1555f684cdb513ef02b62b09c2a95514e1763c47af4b41"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GOBLIN/sfx_goblin_hurt_3.ogg",
+      "size": 7154,
+      "sha256": "20114c5ee140bbc0b913d83bf8e8ae59f15bd8fe664cdecaa28e9a167ce97ba8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_dash.ogg",
+      "size": 22143,
+      "sha256": "7040cd34cc917566264582758a2a3c74c3ea83588044caed333dddebc05c38f8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_die.ogg",
+      "size": 21658,
+      "sha256": "36c850756c64698ce700097c5c35f5ba7f24b8c72c17ab3b50e4f51667381fe7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_fireball_land.ogg",
+      "size": 11624,
+      "sha256": "02cf1981412b51595219f2f0c86f3dc2b506ebe2c450e06a4b5b7546b19c9c46"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_hurt_1.ogg",
+      "size": 7144,
+      "sha256": "123a08c728e62e60ce7723fb84e66e1b2b6630865f090061bc6be94881d2e09b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_hurt_2.ogg",
+      "size": 6709,
+      "sha256": "411e44ab1d3ede36f8614b51d152ed7244f7901d40c08b3c3b9d037d01fdc27c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_hurt_3.ogg",
+      "size": 7217,
+      "sha256": "0ab40096b4bd1ce253743c9f9b225ef122c2a92b2960a32c9269e7a4231231e0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_jump.ogg",
+      "size": 12332,
+      "sha256": "4aa68078840d2a42007712aca0e84e8e8bb493690d90f73967da9b486062de95"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_land.ogg",
+      "size": 18607,
+      "sha256": "d4779a67862aa90da66d70617076a1c5fdce86fd7bc8140a4e9bd2276748a423"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_roar.ogg",
+      "size": 19695,
+      "sha256": "4fb4140dc153a8ab5bddf73902417f7048634eecc689f436442a07f89a590506"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_roar_in_air.ogg",
+      "size": 23687,
+      "sha256": "eac1fd272adb5b70c98d9a9ea3240e0e001f1f738b2dc69848efbd32b7f69437"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_spout_fireball.ogg",
+      "size": 20820,
+      "sha256": "c8d83d3b5d209c5670fc5e14dc2e31958b0696121af8fa51cb73c62fbadcdc57"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/GREEN_GOBLIN/sfx_green_goblin_throw.ogg",
+      "size": 11897,
+      "sha256": "fddf0de8274e0cbd26ae2fa42d587a78ff257ef0afc647b3d1018bcdc61e3e56"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/HOSTAGE/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/HOSTAGE/sfx_man_hostage_help.ogg",
+      "size": 14116,
+      "sha256": "397b4abf1ea8eda8502399cb1c3e127bb1831e2560efdd2854f011e98df33d5b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/HOSTAGE/sfx_man_hostage_thank.ogg",
+      "size": 20996,
+      "sha256": "2b68171e6ddbaf938641d3e5621890f5636ba63234008abd94ff9d05e21affc1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/HOSTAGE/sfx_woman_hostage_help.ogg",
+      "size": 15007,
+      "sha256": "c8b13be21ced932119b25604f6df149af04abf6178a9d37d6e416cbe3293b7ec"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/HOSTAGE/sfx_woman_hostage_thank.ogg",
+      "size": 20714,
+      "sha256": "f34344fa2677ed7041de483d7c0229ae8d4ba75597eba0dbcd34e7f1fc7b2985"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_dies.ogg",
+      "size": 19357,
+      "sha256": "fb55dce765c07c82391f68cb9883d866b156b27084204682998f9a5f0ab66e31"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_electric_attack.ogg",
+      "size": 20351,
+      "sha256": "849da59def6d07d1f2a7e3a85cb0864475486cdef8040094a0724877a2eab721"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_hurt_1.ogg",
+      "size": 8210,
+      "sha256": "06196050fac6c2bbe3403448b99d13059d8b9bcc862a2a3d8015689942013c56"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_hurt_2.ogg",
+      "size": 7101,
+      "sha256": "c43eaf2603e968368ba4950027bf51cb000bc5bc9c2969512c4d0872db4ddb82"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_hurt_3.ogg",
+      "size": 6544,
+      "sha256": "f7906edff6e82dbea8685a30246c64dff8ef5e0250cc2f1a141eaf35ae93b78b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_jump.ogg",
+      "size": 12498,
+      "sha256": "19e72eb50c0f8a37958a78f28fa8e359d94d54e15b1740148f01bc118653d7e8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_land.ogg",
+      "size": 20200,
+      "sha256": "7a0aaf55bc6540e126e0450357aa5d242347ce3153f6881bb7806428ae2132f0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_plasma.ogg",
+      "size": 79556,
+      "sha256": "d642929be59e3bec7d3b0c9459dcf4c947df307c02655d6ba93a754044ab543e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_plasma_thick.ogg",
+      "size": 44145,
+      "sha256": "f0e346dc34deb5e744da9ed767ce0bf03ffdf593bf9a70870369a96e0e021832"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_plasma_thin_loop.ogg",
+      "size": 29341,
+      "sha256": "ccbaff7adf90831a03bceeb79b3dabf211ee10e5bf971a9491cb344fc8f2ed7b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_plasma_thin_start.ogg",
+      "size": 20095,
+      "sha256": "3b1d7808317eb1eb22c2b314c006a583b565ee3abca6fb720c49705a9b96496f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_tentacle_attack.ogg",
+      "size": 10709,
+      "sha256": "5e4aa3d23b5055a50a22547184e20e1a0f3361a860fc8bb5a1324f9ca2f2bf4d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_tentacle_hurt_01.ogg",
+      "size": 9935,
+      "sha256": "50e61d11bb917e39e3c6a9bf55fcca7bb3a6c113748b87080fb3d537e84d95cd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_tentacle_hurt_02.ogg",
+      "size": 8524,
+      "sha256": "c6d11514af6584bf73f8bf9f9f3c88517caccec2d5b8d6236718ca801ffae071"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_tentacle_hurt_03.ogg",
+      "size": 10048,
+      "sha256": "27321ddbb8bf2592c43ad5fbee26be9ab919dcf60fa57b20ab536b644744f8f6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_tentacle_out.ogg",
+      "size": 25655,
+      "sha256": "ea200f7b6e84aefd6b6d939d28c7e9df37c01ffb60cd90c73a7507c6b83eb95e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_walk_01.ogg",
+      "size": 6561,
+      "sha256": "7746d8c9accda668250ce14895c3f11a5a032c6a8689f7039ce96c5accdb1af2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_walk_02.ogg",
+      "size": 7641,
+      "sha256": "3e08f7654a4652ac221c511445364fa3d68151bd2f7eb0b54e202080e4f712a6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_walk_03.ogg",
+      "size": 7429,
+      "sha256": "9364f962dbd5c75a07e98bbc8a7de33314d6260f395e70ada7d9e4e761a9c246"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_walk_04.ogg",
+      "size": 7849,
+      "sha256": "dfb22095e66af63ec05c82fb82032382b322fc3f7e506614a537ea6c740e8b4b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/OCTOPUS/sfx_octopus_weak.ogg",
+      "size": 22364,
+      "sha256": "cb2eb73d4437b7e07b1a9e41f46772a88af8f674e4a51d902a2d063ed0e9be1c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_die.ogg",
+      "size": 19212,
+      "sha256": "8fa300e026b60a3b7c7283241b9fdd6e647c586458384311583f4fdc134e5563"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_double_slash_1.ogg",
+      "size": 8785,
+      "sha256": "a404c218a7535f9408984c193fefdc013a3662edbe6477e2bd7c93ee363aae89"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_double_slash_2.ogg",
+      "size": 8679,
+      "sha256": "4baf4567b5eb9af154a0386cabe8bb85468fbb11b66c6c2c6010edb4fcbaf25d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_hurt_1.ogg",
+      "size": 6632,
+      "sha256": "939c85b5e43842bcae2b2f7808f36ca575365b73c3dfa5638d8033a3d1b0c142"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_hurt_2.ogg",
+      "size": 7240,
+      "sha256": "18310467c2811ceca4b8ccde3e00588fb53bef70cf5510dbdc6cbe71673a8cc6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_hurt_3.ogg",
+      "size": 6665,
+      "sha256": "9fbb06be5287a63b73d9f86ca86c95ac41b289fdada258d9963ca5a01cd60c29"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_slash.ogg",
+      "size": 11624,
+      "sha256": "750139171e53c1717a599d2be324e8be4da39766b80a2395e1bf0f4e0cfb82c6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_throw_end.ogg",
+      "size": 7754,
+      "sha256": "8137c7c7a8d8b061242cd6a961f07beba8758e4c46b60ff6904507576b35a5bb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_throw_loop.ogg",
+      "size": 17867,
+      "sha256": "4c1be1e2fdf097a688531fc4f372e789c3f5ace577219f8a00abdb4e69568640"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/PHANTOM/sfx_phantom_throw_start.ogg",
+      "size": 9416,
+      "sha256": "0b991aa9776f9e26d612b9d42a6b5128b575b31280b278c707a6f18249f85f9b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_bump.ogg",
+      "size": 22186,
+      "sha256": "bec527646d72a15c60f9b49032c3c18672a18ed021167556cae21205d0929203"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_car_fall.ogg",
+      "size": 16950,
+      "sha256": "aec2b6174ca10b283d8667164d6b7b5ac432b7a4262d9b38cac2734aeeada4a2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_car_throw.ogg",
+      "size": 16031,
+      "sha256": "896a99522dee2f77d3c8a3ae9252cb85331b0654c3ab82f768be79b046621832"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_defense.ogg",
+      "size": 20339,
+      "sha256": "630a77f60f8e31af82982acd3f1720c8fc7670f1e853ab2ca1aa7b18ad3f8fec"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_dies.ogg",
+      "size": 26010,
+      "sha256": "f663272ca8f9741a2f97390b61d08649544c116a455618838962a2c0d51283ee"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_grab.ogg",
+      "size": 84610,
+      "sha256": "f54408453f6857c5e9c3904526903bfb6a14d14a6899de18abbe423c921f7eea"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_hurt_1.ogg",
+      "size": 7973,
+      "sha256": "e868b683d82982f9f50b00a9d419e1e1bb2215f9ea0ae54e9f3484f3f219bc84"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_hurt_1b.ogg",
+      "size": 11268,
+      "sha256": "0176a124d31c01bb98472e7e13840775e377826988af43e34c831f4acafcbc2f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_hurt_2.ogg",
+      "size": 8348,
+      "sha256": "8a44165ea0bbb514f9973a1a6c1102a9fab4828c3e847dfeda7a7f99a9111269"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_hurt_2b.ogg",
+      "size": 11633,
+      "sha256": "fabab13cc3d514874010a2f8d860ea271c580ce20b9af67a99ab11555787b7b8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_laugh.ogg",
+      "size": 24856,
+      "sha256": "41fa00bb6a22ab67ddf53e3cae6627c5df828e9ad76523e6b23a6665e42c3fb4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_rotate_attack.ogg",
+      "size": 13052,
+      "sha256": "0f8c161f04157a49d734385d41e264f4c4cc9ca1addbf5a030fe5d3d26d78462"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_strike.ogg",
+      "size": 26385,
+      "sha256": "45aff8c3c18eca93ef147f8ad66ff0369d1f1b147dd0d149ee41007c788d01b5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_strike_1.ogg",
+      "size": 9389,
+      "sha256": "00ab644c9d80bb252cf6775882bfccde847ded607fa590df60ee53e90788f9e6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_strike_2.ogg",
+      "size": 10606,
+      "sha256": "a27c593f520ad344ce93be2278763b3981252b3664e61b0042927ae4dd333470"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/RHINO/sfx_rhino_tramp.ogg",
+      "size": 20484,
+      "sha256": "bc3227b3cfcc865dc05336850a174c081b3d4072bbcb82c917c2c688289170e9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_Punch.ogg",
+      "size": 15720,
+      "sha256": "2b94d5b8c67ac0da6680a6c16f4ad9ccace267d2e74c695e7e3d92b7a6fcca29"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_big_hands.ogg",
+      "size": 15890,
+      "sha256": "eb556b48c015af95a8bc13a4625af5d0ba48262ca2b67e1685cb5c030f25ed15"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_dies.ogg",
+      "size": 18021,
+      "sha256": "f2dfa76b0651b20d3f1352402a496381bff640c6dbe090d991c61d82628182f4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_get_in_ground.ogg",
+      "size": 20359,
+      "sha256": "9a5a23b9068eca85cb84ef74f59919c9e905e58914ac0f570654de7ab3b0cacf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_get_out_ground.ogg",
+      "size": 17568,
+      "sha256": "65373a058ad9c7be311b9d7f9e5aea4622fa93ed7e5ae8600f8fc72c62758a41"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_hurt_1.ogg",
+      "size": 8020,
+      "sha256": "82d934acba2c72d23cb329dbb9a20bd3a80f236d70b92370835907bb410f3500"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_hurt_2.ogg",
+      "size": 8025,
+      "sha256": "f51d110b56935dbe1f8581a54cd4288c434e286912b919b3baff01dc8515a1b3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_hurt_3.ogg",
+      "size": 6876,
+      "sha256": "9597cbc5bc3e3df3f5f5c7556f5d0223eb8921af12ea7dd17d40957f61fd59eb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_move_underground.ogg",
+      "size": 26116,
+      "sha256": "71ac6ecb03d837eb5e47367160b211e083836280a2b6bcab172ae25c0a499fdb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SANDMAN/sfx_sandman_strike.ogg",
+      "size": 12283,
+      "sha256": "bed2b996ab1d99436c7cf7e1c2e6b2e7103f422a67cfa4033259b0b100ba1c34"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_dies.ogg",
+      "size": 19500,
+      "sha256": "b6330a6519aa617a8a98b09f9705e41935db2714968828023c3ece16c0eb6dc7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_hurt_1.ogg",
+      "size": 11406,
+      "sha256": "8992ca2a5a49d478870c904e34873e5410851b5b49ddd7daa4a52aef77b7d819"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_hurt_2.ogg",
+      "size": 11145,
+      "sha256": "012e49d287ca0ed450491012b695d72930128883ac703ac510df2167b00bed87"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_plasma_impact.ogg",
+      "size": 22292,
+      "sha256": "f1f575700bd27fb13a9d4537486d1f9e5643a6c5f8291f3e5524e22c321cda3a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_plasma_shoot.ogg",
+      "size": 17744,
+      "sha256": "00674a3946e96fd9cec97a8d6c81aec39ee81b6e5d81ad015ca5b05e2667e7e8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_shield.ogg",
+      "size": 19380,
+      "sha256": "56e7c1bf9af235c881e1b2a33084e3d0c781a6f9dd2243d931a2d675c995e346"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_bot_shield_break.ogg",
+      "size": 10198,
+      "sha256": "2878068de260095ca609ad1bd0fbe1c96481ce576440d35644e7def356619f16"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_plasma_loop.ogg",
+      "size": 33666,
+      "sha256": "fc5fffd0c6b860e63a735cea71584ce18482a0b5a6f54ffad50670c2ce8d9935"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SECURITY_BOTS/sfx_sledger_swing.ogg",
+      "size": 11517,
+      "sha256": "07e24f61f174af6abb7280cee8f28506ef9c8e969384898857cedba71f27ffdd"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_attack.ogg",
+      "size": 31174,
+      "sha256": "628d3c3433a785061f7468755a7a28328047cda0fd69e64c1672fd58d5ead33c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_attack_1.ogg",
+      "size": 11719,
+      "sha256": "d8fd92aca520b72d2f78b250eb848f6a96e1def36150462ebae85b9ddd653ee7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_attack_2.ogg",
+      "size": 17898,
+      "sha256": "b88504f291568169f9e7ffc80bf0e941844e68c010518df0783658e84f82671c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_dies.ogg",
+      "size": 34530,
+      "sha256": "b7b26de0e495885332e38af1aa97797933cd855cab258249a353a9ef1013acb0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_hurt_1.ogg",
+      "size": 8600,
+      "sha256": "d2fac2a92e448b9acda0981f849335d4052a6032de5373cc6f6a2eabd4d49774"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_hurt_2.ogg",
+      "size": 10351,
+      "sha256": "1cb075becb358ed69f3c09ecc48aea04f7b0e147262e8149f3189d17602d1e4b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SLEDGER/sfx_sledger_swing.ogg",
+      "size": 11517,
+      "sha256": "b64689c8f4b7a6d958b176264db0b06ca6ce2bc3e3cf976bf3c676bc2d40a883"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE/sfx_symbiote_action.ogg",
+      "size": 35354,
+      "sha256": "98ff63b8dd8e7d590f57cfc5564e37b7f4c6e120b0a67f8a6c1b99d9e1576002"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE/sfx_symbiote_trap.ogg",
+      "size": 146735,
+      "sha256": "6229bf15694c891dd9371ec0ffe2bea8615126ace6be6c292d6d1c6e77708bac"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE/sfx_symbiote_trap_hurt.ogg",
+      "size": 15598,
+      "sha256": "2bdb340c23656769b79f86a73bc58832d214222d312bcae6e0720e592c89eb7b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_bound.ogg",
+      "size": 80446,
+      "sha256": "8154a6f9edd9ce157ae9f62c6a0c6d6d8e4221cae9111263a26f80bf89810b14"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_bound_fall.ogg",
+      "size": 19422,
+      "sha256": "e39bcb67bf919e74625e5781eb29c9662755429b3b0d0ce496736d5bff690e2b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_dies.ogg",
+      "size": 17283,
+      "sha256": "88cf8c87c2ada701da2f8606e0928eda8c7252fbecdfd77d735af649973171c5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_hurt_1.ogg",
+      "size": 9626,
+      "sha256": "d88ad6ef60a335b272fa247513be641011bcf370266f71c4c138762c20d96189"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_hurt_2.ogg",
+      "size": 9764,
+      "sha256": "1656e2adf5aba81c605e57f3228fb989a8d0b35348eb7275c35083d010217151"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_scream.ogg",
+      "size": 21343,
+      "sha256": "1eeac407b6f8e679acc84d1979bfe3734ea7436fe98ed5f13bc84830778feb08"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_smash.ogg",
+      "size": 15642,
+      "sha256": "12b3b875a3369d30b2b2bb77528f8817433eaf4ce6a9bfcdced7deb96e6a7b30"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_voice_1.ogg",
+      "size": 18440,
+      "sha256": "a6399fef20a85b16c22f71bd592b3de54944d808a5e32f4afdba760181154733"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_voice_2.ogg",
+      "size": 18417,
+      "sha256": "bf7720d9a6f1111678fdd9810d1a20afe1d499da7d67b1a23922fb68d1cf869c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_voice_3.ogg",
+      "size": 18476,
+      "sha256": "6ac8008e0230256d119ec9870cc7d2c9cdaaed8a83826dc08f037cbe32f295f9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_voice_4.ogg",
+      "size": 20821,
+      "sha256": "6b17df2546cf077e43b04d9425997a84d94d2d5c55afb76adced5ed26bbfedc7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_charger_voice_5.ogg",
+      "size": 14994,
+      "sha256": "9c21a8617ed2080bade944eb67f16deb3ca3b17c16dba1272d9e49ae4e9490fa"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_CHARGERS/sfx_chargers_whip.ogg",
+      "size": 12029,
+      "sha256": "97344c8eaee05aad3bd364e495c447e4fde6a9f934fdf1d3bd7246bc62b329f5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_bound.ogg",
+      "size": 83990,
+      "sha256": "48f44c4e80525f34d5c03357e31ef0bda80f1d88b7167db6a7df17f3c7c4d575"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_bound_fall.ogg",
+      "size": 20836,
+      "sha256": "87b969c153c1bc1c4078be02cda1302d9db1625cf30b99dcf66efff17d71e882"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_dies.ogg",
+      "size": 21649,
+      "sha256": "94b2b9a75aecaa197dc7204e8af179280654e600c320c5a042b226cb2348104a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_hurt_1.ogg",
+      "size": 11959,
+      "sha256": "176ad1ce0cdba8ab62e2c4940e4f39f6f3a6c253591d4788cd9397bccee065e1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_hurt_2.ogg",
+      "size": 13368,
+      "sha256": "c0573ab03c41f8b3c82bb3f897cf1ccae4a3316ff339c884b61f2d4d56354592"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_symbiote.ogg",
+      "size": 19271,
+      "sha256": "be821d1e36505eda5a575b8b80613a2cd499747a45021fabea655038309bc3a7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_voice_1.ogg",
+      "size": 16817,
+      "sha256": "007ad0df914e93194164470db08b334672cd1dfc6b408a364a629d833525020b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_voice_2.ogg",
+      "size": 18537,
+      "sha256": "cd3c7b8a58d39aec37db4a0ab5fb0c40fa878832ecfaeec8c1db99ff9bd8bff4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_voice_3.ogg",
+      "size": 13752,
+      "sha256": "a00d79d09501b4d9066902752c77bcd5ac90206d0bfa25b530ee3d51719be310"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_voice_4.ogg",
+      "size": 14385,
+      "sha256": "47cd55bb6f6663587b94e3b256aa6c463a89ed5e7689048aa14ea6bc551282b9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/SYMBIOTE_ZOMBIES/sfx_zombie_voice_5.ogg",
+      "size": 22149,
+      "sha256": "3f12584e13068d06b88edcc92821e56c19fd73db45f00fa0acdfa202b4f24e29"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_bat_dies.ogg",
+      "size": 16691,
+      "sha256": "8702c71c9fba95d18eac7a1d083116f644a21b8e1beb983c5f775cf3d4364e32"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_bat_hurt_1.ogg",
+      "size": 8856,
+      "sha256": "b4f02e32bb183ef6396e99d55036c1e0df96ff9885ff4c73d04e442166293ef0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_bat_hurt_2.ogg",
+      "size": 8456,
+      "sha256": "9963ce6609a64490d4cf8966197dae88408fa28997de4c3bc1521df98c7b4d52"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_bat_hurt_3.ogg",
+      "size": 9083,
+      "sha256": "a3743ebfaf8e8cc13a133df442182343a2958deec8a587823f8e55af88f5bcd7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_dies.ogg",
+      "size": 13546,
+      "sha256": "3afb98a14f8ab74a38f3aff57bb4ac66321f966e69e185a5098c22e896e38d2b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_gun_dies.ogg",
+      "size": 10431,
+      "sha256": "6757b6e8bfbaa89e08f05f47ad3382c4aebb3e2996ab1f5f1139701e5d2f262b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_gun_hurt_1.ogg",
+      "size": 8999,
+      "sha256": "aac4ff5fe1afb10e369b73606a3424ff60bc1bf0ead0eb9359afdf5b83c74075"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_gun_hurt_2.ogg",
+      "size": 10324,
+      "sha256": "0ca21cd7c22c39bbda63c0b2c519741f892a2cea8927f9f2b7c80ab7e116f682"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_gun_hurt_3.ogg",
+      "size": 10148,
+      "sha256": "41e6bf7a3e921623ebed0fad82975009d75b3ea70b69ff933d5359d4ad9c4b07"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_gun_shoot.ogg",
+      "size": 13707,
+      "sha256": "439cb3c4a1daccf65e6b048222dbd521393a9096decaee4c3b092ec7eec667d2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_hurt_1.ogg",
+      "size": 10186,
+      "sha256": "5cc4a6b2e886c93ffb3b9ffa0a58c55ee86cfc8da4a0892736d06c24be22508e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_hurt_2.ogg",
+      "size": 8913,
+      "sha256": "9640baa6900d981eac302a2993b64517c4678e8c30e51cce9ebdc6b42c812d50"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_hurt_3.ogg",
+      "size": 8744,
+      "sha256": "ff9a27460b85d629011f2d00cfcaf0dcb6829e2d19e7b2029fa700b064e8933f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_dies.ogg",
+      "size": 17875,
+      "sha256": "ac963a51fef8d478755688ac539fad01e26ac1dd62f050e9830d1b8e6004905b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_ground.ogg",
+      "size": 16067,
+      "sha256": "21f090c356feb3260567a3c1476fda6816baf0920c0ac34f231d476212813186"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_hurt_1.ogg",
+      "size": 9047,
+      "sha256": "815d92bf2ef25a29b889c16ce182c7a946b8ae87e48575e91d0af40047828899"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_hurt_2.ogg",
+      "size": 8037,
+      "sha256": "fcfd99e62311a7c5d2b1eb7e3d84120e1874e1fa32476a196eb1e672547921dc"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_hurt_3.ogg",
+      "size": 7878,
+      "sha256": "8db8de4b1ea3e1ec76640e8bb6dee6947e8b7282c3d819283e1f9e79d693235b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_impact.ogg",
+      "size": 24686,
+      "sha256": "79e2304b64750aa1eab7f5bef60aefddac802053f00bf3c45d2c14fe2378c025"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_molotov_shoot.ogg",
+      "size": 10000,
+      "sha256": "e2eb56a0bf634ddd8e499c268c41984d7a1a02a9354d680807961aa963ca7757"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_rocket_dies.ogg",
+      "size": 9236,
+      "sha256": "f1589572e48797673d050b9c8c68b0ddb619f358cd3d6e903227152f20ee84d6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_rocket_hurt_1.ogg",
+      "size": 8801,
+      "sha256": "b7fcdf2b505240546019150d0802c376b61091011a24cfd215dfb161a1480cbe"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_rocket_hurt_2.ogg",
+      "size": 9105,
+      "sha256": "ba9b69af3035b3bd331d11ede29c4c2750626d395d741227e0dd690fb26b2064"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_rocket_hurt_3.ogg",
+      "size": 7913,
+      "sha256": "6c950e432ad8de0b650b0bd0c4b89a51d04367e061e79a1ba4d3229d38e57c53"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_rocket_impact.ogg",
+      "size": 14288,
+      "sha256": "d977bee7959b70e17c0eead8d861eaa4a6d7c0704d07822b675c1db577ef4497"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_rocket_shoot.ogg",
+      "size": 19007,
+      "sha256": "7ed2a4b9f92e82731f1d202e23b981bafad64c4af1d6ff012c4b2bbee96f3227"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_swoosh.ogg",
+      "size": 9625,
+      "sha256": "ace7a819a14882d14d96cc223a11f445955b91a44c4b4a3b3d09418dbcb5739b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_1.ogg",
+      "size": 35430,
+      "sha256": "86b650cc4f44b973fc7a496b2619d182b84a15979b0cc7f57db66f0cbb039ae0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_10.ogg",
+      "size": 21018,
+      "sha256": "0e65c9c13925c9a95a189abab351dcade40ee672038dd8e4fb22af3e477d4baa"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_11.ogg",
+      "size": 21608,
+      "sha256": "1981992d3f4eb2f686b6a2272efe4fdde36cd9d6f7fcd3ba2f8a1efd4b8290a1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_12.ogg",
+      "size": 15431,
+      "sha256": "04ea51ef32ff595801168efa8455ba61bbbcd8b682c8c2a6c59376f8ab8b18c6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_2.ogg",
+      "size": 25549,
+      "sha256": "19ae62d62855efe4a2247a4019f5e6f67343b7baed92f6b730e42fc12662f114"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_3.ogg",
+      "size": 30278,
+      "sha256": "9240f108ea3fcbf2cdecee51bdf6084cf1f5c1f005fff9e5fdc274f65ef08273"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_4.ogg",
+      "size": 24265,
+      "sha256": "f44047c4d2646ea006e61d87394a0de0df89c7a81aa0df85596623cef8010861"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_5.ogg",
+      "size": 21533,
+      "sha256": "cbcb1ddc671e283ea9f4db16121e54dca1ee383cf8388c72fb33d8f99a18e52d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_6.ogg",
+      "size": 30034,
+      "sha256": "e14fbcff162d6f93ef652ca1e45c65cb41c7f477fb02a3638900af5f19f69a8f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_7.ogg",
+      "size": 28582,
+      "sha256": "75ae05d6b3bcbc8dd1e5009c87420e77fadf18c814dd933a91c394378cfac0ba"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_8.ogg",
+      "size": 29232,
+      "sha256": "780fdc7e98b212c137277fc671d736a0785a10cff337823000156c383580c751"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/THUGS/sfx_thug_voice_9.ogg",
+      "size": 28221,
+      "sha256": "f336dca46cf7349932a528433e66e594087d092bdbc8d220e8ae2d297c6fcc29"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_attack_1.ogg",
+      "size": 10551,
+      "sha256": "703ce54f69bbc20db5b54e5c56d5b4aaae23d63fbd45caa10d0655342a21eb3b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_attack_2.ogg",
+      "size": 10617,
+      "sha256": "3747e918b389051521cb1040674101d7202d956a95451b71d4a8ef5f8008bd86"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_attack_3.ogg",
+      "size": 12014,
+      "sha256": "a267b3abd16410d4b5f9316baf39b6a738a8ed3a1e270b06b49fb8d7e87c8f63"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_claw.ogg",
+      "size": 9000,
+      "sha256": "5f9c42b5f72e235accbbbed9b4a1f81df59f92cd1ba37ee2ee4f8e952f0044de"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_dies.ogg",
+      "size": 29759,
+      "sha256": "cecb4d021fc99030912f070f74b82871557b8bdf19cfd263683a58f08651cfa7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_fall_1.ogg",
+      "size": 13535,
+      "sha256": "21a444d2bc2e6b7563d7ccaee9640b4f70a45ffada0fcd748a7d180778231113"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_fall_2.ogg",
+      "size": 10508,
+      "sha256": "4a4d405e4cadbc1a8a44e655990013b7d727c00e6e195d9e56bf29765fe4f10f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_fall_3.ogg",
+      "size": 14068,
+      "sha256": "d44bd3a925e0b1be7c8fd0926fcf4308ed9b2a716d28bf95d83f1961af072025"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_hurt_1.ogg",
+      "size": 9887,
+      "sha256": "fc329c0156892a8caa6462b66a70a5aa445fdd6c7389abae5357b742cd6da18e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_hurt_2.ogg",
+      "size": 9585,
+      "sha256": "e8afc05e43ab4ff4766b15393d98dff8b18a38dba47c810a3d09137b08e953da"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_hurt_3.ogg",
+      "size": 10318,
+      "sha256": "f7ffb5ab0a936280ac4a8eb5dcd7afdb5669e53db3e30df97d31730e1f1d096d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_pat_train.ogg",
+      "size": 22387,
+      "sha256": "1a74a54ce6d9c6fe66fa8e61730c71d2d11cdc9f11c1c8e59e4975c00cb22773"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_scream.ogg",
+      "size": 21153,
+      "sha256": "3e0653997704c8166f009e54650bb181af81e8e5253cc3366703e337152da35c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_throw_land.ogg",
+      "size": 9907,
+      "sha256": "f00ca33b23b9629568e0c8fb548df896e37cfe15c760db036f2bd5989ba2d5e1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_throw_symbiote.ogg",
+      "size": 7669,
+      "sha256": "ac14f9db85ed5fa42a98ef6c9b12ee2c11d823e71e217d4b12cef4b09e13b706"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/NPC/VENOM/sfx_venom_whip.ogg",
+      "size": 13583,
+      "sha256": "ac4cac29bf7559bc868635297ac7a8cff0aaa1c2d74e418e47d72ade6a38dca5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/COLLECTIBLES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/COLLECTIBLES/sfx_orbs_collect.ogg",
+      "size": 26796,
+      "sha256": "9e04eb5ea362d0db6de5aa6d6b0427e5b5d851477729ef139f02dfee2fa84289"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/COLLECTIBLES/sfx_special_collect.ogg",
+      "size": 22997,
+      "sha256": "619ca5f68fa9596b19451d17666bd68a9406a84374a1858594ec46a419f53905"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_air_conditioner_impact.ogg",
+      "size": 24226,
+      "sha256": "6032a0c066327fdecf1c1597e6e446069962963993dec57c911085292026de0d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_antenna_impact.ogg",
+      "size": 25319,
+      "sha256": "79846319fd7265758385a630aecfbb125795c9d5b66842c09f9a94052f50cb55"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_bank_chair_impact.ogg",
+      "size": 6189,
+      "sha256": "3012872a799251c16c873e809b4b514c71f481d323398ab83de8ef07d8c9c372"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_bank_desk_impact.ogg",
+      "size": 21737,
+      "sha256": "3e24277d0312be07e03226ef83bc4011c89e9dec485d7b150f848911bd13a3ea"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_barber_sign_impact.ogg",
+      "size": 17019,
+      "sha256": "1ee7d21fcdd5561a67fcdf3a413dcce4a653eba33fca0d1e07a96f89a1b187be"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_barrier_impact.ogg",
+      "size": 17462,
+      "sha256": "f0c40394dd9e307414e9e7706ad1dd9ad704e05bbd3e91158f2d31ce6332b96c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_battery_cell_impact.ogg",
+      "size": 39714,
+      "sha256": "cae68d32844ad9b551d9fa75bb7975031138c9adecf76b7c9002821f6cdb69b3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_bench_impact.ogg",
+      "size": 18108,
+      "sha256": "2cb7582ee3fa73a1467a69938f33d14109b67cc7a56dd5e623e7f7b105940e91"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_bigoffice_table_impact.ogg",
+      "size": 33916,
+      "sha256": "6ced8e4494d7ca1fc6b97069e58ceeacb9a3ca3cd4d6db016eaf58f9ae9b9c24"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_book_stand_impact.ogg",
+      "size": 24499,
+      "sha256": "314dbe294745f5f76be4640fd4db18c44655c913162a38241a445093162eb9e2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_bus_stop_impact.ogg",
+      "size": 20313,
+      "sha256": "45ea3cae32c059ed5203114df43e950a66f92c8b645b5461259dc15d255b012c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_car_impact.ogg",
+      "size": 52607,
+      "sha256": "f41de2a5e94b890c62e6701347fd385b2083f41e6bec5fb15f2e586456d05c2b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_crate_impact.ogg",
+      "size": 26014,
+      "sha256": "6307c75120f5094d744d8f84bb24f069ee6bfdac9d77514f2762676f31c4def0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_fire_extinguisher_impact.ogg",
+      "size": 10238,
+      "sha256": "4c33ee09f1b503f639ce801d3164694baf5028d113bffbad112d40904d778ed8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_flower_pot_impact.ogg",
+      "size": 17135,
+      "sha256": "b1a50b3fdc16fd3fca0491c91f729cacbb207d6a4e52a7ca6c85494567b55e60"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_gumball_machine_impact.ogg",
+      "size": 21397,
+      "sha256": "80e0d7d6b07c3728b503695a262fa95b1a47f6b19e1b8f45cf8d17947be78372"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_hotdog_stand_impact.ogg",
+      "size": 18115,
+      "sha256": "6c704d551c4ccb26d1ed53fca1d2ccbe280a7e67270cdc5478f154547f7fff16"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_hydrant_impact.ogg",
+      "size": 18658,
+      "sha256": "a9c3a07047062d842971fa24f2bcbee0baa846e26d540a39279e900deb51f375"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_hydrant_leaking.ogg",
+      "size": 23229,
+      "sha256": "3af8013e08c41e36775e6925ecb75407975766212ca6296b50601f547e7b8383"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_newspaper_impact.ogg",
+      "size": 21290,
+      "sha256": "c62f4bcda918b216a7605a0cd8192f9ab54641dcf137bb94bd5db55c1c1a7aaf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_office_chair_impact.ogg",
+      "size": 18131,
+      "sha256": "8badfe6fe7a76a7cebbf37a31881d66f23748d35c4e60dd62717774a0d26e06d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_office_table_impact.ogg",
+      "size": 47454,
+      "sha256": "3597217707e64e1ed42edd6a7cdb757fc5f9961eb5a43b92b00387d87461990a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_postal_box_impact.ogg",
+      "size": 17445,
+      "sha256": "695c3fb0f9dbd5a0778f115e453a2f6e11448d4ca07b7d724551ce9b03cda38c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_shopping_cart_impact.ogg",
+      "size": 25208,
+      "sha256": "c4183f8bad497959ca8039bdd73f99ac04f93c60db732aabf8e91737651c5c57"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_steam_pipe_impact.ogg",
+      "size": 18996,
+      "sha256": "1a15f9b315067714d8786cf3a6d0b784610069a4c41ec4e18266b680cd9b24b9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_street_lamp_impact.ogg",
+      "size": 26215,
+      "sha256": "b6dd235940a601217412d0a8df0b06914c31acbbf773fc129f5ef68ab2c89bf3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_thug_molotov_impact.ogg",
+      "size": 53095,
+      "sha256": "5155c4a0bdbf01c28996cb4a175298d5fd2118537f743ba8c8d334daa46f1475"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_traffic_cone_impact.ogg",
+      "size": 14456,
+      "sha256": "eb2862c17fb058221164fd110a3a27cfb0e67b559183993919e175f0a07d040d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_trash_can_impact.ogg",
+      "size": 20102,
+      "sha256": "d448b878f0a928e42a4ca5f5fbca2d88c19bbdc8c201c1732b02868432fc4e60"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_tree_impact.ogg",
+      "size": 11615,
+      "sha256": "2a82c3f719ef0779afb51dc44deaad3a514911634b29331a2fae3bda6e5c9f8f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_vending_machine_impact.ogg",
+      "size": 17822,
+      "sha256": "8c0453eea0cff86d12c6ff7fa3a4488095185695dfe8ea04621fdbedf6dd1e1e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/DESTRUCTIBLES/sfx_vent_fan_box_impact.ogg",
+      "size": 20189,
+      "sha256": "cee784252bf9cc8e2c86fc8ea810e1d12f59bdaeab266504d28986e37517b11e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_block_symbiote_close.ogg",
+      "size": 15387,
+      "sha256": "683f10230f3d0a21ecd1ddb1fd3a06e05641c6b18903e8f7c5f00a77f3db5891"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_block_web_close.ogg",
+      "size": 13283,
+      "sha256": "421dfa47c389e539491a8fe9a1f000c25c3086c56a3766abd2356e13277bae13"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_bridge_falling.ogg",
+      "size": 25116,
+      "sha256": "ad9e66ea57cfdf58ab0b94968d0931536a5155eced0f83ac665621f1e9cea951"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_car_fire_loop.ogg",
+      "size": 49701,
+      "sha256": "89888cc51a917ab5eaac58c39599fda5ad5c0a89aa35896db6f0930df01200d1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_drone_alarm_1.ogg",
+      "size": 8647,
+      "sha256": "209111c8b14d37a9eb223132c7fe3ad22e90c94a52be03ba41bf7b09c20d08ab"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_drone_alarm_2.ogg",
+      "size": 8736,
+      "sha256": "12e92d0de6e829fa063e1a63e0ea2a45450aa56192dbea4cd9240d9a16788616"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_drone_fly.ogg",
+      "size": 31751,
+      "sha256": "c8d1c47af6d5a03050eff60a834a57113d98880803b6fe9bea15e0ae76407162"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_electric_door_loop.ogg",
+      "size": 40963,
+      "sha256": "515889cd88e8406fa6855f56301d28302abc18c368e0b8480396a0afdffc3562"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_fence_down.ogg",
+      "size": 12486,
+      "sha256": "38da5278d16acf9aeee9f1c4286b2813d6d2d00c068f7c9f0e1cad6370775b8a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_fence_up.ogg",
+      "size": 13162,
+      "sha256": "63578f7b536606a93685a32c3e07d8642b0187aa2afc7477d2272c546d76e055"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_fountain_loop.ogg",
+      "size": 82467,
+      "sha256": "6e750df51ca37e732296e773469b43da740bbf0d1f3e8e600941bd74a9e32750"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_glass_break.ogg",
+      "size": 21946,
+      "sha256": "0bf6d2e6c89ddebec93c92dda0271105fb0f48a0db039428f4b6475c4e16b2a6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_laser_beam.ogg",
+      "size": 43815,
+      "sha256": "28e1edb0b2cde3ce9e3c4031b938984fcffacee314005811f06463ff2aa3585e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_obstacle_falling.ogg",
+      "size": 48136,
+      "sha256": "141665f8b7388f5926325782632506d2d5336417ab33c2f1d26dc7277f095a60"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/MISC/sfx_switch_off.ogg",
+      "size": 16307,
+      "sha256": "41ffbdff48a283c16e3384a9a8e8ae828d85a08c3dc688cf181148f0c89160b6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_bridge_trap.ogg",
+      "size": 140819,
+      "sha256": "b53ccbe32750ab5f31210095d835953c7292b142c4799f198dc5eeb945beb5e9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_electric_alarm.ogg",
+      "size": 10672,
+      "sha256": "1597a777feacbaff8492390778cfd633392c905fb45028bc14c25ddd9cf3fe38"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_electric_trap.ogg",
+      "size": 35264,
+      "sha256": "44fa64fd0018e9356841e2bb623c79215c9c34e95a26a98e1cf56f1deb2c589e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_electric_trap_hurt.ogg",
+      "size": 16588,
+      "sha256": "eb864c22d7abd88bc99b48db0b644a6a1582a9b4777444b0b0de53cfd2ccfcf0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_fire_trap.ogg",
+      "size": 87309,
+      "sha256": "71d731691b3abc2401c7cf78a77db2e89b85f4f3f086c084ef770374d705ab2a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_fire_trap_hurt.ogg",
+      "size": 17964,
+      "sha256": "49b291095baa29d2152c690da0647c4bed037e8056851ddf0c3a02c6260fd7db"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_subway_train_run.ogg",
+      "size": 43108,
+      "sha256": "ad3d012409180321eb7d4bd1e96d47b5ea62b5e5f9353b29b75bf0059c67bdaf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_subway_train_trumpet_1.ogg",
+      "size": 12277,
+      "sha256": "c84da231e045667940a7ab4da420247fae0cbbf07991c1ea374a19ba23b5c847"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_subway_train_trumpet_2.ogg",
+      "size": 20667,
+      "sha256": "27ecdb61829ce1eb89a89bf9d06b377190c4bd694c576daa5dafb38ac9af299f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_symbiote_action.ogg",
+      "size": 12451,
+      "sha256": "97e1a24cd0671ec3f5afb1286fccef98b6430073ce609cc4646b8ec5e67ab214"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_symbiote_move.ogg",
+      "size": 45755,
+      "sha256": "1a09eff6d6b1b9bebe9de22f5cbb41ae2ed1736da332147bd929e8b36f7986eb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_symbiote_trap.ogg",
+      "size": 142453,
+      "sha256": "39d66c7e9235964e8c61a6f5ca4fcd3d5601b2b3c4c949af4fe1ed4703048e00"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/OBJECTS/TRAPS/sfx_symbiote_trap_hurt.ogg",
+      "size": 11071,
+      "sha256": "46bf7eb18823a6a4591023e56fc18975dedce908b120b95cb51ab56ec1cd1319"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_camera_shot.ogg",
+      "size": 11458,
+      "sha256": "d66e3e77a5cdc79355a15bfbe3e861818619fda00eb24d4889abca7dc9d2cc67"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_qte_click.ogg",
+      "size": 3848,
+      "sha256": "0fde256c3f46770eeb1adb67133a0926634d68664daa39a008b64123b0411ec3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_qte_fail.ogg",
+      "size": 14381,
+      "sha256": "eccd90dc585f8f8c3e2497c9d119f925ec21ddcb851128176b9007f35fe8a374"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_qte_success.ogg",
+      "size": 22462,
+      "sha256": "fbed46e8b8e6e30a6e389535c0b1d0faafb20f023cba8777df26e6d9524c8231"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_qte_untie.ogg",
+      "size": 17535,
+      "sha256": "52ccf675dc8981f37971560a2354bd0e38c254074e8b4b43ef53dc7a9611a48f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_spider_logo_in.ogg",
+      "size": 38350,
+      "sha256": "45e4fd5b008c4b8c4144b6195a4c56655e238f21e4e209657a0d80bd9edc1a94"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_spider_logo_out.ogg",
+      "size": 42721,
+      "sha256": "67c0b1b4d86e2dec15e43c87593e1689a00a6fbcf4d06e6c216dd9d177b026c0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_spider_sense_in.ogg",
+      "size": 43053,
+      "sha256": "85501461c7ea0e377bd58c1f82d6262e7cb148b045f7c3d12a5b406b6bd3473e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/SFX/PRODUCTION_ELEMENTS/sfx_spider_sense_out.ogg",
+      "size": 20320,
+      "sha256": "57cf5a96b2acb69ca6c9a4b28410e5d3e0edd75b8632f51d13c0e1c7ac94136c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/.nomedia",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_end_girl_01.ogg",
+      "size": 12391,
+      "sha256": "40f23828af6d05e0c879870b6faa57e1a03efec3ab7bbd2b80e9e9cb099b1e45"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_end_girl_02.ogg",
+      "size": 43928,
+      "sha256": "d139eef7c73d15426fe4f9707cb49bf85ee278eb22922af75f97ea28cffc7f03"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_end_spidy_01.ogg",
+      "size": 20518,
+      "sha256": "b081fe6140d6fe8bb3e4e948e3652c3023823b0416be2b485f37ee4b2b5f834c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_end_spidy_02.ogg",
+      "size": 47032,
+      "sha256": "915d90fd0f3aad92ace46003177fa979b0928e072587eebd73a1ccea54f9e3f4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv10_02_spidy_02.ogg",
+      "size": 48988,
+      "sha256": "2933c86d8814ae534399d37142d1efa8f53ba60ae2fd0e28a6cecd36dcf46e3b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv11_01_spidy_01.ogg",
+      "size": 63090,
+      "sha256": "ac05aead319837cf48d6884a510c9b8883c87df7c6f4f67b5c6d7e91537866e3"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv11_01_spidy_02.ogg",
+      "size": 31323,
+      "sha256": "ae7528766318c8030256f8df8cc54883198b8d93d986ce13852196e9b832ea8f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv11_02_goblin_01.ogg",
+      "size": 131661,
+      "sha256": "d488ee8eeac41072cac259df9df36baff4a2e5b24b6bfb4bc9d9d8cd3d38e7eb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv11_02_goblin_02.ogg",
+      "size": 113760,
+      "sha256": "510e305c414c2e914fabf6f3dd561bd3eb36ef4c1d31d4e63912c1eb88015f35"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv11_02_goblin_03.ogg",
+      "size": 92903,
+      "sha256": "92f568245ad12c44d22cabd4c5fd7b3e7b2db677b07b48a3ce3b62c7fcec6a03"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_01_goblin_01.ogg",
+      "size": 33164,
+      "sha256": "a48d3dc20be8b9ad438e669cb82c66aae22943a32a3009627afe67002b9ab022"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_01_spidy_01.ogg",
+      "size": 22215,
+      "sha256": "07804da0d37a900f3345723483383da5c4124d96c4739b1086d439188f5b1ed2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_goblin_01.ogg",
+      "size": 82044,
+      "sha256": "b8b9651b2a0aaf8855a2ae6d1eb3238d1bda999f080b5c04a3e873363eb40854"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_leader_01.ogg",
+      "size": 18193,
+      "sha256": "94b3080bbf3d4e7eb095dc7141f8bf194a5a2914e8f214cf480cf64afe049c32"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_leader_02.ogg",
+      "size": 74879,
+      "sha256": "e9db3a14ba25a0d5edae19dd240c064fede4722583a429efea71fa957c367263"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_leader_03.ogg",
+      "size": 44224,
+      "sha256": "41b3f80667118b78f509f54cff3be5ea35183f925a83c3e34e4664b54528fb48"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_spidy_01.ogg",
+      "size": 25190,
+      "sha256": "bcdb9cd17c0e73fd347a021a6381237e3bf6725ea11e840c261819000cc76f9e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_spidy_02.ogg",
+      "size": 13097,
+      "sha256": "4eba9da5e5d4e31acda40232926b82f3d65c96d4cd95d755f7b517438c96efde"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_spidy_03.ogg",
+      "size": 32864,
+      "sha256": "1434818cfdf7fbb57acc297de3d2bfa2aec5acd53c55f1e7acc88efa6ddb906e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv12_02_spidy_04.ogg",
+      "size": 63882,
+      "sha256": "4ff3f83eebb305fe7604c3c09532a0cb91783cb5fdf3b66a6080a76c5da11c8b"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_01_sandman_01.ogg",
+      "size": 37627,
+      "sha256": "2a9d818772c63b0db211dad57381c08875383e43f6433f21e4d7f11e7cff4e9a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_01_sandman_02.ogg",
+      "size": 20852,
+      "sha256": "78e2a52d74df75fcfc70faa37055939bf150a8109ba08aae3435901927398f22"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_01_spidy_01.ogg",
+      "size": 24609,
+      "sha256": "5e94260be3fe4b00fe2063d9256ead10b2db5cd0e8b1bb11b725dfe953295b98"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_01_spidy_02.ogg",
+      "size": 43441,
+      "sha256": "0fc85458ebbb768d69fa79dd31cfc73b90747132566aa19faa48366bed44d933"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_01_spidy_03.ogg",
+      "size": 7176,
+      "sha256": "371e168cc9f1950ec68ce3fb89834d46fc111c2cdb431bd93e3e1c7cfb3635d6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_01_spidy_04.ogg",
+      "size": 51904,
+      "sha256": "9d4d1892133dcf4d369381a6af8eafd915f1db0a25a1c021ffa0f4952bfbe06f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_02_spidy_01.ogg",
+      "size": 22273,
+      "sha256": "f2d4573b0ce9c24ffd416e336d6eecd04a35e3a58ea132b552181b40371901a7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_02_spidy_02.ogg",
+      "size": 74638,
+      "sha256": "4542f5ca6ba4bc83d253907cdf6d5b622148a56d406203036ccb36a0305accbf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv1_02_spidy_03.ogg",
+      "size": 42823,
+      "sha256": "a4168867d625c2f68a5ba33588770f30af60f07fbb6d90219cc48572c0124282"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_01_rhino_01.ogg",
+      "size": 29969,
+      "sha256": "778ae94f12ee44113c55f0a4a0f0178a5eac9bfc4856ed21a277b20c326e95fc"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_01_rhino_02.ogg",
+      "size": 16359,
+      "sha256": "447191aa974d8067b023240ad515eb11937796207a5f92510fb80a69edd086e9"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_01_rhino_03.ogg",
+      "size": 21012,
+      "sha256": "7837949c708b8bf8db4a55341e4a82c2b393bd0af670a2c458368457872973b8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_01_spidy_01.ogg",
+      "size": 47371,
+      "sha256": "978b729cfaf6b51da287c2a67a579d0a2ae7f394825da22eabbe75120faeb08c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_02_COP1_01.ogg",
+      "size": 16279,
+      "sha256": "79ee51fbbb5f1ecfa9e0eefddbd8434ce58760524ce0d2bfa3f1f6fc446f1468"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_02_COP1_02.ogg",
+      "size": 44234,
+      "sha256": "74d2a61ff3be9c38725587beb072c4dc6c7af40ce4ef632086f938b69d830619"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_02_COP2_01.ogg",
+      "size": 34257,
+      "sha256": "50f66bdd08d11903492a0b1cd520d049e29444ff3708ac8d5c6e94a2e8dc7438"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_02_spidy_01.ogg",
+      "size": 90246,
+      "sha256": "77f2ce6e35dffc6046b011732aaeda08cca647e784a6283ed7b3ad605b9a2631"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_02_spidy_02.ogg",
+      "size": 61935,
+      "sha256": "f8e492e1c9d20446cc9f9e629c145a568215fc057a5ba540fc2d169a6b25a108"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv2_03_spidy_01.ogg",
+      "size": 41729,
+      "sha256": "249817d1060738b1c8726bfa2dcfc4cab9406bf08975e67ebc98be5ea718e0c6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv3_01_electro_01.ogg",
+      "size": 47652,
+      "sha256": "58f1586aee3bd3aa40c25b86c1439110423b9528003cd73b6f63ea0ffccb6ecc"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv3_01_spidy_01.ogg",
+      "size": 72157,
+      "sha256": "17e6580a765f977f7bc343d7ac5fc0d90a4a26fa53d69a22c07e270468ec007a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv3_01_spidy_02.ogg",
+      "size": 45323,
+      "sha256": "c94d46a35c74f7ba55574a27d18ead82deceea4a1b3dd162e70a811bebb86917"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv3_01_spidy_03.ogg",
+      "size": 63263,
+      "sha256": "6b7ac92a27fc48c16dfc9f3794db4ebf2aa90f659b36fb3c11ed35a16e989c73"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv4_01_electro_01.ogg",
+      "size": 72753,
+      "sha256": "6b95291f2b022ebe631fb69816dceac3b3c24820b7083534f776c5be5ba45adc"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv4_01_spidy_01.ogg",
+      "size": 56643,
+      "sha256": "cd7fc19c6a04352bc048a64a8c7904ac5c0eb2a58c8b258882653eea182533f1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv4_02_COP1_01.ogg",
+      "size": 29520,
+      "sha256": "0350c1f1e1fd0e9a798d141485bc792967bc42de9f48cdadf2b1e30b15cd5c62"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv4_02_COP1_02.ogg",
+      "size": 80327,
+      "sha256": "01fbfcd9135e1714e4c14664954fe71a4c48019e4453da3dd381a0566b7350d0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv4_02_spidy_01.ogg",
+      "size": 40795,
+      "sha256": "f480ba03defe4f873fed4760307e5d0b31d735437420677fa3d2f1650206720f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv4_02_spidy_02.ogg",
+      "size": 57771,
+      "sha256": "557bf9f16e003b797a6013b95f6cee766ceb234cc14212229db4bf5db4eb8e58"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv5_01_spidy_01.ogg",
+      "size": 63177,
+      "sha256": "c1b1a6d52e80eea101cc596098876d025514cdbb1bc46f4bcb3097013999476f"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv5_01_spidy_02.ogg",
+      "size": 83293,
+      "sha256": "01010bed23908864bd3cb97f842f86a1257745b39569d0d0059264e0bccec2e7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv5_01_spidy_03.ogg",
+      "size": 76734,
+      "sha256": "d5b0fa23e086e76da35cfb13b631758b36d43d22059af3df13616e0fd7722dbb"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv6_01_octo_01.ogg",
+      "size": 90912,
+      "sha256": "12c43acca50ea820613fa061d7fbb1e572bedfd37c326afd1e5a4d76d8dd3e60"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv6_01_octo_02.ogg",
+      "size": 45240,
+      "sha256": "5cbe74591c7cc219791a13c254e3f7d7fb11ba2c099c0d0549f1707bdcc1c4e5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv6_01_octo_03.ogg",
+      "size": 48300,
+      "sha256": "1758ac4089fc2a6c9950a4523b3e9dfbbe3acbf245058aa9d02c5666d097cf63"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv6_01_spidy_01.ogg",
+      "size": 66208,
+      "sha256": "8a0b4c70019b28d1df775e15db49ed4c1188a8dbeb60d4dede7e6fb9a3d1063c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv6_01_spidy_02.ogg",
+      "size": 31589,
+      "sha256": "cf18932d689cde279b9d17e7436adebad1cc8b82b46b9d9255fef4cd76f436c6"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv6_02_spidy_01.ogg",
+      "size": 49732,
+      "sha256": "06cdb157fa19150ab5c01af5869009a3cfa4082e9e11d171f4ba375efeb6e196"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_01_spidy_01.ogg",
+      "size": 24598,
+      "sha256": "2a650db96c31fa29e374711f436b1e4d3637412090ab9bfbf5e71323a8e47318"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_01_spidy_02.ogg",
+      "size": 40439,
+      "sha256": "cc588dcf9e8d7c60d3781bd07556df4ba6c488ecc8becbc86e937c3fd566d170"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_02_leader_01.ogg",
+      "size": 23430,
+      "sha256": "14f2ab068f57271dc2b3096b0bce71dc113661fe3a7214b39c8fef417529945a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_02_leader_02.ogg",
+      "size": 74538,
+      "sha256": "eded560ff790aa31a1b2fe267f5a97deac742abb71e0305f2ff6284ea628696d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_02_leader_03.ogg",
+      "size": 62081,
+      "sha256": "64a3533e924b82c9144e1a33199e0b6c0cbbd5ca5db63b5de1d1ca08ea64be04"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_02_spidy_01.ogg",
+      "size": 46098,
+      "sha256": "b46eda6ea8ae8f035c29a9148a2c5251f98dac2fea164264bf16d52384276e07"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_02_spidy_02.ogg",
+      "size": 27963,
+      "sha256": "fce416c8e549adb9506b11ab71e16d87306fb90240c598ce93273d3605ac3635"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_02_spidy_03.ogg",
+      "size": 45125,
+      "sha256": "b890c4cdcf5cfec38478dac8090a0f9a3e7bfd6d2bab423a9c67699ea34ecc5d"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_03_robot_01.ogg",
+      "size": 33466,
+      "sha256": "2ae0e82cdfab85a72d0dc8c9cd04aec1e33aaceb932b40f7f1094847614bfbaf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_03_spidy_01.ogg",
+      "size": 68583,
+      "sha256": "a07f76af6c2bae8bac114b4188fee3d0673b68794097e049197ffc37afcea2b1"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_03_spidy_02.ogg",
+      "size": 38834,
+      "sha256": "c306fdcabcb01a32d187df350a420101ed2a8bf06c6b97ae310dd0a0c2b82119"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv7_03_spidy_03.ogg",
+      "size": 72400,
+      "sha256": "6616aea04fb4c3e8e8d779242fbd7538ea9efa722eead6c654c0eea12b29a02a"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_researcher_01.ogg",
+      "size": 93796,
+      "sha256": "c895e30cd916c53dd94a7f3311f481344f09dae63e881943b0cbf44158055371"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_spidy_01.ogg",
+      "size": 21800,
+      "sha256": "6b929a5f65018017af92c765dc6922248f0d935e2e5332c315d9c68e52c7d029"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_spidy_02.ogg",
+      "size": 24959,
+      "sha256": "8d49a641552aa47accf761ee8af2f64674a58397c999878f828f8a413be88258"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_spidy_03.ogg",
+      "size": 31334,
+      "sha256": "4cca049266b5cb3e6a79c8ad5824eff4a7e54b1001bc1ffc60c881b53cadba67"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_spidy_04.ogg",
+      "size": 7152,
+      "sha256": "b279b6c214332a78e3ef70e6fd8c1ba31977625d95d5289983935547cfd97590"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_spidy_05.ogg",
+      "size": 44213,
+      "sha256": "f5168596d7b904a120bfeec03b44b558c167041a44fa2f692ec07f6fb129cb55"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_spidy_06.ogg",
+      "size": 11775,
+      "sha256": "dedeaf582746f26a6162ec048cace969275c3fc09690108f8dfdc05358dbf831"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_venom_01.ogg",
+      "size": 35744,
+      "sha256": "2cdf8415c59a7dda6db9ee1b1e1608bc2838e5bdba50be093865cd518e174fc8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_venom_02.ogg",
+      "size": 112876,
+      "sha256": "33b08964b90709e39a2cf8a50dd7d622e4ff82abc3241ab8c89c3ed38fc6b6e2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_venom_03.ogg",
+      "size": 84035,
+      "sha256": "f236dc7357a6e9e1541e63c1de7e2a9f4bab941d1a7d5daf5632073fb8d6650e"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_01_venom_04.ogg",
+      "size": 45586,
+      "sha256": "c9f37edc7394c77e740c47c097f117e139bbcffef1c6ef2dab6b5e7aeb33fb6c"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv8_02_spidy_07.ogg",
+      "size": 95583,
+      "sha256": "252e6699fc8ab0ff488c8041945f292d5868927456c8ca0bb73b86ba9e01f9b8"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_01_spidy_01.ogg",
+      "size": 11251,
+      "sha256": "19e35b5acb9d61f8d96f483148ab58e0320f2ff018ff041c1d17771e31b870a4"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_01_venom_01.ogg",
+      "size": 50357,
+      "sha256": "c4bdd5372e84844843d64b8cab735a3da017ec8a42c7faacbf17c9079df0ceb2"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_02_leader_01.ogg",
+      "size": 54674,
+      "sha256": "08a9ffac0b5d06ed8011e69e532b6c0316b9683d8e07fa6d4c14d088052c5931"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_02_leader_02.ogg",
+      "size": 120558,
+      "sha256": "d931a41577e809e397c18c79271c0e9fda7a139ed7602838923745c98b4c30a0"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_02_spidy_01.ogg",
+      "size": 11146,
+      "sha256": "d171b072a7daca6ee2850a5d4fd6e9b38b3356ebd9f72232c051dc2a3f4cd033"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_02_spidy_02.ogg",
+      "size": 21736,
+      "sha256": "a13396267413b9e869295d4c5077e7ffa0aee1577ca0ea8e04271b2a69842734"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_lv9_02_spidy_03.ogg",
+      "size": 73864,
+      "sha256": "638ceee9db64e7c4d86bf7deb389cdec6867271559a6ce6c68b4d73bf89c25cf"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_prologue_cop_01.ogg",
+      "size": 47189,
+      "sha256": "095f5a0322747962071337f6fb365626a940c49ac0f8fafd37378c482ee03fe7"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_prologue_girl_01.ogg",
+      "size": 10588,
+      "sha256": "ddb8df7a58992046837d2c7564a385712c80f7fe7858ab39a99410e60de1b613"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_prologue_spidy_01.ogg",
+      "size": 35639,
+      "sha256": "be4d79e62763b482c63eda087669595bc384048acb6ec3f40207585857bd5194"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_prologue_spidy_02.ogg",
+      "size": 30089,
+      "sha256": "a4723db5a5422572b4b6181024c5ddc7a4a38477dccc400451eaba23bc5b0b55"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sound/VFX/vfx_prologue_spidy_03.ogg",
+      "size": 24648,
+      "sha256": "9b643f9241d4f77efc738f2c7aaf2e94d2a47e9babca4fe7e834ef8666ad00ff"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/sprites.pack",
+      "size": 29784274,
+      "sha256": "182775fa22028b5e60ffc18cf383f541ce306d33b81e74b125cf51bfdb3131d5"
+    },
+    {
+      "path": "game/data/gameloft/games/spiderman/xlsStrings.pack",
+      "size": 151718,
+      "sha256": "5104120af3d0a2bc1696edea4749a9547f77cd9d55f62490922299063f84841a"
+    },
+    {
+      "path": "game/original/libspiderman.so",
+      "size": 7713000,
+      "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679"
+    },
+    {
+      "path": "game/original/manifest.json",
+      "size": 325,
+      "sha256": "52ac1e7379f6e3929a92984449d62f9c6933a352593b6d7b495136e67ed78ad3"
+    }
+  ],
+  "rechecked_after_all_tests": true
+}

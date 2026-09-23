@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.25)
 project(OpenAndroidUSM VERSION 0.1.0 LANGUAGES CXX)
 
 option(USM_BUILD_TESTS "Build unit tests" ON)
+option(USM_BUILD_WINDOWS_APP "Build the Windows D3D11/XInput application" ${WIN32})
+if(USM_BUILD_WINDOWS_APP AND NOT WIN32)
+    message(FATAL_ERROR "USM_BUILD_WINDOWS_APP needs a Windows target/toolchain")
+endif()
 
 include(FetchContent)
 set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -131,6 +135,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/LevelDropRuntime.cpp
     src/game/LevelHintRuntime.cpp
     src/game/LevelHostageRuntime.cpp
+    src/game/HostageSound.cpp
     src/game/LevelMusicRuntime.cpp
     src/game/NativeRandomizer.cpp
     src/game/LevelObjectRuntime.cpp
@@ -143,13 +148,18 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/PlayerHudHealthState.cpp
     src/game/PlayerHitEffectConfig.cpp
     src/game/PlayerStateConfig.cpp
+    src/game/QteGesturePath.cpp
+    src/game/QteSpriteAnimation.cpp
+    src/game/QteFeedbackGeometry.cpp
     src/game/QuickTimeEventRuntime.cpp
+    src/game/QteCinematicHandoff.cpp
     src/game/WallWebRuntime.cpp
     src/game/WebGrabPointRuntime.cpp
     src/game/WebLineGeometry.cpp
     src/game/WebSwingRuntime.cpp
     src/diagnostics/AutoplayHarness.cpp
     src/reconstructed/input/XperiaKeyRouter.cpp
+    src/platform/input/XInputStateTranslator.cpp
 )
 target_compile_features(OpenAndroidUSM.Core PUBLIC cxx_std_20)
 target_include_directories(OpenAndroidUSM.Core PUBLIC src)
@@ -163,6 +173,7 @@ if(MSVC)
     target_compile_options(OpenAndroidUSM.Core PRIVATE /W4 /permissive- /EHsc /utf-8)
 endif()
 
+if(USM_BUILD_WINDOWS_APP)
 add_library(OpenAndroidUSM.D3D11 STATIC
     src/renderer/d3d11/D3D11Renderer.cpp
 )
@@ -226,6 +237,7 @@ add_custom_command(TARGET OpenAndroidUSM POST_BUILD
         "${CMAKE_SOURCE_DIR}/xboxButtons.png"
         "$<TARGET_FILE_DIR:OpenAndroidUSM>/xboxButtons.png"
 )
+endif()
 
 include(CTest)
 if(BUILD_TESTING AND USM_BUILD_TESTS)
@@ -245,6 +257,64 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     endif()
     add_test(NAME OpenAndroidUSM.CoreTests COMMAND OpenAndroidUSM.CoreTests)
 
+    add_executable(OpenAndroidUSM.QteParityTests tests/QteParityTests.cpp)
+    target_compile_features(OpenAndroidUSM.QteParityTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.QteParityTests PRIVATE OpenAndroidUSM.Core)
+    target_compile_definitions(OpenAndroidUSM.QteParityTests PRIVATE
+        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
+    foreach(group IN ITEMS clock cinematic hostage attributes gesture sprite sequence gamepad audio first_level controller_boundaries controller_first_level feedback shared_manager consumption handoff)
+        add_test(NAME OpenAndroidUSM.QteParity.${group}
+            COMMAND OpenAndroidUSM.QteParityTests ${group})
+        set_tests_properties(OpenAndroidUSM.QteParity.${group} PROPERTIES
+            TIMEOUT 120 LABELS "qte-parity")
+    endforeach()
+
+    add_executable(OpenAndroidUSM.QteControlTests tests/QteControlTests.cpp)
+    target_compile_features(OpenAndroidUSM.QteControlTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.QteControlTests PRIVATE OpenAndroidUSM.Core)
+    target_compile_definitions(OpenAndroidUSM.QteControlTests PRIVATE
+        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
+    foreach(group IN ITEMS lifecycle integration keypad)
+        add_test(NAME OpenAndroidUSM.QteControl.${group}
+            COMMAND OpenAndroidUSM.QteControlTests ${group})
+        set_tests_properties(OpenAndroidUSM.QteControl.${group} PROPERTIES
+            TIMEOUT 120 LABELS "qte-control")
+    endforeach()
+
+    add_executable(OpenAndroidUSM.HostageIntegrationTests tests/HostageIntegrationTests.cpp)
+    target_compile_features(OpenAndroidUSM.HostageIntegrationTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.HostageIntegrationTests PRIVATE OpenAndroidUSM.Core)
+    target_compile_definitions(OpenAndroidUSM.HostageIntegrationTests PRIVATE
+        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
+    foreach(group IN ITEMS dispatch recovery controls)
+        add_test(NAME OpenAndroidUSM.HostageIntegration.${group}
+            COMMAND OpenAndroidUSM.HostageIntegrationTests ${group})
+        set_tests_properties(OpenAndroidUSM.HostageIntegration.${group} PROPERTIES
+            TIMEOUT 120 LABELS "hostage-integration")
+    endforeach()
+
+    add_executable(OpenAndroidUSM.InputParityTests tests/InputParityTests.cpp)
+    target_compile_features(OpenAndroidUSM.InputParityTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.InputParityTests PRIVATE OpenAndroidUSM.Core)
+    target_compile_definitions(OpenAndroidUSM.InputParityTests PRIVATE
+        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman"
+    )
+    foreach(group IN ITEMS buttons routing sticks hostage autoplay)
+        add_test(NAME OpenAndroidUSM.InputParity.${group}
+            COMMAND OpenAndroidUSM.InputParityTests ${group})
+        set_tests_properties(OpenAndroidUSM.InputParity.${group} PROPERTIES
+            TIMEOUT 120 LABELS "input-parity")
+    endforeach()
+
+    add_executable(OpenAndroidUSM.InputTransitionsTests tests/InputTransitionsTests.cpp)
+    target_compile_features(OpenAndroidUSM.InputTransitionsTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.InputTransitionsTests PRIVATE OpenAndroidUSM.Core)
+    add_test(NAME OpenAndroidUSM.InputParity.transitions
+        COMMAND OpenAndroidUSM.InputTransitionsTests)
+    set_tests_properties(OpenAndroidUSM.InputParity.transitions PROPERTIES
+        TIMEOUT 120 LABELS "input-parity")
+
+    if(USM_BUILD_WINDOWS_APP)
     add_executable(OpenAndroidUSM.RenderTests
         tests/D3D11RenderTests.cpp
     )
@@ -272,6 +342,8 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
             "$<TARGET_FILE_DIR:OpenAndroidUSM.RenderTests>/xboxButtons.png"
     )
     add_test(NAME OpenAndroidUSM.RenderTests COMMAND OpenAndroidUSM.RenderTests)
+
+    endif()
 
     find_program(USM_POWERSHELL_EXECUTABLE NAMES pwsh powershell)
     if(USM_POWERSHELL_EXECUTABLE)

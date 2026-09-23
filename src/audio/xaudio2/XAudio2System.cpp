@@ -180,6 +180,17 @@ void XAudio2System::applySpatialization(ActiveVoice& active) noexcept {
     (void)active.voice->SetVolume(active.volume * mix.attenuation);
 }
 
+bool XAudio2System::isNamedPlaying(std::string_view eventName) const noexcept {
+    for (const ActiveVoice& active : activeVoices_) {
+        if (active.eventName != eventName || active.voice == nullptr ||
+            !active.callback || active.callback->finished.load()) { continue; }
+        XAUDIO2_VOICE_STATE state{};
+        active.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+        if (state.BuffersQueued != 0) { return true; }
+    }
+    return false;
+}
+
 Result XAudio2System::stopNamed(
     std::string_view eventName,
     std::uint32_t fadeMilliseconds) noexcept {

@@ -1,0 +1,84 @@
+{
+  "archive": "game/data/gameloft/games/spiderman/levelnew_01.pack",
+  "sha256": "239885353902df237e1bb83ac0ec3bbf27398ee2245ee4b4cad65be0f5073fa5",
+  "hostage": [
+    {
+      "member": "levelnew_01_1_Room2.irr",
+      "sha256": "99ff718b06973bf46dc761cb7e5c934761cbe054327b7c56642105dcfe8991f9",
+      "type": {
+        "type": ""
+      },
+      "object_id": 30018,
+      "attributes": [
+        {
+          "name": "Id",
+          "value": "30018"
+        },
+        {
+          "name": "Position",
+          "value": "2196.033203, -1276.229492, 374.596375"
+        },
+        {
+          "name": "Rotation",
+          "value": "0.000000, 0.000000, 0.977465, -0.211097"
+        },
+        {
+          "name": "Scale",
+          "value": "0.999999, 0.999999, 1.000000"
+        },
+        {
+          "name": "AbsoluteTransformation",
+          "value": "-0.910875, 0.412679, 0.000000, 0.000000, -0.412679, -0.910875, 0.000000, 0.000000, 0.000000, 0.000000, 1.000000, 0.000000, 11758.163086, -5892.269531, 807.749390, 1.000000"
+        },
+        {
+          "name": "Visible",
+          "value": "true"
+        }
+      ],
+      "authored_rescue_attributes": [
+        {
+          "name": "!GameType",
+          "value": "Hostage"
+        },
+        {
+          "name": "MeshFile",
+          "value": "..\\entities\\meshes_bin\\woman_red_mesh.bdae"
+        },
+        {
+          "name": "AnimationFile",
+          "value": "..\\entities\\meshes_bin\\woman_anim.bdae"
+        },
+        {
+          "name": "@Anim1",
+          "value": "tied"
+        },
+        {
+          "name": "@Anim2",
+          "value": "tied_to_idle"
+        },
+        {
+          "name": "@Anim3",
+          "value": "idle_to_thanks"
+        },
+        {
+          "name": "@Anim4",
+          "value": "idle_watching_idle"
+        },
+        {
+          "name": "HPCount",
+          "value": "10"
+        },
+        {
+          "name": "SkillPointCount",
+          "value": "0"
+        },
+        {
+          "name": "ButtonHeightAbove",
+          "value": "-1.000000"
+        }
+      ],
+      "user_data": []
+    }
+  ],
+  "scope": "Original node metadata only, not runtime execution. No original XML redistributed."
+}

@@ -2,8 +2,15 @@
 
 namespace usm::reconstructed {
 
-void XperiaKeyRouter::route(const XperiaKeyEvent& event,
-                            InputContext context) noexcept {
+namespace {
+void routeState(GameplayInputState& state_, const XperiaKeyEvent& event,
+                InputContext context) noexcept {
+    if (event.deviceCancelled) {
+        // Clear held buttons and pending PC events across all contexts. This
+        // does not enter any native key handler or generate a release action.
+        state_ = {};
+        return;
+    }
     const bool gameplay = context == InputContext::Gameplay;
 
     switch (event.keyCode) {
@@ -41,6 +48,17 @@ void XperiaKeyRouter::route(const XperiaKeyEvent& event,
             state_.spiderSense.set(event.pressed);
         }
         break;
+    case XperiaKeyCode::R1:
+        // appKeyReleased, ELF 0x003cc2b8-0x003cc2ea:
+        // key 0x67 + scan 0x137 in gameplay writes rescue=1, switch=1,
+        // switch payload=4. appKeyPressed has no corresponding R1 action.
+        if (event.scanCode == XperiaScanCode::R1 && gameplay &&
+            !event.pressed) {
+            state_.rescueRequested = true;
+            state_.switchRequested = true;
+            state_.switchRequestValue = 4;
+        }
+        break;
     case XperiaKeyCode::DpadUp:
         if (gameplay || context == InputContext::Menu) {
             state_.moveUp.set(event.pressed);
@@ -66,6 +84,17 @@ void XperiaKeyRouter::route(const XperiaKeyEvent& event,
         break;
     default:
         break;
+    }
+}
+
+} // namespace
+
+void XperiaKeyRouter::route(const XperiaKeyEvent& event, InputContext context) noexcept {
+    routeState(state_, event, context);
+    if (event.deviceCancelled) {
+        resetGameplayKeypad();
+    } else if (context == InputContext::Gameplay) {
+        routeState(gameplayKeypad_, event, context);
     }
 }
 

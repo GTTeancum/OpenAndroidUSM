@@ -1,0 +1,1309 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6e7b9e1..57a1237 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -135,6 +135,7 @@ add_library(OpenAndroidUSM.Core STATIC
+     src/game/LevelDropRuntime.cpp
+     src/game/LevelHintRuntime.cpp
+     src/game/LevelHostageRuntime.cpp
++    src/game/HostageSound.cpp
+     src/game/LevelMusicRuntime.cpp
+     src/game/NativeRandomizer.cpp
+     src/game/LevelObjectRuntime.cpp
+@@ -280,6 +281,18 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
+             TIMEOUT 120 LABELS "qte-control")
+     endforeach()
+ 
++    add_executable(OpenAndroidUSM.HostageIntegrationTests tests/HostageIntegrationTests.cpp)
++    target_compile_features(OpenAndroidUSM.HostageIntegrationTests PRIVATE cxx_std_20)
++    target_link_libraries(OpenAndroidUSM.HostageIntegrationTests PRIVATE OpenAndroidUSM.Core)
++    target_compile_definitions(OpenAndroidUSM.HostageIntegrationTests PRIVATE
++        USM_TEST_GAME_DATA_ROOT="${CMAKE_SOURCE_DIR}/game/data/gameloft/games/spiderman")
++    foreach(group IN ITEMS dispatch recovery controls)
++        add_test(NAME OpenAndroidUSM.HostageIntegration.${group}
++            COMMAND OpenAndroidUSM.HostageIntegrationTests ${group})
++        set_tests_properties(OpenAndroidUSM.HostageIntegration.${group} PROPERTIES
++            TIMEOUT 120 LABELS "hostage-integration")
++    endforeach()
++
+     add_executable(OpenAndroidUSM.InputParityTests tests/InputParityTests.cpp)
+     target_compile_features(OpenAndroidUSM.InputParityTests PRIVATE cxx_std_20)
+     target_link_libraries(OpenAndroidUSM.InputParityTests PRIVATE OpenAndroidUSM.Core)
+diff --git a/docs/references/re06-original-fingerprints.json b/docs/references/re06-original-fingerprints.json
+new file mode 100644
+index 0000000..d889109
+--- /dev/null
++++ b/docs/references/re06-original-fingerprints.json
+@@ -0,0 +1,333 @@
++{
++  "size": 7713000,
++  "sha256": "f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679",
++  "machine": "ELF32 little-endian ARM",
++  "symbols": [
++    {
++      "name": "_ZN8CHostage6UpdateEf",
++      "elf_address": "0x00328068",
++      "thumb": true,
++      "size": 1352,
++      "sha256": "602e73d58728990678567ae103d2ccf6b9103081eda16e01a7ed6fcc672cf782"
++    },
++    {
++      "name": "_ZN11CQTEManager8BeginQTEEiiii",
++      "elf_address": "0x0037ab40",
++      "thumb": true,
++      "size": 120,
++      "sha256": "89d03744fb39e91be7bc7d7b1f8068499184181f755f3e6f8630534f1693d288"
++    },
++    {
++      "name": "_ZN11CQTEManager11BeginNowQTEEv",
++      "elf_address": "0x0037aa08",
++      "thumb": true,
++      "size": 312,
++      "sha256": "42fa12b37c92687f6b9b9b22654f693b3d11814ca7734baf1ebb114e42dd46b9"
++    },
++    {
++      "name": "_ZN11CQTEManager12ForceFailQTEEv",
++      "elf_address": "0x0037a9fc",
++      "thumb": true,
++      "size": 10,
++      "sha256": "9af497dce9eb1b5f74f790a5ebcdfe20cbf0299d9b6ed9b46b2a222e7de32b7d"
++    },
++    {
++      "name": "_ZN11CQTEManager6UpdateEf",
++      "elf_address": "0x0037b240",
++      "thumb": true,
++      "size": 460,
++      "sha256": "b37b509937754778139e710d09a0ab2765c5720af3f39addf0bac66ba3e7cc90"
++    },
++    {
++      "name": "_ZN11CQTEManager8SetStateEi",
++      "elf_address": "0x0037a67c",
++      "thumb": true,
++      "size": 332,
++      "sha256": "dcf6a85d3a724edb2428bb25a44d5d1024b7f5fec80372faebc4ccc49a9dc8f2"
++    },
++    {
++      "name": "_ZN11CQTEManager13SuccessHandleEv",
++      "elf_address": "0x0037a5e4",
++      "thumb": true,
++      "size": 76,
++      "sha256": "186d171d9ae2b12b71a66f96916b88c9ee05fd388aafb1529ebe144cdd83be88"
++    },
++    {
++      "name": "_ZN11CQTEManager10FailHandleEv",
++      "elf_address": "0x0037a630",
++      "thumb": true,
++      "size": 76,
++      "sha256": "7ec93470cf683588f3f2f16083870b820d9d5b9c757b54694ffdbc171248fc74"
++    },
++    {
++      "name": "_ZN11CQTEManager4DrawEv",
++      "elf_address": "0x0037a7c8",
++      "thumb": true,
++      "size": 540,
++      "sha256": "3547a2cca9cc7526786e36032e48fdbf28dd0ab2b20eb0cbb2f5e748253c9895"
++    },
++    {
++      "name": "_ZN11CQTEManager6EndQTEEv",
++      "elf_address": "0x0037a5b0",
++      "thumb": true,
++      "size": 52,
++      "sha256": "79c93206f203f587d78388dae661d0dce6fe4521d95b8868a3e16527888dd37c"
++    },
++    {
++      "name": "_ZN6CLevel6UpdateEf",
++      "elf_address": "0x003720bc",
++      "thumb": true,
++      "size": 1688,
++      "sha256": "5ec788200423ab60e59b6adb9396cdcb08130ea57fd6d9cbfa7140106c343a89"
++    },
++    {
++      "name": "_ZN6CLevel10PauseTimerEv",
++      "elf_address": "0x0036f42c",
++      "thumb": true,
++      "size": 24,
++      "sha256": "68d88b01e7526d11544ce8223f077094b578b39994779cc5222b94c6f5b7c129"
++    },
++    {
++      "name": "_ZN6CLevel8ResumeItEv",
++      "elf_address": "0x0036f3e4",
++      "thumb": true,
++      "size": 72,
++      "sha256": "1e12545b2fbb0c6f844a66ae57cc8372195f661542d9a50caab1cab8259f5ca5"
++    },
++    {
++      "name": "_ZN11CQTEManager8SetPauseEb",
++      "elf_address": "0x0037a4fc",
++      "thumb": true,
++      "size": 96,
++      "sha256": "b1b71abc06a83baf49def169c20bf014ce724ae1cfe8d6124729a71e99b2bbc4"
++    },
++    {
++      "name": "_ZN6CLevel14EnableControlsEbb",
++      "elf_address": "0x0036fe94",
++      "thumb": true,
++      "size": 54,
++      "sha256": "cd098464dda664ac1bb5c708135371da04603a54b288c8b2d5c3cf9a78a468b7"
++    },
++    {
++      "name": "_ZN16GameEventKeyWrap12ResetAllKeysEv",
++      "elf_address": "0x002e8888",
++      "thumb": true,
++      "size": 32,
++      "sha256": "6d681472aa52914df38ec56d95c151b9ab3a8ae9834c3dc00f0bf0e0645d189b"
++    },
++    {
++      "name": "_ZN16CCinematicThread8StartQTEEPN3irr2io11IAttributesE",
++      "elf_address": "0x0036153c",
++      "thumb": true,
++      "size": 100,
++      "sha256": "48a2f5d76ce16e5ed9402a51bbe3f982a7fa5154f065b5e593d24c09de0e704b"
++    },
++    {
++      "name": "_ZN21CLevelInterfaceNormal14EnableControlsEb",
++      "elf_address": "0x00378730",
++      "thumb": true,
++      "size": 10,
++      "sha256": "d36c81af0d9902b5a06c216ae0a1c258a0334dd8af2c2c2a4df887b8677a7ed8"
++    },
++    {
++      "name": "_ZN13ControlScheme16EnableQTEControlEb",
++      "elf_address": "0x002ea990",
++      "thumb": true,
++      "size": 28,
++      "sha256": "31c30b79d9e07defd7ec6a32d10535643d9f4871b1d2c05259017016aa1dccd3"
++    },
++    {
++      "name": "_ZN13ControlScheme10SetEnabledEb",
++      "elf_address": "0x002ead8c",
++      "thumb": true,
++      "size": 208,
++      "sha256": "facf14ed259607487219ef7087bc50b69ebfa0df50895175959be3fbdf036127"
++    },
++    {
++      "name": "_ZN15CKeyPadCustomer9resetKeysEv",
++      "elf_address": "0x002e9b28",
++      "thumb": true,
++      "size": 44,
++      "sha256": "f767ebe2bb2e760ca8ede914e5cbf49b4344e3f72bf597bdbf2da4c90a57e5f9"
++    },
++    {
++      "name": "_ZN7CKeyPad9resetKeysEv",
++      "elf_address": "0x002e951c",
++      "thumb": true,
++      "size": 44,
++      "sha256": "f767ebe2bb2e760ca8ede914e5cbf49b4344e3f72bf597bdbf2da4c90a57e5f9"
++    },
++    {
++      "name": "_ZN7CButton5ResetEv",
++      "elf_address": "0x002e636c",
++      "thumb": true,
++      "size": 8,
++      "sha256": "ba908ad9669babfc851f1b44c9b1efce3211b00ca1dc72174e0e67ba49cc8b17"
++    },
++    {
++      "name": "_ZN7CButton10SetEnabledEb",
++      "elf_address": "0x002e6548",
++      "thumb": true,
++      "size": 76,
++      "sha256": "5dec17dbd5edbbad139f02a271075dab25e8cc0e1f00012ac9121d3c1399591c"
++    },
++    {
++      "name": "_ZN16GameEventKeyWrap9IsPressedEi",
++      "elf_address": "0x002e8a88",
++      "thumb": true,
++      "size": 50,
++      "sha256": "aeca669c48b59a5b0b6685471ea70ee4cd742673ee84586af4c998f86b35aa8b"
++    },
++    {
++      "name": "_ZN16GameEventKeyWrap6IsHoldEii",
++      "elf_address": "0x002e8a48",
++      "thumb": true,
++      "size": 10,
++      "sha256": "aaa6c43c7cf8379de6ef2c33b63b47459273fdca79f600f6279793fa895dea64"
++    },
++    {
++      "name": "_ZN16GameEventKeyWrap10IsReleasedEi",
++      "elf_address": "0x002e8a54",
++      "thumb": true,
++      "size": 50,
++      "sha256": "db68c4caa14627016771994f282def9f88fa63eaeae28af56ff013f16994bbae"
++    },
++    {
++      "name": "_ZN16CCinematicThread19InterfaceControlCmdEPN3irr2io11IAttributesE",
++      "elf_address": "0x003611e0",
++      "thumb": true,
++      "size": 280,
++      "sha256": "95bffafd61da4506be762dea53e9647be706c8b7bcc8d68a4cc3822e652cb3e7"
++    },
++    {
++      "name": "_ZN16CCinematicThread15OnOffDaeMovieUIEb",
++      "elf_address": "0x0036043c",
++      "thumb": true,
++      "size": 88,
++      "sha256": "4ed1083d7caa68d95509af187996980abb152253b3fbf11ad609d76047bb50b9"
++    },
++    {
++      "name": "_ZN7Audible9PlayAudioEibb",
++      "elf_address": "0x003bbf2c",
++      "thumb": true,
++      "size": 128,
++      "sha256": "b6b2f825472b7bfebfbd0546a28f60b2ea2fc91496146b5dd987e35f44b26b90"
++    },
++    {
++      "name": "_ZN7Audible9IsPlayingEib",
++      "elf_address": "0x003bbdd0",
++      "thumb": true,
++      "size": 72,
++      "sha256": "38904bf3b0c85b11d99b383b0be777a081169cd16e246b8bffa31dc3b387978d"
++    },
++    {
++      "name": "_ZN7Audible9StopAudioEii",
++      "elf_address": "0x003bbe50",
++      "thumb": true,
++      "size": 80,
++      "sha256": "bb0bd7e2c6849bff8f5f7b1e9714c940f07f1f820e718fb8fdc2be104502f5c6"
++    },
++    {
++      "name": "_ZN15VoxSoundManager6Play3DEiRKN3irr4core8vector3dIfEEbiffbi",
++      "elf_address": "0x003caf74",
++      "thumb": true,
++      "size": 52,
++      "sha256": "cf6f05d6b38c42fabc5ff1c9deab8fa511f124b6d818115041d6c462558e9476"
++    },
++    {
++      "name": "_ZN15VoxSoundManager9IsPlayingEii",
++      "elf_address": "0x003cac58",
++      "thumb": true,
++      "size": 16,
++      "sha256": "f783bc991df381c05ef20f0135335c574b3daa75a0c6e733ad2f883cf39d80f0"
++    },
++    {
++      "name": "_ZN15VoxSoundManager4StopEiii",
++      "elf_address": "0x003cace4",
++      "thumb": true,
++      "size": 16,
++      "sha256": "83ab6b10be3f1a073e25ac3242a6bad3fb9d25d770a47ba2d904d6f75882e4f5"
++    },
++    {
++      "name": "_ZN15VoxSoundManager11PlayEmitterEibi",
++      "elf_address": "0x003cadc0",
++      "thumb": true,
++      "size": 18,
++      "sha256": "a1d1e50d435ef2385823ef7cf979f2bcc80d30fc15930f7dc0d092901d4f4c24"
++    },
++    {
++      "name": "_ZN8CHostageC1Ev",
++      "elf_address": "0x00328c20",
++      "thumb": true,
++      "size": 372,
++      "sha256": "7555491c3e3c224c745cabf118434625adc9516dfafbb3209e135b672282ecfd"
++    },
++    {
++      "name": "_ZN7AudibleC1Ev",
++      "elf_address": "0x003bbfac",
++      "thumb": true,
++      "size": 116,
++      "sha256": "d9ed08fc0d799002e7828b2bc2f1029771578ead94f75e89293bd8c61149ff58"
++    },
++    {
++      "name": "_ZN8CHostage15ProcessUserAttrEPN3irr2io11IAttributesE",
++      "elf_address": "0x00328724",
++      "thumb": true,
++      "size": 676,
++      "sha256": "345863591bbdb8b0cee296bce789c8170e0950c7d0fb0b084fd6d6ce43aa877b"
++    },
++    {
++      "name": "_ZN8CHostage4InitEP5CRoom",
++      "elf_address": "0x003285e8",
++      "thumb": true,
++      "size": 308,
++      "sha256": "8188fe5f80ad024c39a19d57e3d94e51333c2bdd59200972d6228f534691711f"
++    },
++    {
++      "name": "_ZN8CHostage12OnEnterStateEi",
++      "elf_address": "0x00327de4",
++      "thumb": true,
++      "size": 528,
++      "sha256": "6253a4194f69d0f895d476ec2f64cd20fe5ebba75c91271fd292dd980a5719d8"
++    },
++    {
++      "name": "_ZN4UnitC1Ev",
++      "elf_address": "0x003159d8",
++      "thumb": true,
++      "size": 468,
++      "sha256": "526cd403826449d035dfbc74f9f7d7278db8620fc3e0ac8b0cb67ffadf44882c"
++    },
++    {
++      "name": "_ZN4UnitC2Ev",
++      "elf_address": "0x00315bac",
++      "thumb": true,
++      "size": 396,
++      "sha256": "7ec7ac89904e9259ba6fc99a4e3fb635fb02c9ffd9a17454805c50180948e8cf"
++    },
++    {
++      "name": "_ZN11CGameObjectC2Ev",
++      "elf_address": "0x002ffd08",
++      "thumb": true,
++      "size": 456,
++      "sha256": "3beddc9331ed9245d30683e708ca4bda01a7ffd9c91f49a2d0baf49835b5a2eb"
++    },
++    {
++      "name": "_ZN7AudibleC2Ev",
++      "elf_address": "0x003bbc40",
++      "thumb": true,
++      "size": 64,
++      "sha256": "9c91e5541da2f7a4b91765b40371c81aa5a3bc807441bb6170eb9081fe1874e0"
++    }
++  ],
++  "ghidra_rebase_offset": "0x00010000",
++  "note": "RE06 extends RE05 fingerprints. Identity alone is not behavioral equivalence; no original ARM execution.",
++  "hostage_audible_vtable": {
++    "vptr_elf": "0x004b27b8",
++    "hostage_subobject_offset": "0x114",
++    "slots": {
++      "0x1c": "_ZN7Audible9PlayAudioEibb",
++      "0x20": "_ZN7Audible9StopAudioEii",
++      "0x24": "_ZN7Audible9IsPlayingEib"
++    }
++  }
++}
+diff --git a/src/app/Application.cpp b/src/app/Application.cpp
+index 1182eab..8f9e2bd 100644
+--- a/src/app/Application.cpp
++++ b/src/app/Application.cpp
+@@ -2513,6 +2513,35 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+              record->distanceCullingEnabled},
+             loop);
+     };
++    const game::HostageSoundCallbacks hostageAudio{
++        [this, audioEnabled](std::uint16_t soundId) {
++            const auto* record = voxSounds_.find(soundId);
++            return audioEnabled && record && audio_.isNamedPlaying(record->eventName);
++        },
++        [this, &playSpatialSound](std::int32_t objectId, std::uint16_t soundId) -> Result {
++            const auto* record = voxSounds_.find(soundId);
++            const auto clip = hostageSounds_.find(soundId);
++            if (!record || clip == hostageSounds_.end()) {
++                return Result::failure("Hostage cue has no preloaded sound");
++            }
++            return playSpatialSound(objectId, record->eventName, clip->second, false);
++        },
++        [this, &stopNamedAudio](std::uint16_t soundId) -> Result {
++            const auto* record = voxSounds_.find(soundId);
++            if (!record) { return Result::failure("Hostage stop has no VoxSound record"); }
++            return stopNamedAudio(record->eventName);
++        }
++    };
++    const game::HostageUpdateHooks hostageHooks{
++        [&hostageAudio, &applyQteEffects](const game::HostageSoundCue& cue) -> Result {
++            // A synchronous ForceFailQTE cue precedes the following hostage stop.
++            const Result pending = applyQteEffects();
++            return pending ? hostageAudio.dispatch(cue) : pending;
++        },
++        [this](bool enabled, bool preservePauseButton) {
++            levelCinematicRuntime_.enableControls(enabled, preservePauseButton);
++        }
++    };
+     const auto dispatchObjectEvents =
+         [this, &autoplay, &traceTimeMilliseconds, &playSpatialSound,
+          &playNamedAudio,
+@@ -4061,32 +4090,15 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
+                 result = hostageRuntime_.updateObjects(
+                     gameplayPlayer_, objectRuntime_, levelBonusRuntime_,
+                     {gameDeltaMilliseconds, realDeltaMilliseconds,
+-                     nativeTimerMilliseconds}, rescuePressed);
++                     nativeTimerMilliseconds}, rescuePressed, hostageHooks);
+             }
+             if (!result) {
+                 return fail(result.message());
+             }
+-            result = applyQteEffects(); // ForceFailQTE sound precedes CHostage's loop stop.
++            result = applyQteEffects(); // Drain any remaining manager effects.
+             if (!result) { return fail(result.message()); }
+-            for (const game::HostageSoundCue& cue :
+-                 hostageRuntime_.consumeSoundCues()) {
+-                const audio::VoxSoundRecord* record =
+-                    voxSounds_.find(cue.voxSoundId);
+-                const auto clip = hostageSounds_.find(cue.voxSoundId);
+-                if (record == nullptr || clip == hostageSounds_.end()) {
+-                    return fail("Hostage cue has no preloaded sound");
+-                }
+-                if (cue.action == game::HostageSoundAction::StopLoop) {
+-                    result = stopNamedAudio(record->eventName);
+-                } else {
+-                    result = playSpatialSound(
+-                        cue.hostageObjectId, record->eventName, clip->second,
+-                        cue.action == game::HostageSoundAction::StartLoop);
+-                }
+-                if (!result) {
+-                    return fail(result.message());
+-                }
+-            }
++            // Bound hostage hooks already dispatched their sounds synchronously.
++            // No second queue drain or "requested = playing" fallback.
+             objectRuntime_.updateComicCollections(
+                 gameplayPlayer_.position());
+             result = dispatchObjectEvents();
+diff --git a/src/audio/xaudio2/XAudio2System.cpp b/src/audio/xaudio2/XAudio2System.cpp
+index d406b1d..cc59b5f 100644
+--- a/src/audio/xaudio2/XAudio2System.cpp
++++ b/src/audio/xaudio2/XAudio2System.cpp
+@@ -180,6 +180,17 @@ void XAudio2System::applySpatialization(ActiveVoice& active) noexcept {
+     (void)active.voice->SetVolume(active.volume * mix.attenuation);
+ }
+ 
++bool XAudio2System::isNamedPlaying(std::string_view eventName) const noexcept {
++    for (const ActiveVoice& active : activeVoices_) {
++        if (active.eventName != eventName || active.voice == nullptr ||
++            !active.callback || active.callback->finished.load()) { continue; }
++        XAUDIO2_VOICE_STATE state{};
++        active.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
++        if (state.BuffersQueued != 0) { return true; }
++    }
++    return false;
++}
++
+ Result XAudio2System::stopNamed(
+     std::string_view eventName,
+     std::uint32_t fadeMilliseconds) noexcept {
+diff --git a/src/audio/xaudio2/XAudio2System.hpp b/src/audio/xaudio2/XAudio2System.hpp
+index 38ebbc2..96cd3e3 100644
+--- a/src/audio/xaudio2/XAudio2System.hpp
++++ b/src/audio/xaudio2/XAudio2System.hpp
+@@ -43,6 +43,9 @@ public:
+                      const assets::Vector3& target,
+                      const assets::Vector3& up) noexcept;
+     void update();
++    // Main-thread query. Includes live one-shots/fading voices, but not completed
++    // buffers, error callbacks, failed submissions, or distance-culled requests.
++    [[nodiscard]] bool isNamedPlaying(std::string_view eventName) const noexcept;
+ 
+ private:
+     class VoiceCallback final : public IXAudio2VoiceCallback {
+diff --git a/src/game/HostageSound.cpp b/src/game/HostageSound.cpp
+new file mode 100644
+index 0000000..5c1a504
+--- /dev/null
++++ b/src/game/HostageSound.cpp
+@@ -0,0 +1,21 @@
++#include "game/HostageSound.hpp"
++
++namespace usm::game {
++Result HostageSoundCallbacks::dispatch(const HostageSoundCue& cue) const {
++    switch (cue.action) {
++    case HostageSoundAction::PlayOnceIfStopped:
++        if (!isPlaying || !playOnce) {
++            return Result::failure("Hostage sound needs live query and playback callbacks");
++        }
++        if (isPlaying(cue.voxSoundId)) { return Result::success(); }
++        return playOnce(cue.hostageObjectId, cue.voxSoundId);
++    case HostageSoundAction::PlayOnce:
++        if (!playOnce) { return Result::failure("Hostage playback callback is missing"); }
++        return playOnce(cue.hostageObjectId, cue.voxSoundId);
++    case HostageSoundAction::Stop:
++        if (!stop) { return Result::failure("Hostage stop callback is missing"); }
++        return stop(cue.voxSoundId);
++    }
++    return Result::failure("Invalid hostage sound action");
++}
++} // namespace usm::game
+diff --git a/src/game/HostageSound.hpp b/src/game/HostageSound.hpp
+new file mode 100644
+index 0000000..1dba2ab
+--- /dev/null
++++ b/src/game/HostageSound.hpp
+@@ -0,0 +1,38 @@
++#pragma once
++
++#include "core/Result.hpp"
++#include <cstdint>
++#include <functional>
++
++namespace usm::game {
++// CHostage::Update ELF 0x328454..0x32847e issues IsPlaying(0x18b,true)
++// followed, only when false, by Audible::PlayAudio(0x18b,true,false).
++// The latter's transient branch ignores its loop argument and calls Play3D
++// with loop=false (ELF 0x3bbf6c..0x3bbf84). This is NOT a looping voice.
++enum class HostageSoundAction { PlayOnce, PlayOnceIfStopped, Stop };
++struct HostageSoundCue {
++    std::int32_t hostageObjectId{-1};
++    std::uint16_t voxSoundId{};
++    HostageSoundAction action{HostageSoundAction::PlayOnce};
++};
++using HostageSoundHandler = std::function<Result(const HostageSoundCue&)>;
++
++// Scoped transient Audible path used by hostage 30018, not a reconstruction
++// of every persistent/attached emitter. The Android VoxSoundManager fallback
++// queries/stops media by sound ID; it ignores the supplied scene-object ID.
++// A request is not proof of playback: failed, culled and completed voices
++// must leave isPlaying false. No synthetic duration or gameplay-clock latch.
++struct HostageSoundCallbacks {
++    std::function<bool(std::uint16_t)> isPlaying;
++    std::function<Result(std::int32_t, std::uint16_t)> playOnce;
++    std::function<Result(std::uint16_t)> stop;
++    [[nodiscard]] Result dispatch(const HostageSoundCue& cue) const;
++};
++
++// Call-scoped, never stored in checkpoint copies. Empty hooks are detached
++// diagnostics: sound commands are queued, with no claimed playback status.
++struct HostageUpdateHooks {
++    HostageSoundHandler sound;
++    std::function<void(bool enabled, bool preservePauseButton)> enableControls;
++};
++} // namespace usm::game
+diff --git a/src/game/LevelHostageRuntime.cpp b/src/game/LevelHostageRuntime.cpp
+index 1f56868..e06c818 100644
+--- a/src/game/LevelHostageRuntime.cpp
++++ b/src/game/LevelHostageRuntime.cpp
+@@ -8,7 +8,7 @@
+ namespace usm::game {
+ namespace {
+ 
+-constexpr std::uint16_t kRescueCuttingLoopSound = 0x18b;
++constexpr std::uint16_t kRescueCuttingSound = 0x18b;
+ constexpr std::uint16_t kWomanRescuedSound = 0xa3;
+ constexpr std::uint16_t kManRescuedSound = 0xa5;
+ constexpr std::uint16_t kRescueStartPlayerState = 27;
+@@ -79,9 +79,10 @@ Result LevelHostageRuntime::update(GameplayPlayer& player,
+                                    LevelObjectRuntime& objects,
+                                    LevelBonusRuntime& bonuses,
+                                    HostageTimeStep time,
+-                                   HostageInput input) {
++                                   HostageInput input,
++                                   const HostageUpdateHooks& hooks) {
+     const Result result = updateObjects(player, objects, bonuses, time,
+-                                        input.rescueRequested);
++                                        input.rescueRequested, hooks);
+     if (result) {
+         updateQuickTime({time.timerMilliseconds, time.realMilliseconds},
+                         input.quickTimeActionPressed);
+@@ -93,7 +94,8 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                                           LevelObjectRuntime& objects,
+                                           LevelBonusRuntime& bonuses,
+                                           HostageTimeStep time,
+-                                          bool rescueRequested) {
++                                          bool rescueRequested,
++                                          const HostageUpdateHooks& hooks) {
+     if (sharedQte_ == nullptr) {
+         return Result::failure("Hostage runtime has no shared level QTE manager");
+     }
+@@ -136,15 +138,19 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                 hostage.phaseElapsedMilliseconds = 0;
+                 hostage.promptVisible = false;
+                 rescueRequested = false; // The native global is consumed once.
++                if (hooks.enableControls) { hooks.enableControls(false, true); }
+             }
+             break;
+         case HostageRescuePhase::RescueStart:
+             if (player.activeStateId() != kRescueStartPlayerState) {
++                if (hooks.enableControls) { hooks.enableControls(true, false); }
+                 Result result = setPhase(hostage, HostageRescuePhase::Tied,
+-                                         player, objects, bonuses);
++                                         player, objects, bonuses, hooks);
+                 if (!result) {
+                     return result;
+                 }
++            } else if (hooks.enableControls) {
++                hooks.enableControls(false, true);
+             }
+             // Native checks the animation even after resetting an interrupted
+             // hostage. Do not collapse these independent checks into else-if.
+@@ -159,7 +165,6 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                 if (!result) { return result; }
+                 hostage.phase = HostageRescuePhase::QuickTime;
+                 hostage.phaseElapsedMilliseconds = 0;
+-                hostage.cuttingLoopRequested = false;
+                 observeQuickTime();
+             }
+             break;
+@@ -172,10 +177,9 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+             const bool failed =
+                 hostage.quickTimeOutcome == HostageQteOutcome::Failure;
+             if (succeeded || failed) {
+-                soundCues_.push_back({hostage.asset->objectId,
+-                                      kRescueCuttingLoopSound,
+-                                      HostageSoundAction::StopLoop});
+-                hostage.cuttingLoopRequested = false;
++                Result soundResult = emitSound({hostage.asset->objectId,
++                    kRescueCuttingSound, HostageSoundAction::Stop}, hooks);
++                if (!soundResult) { return soundResult; }
+                 if (succeeded) {
+                     Result result = player.enterScriptedState(
+                         kRescueEndPlayerState, false);
+@@ -184,52 +188,56 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+                     hostage.phaseElapsedMilliseconds = 0;
+                 } else {
+                     player.clearScriptedState(); // Native requests idle here.
++                    if (hooks.enableControls) { hooks.enableControls(true, false); }
+                     Result result = setPhase(hostage, HostageRescuePhase::Tied,
+-                                             player, objects, bonuses);
++                                             player, objects, bonuses, hooks);
+                     if (!result) { return result; }
+                 }
+             } else if (player.activeStateId() != kRescueQuickTimePlayerState) {
+                 // An interrupted rescue fails; it must not replace the
+                 // interrupting player state with idle or grant rescue rewards.
+                 sharedQte_->forceFail(); // CHostage ELF 0x32840e -> manager state 4
+-                soundCues_.push_back({hostage.asset->objectId,
+-                                      kRescueCuttingLoopSound,
+-                                      HostageSoundAction::StopLoop});
+-                hostage.cuttingLoopRequested = false;
++                if (hooks.enableControls) { hooks.enableControls(true, false); }
++                Result soundResult = emitSound({hostage.asset->objectId,
++                    kRescueCuttingSound, HostageSoundAction::Stop}, hooks);
++                if (!soundResult) { return soundResult; }
+                 Result result = setPhase(hostage, HostageRescuePhase::Tied,
+-                                         player, objects, bonuses);
++                                         player, objects, bonuses, hooks);
+                 if (!result) { return result; }
+-            } else if (sharedQte_->remainingActionCount() == 7 &&
+-                       !hostage.cuttingLoopRequested) {
+-                // ELF 0x0032844c compares remaining actions to literal 7.
+-                // It does not start this loop at QTE entry, or for any
+-                // arbitrary nonzero progress. Subsequent counts keep it on.
+-                soundCues_.push_back({hostage.asset->objectId,
+-                                      kRescueCuttingLoopSound,
+-                                      HostageSoundAction::StartLoop});
+-                hostage.cuttingLoopRequested = true;
++            } else {
++                // Native repeats EnableControls(false,true) before querying.
++                if (hooks.enableControls) { hooks.enableControls(false, true); }
++                if (sharedQte_->remainingActionCount() == 7) {
++                    Result soundResult = emitSound({hostage.asset->objectId,
++                        kRescueCuttingSound, HostageSoundAction::PlayOnceIfStopped}, hooks);
++                    if (!soundResult) { return soundResult; }
++                }
+             }
+             break;
+         }
+         case HostageRescuePhase::RescueEnd:
+             // Native calls Stop(0x18b) each state-3 object update. Repeated
+             // stop requests are intentional and have no new gameplay effect.
+-            soundCues_.push_back({hostage.asset->objectId,
+-                                  kRescueCuttingLoopSound,
+-                                  HostageSoundAction::StopLoop});
++            {
++                Result soundResult = emitSound({hostage.asset->objectId,
++                    kRescueCuttingSound, HostageSoundAction::Stop}, hooks);
++                if (!soundResult) { return soundResult; }
++            }
+             if (player.activeStateId() != kRescueEndPlayerState) {
++                if (hooks.enableControls) { hooks.enableControls(true, false); }
+                 Result result = setPhase(hostage, HostageRescuePhase::Tied,
+-                                         player, objects, bonuses);
++                                         player, objects, bonuses, hooks);
+                 if (!result) { return result; }
+             }
+             if (player.scriptedStateAnimationFinished()) {
+                 player.clearScriptedState();
++                if (hooks.enableControls) { hooks.enableControls(true, false); }
+                 // OnExitState(0) prevents a freshly reset, still-animating
+                 // tied hostage from entering release after an interruption.
+                 if (hostage.phase != HostageRescuePhase::Tied ||
+                     objects.animationFinished(hostage.asset->objectId)) {
+                     Result result = setPhase(hostage, HostageRescuePhase::Release,
+-                                             player, objects, bonuses);
++                                             player, objects, bonuses, hooks);
+                     if (!result) { return result; }
+                 }
+             }
+@@ -237,7 +245,7 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+         case HostageRescuePhase::Release:
+             if (objects.animationFinished(hostage.asset->objectId)) {
+                 Result result = setPhase(hostage, HostageRescuePhase::Thank,
+-                                         player, objects, bonuses);
++                                         player, objects, bonuses, hooks);
+                 if (!result) {
+                     return result;
+                 }
+@@ -246,7 +254,7 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
+         case HostageRescuePhase::Thank:
+             if (objects.animationFinished(hostage.asset->objectId)) {
+                 Result result = setPhase(hostage, HostageRescuePhase::Freed,
+-                                         player, objects, bonuses);
++                                         player, objects, bonuses, hooks);
+                 if (!result) {
+                     return result;
+                 }
+@@ -369,7 +377,8 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+                                      HostageRescuePhase phase,
+                                      GameplayPlayer& player,
+                                      LevelObjectRuntime& objects,
+-                                     LevelBonusRuntime& bonuses) {
++                                     LevelBonusRuntime& bonuses,
++                                     const HostageUpdateHooks& hooks) {
+     if (hostage.asset == nullptr) {
+         return Result::failure("Hostage phase target is invalid");
+     }
+@@ -381,7 +390,6 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+         // CHostage::SetState(0) changes the hostage, not the player. Only
+         // branches with an evidenced Player::SetNextStateId(0) clear it.
+         hostage.quickTimeOutcome = HostageQteOutcome::Inactive;
+-        hostage.cuttingLoopRequested = false;
+         hostage.quickTimeElapsedMilliseconds = 0;
+         hostage.completedActions = 0;
+         return objects.setAnimation(hostage.asset->objectId,
+@@ -397,11 +405,12 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+                                     hostage.asset->hostageAnimations[1],
+                                     false);
+     case HostageRescuePhase::Thank:
+-        soundCues_.push_back(
+-            {hostage.asset->objectId,
+-             hostage.asset->hostageIsWoman ? kWomanRescuedSound
+-                                            : kManRescuedSound,
+-             HostageSoundAction::PlayOnce});
++        {
++            Result soundResult = emitSound({hostage.asset->objectId,
++                hostage.asset->hostageIsWoman ? kWomanRescuedSound : kManRescuedSound,
++                HostageSoundAction::PlayOnce}, hooks);
++            if (!soundResult) { return soundResult; }
++        }
+         return objects.setAnimation(hostage.asset->objectId,
+                                     hostage.asset->hostageAnimations[2],
+                                     false);
+@@ -416,6 +425,13 @@ Result LevelHostageRuntime::setPhase(LevelHostageState& hostage,
+     return Result::success();
+ }
+ 
++Result LevelHostageRuntime::emitSound(const HostageSoundCue& cue,
++                                      const HostageUpdateHooks& hooks) {
++    if (hooks.sound) { return hooks.sound(cue); }
++    soundCues_.push_back(cue); // Request only; never latched as actually playing.
++    return Result::success();
++}
++
+ bool LevelHostageRuntime::playerInsideEnableRadius(
+     const LevelHostageState& hostage,
+     const GameplayPlayer& player) const noexcept {
+diff --git a/src/game/LevelHostageRuntime.hpp b/src/game/LevelHostageRuntime.hpp
+index e48a0e5..97642d6 100644
+--- a/src/game/LevelHostageRuntime.hpp
++++ b/src/game/LevelHostageRuntime.hpp
+@@ -4,6 +4,7 @@
+ #include "game/QuickTimeEventRuntime.hpp"
+ #include "game/QteClock.hpp"
+ #include "game/GameplayPlayer.hpp"
++#include "game/HostageSound.hpp"
+ #include "game/LevelBonusRuntime.hpp"
+ #include "game/LevelObjectRuntime.hpp"
+ 
+@@ -24,18 +25,6 @@ enum class HostageRescuePhase : std::int32_t {
+     Freed = 6,
+ };
+ 
+-enum class HostageSoundAction {
+-    PlayOnce,
+-    StartLoop,
+-    StopLoop,
+-};
+-
+-struct HostageSoundCue {
+-    std::int32_t hostageObjectId{-1};
+-    std::uint16_t voxSoundId{};
+-    HostageSoundAction action{HostageSoundAction::PlayOnce};
+-};
+-
+ // CHostage::Update starts from m_pRescuePressed (R1 release);
+ // CQTEManager::Update counts m_pQTEPressed (Cross press). They must not
+ // be represented by a shared contextual punch input.
+@@ -70,7 +59,6 @@ struct LevelHostageState {
+     std::int16_t requiredActions{1};
+     bool promptVisible{};
+     HostageQteOutcome quickTimeOutcome{HostageQteOutcome::Inactive};
+-    bool cuttingLoopRequested{};
+ };
+ 
+ // Portable reconstruction of CHostage::Update/OnEnterState/OnExitState at
+@@ -88,7 +76,8 @@ public:
+                                 LevelObjectRuntime& objects,
+                                 LevelBonusRuntime& bonuses,
+                                 HostageTimeStep time,
+-                                HostageInput input);
++                                HostageInput input,
++                                const HostageUpdateHooks& hooks = {});
+ 
+     // CLevel::Update (ELF 0x003720bc) advances hostage objects before the
+     // QTE manager. The Windows loop uses these two explicit phases. update()
+@@ -97,7 +86,8 @@ public:
+                                        LevelObjectRuntime& objects,
+                                        LevelBonusRuntime& bonuses,
+                                        HostageTimeStep time,
+-                                       bool rescueRequested);
++                                       bool rescueRequested,
++                                       const HostageUpdateHooks& hooks = {});
+     // Composed test/headless entry: advances the SAME shared manager once.
+     // Application updates that manager directly and calls observeQuickTime;
+     // it must not also call updateQuickTime during that update.
+@@ -123,9 +113,7 @@ public:
+     [[nodiscard]] std::vector<HostageSoundCue> consumeSoundCues();
+     void clearTransientCues() noexcept {
+         soundCues_.clear();
+-        // Snapshot restoration stops the host audio voices before copying
+-        // this runtime. Do not retain a stale "loop is playing" latch.
+-        for (auto& state : states_) { state.cuttingLoopRequested = false; }
++
+     }
+ 
+ private:
+@@ -133,11 +121,15 @@ private:
+                                   HostageRescuePhase phase,
+                                   GameplayPlayer& player,
+                                   LevelObjectRuntime& objects,
+-                                  LevelBonusRuntime& bonuses);
++                                  LevelBonusRuntime& bonuses,
++                                  const HostageUpdateHooks& hooks);
+     [[nodiscard]] bool playerInsideEnableRadius(
+         const LevelHostageState& hostage,
+         const GameplayPlayer& player) const noexcept;
+ 
++    [[nodiscard]] Result emitSound(const HostageSoundCue& cue,
++                                    const HostageUpdateHooks& hooks);
++
+     QuickTimeEventRuntime* sharedQte_{};
+     const ButtonConfigDefinition* quickTimeConfig_{};
+     std::vector<LevelHostageState> states_;
+diff --git a/tests/HostageIntegrationTests.cpp b/tests/HostageIntegrationTests.cpp
+new file mode 100644
+index 0000000..15fe674
+--- /dev/null
++++ b/tests/HostageIntegrationTests.cpp
+@@ -0,0 +1,270 @@
++// RE06: original hostage control calls and transient Audible query/play/stop.
++// Source/asset fixtures only, not an ARM differential or an audible XAudio test.
++#include "game/HostageSound.hpp"
++#include "game/LevelHostageRuntime.hpp"
++#include "game/LevelCinematicRuntime.hpp"
++#include "game/PlayerStateConfig.hpp"
++#include "reconstructed/input/XperiaKeyRouter.hpp"
++#include "platform/input/XInputStateTranslator.hpp"
++#include <algorithm>
++#include <filesystem>
++#include <iostream>
++#include <stdexcept>
++#include <string>
++#include <string_view>
++#include <vector>
++
++namespace {
++using namespace usm::game;
++using usm::Result;
++std::size_t checks{};
++void check(bool value, const char* text, int line) {
++    ++checks;
++    if (!value) { throw std::runtime_error("line " + std::to_string(line) + ": " + text); }
++}
++#define CHECK(x) check(static_cast<bool>(x), #x, __LINE__)
++
++struct Sink {
++    bool playing{}, culled{}, playFailure{}, stopFailure{};
++    int queries{}, plays{}, stops{};
++    int source{-1};
++    std::vector<std::string> events;
++    HostageSoundCallbacks callbacks{
++        [this](std::uint16_t id) {
++            CHECK(id == 0x18b); ++queries; events.push_back("query"); return playing;
++        },
++        [this](std::int32_t object, std::uint16_t id) {
++            CHECK(id == 0x18b || id == 0xa3 || id == 0xa5);
++            ++plays; source = object; events.push_back("play");
++            if (playFailure) { return Result::failure("injected play failure"); }
++            if (!culled) { playing = true; }
++            return Result::success();
++        },
++        [this](std::uint16_t id) {
++            CHECK(id == 0x18b); ++stops; events.push_back("stop");
++            if (stopFailure) { return Result::failure("injected stop failure"); }
++            playing = false; return Result::success();
++        }
++    };
++};
++void dispatchTests() {
++    const HostageSoundCue query{30018,0x18b,HostageSoundAction::PlayOnceIfStopped};
++    const HostageSoundCue stop{30018,0x18b,HostageSoundAction::Stop};
++    Sink sink;
++    CHECK(sink.callbacks.dispatch(query));
++    CHECK((sink.events==std::vector<std::string>{"query","play"}));
++    CHECK(sink.plays==1 && sink.playing);
++    for (int i=0;i<32;++i) { CHECK(sink.callbacks.dispatch(query)); }
++    CHECK(sink.queries==33 && sink.plays==1);
++    sink.playing=false; // actual sink completion, not elapsed game time
++    CHECK(sink.callbacks.dispatch(query)); CHECK(sink.plays==2);
++    CHECK(sink.callbacks.dispatch(stop)); CHECK(!sink.playing);
++    CHECK(sink.callbacks.dispatch(stop)); CHECK(sink.stops==2);
++    // A culled successful request is NOT an active voice; retry may be needed.
++    sink.culled=true;
++    CHECK(sink.callbacks.dispatch(query)); CHECK(!sink.playing);
++    CHECK(sink.callbacks.dispatch(query)); CHECK(sink.plays==4);
++    sink.playFailure=true;
++    CHECK(!sink.callbacks.dispatch(query)); CHECK(!sink.playing);
++    sink.playFailure=false; sink.culled=false;
++    CHECK(sink.callbacks.dispatch(query)); CHECK(sink.playing && sink.plays==6);
++    // The native transient fallback has sound-media scope, not object scope.
++    CHECK(sink.callbacks.dispatch({1234,0x18b,HostageSoundAction::PlayOnceIfStopped}));
++    CHECK(sink.plays==6);
++    CHECK(sink.callbacks.dispatch({1234,0x18b,HostageSoundAction::Stop}));
++    CHECK(!sink.playing);
++    CHECK(sink.callbacks.dispatch({30018,0xa3,HostageSoundAction::PlayOnce}));
++    CHECK(sink.source==30018 && sink.plays==7);
++    // Broken host bindings fail explicitly, not an invented playback state.
++    HostageSoundCallbacks empty;
++    CHECK(!empty.dispatch(query)); CHECK(!empty.dispatch(stop));
++    CHECK(!empty.dispatch({30018,0xa5,HostageSoundAction::PlayOnce}));
++    CHECK(!sink.callbacks.dispatch({30018,0x18b,static_cast<HostageSoundAction>(100)}));
++}
++
++struct Fixture {
++    QuickTimeEventRuntime qte;
++    LevelTriggerRuntime triggers;
++    GameplayCamera camera;
++    LevelCinematicRuntime controls;
++    LevelObjectRuntime objects;
++    LevelBonusRuntime bonuses;
++    LevelHostageRuntime hostages;
++    GameplayPlayer player;
++    usm::reconstructed::XperiaKeyRouter keys;
++    usm::platform::XInputStateTranslator raw;
++    Sink sink;
++    int resets{};
++    std::vector<std::string> order;
++    std::uint32_t now{10000};
++    HostageUpdateHooks hooks;
++    const LevelHostageState& state() const { return *hostages.find(30018); }
++    Fixture(const LevelOneBootstrap& level, const PlayerStateConfigDatabase& states) {
++        controls.bind(triggers,camera);
++        controls.setInputResetHandler([this] { ++resets; keys.resetGameplayKeypad(); order.push_back("reset"); });
++        qte.bind(level.buttonConfigs(),level.hud().interfaceAtlas,nullptr,&controls);
++        CHECK(objects.initialize(level)); CHECK(bonuses.initialize(level.bonuses()));
++        CHECK(hostages.initialize(level,qte,&objects));
++        CHECK(player.initialize(level.player(),nullptr,&states));
++        CHECK(hostages.find(30018) && state().asset);
++        player.restoreAt(state().asset->position,{1,0,0});
++        hooks.sound=[this](const HostageSoundCue& cue) {
++            // Production bridge drains prior manager cues before the hostage sound.
++            for (const auto id:qte.consumeSoundCues()) { order.push_back("qte:"+std::to_string(id)); }
++            order.push_back(cue.action==HostageSoundAction::Stop ? "stop" : "query/play");
++            return sink.callbacks.dispatch(cue);
++        };
++        hooks.enableControls=[this](bool enabled,bool preservePause) {
++            order.push_back(enabled ? "enable" : "disable");
++            CHECK(preservePause == !enabled);
++            controls.enableControls(enabled,preservePause);
++        };
++    }
++    Result tryStep(bool rescue=false) { return hostages.updateObjects(player,objects,bonuses,{0,0,now},rescue,hooks); }
++    void step(bool rescue=false) { CHECK(tryStep(rescue)); }
++    void poll(std::uint16_t buttons) {
++        keys.beginFrame(); raw.update(true,buttons,0,0,[this](const auto& e){keys.route(e,usm::reconstructed::InputContext::Gameplay);});
++    }
++    void tap() { qte.update({now,0},true); hostages.observeQuickTime(); }
++    void begin(bool activationTap=false) {
++        step(); CHECK(hostages.contextPromptVisible());
++        step(true); CHECK(player.activeStateId()==27);
++        CHECK(!controls.controlsEnabled() && controls.pauseButtonEnabled());
++        CHECK(resets==1); const auto n=resets;
++        step(); CHECK(resets==n+1); // repeated native disable during rescue-start
++        player.update({}, {}, 1000);
++        poll(usm::platform::xinput::A);
++        CHECK(keys.gameplayKeypad().jump.pressed && keys.state().quickTimeEvent.pressed);
++        const auto before=resets;
++        step(); CHECK(state().phase==HostageRescuePhase::QuickTime);
++        CHECK(resets==before+2); // hostage disable, then outer BeginQTE disable
++        CHECK(!keys.gameplayKeypad().jump.pressed && keys.state().quickTimeEvent.pressed);
++        CHECK(qte.remainingActionCount()==8 && sink.queries==0 && sink.plays==0);
++        if (activationTap) { tap(); }
++    }
++};
++
++void recoveryTests(const LevelOneBootstrap& level,const PlayerStateConfigDatabase& states) {
++    Fixture f(level,states); f.begin(true); CHECK(f.qte.remainingActionCount()==7);
++    f.step(); CHECK(f.sink.plays==1 && f.sink.playing && f.sink.queries==1);
++    CHECK(f.hostages.consumeSoundCues().empty()); // no double dispatch in bound path
++    for (int i=0;i<20;++i) { f.step(); }
++    CHECK(f.sink.plays==1 && f.sink.queries==21);
++    f.sink.playing=false;
++    f.step(); CHECK(f.sink.plays==2 && f.sink.queries==22);
++    f.tap(); CHECK(f.qte.remainingActionCount()==6);
++    f.sink.playing=false; f.step(); CHECK(f.sink.plays==2 && f.sink.queries==22);
++    // Mash idle decay can return the native counter to 7: query again there.
++    f.qte.update({f.now,500},false); f.hostages.observeQuickTime();
++    CHECK(f.qte.remainingActionCount()==7);
++    f.sink.culled=true; f.step(); CHECK(!f.sink.playing && f.sink.plays==3);
++    f.step(); CHECK(!f.sink.playing && f.sink.plays==4);
++    f.sink.playFailure=true; CHECK(!f.tryStep());
++    CHECK(f.state().phase==HostageRescuePhase::QuickTime && f.qte.remainingActionCount()==7);
++    f.sink.playFailure=false; f.sink.culled=false; f.step(); CHECK(f.sink.playing);
++    auto saved=f.hostages; // no pointers to the call-scoped hooks or sink state
++    f.sink.playing=false; f.hostages=saved; f.hostages.clearTransientCues();
++    const auto plays=f.sink.plays; f.step(); CHECK(f.sink.plays==plays+1);
++    for (int i=0;i<7;++i) { f.tap(); }
++    CHECK(f.qte.state()==QteState::SuccessDisplay);
++    f.sink.stopFailure=true; CHECK(!f.tryStep());
++    CHECK(f.state().phase==HostageRescuePhase::QuickTime && f.player.activeStateId()==28);
++    f.sink.stopFailure=false; f.step();
++    CHECK(f.state().phase==HostageRescuePhase::RescueEnd && !f.sink.playing);
++    const int stops=f.sink.stops;
++    f.step(); f.step(); CHECK(f.sink.stops==stops+2);
++    // Detached mode publishes repeatable queries, not asserted playback.
++    Fixture detached(level,states); detached.begin(true);
++    HostageUpdateHooks none;
++    for(int i=0;i<2;++i) { CHECK(detached.hostages.updateObjects(detached.player,detached.objects,detached.bonuses,{0,0,10000},false,none)); }
++    auto cmds=detached.hostages.consumeSoundCues();
++    CHECK(cmds.size()==2 && cmds[0].action==HostageSoundAction::PlayOnceIfStopped && cmds[1].action==cmds[0].action);
++}
++
++void controlTests(const LevelOneBootstrap& level,const PlayerStateConfigDatabase& states) {
++    for (const bool interrupt : {false,true}) {
++        Fixture f(level,states); f.begin(true); const auto base=f.bonuses.states().size();
++        f.order.clear(); auto before=f.resets;
++        f.step(); CHECK(f.resets==before+1);
++        CHECK(f.order.size()>=3 && f.order[0]=="disable" && f.order[1]=="reset");
++        CHECK(!f.controls.controlsEnabled());
++        if (interrupt) {
++            CHECK(f.player.enterScriptedState(27,false));
++            f.order.clear(); before=f.resets; f.step();
++            CHECK(f.resets==before+2); // EndQTE + CHostage restoration, do not coalesce
++            CHECK(f.qte.state()==QteState::FailureDisplay && f.player.activeStateId()==27);
++            CHECK(f.state().phase==HostageRescuePhase::Tied && f.bonuses.states().size()==base);
++            const auto cue=std::find(f.order.begin(),f.order.end(),"qte:393");
++            const auto stop=std::find(f.order.begin(),f.order.end(),"stop");
++            CHECK(cue!=f.order.end() && stop!=f.order.end() && cue<stop);
++        } else {
++            for (int i=0;i<7;++i) { f.tap(); }
++            before=f.resets; f.step(); CHECK(f.resets==before);
++            CHECK(f.state().phase==HostageRescuePhase::RescueEnd);
++            CHECK(f.controls.controlsEnabled());
++            f.player.update({}, {},1000); before=f.resets; f.step();
++            CHECK(f.resets==before+1 && f.state().phase==HostageRescuePhase::Release);
++            const auto rewardCount = static_cast<std::size_t>(
++                f.state().asset->hostageHealthOrbCount +
++                f.state().asset->hostageSkillPointOrbCount);
++            CHECK(f.bonuses.states().size() == base + rewardCount);
++            const auto priorPlays = f.sink.plays;
++            f.objects.advanceAnimations(100000);
++            f.step();
++            CHECK(f.state().phase == HostageRescuePhase::Thank);
++            CHECK(f.sink.plays == priorPlays + 1 && f.sink.source == 30018);
++            CHECK(f.hostages.consumeSoundCues().empty());
++            f.step();
++            CHECK(f.sink.plays == priorPlays + 1);
++            f.objects.advanceAnimations(100000);
++            f.step();
++            CHECK(f.state().phase == HostageRescuePhase::Freed);
++            f.step();
++            CHECK(f.bonuses.states().size() == base + rewardCount);
++            CHECK(f.sink.plays == priorPlays + 1);
++        }
++        CHECK(f.controls.controlsEnabled() && f.controls.pauseButtonEnabled());
++    }
++    // A timeout restores via EndQTE and then the hostage failure branch.
++    {
++        Fixture timedOut(level, states);
++        timedOut.begin(true);
++        timedOut.step();
++        const auto count = timedOut.bonuses.states().size();
++        timedOut.qte.update({14001, 0}, false);
++        timedOut.hostages.observeQuickTime();
++        CHECK(timedOut.qte.state() == QteState::FailureDisplay);
++        const auto resets = timedOut.resets;
++        timedOut.step();
++        CHECK(timedOut.resets == resets + 1);
++        CHECK(timedOut.controls.controlsEnabled());
++        CHECK(timedOut.state().phase == HostageRescuePhase::Tied);
++        CHECK(!timedOut.sink.playing && timedOut.sink.stops == 1);
++        CHECK(timedOut.bonuses.states().size() == count);
++    }
++    // Composed entry must forward hooks, not silently run detached.
++    Fixture f(level,states); f.step();
++    CHECK(f.hostages.update(f.player,f.objects,f.bonuses,{0,0,10000},{true,false},f.hooks));
++    CHECK(f.resets==1 && !f.controls.controlsEnabled());
++    // Interrupted start restores normal controls without starting QTE.
++    f.player.restoreAt(f.state().asset->position,{1,0,0});
++    const auto n=f.resets; f.step(); CHECK(f.resets==n+1);
++    CHECK(f.controls.controlsEnabled() && f.state().phase==HostageRescuePhase::Tied);
++}
++} // namespace
++int main(int argc,char** argv) {
++    try {
++        if(argc!=2) { throw std::runtime_error("Select dispatch, recovery or controls"); }
++        const std::string_view group=argv[1];
++        if(group=="dispatch") { dispatchTests(); }
++        else {
++            LevelOneBootstrap level; PlayerStateConfigDatabase states;
++            const auto root=std::filesystem::path(USM_TEST_GAME_DATA_ROOT);
++            CHECK(level.load(root)); CHECK(states.load(root));
++            if(group=="recovery") { recoveryTests(level,states); }
++            else if(group=="controls") { controlTests(level,states); }
++            else { throw std::runtime_error("Unknown group"); }
++        }
++        std::cout<<group<<": "<<checks<<" checks passed\n"; return 0;
++    } catch(const std::exception& e) { std::cerr<<e.what()<<'\n';return 1; }
++}
+diff --git a/tests/QteParityTests.cpp b/tests/QteParityTests.cpp
+index e90cbeb..be3c2cd 100644
+--- a/tests/QteParityTests.cpp
++++ b/tests/QteParityTests.cpp
+@@ -806,13 +806,14 @@ void hostageTests(const LevelOneBootstrap& level, const PlayerStateConfigDatabas
+         f.objectStep();
+         const auto start = f.hostages.consumeSoundCues();
+         CHECK(start.size() == 1 && start[0].voxSoundId == 0x18b);
+-        CHECK(start[0].action == HostageSoundAction::StartLoop);
++        CHECK(start[0].action == HostageSoundAction::PlayOnceIfStopped);
+         f.objectStep();
+-        CHECK(f.hostages.consumeSoundCues().empty());
++        const auto repeatedQuery = f.hostages.consumeSoundCues();
++        CHECK(repeatedQuery.size() == 1 && repeatedQuery[0].action == HostageSoundAction::PlayOnceIfStopped);
+         f.qteStep(false, 500);
+         CHECK(f.state().completedActions == 0);
+         f.objectStep();
+-        CHECK(f.hostages.consumeSoundCues().empty()); // Decay does not stop loop.
++        CHECK(f.hostages.consumeSoundCues().empty()); // Decay issues no stop or new play query.
+         f.now = 14000;
+         f.qteStep(false);
+         CHECK(f.state().quickTimeOutcome == HostageQteOutcome::Running);
+@@ -824,7 +825,7 @@ void hostageTests(const LevelOneBootstrap& level, const PlayerStateConfigDatabas
+         f.objectStep();
+         CHECK(f.state().phase == HostageRescuePhase::Tied);
+         const auto stop = f.hostages.consumeSoundCues();
+-        CHECK(stop.size() == 1 && stop[0].action == HostageSoundAction::StopLoop);
++        CHECK(stop.size() == 1 && stop[0].action == HostageSoundAction::Stop);
+         CHECK(f.bonuses.states().size() == f.initialBonuses);
+         f.start();
+         CHECK(f.state().completedActions == 0);
+@@ -868,7 +869,7 @@ void hostageTests(const LevelOneBootstrap& level, const PlayerStateConfigDatabas
+         CHECK(f.player.activeStateId() == 27); // Do not clobber the interrupting state.
+         CHECK(f.bonuses.states().size() == f.initialBonuses);
+         const auto stop = f.hostages.consumeSoundCues();
+-        CHECK(stop.size() == 1 && stop[0].action == HostageSoundAction::StopLoop);
++        CHECK(stop.size() == 1 && stop[0].action == HostageSoundAction::Stop);
+     }
+     {
+         HostageFixture f(level, configs);
+@@ -1008,7 +1009,7 @@ void sharedManagerTests(const LevelOneBootstrap& level,
+         CHECK(f.hostages.consumeQuickTimeSoundCues().empty()); // Same queue.
+         f.objectStep();
+         const auto cut=f.hostages.consumeSoundCues();
+-        CHECK(cut.size()==1 && cut[0].action==HostageSoundAction::StartLoop);
++        CHECK(cut.size()==1 && cut[0].action==HostageSoundAction::PlayOnceIfStopped);
+         const auto generation=f.qte.generation();
+         for(int attempt=0;attempt<256;++attempt) {
+             CHECK(f.qte.applyCommand(startCommand(6),{12000,50},20004));
+@@ -1054,7 +1055,7 @@ void sharedManagerTests(const LevelOneBootstrap& level,
+         CHECK(f.state().phase==HostageRescuePhase::Tied);
+         CHECK(f.qte.state()==QteState::FailureDisplay); // Reset hostage is not reset manager.
+         const auto stop=f.hostages.consumeSoundCues();
+-        CHECK(stop.size()==1 && stop[0].action==HostageSoundAction::StopLoop);
++        CHECK(stop.size()==1 && stop[0].action==HostageSoundAction::Stop);
+         const auto generation=f.qte.generation();
+         f.start();
+         CHECK(f.qte.generation()==generation+1 && f.qte.state()==QteState::Mash);
+diff --git a/tests/SmokeTests.cpp b/tests/SmokeTests.cpp
+index c0edd56..f685251 100644
+--- a/tests/SmokeTests.cpp
++++ b/tests/SmokeTests.cpp
+@@ -6032,9 +6032,9 @@ int main() {
+         assert(hostageCuttingCues.size() == 2);
+         assert(hostageCuttingCues.front().voxSoundId == 0x18b);
+         assert(hostageCuttingCues.front().action ==
+-               usm::game::HostageSoundAction::StartLoop);
++               usm::game::HostageSoundAction::PlayOnceIfStopped);
+         assert(hostageCuttingCues.back().action ==
+-               usm::game::HostageSoundAction::StopLoop);
++               usm::game::HostageSoundAction::Stop);
+         hostagePlayer.update({}, {}, 1000);
+         assert(hostageRuntime.update(hostagePlayer, objectRuntime,
+                                      hostageBonuses, {0, 0, 0}, {}));
+@@ -6061,7 +6061,7 @@ int main() {
+         const auto hostageThankCues = hostageRuntime.consumeSoundCues();
+         assert(hostageThankCues.size() == 2);
+         assert(hostageThankCues.front().action ==
+-               usm::game::HostageSoundAction::StopLoop);
++               usm::game::HostageSoundAction::Stop);
+         assert(hostageThankCues.back().voxSoundId == 0xa3);
+         hostageBonuses.update(roomTwoHostageAsset->position, 3000);
+         assert(hostageBonuses.consumeGrants().size() ==
+diff --git a/tools/verify_re06_reference.py b/tools/verify_re06_reference.py
+new file mode 100644
+index 0000000..4ef7ebe
+--- /dev/null
++++ b/tools/verify_re06_reference.py
+@@ -0,0 +1,79 @@
++#!/usr/bin/env python3
++"""Verify RE06 reference functions and CHostage's actual Audible virtual slots.
++
++No ARM code is executed. The supplied image is never modified by this tool.
++"""
++from __future__ import annotations
++import argparse
++import json
++import struct
++import sys
++from pathlib import Path
++from verify_re01_reference import inspect_elf
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def virtual_word(data: bytes, address: int) -> int:
++    # inspect_elf has already validated this ELF32 header and section table.
++    header = struct.unpack_from('<16sHHIIIIIHHHHHH', data)
++    shoff, shentsize, shnum = header[6], header[11], header[12]
++    for index in range(shnum):
++        sec = struct.unpack_from('<IIIIIIIIII', data, shoff + index * shentsize)
++        _, kind, _, start, offset, size, *_ = sec
++        if kind != 8 and start <= address and address + 4 <= start + size:
++            at = offset + address - start
++            if at + 4 > len(data):
++                raise ValueError('Virtual word lies outside file-backed bytes')
++            return struct.unpack_from('<I', data, at)[0]
++    raise ValueError(f'No file-backed section covers virtual address {address:#x}')
++
++
++def verify(reference: Path, manifest: Path) -> dict:
++    expected = json.loads(manifest.read_text(encoding='utf-8'))
++    actual = inspect_elf(reference, [s['name'] for s in expected['symbols']])
++    for key in ('size', 'sha256', 'machine', 'symbols'):
++        if actual[key] != expected[key]:
++            raise ValueError(f'Reference mismatch in {key}; do not reuse RE06 evidence')
++    raw = reference.read_bytes()
++    by_name = {s['name']: s for s in actual['symbols']}
++    table = expected['hostage_audible_vtable']
++    slots = []
++    for offset, name in table['slots'].items():
++        address = int(table['vptr_elf'], 16) + int(offset, 16)
++        target = by_name[name]
++        expected_pointer = int(target['elf_address'], 16) | int(target['thumb'])
++        pointer = virtual_word(raw, address)
++        if pointer != expected_pointer:
++            raise ValueError(f'Audible virtual slot {offset} does not resolve to {name}')
++        slots.append({'offset': offset, 'slot_elf': f'0x{address:08x}',
++                      'pointer': f'0x{pointer:08x}', 'name': name})
++    actual.update(verified=True, vtable_slots=slots,
++                  ghidra_rebase_offset=expected['ghidra_rebase_offset'],
++                  note='Identity and virtual-slot verification only; no ARM execution.')
++    return actual
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('reference', nargs='?', type=Path,
++                        default=ROOT/'game/original/libspiderman.so')
++    parser.add_argument('--manifest', type=Path,
++                        default=ROOT/'docs/references/re06-original-fingerprints.json')
++    parser.add_argument('--output', type=Path)
++    args = parser.parse_args()
++    try:
++        actual = verify(args.reference, args.manifest)
++        text = json.dumps(actual, indent=2) + '\n'
++        if args.output:
++            args.output.parent.mkdir(parents=True, exist_ok=True)
++            args.output.write_text(text, encoding='utf-8')
++        print(text, end='')
++        return 0
++    except (OSError, ValueError, KeyError, TypeError, struct.error) as error:
++        print(f'Reference verification failed: {error}', file=sys.stderr)
++        return 1
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())

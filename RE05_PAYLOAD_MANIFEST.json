@@ -1,0 +1,2718 @@
+{
+  "checkpoint": "RE05",
+  "baseline_archive": "OpenAndroidUSM_RE04_Source.zip",
+  "baseline_archive_sha256": "e2f4507d2cc8993a4401ba0c4687ef5c58d235c558121de695af145a2965a16a",
+  "file_count_excluding_this_manifest": 542,
+  "files": [
+    {
+      "path": ".gitignore",
+      "size": 340,
+      "sha256": "ccd2c70b192b76c945861965071bd6a3b99517877c372d1fc9a0ee5fe85f6e63"
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 2354,
+      "sha256": "c1727de53a6d53adcda6c689958f7977ca406a87349894477eff337ede1a7ca9"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "size": 13086,
+      "sha256": "35412145ca223daa5255b8f247f2dc154c7ec500da389a55016f28de149de34f"
+    },
+    {
+      "path": "CMakePresets.json",
+      "size": 1289,
+      "sha256": "c4f80f52f2bd30090aee542dd268575eb974b75719133cc7e212f39af7898370"
+    },
+    {
+      "path": "RE01.patch",
+      "size": 79653,
+      "sha256": "541657b701a743729feb1c77d9e20233547de57e642c21c9e2ec713667d8002f"
+    },
+    {
+      "path": "RE01_README.md",
+      "size": 1982,
+      "sha256": "bb820b36990fe98ada167884e70d303528713b46a366a1d50131ad785c300673"
+    },
+    {
+      "path": "RE01_verification/baseline-core-tests.log",
+      "size": 333,
+      "sha256": "f283ff0f8831a58993de16b5fa2993016e195f2eebda15d272abecbdeb6952c0"
+    },
+    {
+      "path": "RE01_verification/build-environment.json",
+      "size": 697,
+      "sha256": "bc88ec35eb06ab6a1bc55c9cba846b32b26941c831a3edaa8e5ced492e5d2588"
+    },
+    {
+      "path": "RE01_verification/commands.txt",
+      "size": 1904,
+      "sha256": "a69de8d86450292ec3542a55ff6ecf3113a84bd03909ced25e8701e7728eaf29"
+    },
+    {
+      "path": "RE01_verification/input-transitions-sanitized.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE01_verification/input-transitions-sanitized.log",
+      "size": 60,
+      "sha256": "0a931c7bb0e796aecbd845194d524d758d938bc0cb5990e40af2058a24dbbb5c"
+    },
+    {
+      "path": "RE01_verification/original-material-integrity.json",
+      "size": 127144,
+      "sha256": "5285f20d7225b5af5ba73bde88e2cf6d2bc397c8794c7ac8584bc0b8f0487b1f"
+    },
+    {
+      "path": "RE01_verification/patch-apply-check.json",
+      "size": 319,
+      "sha256": "f8b6133c1863150f89c8c220ae491fd804ae4269d1f60364211f302595f102e5"
+    },
+    {
+      "path": "RE01_verification/re01-final-build.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE01_verification/re01-final-build.log",
+      "size": 430,
+      "sha256": "1c8c80cdef7d861ee91f63926466c72be27375ad5214dbea6e7a6300e16f7174"
+    },
+    {
+      "path": "RE01_verification/re01-final-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE01_verification/re01-final-tests.log",
+      "size": 3761,
+      "sha256": "4cb750bc8c4bd94ff2598bc5ba08f4ea3d83ed661942832973d08f298dd690e2"
+    },
+    {
+      "path": "RE01_verification/reference-identity.json",
+      "size": 1975,
+      "sha256": "484a99f95a7c5e29c6d2d118d76b78a332eb5fb96705b07dae0eb896d5f8de40"
+    },
+    {
+      "path": "RE01_verification/source-change-manifest.json",
+      "size": 60320,
+      "sha256": "50ce9a9c7d27de12fc18391742c2873c1835035b2ebeb697aca7e4d6f5bfa095"
+    },
+    {
+      "path": "RE02.patch",
+      "size": 178013,
+      "sha256": "a0370c11c3f93eb2b2d6c44d5783e9862d3762f0c71800299ce345921157096a"
+    },
+    {
+      "path": "RE02_README.md",
+      "size": 3966,
+      "sha256": "b8b244e275fe9442eedc8fb9a2bd697e3b245b964d3b451e5c0070104c2636a8"
+    },
+    {
+      "path": "RE02_VERIFICATION.md",
+      "size": 7360,
+      "sha256": "c15c7ded3308af21959c42bbd29c09a2722454fd45a747a837c9165ecbc05466"
+    },
+    {
+      "path": "RE02_verification/README.md",
+      "size": 1967,
+      "sha256": "6ed364c06d91ed2fa59f5f970959be8041d6132919a6e2d04eb7ab3dc07dd8a1"
+    },
+    {
+      "path": "RE02_verification/asset-witness.json",
+      "size": 2559,
+      "sha256": "b7b4df6814583720452a003eb6bf602648aca8e7ac872838168aa91f670d5346"
+    },
+    {
+      "path": "RE02_verification/baseline-build.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/baseline-build.log",
+      "size": 9276,
+      "sha256": "797768c326719815defa8301e3e1fbb9e05cdd31cb0a0c28c3549f6551d793ba"
+    },
+    {
+      "path": "RE02_verification/baseline-configure.log",
+      "size": 1388,
+      "sha256": "e2d333ebc1283e8f8854cf685297b1a19f947b5009fb113fe57293dd2f0dbf94"
+    },
+    {
+      "path": "RE02_verification/baseline-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/baseline-tests.log",
+      "size": 1162,
+      "sha256": "a2686c7c03ec1c0fb88ab891968a05a9f683397f58e42922a30c32c304f14030"
+    },
+    {
+      "path": "RE02_verification/build-environment.json",
+      "size": 1038,
+      "sha256": "63ad6e145a18bd397a028a33db5107e18f205aa2238c2ded19125d0ceb44aae7"
+    },
+    {
+      "path": "RE02_verification/clean-build-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/clean-build-tests.log",
+      "size": 20402,
+      "sha256": "fbdab2ea38367d69c712f74e34eb9f3af6ccfa51ee497353a29e8de5d08922f8"
+    },
+    {
+      "path": "RE02_verification/commands.txt",
+      "size": 3876,
+      "sha256": "0badd0b0ab2ca6ab6f56803027d7682ad64ef807d700d737f91114489f4d2bcd"
+    },
+    {
+      "path": "RE02_verification/final-release.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/final-release.log",
+      "size": 8595,
+      "sha256": "8b31c50ab0e9cbaa83f9257cc7249dec5dfa012f34fd59c7b7aa4b686f8d9ed8"
+    },
+    {
+      "path": "RE02_verification/final-sanitized.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/final-sanitized.log",
+      "size": 8755,
+      "sha256": "85b84ee7f7973b845338d542b542c2706531af63099928f18fa09a40763f5b23"
+    },
+    {
+      "path": "RE02_verification/iteration1-build.exit",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "RE02_verification/iteration1-build.log",
+      "size": 5383,
+      "sha256": "96e6d68d6601b09ba91ff57f53586d646f09ec07589df5214d9fe4dda9f06876"
+    },
+    {
+      "path": "RE02_verification/iteration2-build-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/iteration2-build-tests.log",
+      "size": 1424,
+      "sha256": "d1af9f13be795287f3bd1b06d87d20cdbe82f5f909c464dea7ed97087fcc2cf5"
+    },
+    {
+      "path": "RE02_verification/iteration3-build-tests.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE02_verification/iteration3-build-tests.log",
+      "size": 4024,
+      "sha256": "ba6cc5a2b7f73d1038bfde2577cc813e6263547552522900db7600fed8b5835b"
+    },
+    {
+      "path": "RE02_verification/iteration4-build-tests.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE02_verification/iteration4-build-tests.log",
+      "size": 4174,
+      "sha256": "67832bb26363958fa485d3ed775287da4b7f5648db5a73af650635c5c5f9f7dd"
+    },
+    {
+      "path": "RE02_verification/iteration5-build-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/iteration5-build-tests.log",
+      "size": 5041,
+      "sha256": "e8062a15c20ec14404ea6a3fe6a3d9aad517978b6704d45936845bcf896bb8bd"
+    },
+    {
+      "path": "RE02_verification/iteration6-build-tests.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE02_verification/iteration6-build-tests.log",
+      "size": 4242,
+      "sha256": "03bcd6a33d9202285bf0e5751b894a1634f64fe88b2d7d0507854139feb1b32e"
+    },
+    {
+      "path": "RE02_verification/iteration6-sanitized-tests.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE02_verification/iteration6-sanitized-tests.log",
+      "size": 4254,
+      "sha256": "12df9d82a6efa0dc7d68081245a02677246f0299f2ff6c1479420570ea271721"
+    },
+    {
+      "path": "RE02_verification/original-material-integrity.json",
+      "size": 163217,
+      "sha256": "91d6da83e3e1634ae93d5b818012f02e0636a1e15b826ded8ed58194839ac732"
+    },
+    {
+      "path": "RE02_verification/overlay-files.sha256",
+      "size": 7569,
+      "sha256": "230baee15fd9cbd742ed67ed85b9d3a25082927d750c3665e8d1a1411c216910"
+    },
+    {
+      "path": "RE02_verification/package-files.sha256",
+      "size": 40918,
+      "sha256": "659b4f02f0f262d35bba1d32085aa925549a1096d100caa3a76d2b0a7dd4489c"
+    },
+    {
+      "path": "RE02_verification/patch-apply-check.json",
+      "size": 918,
+      "sha256": "116bc066bdb4ac6f32018efc1aba23c4b8ec49fb2f27ee9f2519b51c4f9953bb"
+    },
+    {
+      "path": "RE02_verification/reference-identity.json",
+      "size": 10794,
+      "sha256": "4fd9894707cf6590de89545eaf4a02a1e4cc7d93c6cb3d6ab62ff8586b43d185"
+    },
+    {
+      "path": "RE02_verification/reference-rejection.log",
+      "size": 167,
+      "sha256": "331fcc8c0096484f635cf28cfa5a64a97e0bec635bd3c962ae5a9a1f58dc9962"
+    },
+    {
+      "path": "RE02_verification/reference-verifier.log",
+      "size": 10794,
+      "sha256": "4fd9894707cf6590de89545eaf4a02a1e4cc7d93c6cb3d6ab62ff8586b43d185"
+    },
+    {
+      "path": "RE02_verification/sanitized-build-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE02_verification/sanitized-build-tests.log",
+      "size": 14790,
+      "sha256": "c3cb6c05d2a8ccf858217bd9040605e9ee4427d50556e85c0a5dd6f421829d3e"
+    },
+    {
+      "path": "RE02_verification/source-change-manifest.json",
+      "size": 10082,
+      "sha256": "ce39e51b2324890fb0f0c272bcfad61c7f38a49177bc932dc79ec11b14bd2dd7"
+    },
+    {
+      "path": "RE02_verification/source-files.sha256",
+      "size": 36535,
+      "sha256": "26ea72fa00696d824510b69659e98ff34a761823a028f1841ca4a177806abbc6"
+    },
+    {
+      "path": "RE02_verification/test-summary.json",
+      "size": 7280,
+      "sha256": "2f0440b86a907ead659ea5d3c85b88a8a62cdc6f37fb6193b694db032c15ac69"
+    },
+    {
+      "path": "RE02_verification/tested-binary-identities.json",
+      "size": 2584,
+      "sha256": "5b9280f6fe8466122b0054986e64d5319cbab49233facbdfba557c7809a06656"
+    },
+    {
+      "path": "RE03.patch",
+      "size": 62512,
+      "sha256": "25e490ffdc545cd273152738d1e59ea219d1306a5f631db80777f08ff7a90da3"
+    },
+    {
+      "path": "RE03_README.md",
+      "size": 2914,
+      "sha256": "37fdf490dad977fb12713e446ad1cc11899b4b2f22d103b60e82b0909d1e7b60"
+    },
+    {
+      "path": "RE03_VERIFICATION.md",
+      "size": 6243,
+      "sha256": "e80ab519a5c142e34ae3aad7274b4b07a08f1332356e55d83c0ecbee028e1f8b"
+    },
+    {
+      "path": "RE03_verification/baseline-build.log",
+      "size": 10936,
+      "sha256": "99b3ea1de8a5370519ef329239b0c6fbb7b60cf0bc3b3911718cf60c46cf4c49"
+    },
+    {
+      "path": "RE03_verification/baseline-configure.log",
+      "size": 1392,
+      "sha256": "74e255fe137e252d92ddc0e7827a52b5dae81f50bf96eba89b31f369615cb311"
+    },
+    {
+      "path": "RE03_verification/baseline-tests.log",
+      "size": 7962,
+      "sha256": "752c767c95492c2e1121b49962d1b476a144dc509f201d6f9a9b79cd66a197f1"
+    },
+    {
+      "path": "RE03_verification/baseline.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE03_verification/clean-build.log",
+      "size": 11036,
+      "sha256": "3829aacf686a85b78b6efc5ec04ad6b1a1347f9df15e4be044b9d55c5a5ce104"
+    },
+    {
+      "path": "RE03_verification/clean-configure.log",
+      "size": 1432,
+      "sha256": "bdef1c379d656a53a03694fdcde1df07d1bb5cb8cc14310baf18ac1a20209e00"
+    },
+    {
+      "path": "RE03_verification/clean-patch-check.json",
+      "size": 51515,
+      "sha256": "10dcb51eee7948cde76259eb8d2e5c9fc9b925604020a3ccd3c3ea19ff0e8fae"
+    },
+    {
+      "path": "RE03_verification/clean-tests.log",
+      "size": 9881,
+      "sha256": "b7414399c34cab911491bd4051c7ebf59711d73c63f7ef9ea57b3b63adad041c"
+    },
+    {
+      "path": "RE03_verification/clean.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE03_verification/commands-baseline.sh",
+      "size": 1004,
+      "sha256": "588a481e80da9226f68cf4c6fed056c7db60f7e19300d4a4fbda1bc1d483616b"
+    },
+    {
+      "path": "RE03_verification/commands-clean.sh",
+      "size": 856,
+      "sha256": "2369428098425f6109c21e6d3b9643e96cc41df3249e259d0f323e971db86ae2"
+    },
+    {
+      "path": "RE03_verification/commands-release.txt",
+      "size": 101,
+      "sha256": "5c23d2d00e9e7839c3c358dc69c13051574ea2536e54bdaca44f76018fffd74c"
+    },
+    {
+      "path": "RE03_verification/commands-sanitize.sh",
+      "size": 1281,
+      "sha256": "5e4417bc9434dffe20dfa7dc63209b73c1511d207bdd4225c5ab0169d8aa7eff"
+    },
+    {
+      "path": "RE03_verification/controller-build.log",
+      "size": 1462,
+      "sha256": "1e5f48fc55c4752a5a3782b9faea0cb1367b6ad865acf058ad987977d156a601"
+    },
+    {
+      "path": "RE03_verification/controller-tests.log",
+      "size": 2524,
+      "sha256": "c171f3d2049491a2e09cb3bb22874ba9dc8cc7ced884ff0edce89d71f6d5e857"
+    },
+    {
+      "path": "RE03_verification/controller.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE03_verification/early-sanitize-controller.log",
+      "size": 42,
+      "sha256": "51d154df815d865759b324a96b142bba51be05e810097579ffac5590358d92e9"
+    },
+    {
+      "path": "RE03_verification/feedback-build.log",
+      "size": 1564,
+      "sha256": "52a94b209c1aaeda8b8157194f6286790beb8af15d438bafa6b8772a641c2356"
+    },
+    {
+      "path": "RE03_verification/feedback-development-tests.log",
+      "size": 69,
+      "sha256": "8548a3cd0490c5f911fdccec7f3762a42bb3d350187dee0aed2c089cf8befd68"
+    },
+    {
+      "path": "RE03_verification/feedback-tests.log",
+      "size": 3155,
+      "sha256": "b8de6c8c1fde3d164d9b98db0828f762f43f1dafb5311d82fe09f1a53b1d2fee"
+    },
+    {
+      "path": "RE03_verification/feedback.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE03_verification/negative-reference-check.json",
+      "size": 207,
+      "sha256": "e7f240fc4e4e571ae34048db1e6a9d3791207eb6b46e3aa8b147eda5c17ff930"
+    },
+    {
+      "path": "RE03_verification/original-button-config-facts.txt",
+      "size": 1484,
+      "sha256": "b971d88954ab81ba319d96dfef45bb56aa28ec5af9e62fa826b638dec7151f10"
+    },
+    {
+      "path": "RE03_verification/original-material-check.json",
+      "size": 144642,
+      "sha256": "15273409a5b8ff707f30a0b5bce63f11c3a987a7b09e589ce6461d9bc74f30d0"
+    },
+    {
+      "path": "RE03_verification/original-material-extraction.json",
+      "size": 137036,
+      "sha256": "7d3389e8ab757d8e4ff8021c92cee33aed47f197f0890c5fe6e09d4c31cfee18"
+    },
+    {
+      "path": "RE03_verification/original-result-sprite-facts.txt",
+      "size": 1172,
+      "sha256": "9d2b74bf50eb9137f9b3c29d3a1f50d96ddd6b5b6ab5fd63131e35b5ec199e2c"
+    },
+    {
+      "path": "RE03_verification/re02-reference-check.json",
+      "size": 10794,
+      "sha256": "4fd9894707cf6590de89545eaf4a02a1e4cc7d93c6cb3d6ab62ff8586b43d185"
+    },
+    {
+      "path": "RE03_verification/re03-reference-check.json",
+      "size": 2269,
+      "sha256": "c105fff82ecfe47e9b054b16e122cd48781471d8a1aa323dd4455756d1aafe16"
+    },
+    {
+      "path": "RE03_verification/release-build.log",
+      "size": 990,
+      "sha256": "33a935143040fea4dd85c05a99932cfe0b7127a34ac36061346e39f9e685d673"
+    },
+    {
+      "path": "RE03_verification/release-tests.log",
+      "size": 9603,
+      "sha256": "9c0c136c2a53c1586bc409b8fb07b96fb09b638759007a64d3f69836a92c0e99"
+    },
+    {
+      "path": "RE03_verification/release.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE03_verification/results.json",
+      "size": 1611,
+      "sha256": "aefb22cfe6e7925df94d223df11867d627043ba117616022d5bbfb05a42ba168"
+    },
+    {
+      "path": "RE03_verification/sanitize-build.log",
+      "size": 11036,
+      "sha256": "da1f22a785fcf6dcb5cf307f75f6364db65efdc19fbfc5f791ce1a2f20488515"
+    },
+    {
+      "path": "RE03_verification/sanitize-configure.log",
+      "size": 1439,
+      "sha256": "290ed2cafa4c9e7323db22a2bf2a6874f21c148b7834fe81f650196538062dba"
+    },
+    {
+      "path": "RE03_verification/sanitize-tests.log",
+      "size": 9743,
+      "sha256": "88a259222cc26cbaad059188fa3fc8919ac83ee22521811fa207b47ec701b20a"
+    },
+    {
+      "path": "RE03_verification/sanitize.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE03_verification/source-payload-manifest.json",
+      "size": 75369,
+      "sha256": "745427766402968f952df3f5c80391cdbb66b4cd859dddd1bf318c710efe0759"
+    },
+    {
+      "path": "RE03_verification/windows-toolchain-fetch-failure.log",
+      "size": 1361,
+      "sha256": "c6cc9c958d36d91fd6742d84bf0ce7b33b5f9059296d8b9278a0285956ddf30d"
+    },
+    {
+      "path": "RE03_verification/windows-toolchain-install-failure.log",
+      "size": 239,
+      "sha256": "6486e573ba3bc16730679b9fbd27eb603a2c32f320eccf427d2c4cb02c1d0fda"
+    },
+    {
+      "path": "RE04.patch",
+      "size": 78737,
+      "sha256": "b1970aec2c4529e219a683a96e646ae73a8601e59b9f9cfe6c90ca4c6b9d6e9d"
+    },
+    {
+      "path": "RE04_PAYLOAD_MANIFEST.json",
+      "size": 83347,
+      "sha256": "73cc99cf95a85a1018dec6719fe2fc952d78498a5e9159514bc37997a59a279c"
+    },
+    {
+      "path": "RE04_README.md",
+      "size": 2964,
+      "sha256": "36589421085b52bde536176102bd16cbfd657ad79f9cd7c2254173a90803c977"
+    },
+    {
+      "path": "RE04_VERIFICATION.md",
+      "size": 6873,
+      "sha256": "91f22e99ba53831cda80cb68ff8278071443ef323e805d100339595002a801f9"
+    },
+    {
+      "path": "RE04_verification/analysis-tool-install.log",
+      "size": 2002,
+      "sha256": "fc27a516cf10da555037c7fa93c6156853864b2ee7865cd5d261ea361317d1ef"
+    },
+    {
+      "path": "RE04_verification/baseline-build.log",
+      "size": 11036,
+      "sha256": "ebe3ba8a1eb4684d1b2cf758c43ac7f3673a72a57ddae164660349fa5357fac4"
+    },
+    {
+      "path": "RE04_verification/baseline-configure.log",
+      "size": 1396,
+      "sha256": "83899c2c5fd02a6b22d518fd5b9b745d1234b3c04205ae5dcef247bffbe9d768"
+    },
+    {
+      "path": "RE04_verification/baseline-tests.log",
+      "size": 9789,
+      "sha256": "3c2a75a3fc096ade46167f82f59b83687004966af3e3a18c8a8730197d39fa76"
+    },
+    {
+      "path": "RE04_verification/baseline.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE04_verification/build-linux.sh",
+      "size": 1354,
+      "sha256": "3b76dc291deb18190393a06c6b2985fd82a677aa235084cca735aa5af3e45d4e"
+    },
+    {
+      "path": "RE04_verification/clean-build.log",
+      "size": 11136,
+      "sha256": "2d0eca542d97020df9072aa9f527cc7acb6c469e99a190726563d41e255a5191"
+    },
+    {
+      "path": "RE04_verification/clean-configure.log",
+      "size": 1394,
+      "sha256": "b6a9f7709fc67ddf0d94e09efe0292901f40fbdcbea1227545104eed01605de6"
+    },
+    {
+      "path": "RE04_verification/clean-patch-apply.json",
+      "size": 52625,
+      "sha256": "7c765709e1e633d7ba738f53806bac51ce7d7f2c0bf1b1ad273bfa48d4d5e9bd"
+    },
+    {
+      "path": "RE04_verification/clean-tests.log",
+      "size": 11097,
+      "sha256": "75486ff8d74fc27cd697f9634a355634c6a329142f8e7f1413f33ba884ed4dce"
+    },
+    {
+      "path": "RE04_verification/clean.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE04_verification/environment.json",
+      "size": 1013,
+      "sha256": "08d43c3870b4d582e6b22d455bef1540660b302824ed42aac1f06d587a5546a1"
+    },
+    {
+      "path": "RE04_verification/iteration1-build.log",
+      "size": 11036,
+      "sha256": "264c9dbe51716abb02f7fb87ccdff38fbd4aa09aaf0f1dd696e76e05a5e7dc4f"
+    },
+    {
+      "path": "RE04_verification/iteration1-configure.log",
+      "size": 1395,
+      "sha256": "8094f2a5e980f14c500f81a689ac55bf79893f0c0979ac0ff65a70de958a518f"
+    },
+    {
+      "path": "RE04_verification/iteration1-tests.log",
+      "size": 9743,
+      "sha256": "25626b43c4b81d780c24f9c16ca6768de13aecfca3ac3249349637f1c2a2ae4f"
+    },
+    {
+      "path": "RE04_verification/iteration1.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE04_verification/iteration2-build.log",
+      "size": 1626,
+      "sha256": "f87015d9efb3556b08971bc69c28d3a7b2393b476453cae7cbb4b9505a9a8323"
+    },
+    {
+      "path": "RE04_verification/iteration2-configure.log",
+      "size": 551,
+      "sha256": "b4e2ce596dd5051ba34ee26039c1fd66a39749396cf14aa62e0eec0de1acb758"
+    },
+    {
+      "path": "RE04_verification/iteration2-tests.log",
+      "size": 10779,
+      "sha256": "ab34732d118be03f5e1b3873ab966ea87aa33769e921191461196ef2dea0bd47"
+    },
+    {
+      "path": "RE04_verification/iteration2.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE04_verification/iteration3-build.log",
+      "size": 1829,
+      "sha256": "0c8f4a97821d9443abd8db31c6c2d6caae2d8944590955bd527c4adc72f7efb8"
+    },
+    {
+      "path": "RE04_verification/iteration3-configure.log",
+      "size": 551,
+      "sha256": "b4e2ce596dd5051ba34ee26039c1fd66a39749396cf14aa62e0eec0de1acb758"
+    },
+    {
+      "path": "RE04_verification/iteration3-tests.log",
+      "size": 10584,
+      "sha256": "2b3e516da88026b7a19f023e633abbc44848e7ed6387fb6a5b39d8d9a7470baf"
+    },
+    {
+      "path": "RE04_verification/iteration3.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE04_verification/original-material-integrity.json",
+      "size": 166171,
+      "sha256": "c5aced95c1b9ea9471ed52c3ea256ad70c4a2239bb7f93408f1809629c83bf57"
+    },
+    {
+      "path": "RE04_verification/reference-identity.json",
+      "size": 3982,
+      "sha256": "f52d62be2ef64d17bff97883436aef7237499f24feef97368fab5cbf30ecd483"
+    },
+    {
+      "path": "RE04_verification/reference-negative.json",
+      "size": 174,
+      "sha256": "efbed92247dac6ae3113f89bf78a752ddc11c2af9dab1cb7e6959be1c10cd183"
+    },
+    {
+      "path": "RE04_verification/reference-negative.log",
+      "size": 97,
+      "sha256": "69435d168ffcbe69f15a390d3983885033a54a9fc010f1a65431a8ab166de13e"
+    },
+    {
+      "path": "RE04_verification/reference-positive.log",
+      "size": 3982,
+      "sha256": "f52d62be2ef64d17bff97883436aef7237499f24feef97368fab5cbf30ecd483"
+    },
+    {
+      "path": "RE04_verification/release-build.log",
+      "size": 909,
+      "sha256": "38e399183d17cedb98c47de21e664e9d3832115abe757602232b5dbda5814851"
+    },
+    {
+      "path": "RE04_verification/release-configure.log",
+      "size": 551,
+      "sha256": "b4e2ce596dd5051ba34ee26039c1fd66a39749396cf14aa62e0eec0de1acb758"
+    },
+    {
+      "path": "RE04_verification/release-tests.log",
+      "size": 11149,
+      "sha256": "f8d59f90d61ff2317d40c224b4599729d1e4e9fdc89befb97fdb4a1a4e4819cc"
+    },
+    {
+      "path": "RE04_verification/release.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE04_verification/results.json",
+      "size": 2755,
+      "sha256": "8e51479ab73fb2ae4597a5e8e1e7a1afd24b37dde24f634506234f0b79e014cc"
+    },
+    {
+      "path": "RE04_verification/sanitize-build.log",
+      "size": 11136,
+      "sha256": "e98f486b64b40f5fa95300e9d8205a916c2a091e9b37aa48cccce2b689cfe46b"
+    },
+    {
+      "path": "RE04_verification/sanitize-configure.log",
+      "size": 1439,
+      "sha256": "002d4575d7c06efc6e81c30aab2c2822f06925bb9c3d5c2d988058dd363e5fe5"
+    },
+    {
+      "path": "RE04_verification/sanitize-tests.log",
+      "size": 11201,
+      "sha256": "6110a8ffc47106e502318a376e3ecde340fff6baa715899fc95d55c23cc7268e"
+    },
+    {
+      "path": "RE04_verification/sanitize.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05.patch",
+      "size": 54112,
+      "sha256": "cc7ca22703c28f386238ae86b5b169391e9c942177b64941404353051862a31c"
+    },
+    {
+      "path": "RE05_README.md",
+      "size": 3284,
+      "sha256": "a80d0dcee460e48def0ce6cbbf4e8bb2bff49e043d7b54b1925cfd43ae5a26f7"
+    },
+    {
+      "path": "RE05_VERIFICATION.md",
+      "size": 7737,
+      "sha256": "ad268eaf16230298df3bf185e25f9a11a14bd05f8a21f1c3b24e857cc7fee7a4"
+    },
+    {
+      "path": "RE05_verification/baseline-build.log",
+      "size": 11136,
+      "sha256": "5873cd1b5c52e5a42c3bd92fd68b10befbe10578469a6ae3ff28d510c0e6fb7e"
+    },
+    {
+      "path": "RE05_verification/baseline-configure.log",
+      "size": 1391,
+      "sha256": "318e637325322aeadec0e501c1185634467896859180dc929e7cc9a981eaad74"
+    },
+    {
+      "path": "RE05_verification/baseline-tests.log",
+      "size": 10941,
+      "sha256": "89c46cdb02f773337124fc502e9ad9cdbcfb9886216f62fe102e7b790b06cb8f"
+    },
+    {
+      "path": "RE05_verification/baseline.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/build-linux.sh",
+      "size": 1354,
+      "sha256": "6f4279d305f169f00eeb70ed535a3e31fd01fd1c1a3b07d8e04299494e1173e5"
+    },
+    {
+      "path": "RE05_verification/clean-build.log",
+      "size": 11304,
+      "sha256": "bb11e27f1ed8f1d79fb0041fd227850ee0d6850a2873c0e0d6d70e31d6fa15bc"
+    },
+    {
+      "path": "RE05_verification/clean-configure.log",
+      "size": 1394,
+      "sha256": "821c51fd6568a18243655bfe6104a65cea2e4d1a6a2ce176df3365f75bd5a6b2"
+    },
+    {
+      "path": "RE05_verification/clean-driver.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "RE05_verification/clean-input-links.json",
+      "size": 923,
+      "sha256": "9106fab01e266bf3f6df4989fbc0f18561212c0822688eb2c37c3655c8a37c20"
+    },
+    {
+      "path": "RE05_verification/clean-patch-apply.json",
+      "size": 53886,
+      "sha256": "cbec597611734a7eb01422f860b55679da25912c0c825a45f476c04c874e20bd"
+    },
+    {
+      "path": "RE05_verification/clean-tests.log",
+      "size": 12367,
+      "sha256": "b2d86a5c35afc6c4ef824e9eade27d24c53add3063d9f1195cc162d934cafe61"
+    },
+    {
+      "path": "RE05_verification/clean.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/controls-first.exit",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "RE05_verification/controls-first.log",
+      "size": 2172,
+      "sha256": "32261f54ce896d86c840a85177578c2bb1d36bbcaf7cbb82dd6be5619852a8f7"
+    },
+    {
+      "path": "RE05_verification/controls-second.exit",
+      "size": 2,
+      "sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+    },
+    {
+      "path": "RE05_verification/controls-second.log",
+      "size": 2749,
+      "sha256": "90da231ce27bb0189d6d5807c064ba27fb99182f4ccfe7ad57da10599d072e7a"
+    },
+    {
+      "path": "RE05_verification/controls-third.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/controls-third.log",
+      "size": 2357,
+      "sha256": "bc7f4f7f72b06a77310c5138ed9100bf1bd16ba00a3c238848353360f8c375ff"
+    },
+    {
+      "path": "RE05_verification/environment.json",
+      "size": 434,
+      "sha256": "a0c83455546044f67d5214fdf2965f3369ec89a1a142c72176697c6f959de58b"
+    },
+    {
+      "path": "RE05_verification/final-runs-driver.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/final-runs-driver.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "RE05_verification/intermediate-release-build.log",
+      "size": 11304,
+      "sha256": "72d0e3ae651c21ed7ade1b39333d86960ef380d902ad121db8e142610317cc0c"
+    },
+    {
+      "path": "RE05_verification/intermediate-release-configure.log",
+      "size": 1390,
+      "sha256": "c4057602031b04a25c800fdfc519a79926456f6dc6d7c6f38dd31aaa3b8be468"
+    },
+    {
+      "path": "RE05_verification/intermediate-release-tests.log",
+      "size": 12134,
+      "sha256": "c5d3b0938ba1f44c1401a7831e30279054bc3cd876c3510752faa8c3fed059d1"
+    },
+    {
+      "path": "RE05_verification/intermediate-release.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/iteration1-build.log",
+      "size": 1589,
+      "sha256": "68808da74c890d6661170e1f98d02382494926f2f31a1470b7344e8b06b819c6"
+    },
+    {
+      "path": "RE05_verification/iteration1-complete.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/iteration1-complete.log",
+      "size": 3716,
+      "sha256": "f0f687ef81b662d120832e13c39e6a1d64425c8bf8fe9241c696302c484c197e"
+    },
+    {
+      "path": "RE05_verification/original-material-integrity.json",
+      "size": 127317,
+      "sha256": "49ee7fc324663e1a5b5d08a2d6dac786c594518ade6b8c712353bb5a78fd3e71"
+    },
+    {
+      "path": "RE05_verification/original-material.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/original-material.log",
+      "size": 66,
+      "sha256": "da95ee6fe7a38269f778dc1b099fc4cb51be1c309c288c83ddd1380f2f69ec9f"
+    },
+    {
+      "path": "RE05_verification/reference-identity.json",
+      "size": 6657,
+      "sha256": "3ac7fdd23c3740dd39af3def387ecdbed605d4795fd76457fcacbdc3b3a113a9"
+    },
+    {
+      "path": "RE05_verification/reference-negative.json",
+      "size": 103,
+      "sha256": "c1ebb8e99dd88f503f610729edace1cfba700cc410d8ad27fad7ccd19ba95f0a"
+    },
+    {
+      "path": "RE05_verification/reference-negative.log",
+      "size": 97,
+      "sha256": "69435d168ffcbe69f15a390d3983885033a54a9fc010f1a65431a8ab166de13e"
+    },
+    {
+      "path": "RE05_verification/reference-positive.log",
+      "size": 6657,
+      "sha256": "3ac7fdd23c3740dd39af3def387ecdbed605d4795fd76457fcacbdc3b3a113a9"
+    },
+    {
+      "path": "RE05_verification/release-build.log",
+      "size": 973,
+      "sha256": "c9bab2a924642e6b272b87c978dcb80ac7ac074614b7a8ffa54b94df06872821"
+    },
+    {
+      "path": "RE05_verification/release-configure.log",
+      "size": 546,
+      "sha256": "0538be69b64d53e788159a0dbb3d17a23f8f56aa16cb9b61a7117b055439f8bb"
+    },
+    {
+      "path": "RE05_verification/release-final-driver.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "RE05_verification/release-tests.log",
+      "size": 12135,
+      "sha256": "c8bdeae1fc4f8d5826a46e9d64ee58403b556fa7536c9683548ccd6ff25d7f24"
+    },
+    {
+      "path": "RE05_verification/release.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/results.json",
+      "size": 3228,
+      "sha256": "7f4790d59e30c14f715ed879f3989e633dc5f0496ff7e93d3f7e7459794dfdcb"
+    },
+    {
+      "path": "RE05_verification/sanitize-build.log",
+      "size": 11304,
+      "sha256": "760fa4b0b3c2c02c441e22f0f28416d199d882faffaf820a637ebfcdbfe5e5ec"
+    },
+    {
+      "path": "RE05_verification/sanitize-configure.log",
+      "size": 1434,
+      "sha256": "c486d1ae304055d2b287a1898cd1a53603503adb6e384c83d8443c6c6ae27ed3"
+    },
+    {
+      "path": "RE05_verification/sanitize-tests.log",
+      "size": 12193,
+      "sha256": "a866b668d1a88b299e1429fc31447f7d9cb1abc8c9f8eacd0fc17d62ec610d09"
+    },
+    {
+      "path": "RE05_verification/sanitize.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "RE05_verification/source-check-after-tests.json",
+      "size": 37838,
+      "sha256": "91f4d4610e4e9bc5fba41b4fce3c063e98f01ccca074c57e857e425994574b6e"
+    },
+    {
+      "path": "RE05_verification/test-executable-identities.json",
+      "size": 2420,
+      "sha256": "028593bb1f1a61cc817828c3f741cd204384c05cd7e41c4ff1051ca9c83b8a78"
+    },
+    {
+      "path": "RE05_verification/toolchain-download.exit",
+      "size": 2,
+      "sha256": "06e9d52c1720fca412803e3b07c4b228ff113e303f4c7ab94665319d832bbfb7"
+    },
+    {
+      "path": "RE05_verification/toolchain-download.log",
+      "size": 282,
+      "sha256": "2b04ad1c60037dd4f75892c7ee2c369023efc9a73a14190c56308e9cdefccb03"
+    },
+    {
+      "path": "README.md",
+      "size": 6175,
+      "sha256": "832cb9c111f50a815aa7c56e2f1b0ed2900bac6bf5c789e570d2d7ea16ccf011"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "size": 2585,
+      "sha256": "c1dab73753fee01c56855b069b23b9c14303fb4abd07b9fb375434deb7a98ba6"
+    },
+    {
+      "path": "analysis/README.md",
+      "size": 187,
+      "sha256": "1d8ee9eb53093b159eaa35c266c33ec9319dd4ed757a038a5d8f375b953a7e1b"
+    },
+    {
+      "path": "docs/LEVEL1_COMBAT_PARITY_AUDIT.md",
+      "size": 43977,
+      "sha256": "740f6631b6edd114b4932d313538d573e752623b52db8fc6164a3381bf2a08a1"
+    },
+    {
+      "path": "docs/PROGRESS_2026_09_04.md",
+      "size": 13007,
+      "sha256": "eb5714de8853762e27389e5208dec0df7f6ebe6d54424cebda3637d5320736cd"
+    },
+    {
+      "path": "docs/RE01_RECONSTRUCTION_REPORT.md",
+      "size": 10980,
+      "sha256": "2aa7a532a77239d81c659308f32615ce8642ee55beeca076b360025a5a273b96"
+    },
+    {
+      "path": "docs/RE02_EVIDENCE.md",
+      "size": 12785,
+      "sha256": "632b26dd13d6ee37b8162010cd2ab37c5bef1a5a012ec7eb7b7694272c4fb36d"
+    },
+    {
+      "path": "docs/RE03_EVIDENCE.md",
+      "size": 8114,
+      "sha256": "61ab76af36755ddfdeef5b426cf6811d679d842f5d94a7dc0ca5e60802422b42"
+    },
+    {
+      "path": "docs/RE04_EVIDENCE.md",
+      "size": 9745,
+      "sha256": "2f3c5dd9abe65f4438fda8f5474260ecc9eae5e8cf7dcdd0d5883c8494e79d4b"
+    },
+    {
+      "path": "docs/RE05_EVIDENCE.md",
+      "size": 10385,
+      "sha256": "e8ac6113cf441c21797ed2655dfa49250bda12169bb5691eb98dfd2383fb294e"
+    },
+    {
+      "path": "docs/RECONSTRUCTION.md",
+      "size": 192047,
+      "sha256": "803c3d44e9a214b1d16539247ee3f9f5231648874d01bacec83a8dd527a2ea85"
+    },
+    {
+      "path": "docs/references/re01-original-fingerprints.json",
+      "size": 1993,
+      "sha256": "5322150bfdbb9a97c4c74716e0fdb6717d5c7be3cfcd290cc770c1c543fe63e4"
+    },
+    {
+      "path": "docs/references/re02-original-fingerprints.json",
+      "size": 10824,
+      "sha256": "d6c6f09c00ac9bdc47b5975cd23fbf550899cc44d5ac378471c6fd19afa06110"
+    },
+    {
+      "path": "docs/references/re03-original-fingerprints.json",
+      "size": 2182,
+      "sha256": "867745bd401583fd27d3e4502ede5fc3d94cd4ac11b5b7889c81e1e1df1c1ae0"
+    },
+    {
+      "path": "docs/references/re04-original-fingerprints.json",
+      "size": 3895,
+      "sha256": "3edcf87bbaa123bebb42f76358ec00daf9bb790d2246ec9f23d64b62cbaa6484"
+    },
+    {
+      "path": "docs/references/re05-original-fingerprints.json",
+      "size": 6653,
+      "sha256": "b472415f8b88d0f0088bb863619f4e3287b98c08e8db567514fe8469611e84ed"
+    },
+    {
+      "path": "docs/releases/0.3b.md",
+      "size": 2794,
+      "sha256": "f10c92bc28fbc915c8944ca303c915dc54875b6883af17f4e6dad3a7218f50cc"
+    },
+    {
+      "path": "docs/screenshots/first-encounter-combat.png",
+      "size": 1092567,
+      "sha256": "223577d7e0483eadf05af3bad31421f7c13f17966cae43ab6b12f34080602e9b"
+    },
+    {
+      "path": "docs/screenshots/opening-cop-cutscene.png",
+      "size": 1315627,
+      "sha256": "e725c88b871caad9b1c3a5f24e76f25a2d3fd3fcc2f59f8e31b648de9afe1d62"
+    },
+    {
+      "path": "docs/screenshots/web-swing-gameplay.png",
+      "size": 1288101,
+      "sha256": "c027a4b80ec7ac80bade453f855a10a63e8acc9799578d4e63b8ca222959b431"
+    },
+    {
+      "path": "src/app/Application.cpp",
+      "size": 320981,
+      "sha256": "b2b75d614bfc2756ef8f783db83321ab7fa582c92df7a43b577616e15c4ca1c6"
+    },
+    {
+      "path": "src/app/Application.hpp",
+      "size": 4629,
+      "sha256": "704dca2b25358d981bc938be37c583fa19ce1cb485e6148773f427000ec7d50b"
+    },
+    {
+      "path": "src/app/Main.cpp",
+      "size": 2707,
+      "sha256": "5874d9ea6f62af282604a19afee692d77f13f2a6269172e76c9f71de115068bf"
+    },
+    {
+      "path": "src/assets/AnimationDisplacement.cpp",
+      "size": 3922,
+      "sha256": "64a0d2a1e203ea74949c97716b4b6deaa2cef8c86730797ca2bca0cfe394db0b"
+    },
+    {
+      "path": "src/assets/AnimationDisplacement.hpp",
+      "size": 1192,
+      "sha256": "1874fe2a87d39d2314e7400c34380cfa989d1fd6bf5ec685ea37e7806c482461"
+    },
+    {
+      "path": "src/assets/BresFile.cpp",
+      "size": 4226,
+      "sha256": "1c1201466c8e0d426ae8675c0d4f3e2b7bf31c6a62483bfff5f5184496b21056"
+    },
+    {
+      "path": "src/assets/BresFile.hpp",
+      "size": 1395,
+      "sha256": "591df15a9b92b95ffcdaaa4c4f2ab6928aa4e145e51c5fba2a0a86954caf0936"
+    },
+    {
+      "path": "src/assets/BtexTexture.cpp",
+      "size": 5192,
+      "sha256": "92f77bb2d20182cb102a0b49b2f2499d2326014e8dc127d28ce376bdf273db5b"
+    },
+    {
+      "path": "src/assets/BtexTexture.hpp",
+      "size": 802,
+      "sha256": "ab32418feff6191393460a52443e3fb5e6aa763b6a54c12b3de5f90c4460e3e2"
+    },
+    {
+      "path": "src/assets/ColladaAnimation.cpp",
+      "size": 22011,
+      "sha256": "b5bcb90dc17c28d234138ed560f5dc3bf4a9d2d98367fb6db7cec8d3b9ec8da7"
+    },
+    {
+      "path": "src/assets/ColladaAnimation.hpp",
+      "size": 2676,
+      "sha256": "de3ee3c056b96fcb75820ff19235060dfa89878ed94c70b2abeb80b8a61a1620"
+    },
+    {
+      "path": "src/assets/ColladaMesh.cpp",
+      "size": 61973,
+      "sha256": "736fc3454a5fe0c231c08760e89fb380841095ad72e5e1175b8366f5e4468750"
+    },
+    {
+      "path": "src/assets/ColladaMesh.hpp",
+      "size": 5840,
+      "sha256": "fffe4c2ba67d0ed0300352614e5dc43ca8ba84a89256e4504c6fd96942410973"
+    },
+    {
+      "path": "src/assets/ColladaSkinning.cpp",
+      "size": 21257,
+      "sha256": "7b7c0bd725d256dc366e944b71244d6860fcb38de119e4a0f2db7c96302bdd5a"
+    },
+    {
+      "path": "src/assets/ColladaSkinning.hpp",
+      "size": 1350,
+      "sha256": "892b5545efeda35e97501f0332053462fd2551ff7cb6d7da3029acd88814d40f"
+    },
+    {
+      "path": "src/assets/DdsAtcTexture.cpp",
+      "size": 8285,
+      "sha256": "78a364908b94ec2c629008e0ca6ee79d820524709bde640d7fa8981808886600"
+    },
+    {
+      "path": "src/assets/DdsAtcTexture.hpp",
+      "size": 577,
+      "sha256": "3702d9d7bc4af1365d6e65043683586809cdb3b3ad7d97cbd5948f32706c0a4c"
+    },
+    {
+      "path": "src/assets/IrrScene.cpp",
+      "size": 9224,
+      "sha256": "e6e9d6653a374a29064b94d0c935537d28b3d5f56d73716888d34e5e4ddc0181"
+    },
+    {
+      "path": "src/assets/IrrScene.hpp",
+      "size": 2158,
+      "sha256": "b6ed8803b44d78501208e6241a29407ceb2fd75ca2a84a97db5ac933084b0398"
+    },
+    {
+      "path": "src/assets/SpriteAtlas.cpp",
+      "size": 7217,
+      "sha256": "49192c71f9d5d9a7eaa1a0f436d275c35d3cf326f4638fb5b79dda1d8af52bf4"
+    },
+    {
+      "path": "src/assets/SpriteAtlas.hpp",
+      "size": 2121,
+      "sha256": "7fabd74090775854a83485ceafdf139f87efd35a3e392f0979bc8acf6958fa3c"
+    },
+    {
+      "path": "src/assets/TgaTexture.cpp",
+      "size": 4441,
+      "sha256": "e37a337acfac272d10f17023ef45731cef0bbe61d1aaf3032aa12cae617023ea"
+    },
+    {
+      "path": "src/assets/TgaTexture.hpp",
+      "size": 567,
+      "sha256": "7d0668061d468599bf78e5ef30446620d1f64c561cb718dfbbbddbb448a4c837"
+    },
+    {
+      "path": "src/audio/CinematicSoundBank.cpp",
+      "size": 5149,
+      "sha256": "694a83b9ba2971d4c29d354f4de38e92522857e25e08e37a068e1ab0202e7dd6"
+    },
+    {
+      "path": "src/audio/CinematicSoundBank.hpp",
+      "size": 1672,
+      "sha256": "fb473923c2d24ddb846a830053dad9a08350938483f24955147412748cb40bee"
+    },
+    {
+      "path": "src/audio/EnemyBehaviorSoundBank.cpp",
+      "size": 3306,
+      "sha256": "64668e13de88b48a229dfc121db0d3c1e5fb5cbf5d206e229061d3038b14b380"
+    },
+    {
+      "path": "src/audio/EnemyBehaviorSoundBank.hpp",
+      "size": 1318,
+      "sha256": "6f1bdc82b4255dbef71d90e66db3f2df89cf8fe2162e9dd44f1de4e37e6c7524"
+    },
+    {
+      "path": "src/audio/GameAudioMix.hpp",
+      "size": 843,
+      "sha256": "c78e38c50a5de55c015683e66e7814231b55ad838fe9c715c1ae90a204b79323"
+    },
+    {
+      "path": "src/audio/IAudioSystem.hpp",
+      "size": 216,
+      "sha256": "8043c4d99ab0b6a9f81a991e3dd645a8363ba1f49f2bad0bb68244b47042e884"
+    },
+    {
+      "path": "src/audio/LevelMusicBank.cpp",
+      "size": 1727,
+      "sha256": "25c7fb3d64b7c9e07beca3e06d94bf4e23dbc3a52d4d37ac0cc9c51029badffd"
+    },
+    {
+      "path": "src/audio/LevelMusicBank.hpp",
+      "size": 513,
+      "sha256": "336973d218379ecaae4b576361186304900099c9302ae582a2a008f5f471b0a6"
+    },
+    {
+      "path": "src/audio/OggAudio.cpp",
+      "size": 1577,
+      "sha256": "04bf7af27fdffdbf76ba05b1dbbda222026e9c6be72ddfff43ed0d0c5240172a"
+    },
+    {
+      "path": "src/audio/OggAudio.hpp",
+      "size": 668,
+      "sha256": "9ab19a2c9d95b1049238cb844c887aa5dfc38c8f1d1b0334ab67875b3fb008c1"
+    },
+    {
+      "path": "src/audio/PlayerStateSoundBank.cpp",
+      "size": 9871,
+      "sha256": "dca1b3f75cb665a0ea0323d3888d2744bd3f0ca4b6bf31afa5eaae0281abed30"
+    },
+    {
+      "path": "src/audio/PlayerStateSoundBank.hpp",
+      "size": 2512,
+      "sha256": "596c6764eb1430a2f2a38696830a1c0a86db8ebe710f0a0112c6dbfea76b8349"
+    },
+    {
+      "path": "src/audio/SoundEventCatalog.cpp",
+      "size": 4783,
+      "sha256": "b058422935c2e2a848fa8ec5524e71b800a1238c8422cbd37ead3ba7ece3c287"
+    },
+    {
+      "path": "src/audio/SoundEventCatalog.hpp",
+      "size": 1308,
+      "sha256": "7c33594f509d4eb51ddde7c2b687f057420be2dbe2ce34e2964b726583c1f399"
+    },
+    {
+      "path": "src/audio/SpatialSound.cpp",
+      "size": 2088,
+      "sha256": "5381c18d6251d2f1d27c0d5c5436561fae275e4493c3760d029779d0b94fae44"
+    },
+    {
+      "path": "src/audio/SpatialSound.hpp",
+      "size": 741,
+      "sha256": "24765972c626b7bbb9063b6edfdfab223e76c4dc36a9664ff53c7a2ff86838f4"
+    },
+    {
+      "path": "src/audio/VoxSoundTable.cpp",
+      "size": 5215,
+      "sha256": "e769c1ada450bb2e804537a89e85b3e5ac0c4f7134967a0e2aea3a3189b8f6d4"
+    },
+    {
+      "path": "src/audio/VoxSoundTable.hpp",
+      "size": 1242,
+      "sha256": "0313fa96e9c1b8a032b8eb7fc5cd55c0443dd9004485395a93caffa95efa3e3d"
+    },
+    {
+      "path": "src/audio/xaudio2/XAudio2System.cpp",
+      "size": 10740,
+      "sha256": "185eb03fecdd963680714ea0746b480b607294270f43e56c44360e3e6a587e4e"
+    },
+    {
+      "path": "src/audio/xaudio2/XAudio2System.hpp",
+      "size": 3266,
+      "sha256": "8c4abc00b156b7109f63225acb6b2cd7ea7b445abd4fb4789a818054a7c23e4c"
+    },
+    {
+      "path": "src/core/Result.hpp",
+      "size": 650,
+      "sha256": "5896708bb783a8e10395e15dd6abf4607283851e3c55d73491874d9f788f5e8b"
+    },
+    {
+      "path": "src/diagnostics/AutoplayHarness.cpp",
+      "size": 255303,
+      "sha256": "569911766ee92df54ffe50ac0c0c374807a9d149e60e927cd409d7950b68c58c"
+    },
+    {
+      "path": "src/diagnostics/AutoplayHarness.hpp",
+      "size": 19941,
+      "sha256": "b80aaf4b79bd8c1ef2c0fbc81ef96884535f16040d45116c288d2a90b862458d"
+    },
+    {
+      "path": "src/filesystem/GbmpArchive.cpp",
+      "size": 8201,
+      "sha256": "05ce72ea5ba581ab3470ab990e561f9b65017f437ca66dbb73a7c2e728b1d372"
+    },
+    {
+      "path": "src/filesystem/GbmpArchive.hpp",
+      "size": 1416,
+      "sha256": "3ee6da374d9074f17bde78355a70a6d0f4a07576ef65c59b7eada94c47f12fcd"
+    },
+    {
+      "path": "src/game/AttackConfig.cpp",
+      "size": 7401,
+      "sha256": "91363cd085e4893499bac115005bc93e9d0ea0cd5b5aa4a6383c2936ef27bd32"
+    },
+    {
+      "path": "src/game/AttackConfig.hpp",
+      "size": 3665,
+      "sha256": "5248d13eac503d1979d2d58c648de63bbd97fd1d24e1c5c2c2b85d4942469ae2"
+    },
+    {
+      "path": "src/game/ButtonConfig.cpp",
+      "size": 4781,
+      "sha256": "71c0bf23b0f20f9b068ab81eb00a683182e899be6ef7ba540bdd2ae9b3ef8ddf"
+    },
+    {
+      "path": "src/game/ButtonConfig.hpp",
+      "size": 1225,
+      "sha256": "c6b93d0b17362a4ae70f7c5a806cd378412f6c4cb163a8e53f0be752cdeec41c"
+    },
+    {
+      "path": "src/game/ButtonMashProgress.hpp",
+      "size": 2823,
+      "sha256": "8545ea66c23433c9aca2b68901d3568d8a163e38d55b5f74daff57bf51b3f351"
+    },
+    {
+      "path": "src/game/CinematicCamera.cpp",
+      "size": 5015,
+      "sha256": "9a1f86b31020050c0bb8b4f7dfdc56dfdd630d4a47614493157fb556e6a8fe07"
+    },
+    {
+      "path": "src/game/CinematicCamera.hpp",
+      "size": 2229,
+      "sha256": "ab0425403198b3fcc36936657a676abe9b2c6fd245b962bdbb3fe91b2347579c"
+    },
+    {
+      "path": "src/game/CinematicCameraTrack.cpp",
+      "size": 7782,
+      "sha256": "77ce8f658eff75fa488c842ac67d4be18d6d01e897241b48cc60665996676535"
+    },
+    {
+      "path": "src/game/CinematicCameraTrack.hpp",
+      "size": 1119,
+      "sha256": "5d2ec5596c372c2cce4dd52131d4b619a5c54a644d7c6589aa7d5a1c68848086"
+    },
+    {
+      "path": "src/game/CinematicPlayer.cpp",
+      "size": 2580,
+      "sha256": "6a839a1873e45f198a455ad245e07d24c6fdebc86db37780a9758dc747874bb5"
+    },
+    {
+      "path": "src/game/CinematicPlayer.hpp",
+      "size": 1931,
+      "sha256": "004132fe249bfa7aae50efff463960b8d19a03210de68678931a11f116ccffed"
+    },
+    {
+      "path": "src/game/CinematicScript.cpp",
+      "size": 3168,
+      "sha256": "c0f5a97761d2a03d2815c82755cd8beea1e2574dca9b9ccc6d97b6f65ca27f69"
+    },
+    {
+      "path": "src/game/CinematicScript.hpp",
+      "size": 1218,
+      "sha256": "3277c0601db40366cf84f228e38f11468e42be6591ac4559f9cacc7c53da838b"
+    },
+    {
+      "path": "src/game/CinematicUiRuntime.cpp",
+      "size": 13644,
+      "sha256": "662fd869e9e163ebd4b09abf6ae17bbab027d80be4ae7692506a02af95399fe2"
+    },
+    {
+      "path": "src/game/CinematicUiRuntime.hpp",
+      "size": 3621,
+      "sha256": "6f0a9a27ff06646d446a507140e8ac98a5a0b2cab62146738f1e727de94c3204"
+    },
+    {
+      "path": "src/game/DeathConfirmationRuntime.cpp",
+      "size": 2226,
+      "sha256": "69eb5137377fa6a13f36a8c6602bada4a15059cb773043e1bf682f51c0ebe45b"
+    },
+    {
+      "path": "src/game/DeathConfirmationRuntime.hpp",
+      "size": 1605,
+      "sha256": "67645638fd9632684a245838cc27c9c8baef58c6b9cfe5dad7c83f4b67973ed9"
+    },
+    {
+      "path": "src/game/EffectBillboard.cpp",
+      "size": 6593,
+      "sha256": "3641f0760ed8cdc2c093eff0de7c5a1f3d22ecb2bd5d11f2896b50f436cab457"
+    },
+    {
+      "path": "src/game/EffectBillboard.hpp",
+      "size": 1978,
+      "sha256": "47e6977f8ce328325b50a32cf178dc67570b3b92435a0b65f31bc107fb2e1deb"
+    },
+    {
+      "path": "src/game/EffectPreset.cpp",
+      "size": 15710,
+      "sha256": "53e0e4163e96a44ee5a55357c287a52a304b02a277f4d24dc5bdb03c97701ca8"
+    },
+    {
+      "path": "src/game/EffectPreset.hpp",
+      "size": 3401,
+      "sha256": "8927e591a91af568087314c1ae4c7e2df871945742613accae802d1a092e61c8"
+    },
+    {
+      "path": "src/game/EnemyAttackIntervalConfig.cpp",
+      "size": 5086,
+      "sha256": "3a50f307775a0e6f806ce151bcc2cac08e16f15c0c1d111f473c7db2d9315ec2"
+    },
+    {
+      "path": "src/game/EnemyAttackIntervalConfig.hpp",
+      "size": 1450,
+      "sha256": "e2394c2ee8ad425011cca173949633f8a81f3476a09b370b89eed707fe04260e"
+    },
+    {
+      "path": "src/game/EnemyAttributeConfig.cpp",
+      "size": 11898,
+      "sha256": "a8c932248247042b7825faad25c81575117a92609e59ba6b08aba46f93480d1c"
+    },
+    {
+      "path": "src/game/EnemyAttributeConfig.hpp",
+      "size": 3029,
+      "sha256": "124b2ba9374a3138b58e22ca29ff5182f83c68db91e266c628110a5d744c4093"
+    },
+    {
+      "path": "src/game/EnemyBehaviorConfig.cpp",
+      "size": 14890,
+      "sha256": "6c61a3c65a6aeb484f9de58e4949a7de05a6d971b5796cabca0c455d950aeb11"
+    },
+    {
+      "path": "src/game/EnemyBehaviorConfig.hpp",
+      "size": 3551,
+      "sha256": "7e564113c71f6a62c9a7896bb29da61878eb3ffb8efed432285dbb80315bfc8f"
+    },
+    {
+      "path": "src/game/EnemyRangeAttackConfig.cpp",
+      "size": 4098,
+      "sha256": "eb868e0237eca61ed769563e0018e338c5da111ae19158cf600fa799e8741ce9"
+    },
+    {
+      "path": "src/game/EnemyRangeAttackConfig.hpp",
+      "size": 1131,
+      "sha256": "ff2574ded96ab573c4c7a62ebdc9531cda2b669fe6f22e9f33e4ae964022f55e"
+    },
+    {
+      "path": "src/game/EnemySpecialActionConfig.cpp",
+      "size": 5254,
+      "sha256": "38cb600f822ddc70ecd945aab194c3c57144e43713b26fe33a28c097a8bcf0f6"
+    },
+    {
+      "path": "src/game/EnemySpecialActionConfig.hpp",
+      "size": 1831,
+      "sha256": "2a7c2f1c093a9492273b1c4c6c307dab340da87f3e82db2f579611deae6b00b7"
+    },
+    {
+      "path": "src/game/ExitMenuRuntime.cpp",
+      "size": 1870,
+      "sha256": "398d4b51c9ba7059986db56a5be3492a893612e8ae936b14b6275e372bf2d8bf"
+    },
+    {
+      "path": "src/game/ExitMenuRuntime.hpp",
+      "size": 1592,
+      "sha256": "95cf59da6fd1b2d3e0f1b4baa50dbd1a563b5874989f39b43c6387ffb21a9d69"
+    },
+    {
+      "path": "src/game/GameplayCamera.cpp",
+      "size": 17148,
+      "sha256": "358d4c7d999ea08caeeabc958719189bf1f554f85ecc45ec528a88ef30d8007d"
+    },
+    {
+      "path": "src/game/GameplayCamera.hpp",
+      "size": 3239,
+      "sha256": "3f8cd8e715d0498265c25cc73e6c946476fa088fc55a2c9b17916c45df71833d"
+    },
+    {
+      "path": "src/game/GameplayCinematicScheduler.cpp",
+      "size": 6200,
+      "sha256": "f6a048114906dfa2a83c15afc58110789e3b3045c1f9da747c95e5f4fedfac02"
+    },
+    {
+      "path": "src/game/GameplayCinematicScheduler.hpp",
+      "size": 2050,
+      "sha256": "85c57380da3daf6dc6936f411d24475d2c6f53bb641b801b0d8ab8dea368aa5c"
+    },
+    {
+      "path": "src/game/GameplayPlayer.cpp",
+      "size": 286470,
+      "sha256": "b5ff6956aa32e3defc5fc68746e000a36f6b86fe80ef6bfad521bdbec0e1bc9d"
+    },
+    {
+      "path": "src/game/GameplayPlayer.hpp",
+      "size": 36759,
+      "sha256": "c0b6af4d559c1ebdb996400bcc88215cc3ed1d403b0c5e90fb28f045922fdc51"
+    },
+    {
+      "path": "src/game/HostageAttributes.hpp",
+      "size": 450,
+      "sha256": "7cf5c1560b5407e3cab2c7d36026730fce5f89eb883814f734abb4d46f0bb55e"
+    },
+    {
+      "path": "src/game/LevelBonusRuntime.cpp",
+      "size": 11283,
+      "sha256": "097e414d02cc77cc0e51167775198e6e4620424cfc6c9315c1c53da6e7bdb100"
+    },
+    {
+      "path": "src/game/LevelBonusRuntime.hpp",
+      "size": 4637,
+      "sha256": "bc90df44afa8647d6133124ce2740866eaa05dd399f6d6f8605d84b2118b1055"
+    },
+    {
+      "path": "src/game/LevelCheckPointRuntime.cpp",
+      "size": 9515,
+      "sha256": "d5aaa59cde938e1c12f349ad4ed727bd001414f59ebbbe72c0005b45091de6c4"
+    },
+    {
+      "path": "src/game/LevelCheckPointRuntime.hpp",
+      "size": 2858,
+      "sha256": "2f29a7e780d420c726596831c5b015f80d4c6ffe74b2b6ffa114e152b3919ba8"
+    },
+    {
+      "path": "src/game/LevelCinematicRuntime.cpp",
+      "size": 40557,
+      "sha256": "a316622ebea573388180c38d89d2e2ad8f68aa2b1e73957b0e2f73abf7458c64"
+    },
+    {
+      "path": "src/game/LevelCinematicRuntime.hpp",
+      "size": 10841,
+      "sha256": "7d98046a9efc69dab2b929cd9425a711ed397e5d208a0a033ee29d2177172db3"
+    },
+    {
+      "path": "src/game/LevelCollision.cpp",
+      "size": 60794,
+      "sha256": "ab2748a3de05776c51f73d6bc6e227489e7c198e5cb3bbba87c38803eeb48e7a"
+    },
+    {
+      "path": "src/game/LevelCollision.hpp",
+      "size": 6737,
+      "sha256": "d3aeb394b038edf4c3c68885fe5baefd31d8aad3931ce5e9ed2bc0e16bce8e76"
+    },
+    {
+      "path": "src/game/LevelDamageRuntime.cpp",
+      "size": 3784,
+      "sha256": "4b02b5382d28c2daf41d8f20b438d91bee748327beb67ba22dc2189a6941ad78"
+    },
+    {
+      "path": "src/game/LevelDamageRuntime.hpp",
+      "size": 1326,
+      "sha256": "b77e9bf2f77f87b66fa6b14be48117f13e60f9a60ee020dac87007249a23f840"
+    },
+    {
+      "path": "src/game/LevelDeathRuntime.cpp",
+      "size": 2232,
+      "sha256": "ae62ab4d9f0ee54e3774e29a6c936d7d6a1e32e675d09f981b29f150ebe69aa1"
+    },
+    {
+      "path": "src/game/LevelDeathRuntime.hpp",
+      "size": 1082,
+      "sha256": "532f9058341b48c38157349d5ee183ee144377234aa120073060506518346c36"
+    },
+    {
+      "path": "src/game/LevelDropRuntime.cpp",
+      "size": 6326,
+      "sha256": "891190cb863fc7ead3832c40597f23b38ad418a0e8d6dc08ea99ff712eba958a"
+    },
+    {
+      "path": "src/game/LevelDropRuntime.hpp",
+      "size": 2260,
+      "sha256": "224e821428caaf679d10fafb02b21f8ef52eea74184c99b185ee489e6c473856"
+    },
+    {
+      "path": "src/game/LevelEffectRuntime.cpp",
+      "size": 41023,
+      "sha256": "3e1d18a902fb0d105aaa75b5113af5bc483d481d69981890c3cb7d2502d59d86"
+    },
+    {
+      "path": "src/game/LevelEffectRuntime.hpp",
+      "size": 5365,
+      "sha256": "580df37972e8ee5bcb6d3021aeb6b967b5bd87637ca9b34796836b7f2be71bc5"
+    },
+    {
+      "path": "src/game/LevelEnemyRuntime.cpp",
+      "size": 331135,
+      "sha256": "56038b98adac2eed93f96ecc728785fd9ee2770fb8deb26970873a5ce77b9315"
+    },
+    {
+      "path": "src/game/LevelEnemyRuntime.hpp",
+      "size": 40405,
+      "sha256": "fd8a6d0c9ffe1034ad6ae1929408c5bf494694ef694560523094f962904de4dd"
+    },
+    {
+      "path": "src/game/LevelHintRuntime.cpp",
+      "size": 11668,
+      "sha256": "c3cb6d9c3ede01cdfb748ade1b54b409a119be9ae4727f0c43262e86e5fb9d18"
+    },
+    {
+      "path": "src/game/LevelHintRuntime.hpp",
+      "size": 2605,
+      "sha256": "a9f2132c19216d475a6287434be51610eb0d14ad4d75e72859ff5cf870b7be09"
+    },
+    {
+      "path": "src/game/LevelHostageRuntime.cpp",
+      "size": 19439,
+      "sha256": "eadbcb4467333542bbe31119f654ea7508e94e13f14cde1468d7e29cdf5b6d5c"
+    },
+    {
+      "path": "src/game/LevelHostageRuntime.hpp",
+      "size": 5915,
+      "sha256": "76faa9c759490a877402e376008b1b37a1e839cdb3cac584ee07f1e07e447856"
+    },
+    {
+      "path": "src/game/LevelMusicRuntime.cpp",
+      "size": 2031,
+      "sha256": "61f8249e5ae2d828160cce174564599b11968acf374b777aca8bfa600246df2b"
+    },
+    {
+      "path": "src/game/LevelMusicRuntime.hpp",
+      "size": 1197,
+      "sha256": "199933f1be110abd37c2ba56acff5f066bbdf79929abb764c9c245ea14f95dfc"
+    },
+    {
+      "path": "src/game/LevelObjectRuntime.cpp",
+      "size": 88026,
+      "sha256": "ae6df62ec9868ee97dd12b6b29b43c9c6abfa05f45101e7f89939e89a3713582"
+    },
+    {
+      "path": "src/game/LevelObjectRuntime.hpp",
+      "size": 9589,
+      "sha256": "e669f8d05a820fcf919f931717d46e7e9cfa7503c1ded39f3211cd8072928137"
+    },
+    {
+      "path": "src/game/LevelOneBootstrap.cpp",
+      "size": 138250,
+      "sha256": "98c2d7c30e94ed72dc3096366fb623c9b9da074e93530dce7a6336297d6c1fcc"
+    },
+    {
+      "path": "src/game/LevelOneBootstrap.hpp",
+      "size": 33353,
+      "sha256": "4a30506f4dbc9607be028a40912bea66c1e052fb24f2c12dbae33e9288c0364c"
+    },
+    {
+      "path": "src/game/LevelRestoreRuntime.cpp",
+      "size": 11654,
+      "sha256": "5487559d815539ddd3071797e2f350073fd6b8235b305544748068216b74232c"
+    },
+    {
+      "path": "src/game/LevelRestoreRuntime.hpp",
+      "size": 1833,
+      "sha256": "c267be15f1adc14656002c269634c72abd6f4c50b920ff2c88997cbe2c5528f9"
+    },
+    {
+      "path": "src/game/LevelSlideRuntime.cpp",
+      "size": 14756,
+      "sha256": "5d47b23eae6946e0a06ccb499cc15b2b11be264529e52ab1d19cdcedc654e29c"
+    },
+    {
+      "path": "src/game/LevelSlideRuntime.hpp",
+      "size": 3042,
+      "sha256": "b288dae3dbba635d6bc81f13444c77fb81af7ac038cb82e83ec1b80a7b341561"
+    },
+    {
+      "path": "src/game/LevelTriggerRuntime.cpp",
+      "size": 7526,
+      "sha256": "bd9b9f81991745d43c6f20b19f87b76dc28d6d9d967c7bf89d2d5c589b72fe00"
+    },
+    {
+      "path": "src/game/LevelTriggerRuntime.hpp",
+      "size": 1396,
+      "sha256": "4aa63c7ee43033eec41e05262840fc001c258ad2cebc175e574c808ead3aa983"
+    },
+    {
+      "path": "src/game/LevelTriggerSoundRuntime.cpp",
+      "size": 5336,
+      "sha256": "8a5c6c4893343daae26e0524ecdfb150e4d6edb641e4e45c414f1816f0c44bcb"
+    },
+    {
+      "path": "src/game/LevelTriggerSoundRuntime.hpp",
+      "size": 1144,
+      "sha256": "4d74c0f112c6794f1f895a838f8cf150da91a7e3d3a29473cb28693dc8287080"
+    },
+    {
+      "path": "src/game/LocalizedStringTable.cpp",
+      "size": 5447,
+      "sha256": "476e4747f173a4ddef48a6207187e655b15aaa4701b6758a8ffbc96a26393c8b"
+    },
+    {
+      "path": "src/game/LocalizedStringTable.hpp",
+      "size": 2004,
+      "sha256": "d9a7ffc6790f9b42544a894312b39e7e69230c114c79c5d67c58417ba2e8986a"
+    },
+    {
+      "path": "src/game/NativeRandomizer.cpp",
+      "size": 1747,
+      "sha256": "b245c4e84c77266b18807a32075f157c9788fea20644e73bf131609c0c7232a0"
+    },
+    {
+      "path": "src/game/NativeRandomizer.hpp",
+      "size": 779,
+      "sha256": "57592087bae722fb21595cb5ab4e0751034e0242730a7448237744856baeaa3e"
+    },
+    {
+      "path": "src/game/PlayerHitEffectConfig.cpp",
+      "size": 4294,
+      "sha256": "0290713eefb1fe80c6e9b23c3c262368f51ea447c59531bd42546485727ba080"
+    },
+    {
+      "path": "src/game/PlayerHitEffectConfig.hpp",
+      "size": 1256,
+      "sha256": "606275fe91fb755308878d69b54c798a68b08da26fdc059ec48d9f989e233dd0"
+    },
+    {
+      "path": "src/game/PlayerHudHealthState.cpp",
+      "size": 2398,
+      "sha256": "7b7a43de36bfd19b3e12057ed8bf055043614a69d0f0acaf8f12c9044639e0d3"
+    },
+    {
+      "path": "src/game/PlayerHudHealthState.hpp",
+      "size": 721,
+      "sha256": "08d6d90d65075639e0531631c67a79a4898aff6f83170cf2114bfa4f3521cf89"
+    },
+    {
+      "path": "src/game/PlayerPhysicsConstants.hpp",
+      "size": 760,
+      "sha256": "75a8afd45cfa7fe48610a26894e1d6916224e3a508beda6dc1e2d210e985e87a"
+    },
+    {
+      "path": "src/game/PlayerStateConfig.cpp",
+      "size": 9574,
+      "sha256": "1c24f8455e0f8f6b1f00217bf1a5a67f3ab45b8dc24d5d8b5e6078611807020b"
+    },
+    {
+      "path": "src/game/PlayerStateConfig.hpp",
+      "size": 2535,
+      "sha256": "58c90242704790580388e9dac1a9a5abf5b63880b80fc06d62ed2f672ee2bbf0"
+    },
+    {
+      "path": "src/game/QteCinematicHandoff.cpp",
+      "size": 1379,
+      "sha256": "b28c32035f1f7048978aa0814e98c0818dd9574dbf702b2de18f6bb0b04120ac"
+    },
+    {
+      "path": "src/game/QteCinematicHandoff.hpp",
+      "size": 1115,
+      "sha256": "52ff3707019050aafdd02e2c5ee8cf58a0e678d8a854911786d23f656ed6202d"
+    },
+    {
+      "path": "src/game/QteClock.hpp",
+      "size": 2591,
+      "sha256": "e648947601b63f3ff88f470671b153dc84ce3c72b8f0afd7f8d9089e69b8c9b2"
+    },
+    {
+      "path": "src/game/QteControlHost.hpp",
+      "size": 834,
+      "sha256": "8ba1fc833d0524c5cfacd63bf7ef2d1e04fc18ea2ada5a3104f73345a986ca40"
+    },
+    {
+      "path": "src/game/QteFeedbackFrame.hpp",
+      "size": 557,
+      "sha256": "d27eb50304a1349208fa20525ad0faa82ff595540be6a9cdaa740d05893005e6"
+    },
+    {
+      "path": "src/game/QteFeedbackGeometry.cpp",
+      "size": 3475,
+      "sha256": "0ce976e4c594143f9edaea95b69f49b27864f710998ba538eb3b18d6ef34b30e"
+    },
+    {
+      "path": "src/game/QteFeedbackGeometry.hpp",
+      "size": 762,
+      "sha256": "3bdac0116415d3b764211f493e73e5f32799df497d145047d66b6782889431ce"
+    },
+    {
+      "path": "src/game/QteGesturePath.cpp",
+      "size": 2920,
+      "sha256": "d46fcd1558a98f6e0fcff31985f8f9a02a6105ab31bb59d8e1a217ed7bba68b3"
+    },
+    {
+      "path": "src/game/QteGesturePath.hpp",
+      "size": 2043,
+      "sha256": "e7995b2cae516f1ddc532fa4f36499426e131044cccc497bd9e2edaac4fed4ad"
+    },
+    {
+      "path": "src/game/QteSpriteAnimation.cpp",
+      "size": 2704,
+      "sha256": "791bdc186b10158d5195a2491bf020eb72bf00a6a81670fbe6129b3ebf388211"
+    },
+    {
+      "path": "src/game/QteSpriteAnimation.hpp",
+      "size": 1377,
+      "sha256": "a924d92906182edd98e4cbcaf1d3073caa7acb972558396a30b27c6c65f0051d"
+    },
+    {
+      "path": "src/game/QuickTimeActionConfig.cpp",
+      "size": 5894,
+      "sha256": "3ee16b31ce3b0e24d33b78a23e0c2d409c8796edead0c7353198cb0d431b00e2"
+    },
+    {
+      "path": "src/game/QuickTimeActionConfig.hpp",
+      "size": 1710,
+      "sha256": "fe08ccdc9ce3da90d0bba4b3d7b21fbca309f0ae94a13be44f64982aa505a9e2"
+    },
+    {
+      "path": "src/game/QuickTimeActionRuntime.cpp",
+      "size": 11721,
+      "sha256": "5b9bc7854806fec7b8571116e23b2a2a6b426f90730da9e1358c5f8b85d253e3"
+    },
+    {
+      "path": "src/game/QuickTimeActionRuntime.hpp",
+      "size": 4788,
+      "sha256": "26dd04fff74e4bc7301cf30c576dc1d18b4360ca55c6201bb11702ee0519b437"
+    },
+    {
+      "path": "src/game/QuickTimeEventRuntime.cpp",
+      "size": 17661,
+      "sha256": "0c90d75e3f2369e92a44fb97caa6eff0ded2f19981c5cba55066909ed062bbc8"
+    },
+    {
+      "path": "src/game/QuickTimeEventRuntime.hpp",
+      "size": 7249,
+      "sha256": "03c157eb410695e81ca36b8b5669246576a47c7b2b2e9309a294bfe130baca43"
+    },
+    {
+      "path": "src/game/WallWebRuntime.cpp",
+      "size": 5904,
+      "sha256": "f19a15a63ca385d14ef9a0f65560ae1155d8adee22c4469c94f3c32d1724c0d4"
+    },
+    {
+      "path": "src/game/WallWebRuntime.hpp",
+      "size": 2974,
+      "sha256": "46251c9c547b736261c1357118434e2b2842c62e893ca2205364c356749c6804"
+    },
+    {
+      "path": "src/game/WebGrabPointRuntime.cpp",
+      "size": 10006,
+      "sha256": "2acdaefb278e1bd31b1760f0ccd1ee192a3737ef41061e381dd84962dca475b0"
+    },
+    {
+      "path": "src/game/WebGrabPointRuntime.hpp",
+      "size": 2696,
+      "sha256": "391bbea3ebd63db8032827a2f2597eb6e33f99207d583ea89d9faf2909ad72cd"
+    },
+    {
+      "path": "src/game/WebLineGeometry.cpp",
+      "size": 4899,
+      "sha256": "a2f5ff1b5e08d9c423c367719f523356b60b4e96e9a01b8617a0d06e51f0e11f"
+    },
+    {
+      "path": "src/game/WebLineGeometry.hpp",
+      "size": 1283,
+      "sha256": "bc06c375b03ffc0f53b0f79bc0c6bb97cf2c1f687cdefa2afb38b4cc64b3e7bb"
+    },
+    {
+      "path": "src/game/WebSwingRuntime.cpp",
+      "size": 10455,
+      "sha256": "85ee2490da0aee731334686456bb62e9c5892f1ba8530f0575a76a6405b932b7"
+    },
+    {
+      "path": "src/game/WebSwingRuntime.hpp",
+      "size": 2295,
+      "sha256": "5b1a231990473c6332debfa16ae52cbe98cdf027889e8dea08cdcb836442eff6"
+    },
+    {
+      "path": "src/platform/input/QteGamepadAdapter.hpp",
+      "size": 4397,
+      "sha256": "9bcac1df39277b3dd973c4c2e829a683fdc390f54309dedc22e8e7f85175e9fa"
+    },
+    {
+      "path": "src/platform/input/XInputStateTranslator.cpp",
+      "size": 4223,
+      "sha256": "3b94c82e6a5b4f7745fec68096254fc9e0799562ef75bc08f1498834369e0d7e"
+    },
+    {
+      "path": "src/platform/input/XInputStateTranslator.hpp",
+      "size": 2003,
+      "sha256": "2eba85c568573c3c090fe22ea763603f79efdc36ae4a4077a5d4bf901bccbee1"
+    },
+    {
+      "path": "src/platform/windows/GameDataLocator.cpp",
+      "size": 2653,
+      "sha256": "20797c7d886f32dab1b7ec485ec740b6717bfe1d44d3d8e7e54f7d5bd67140ef"
+    },
+    {
+      "path": "src/platform/windows/GameDataLocator.hpp",
+      "size": 190,
+      "sha256": "1fb5511195ff788843d27c31ce4c05f9bd3bb92420a2915fb4bd4ea86a5875cb"
+    },
+    {
+      "path": "src/platform/windows/Window.cpp",
+      "size": 2644,
+      "sha256": "b1da76a97d4573764504fef5470edd9289190aa0b5ba24de288afdceb34238da"
+    },
+    {
+      "path": "src/platform/windows/Window.hpp",
+      "size": 1076,
+      "sha256": "897c5294268e720b6aeb2b11e08f25040ef5ac0fd403a1e22a6646fa4f8a47cc"
+    },
+    {
+      "path": "src/platform/windows/XInputController.cpp",
+      "size": 1250,
+      "sha256": "fbd8d739d44c81527d242e4bc02851e44833950da86bf3cae436043782c552fb"
+    },
+    {
+      "path": "src/platform/windows/XInputController.hpp",
+      "size": 702,
+      "sha256": "511ccbe1e085ef9283e06c2e8bd4fbfe5634cef6c8369c88d309ac10ba345960"
+    },
+    {
+      "path": "src/reconstructed/input/GameplayInputState.hpp",
+      "size": 3274,
+      "sha256": "97e2869ec81edd9d4973ea822cf30098c43835e8341e0c5dbb08f58ea32c2e08"
+    },
+    {
+      "path": "src/reconstructed/input/XperiaKeyEvent.hpp",
+      "size": 1066,
+      "sha256": "3ddf3130267028120739bd337b536632cfac5a12a7c6ab391815278598cdef10"
+    },
+    {
+      "path": "src/reconstructed/input/XperiaKeyRouter.cpp",
+      "size": 3301,
+      "sha256": "4a921472291d6ab8052615fb104df451038d062e39f76dbf89d177bffbe500c8"
+    },
+    {
+      "path": "src/reconstructed/input/XperiaKeyRouter.hpp",
+      "size": 2665,
+      "sha256": "c9a0796c007fcb92951fe5c466a11824b74da77d4b31490f4786a3eabf4fcc23"
+    },
+    {
+      "path": "src/renderer/IRenderer.hpp",
+      "size": 392,
+      "sha256": "33711689e30d8c384543a8370370442203693f1b3279c4cf4eb31efef3a537d8"
+    },
+    {
+      "path": "src/renderer/d3d11/D3D11Renderer.cpp",
+      "size": 341727,
+      "sha256": "3c0fe0d5bfdbb5995a065bcfaaacb510b4bf1622c84449ecf344122728851990"
+    },
+    {
+      "path": "src/renderer/d3d11/D3D11Renderer.hpp",
+      "size": 19684,
+      "sha256": "1786e92edb97fbc5177e57f12f3d25c0e74a6c2768f056dcdf82676722e593d7"
+    },
+    {
+      "path": "tests/AutoplayComparisonTests.ps1",
+      "size": 2799,
+      "sha256": "a50bd7abc7be0ace901b9d8f1fe70012e484321193fb04855c9cf6cc51c6bf93"
+    },
+    {
+      "path": "tests/AutoplaySuiteRunnerTests.ps1",
+      "size": 5851,
+      "sha256": "1577ed307cb38242fc6da3ba5d3bac5fa09a1b73e4b822da804189d896934f99"
+    },
+    {
+      "path": "tests/D3D11RenderTests.cpp",
+      "size": 126709,
+      "sha256": "725203f4253dadf56280b18ab9526cc75e1fb71f3614f6614f0d1dadb4060f8f"
+    },
+    {
+      "path": "tests/InputParityTests.cpp",
+      "size": 17479,
+      "sha256": "71b06291aa69102d4b3e959655716d5fa48165a299303b492c465ed4a837e80d"
+    },
+    {
+      "path": "tests/InputTransitionsTests.cpp",
+      "size": 3283,
+      "sha256": "ae43cacdf83c305a2f7cbb2a47dd2690f87914239bcdf617a3c4c3bdbb74fb22"
+    },
+    {
+      "path": "tests/QteControlTests.cpp",
+      "size": 23505,
+      "sha256": "009def28b1d67d5e4cd67f1191ef7c69e4dc9a42ed2847ee2716ecfd353b84e5"
+    },
+    {
+      "path": "tests/QteParityTests.cpp",
+      "size": 76966,
+      "sha256": "ae1aa0efb8b902760d50250106366967dffda2c78237a8f2b95aae2b40313c93"
+    },
+    {
+      "path": "tests/SmokeTests.cpp",
+      "size": 756856,
+      "sha256": "a989f419ca561ae3fc1fe64cd7d09a6741b647f1d4493000079e239eb0320997"
+    },
+    {
+      "path": "tests/autoplay/asset-census.usmauto",
+      "size": 317,
+      "sha256": "7d705b76d99d3f4ad517acf537b8de27261e905153bd5512c086efcc7ef74728"
+    },
+    {
+      "path": "tests/autoplay/attack-targeting-probe.usmauto",
+      "size": 854,
+      "sha256": "a3f53770436f626aa0c6a794562c7a897e60aedb70dfe81d0350531a4a95788d"
+    },
+    {
+      "path": "tests/autoplay/bonus-probe.usmauto",
+      "size": 924,
+      "sha256": "31fd41dcaf0ef1890579802737e90765264c2819b7d41b64a7354b48a50c8966"
+    },
+    {
+      "path": "tests/autoplay/campaign-end-cinematic.usmauto",
+      "size": 1039,
+      "sha256": "acd87bc3ba648fedf1ba436eb158fd8a8528880769e0ea4f42d5fc245692904d"
+    },
+    {
+      "path": "tests/autoplay/checkpoint-retry-probe.usmauto",
+      "size": 1070,
+      "sha256": "82435cb48877c42d5eeea7b80a392e1225921d209d3625edc7f2c5ac188aceac"
+    },
+    {
+      "path": "tests/autoplay/combat-boss-probe.usmauto",
+      "size": 1692,
+      "sha256": "1e3cab0017ae8bba61f6b3ce4211a4541bfd9394486ed80f003c86e25c516b2d"
+    },
+    {
+      "path": "tests/autoplay/combat-effects-parity-gate.usmauto",
+      "size": 2315,
+      "sha256": "093f2731f3d25747c5f59b0495a3e368c8ce96e49435fbe7097921f683f736d2"
+    },
+    {
+      "path": "tests/autoplay/combat-probe.usmauto",
+      "size": 1494,
+      "sha256": "ee60c08e6e19267fda74140632a880726cc5e4f1a1169eaf46eb5ee6ce9c4a29"
+    },
+    {
+      "path": "tests/autoplay/combat-room4-probe.usmauto",
+      "size": 649,
+      "sha256": "28ce770fdffbeebb8d7bbd8af38818a77c650bc4e0c1bd7c10bd79b7d3444c36"
+    },
+    {
+      "path": "tests/autoplay/combat-room5-probe.usmauto",
+      "size": 582,
+      "sha256": "0256ae15a3cd392e6829bb071b4dc5e46148c1f4b999aee8147bbb69ee6f47cd"
+    },
+    {
+      "path": "tests/autoplay/combat-room6-probe.usmauto",
+      "size": 501,
+      "sha256": "bc9f655a49aca754fb947c72bd732351175fef589db442f77fbc966c6f056f81"
+    },
+    {
+      "path": "tests/autoplay/combat-rooms7-8-probe.usmauto",
+      "size": 499,
+      "sha256": "7e999ebd1ef18950d57e815be3c7d6fb85a3fa3518bae7b50de41cf9b28c0162"
+    },
+    {
+      "path": "tests/autoplay/combat-rooms9-11-probe.usmauto",
+      "size": 709,
+      "sha256": "f5f41e3e4d4bb20c0acb9c0d6ceb9f5e7a6829f11160b0c9c7b141bdc0a248d4"
+    },
+    {
+      "path": "tests/autoplay/combo-retry-probe.usmauto",
+      "size": 1182,
+      "sha256": "cc7b1e6406ce97a739143f9e8441a443373566e9a03883e15d3d85e8b2880de8"
+    },
+    {
+      "path": "tests/autoplay/comic-cover-probe.usmauto",
+      "size": 667,
+      "sha256": "e0327fd5229997003dbe31095fc925f604f76bc9b8226452483273dd99454757"
+    },
+    {
+      "path": "tests/autoplay/death-exit-menu-probe.usmauto",
+      "size": 910,
+      "sha256": "d6cfe76e2304c9b57dc8126d58c3fbea26e2555828e253689fb2b945f4ffddbe"
+    },
+    {
+      "path": "tests/autoplay/destroyable-probe.usmauto",
+      "size": 511,
+      "sha256": "531377221947daab01dd623cbc01fafa66e0e22915d170a885acaffdd871d62f"
+    },
+    {
+      "path": "tests/autoplay/enemy-animation-probe.usmauto",
+      "size": 576,
+      "sha256": "fc2811f2e1f1ea4ec5098d74ff9cb1e05b2f39ebf5bfce42be2f674151ff4444"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-air-kick-down-combo-parity.usmauto",
+      "size": 2283,
+      "sha256": "4c396276522bada40114457c1883e6795cf8ca1c7821810722f1e6b92482e98e"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-air-target-kick-parity.usmauto",
+      "size": 2426,
+      "sha256": "ab493599e3c75ade123e72d484aad318813b25f896c5caaef18223cf9ecd0b86"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-air-web-grab-parity.usmauto",
+      "size": 1346,
+      "sha256": "472186f9564c70c70e060783938f8468aebe7ec9d425d18e99021a59848bf65f"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-air-web-knockdown-parity.usmauto",
+      "size": 1618,
+      "sha256": "f809a472593eda1595830b5b74cc8daa5d276b5f1012074a6933648587676fbd"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-air-web-throw-parity.usmauto",
+      "size": 1411,
+      "sha256": "4eff82d206e781b9f81ec1e278ab16321cc07b53ce9e82ed367e536b57e966ca"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-alternate-combat-effects.usmauto",
+      "size": 4381,
+      "sha256": "b073997291b999b2e851a635f214e2cc0d1e894fde84f1008388183587104352"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-crowd-separation.usmauto",
+      "size": 666,
+      "sha256": "3673ea2e034ed82c04f6aeee1b0dd6053e48969a1c44336ef04e2f5380c74690"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-enemy-interruption-parity.usmauto",
+      "size": 838,
+      "sha256": "cacd52345b0957a589d76b37a88fa55e977284127d1e68ea7c858793fe62d436"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-enemy-offense-parity.usmauto",
+      "size": 2236,
+      "sha256": "d1ac21b18418d69960a8099c2beea68984f6e0983059a9ff620a1c40c8c1cc76"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-far-combo-parity.usmauto",
+      "size": 1140,
+      "sha256": "a88800d3ae705598b9d4d35a10da512803dedf405b8f62a9d89ae3d90f50059f"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-full-combo-effects.usmauto",
+      "size": 2243,
+      "sha256": "296a831eb71a89df73a44ba7be4127655f4cce35ca997602e5239982ad8a7bd8"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-ground-web-bind-parity.usmauto",
+      "size": 1307,
+      "sha256": "c1eec0d621f381e2598a9f701c7a7b7dfbb94503315738366386e2af87cd11ec"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-ground-web-directional-throw-parity.usmauto",
+      "size": 1370,
+      "sha256": "e33fef02f6c006cb030e968e1405a5cd4e1a93e3d6f08a77b155d35ef0dfa356"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-ground-web-drag-down-parity.usmauto",
+      "size": 2397,
+      "sha256": "8fce94373430eeed6ab564a1c4bb70dda835b1b4ed25e864727dc8ee4de3af5c"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-ground-web-throw-parity.usmauto",
+      "size": 1664,
+      "sha256": "e33259620de2d158365fa35c49c83df58c1f928a880e674de70c3cd0634ac23a"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-health-damage-audit.usmauto",
+      "size": 3189,
+      "sha256": "081995d50d8efba49c98d5d72337221db2329f3d0a5e8ed3c897e97388df60f0"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-jump-release-parity.usmauto",
+      "size": 1708,
+      "sha256": "2f6fc03731e03f2e4075649353fe1e17342ef3c668472230e9fc41c4ff3b12b0"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-launcher-parity.usmauto",
+      "size": 1292,
+      "sha256": "61c1007a021ae057df9a237f767b2627f222f47a810019c0e770557e5d4a39d3"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-manual-combat.usmauto",
+      "size": 906,
+      "sha256": "9b50105f4bfc41d1ec7247add6928a1f2640fe39068d4c922d70c2f015d77048"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-melee-miss-parity.usmauto",
+      "size": 946,
+      "sha256": "fa2124681e8f7beef69284f2ffd4b21a1624b38571696ea07af1e558200e2326"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-normal-progression.usmauto",
+      "size": 1214,
+      "sha256": "e8b74a4d892f3dc6f4de26784c1db02fe1c737658fbe6802e83320717d216f5d"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-presentation.usmauto",
+      "size": 1016,
+      "sha256": "8a57a60939895ede5bd3af4df779d19e5092c74296b13bfab8a55d439292a30e"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-punch-web-throw-parity.usmauto",
+      "size": 1301,
+      "sha256": "1752a5b37d1aaabb53dc3c9d8ba0e5bb35297772108ca51fff1cc290fd5b5703"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-simultaneous-input-order.usmauto",
+      "size": 1081,
+      "sha256": "8d8758dd6ef9164565e8e9a40aec0e9c1b153249d533f564a2f044bb52c11566"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-skill-lock-parity.usmauto",
+      "size": 1081,
+      "sha256": "88aec5afdeadfd72d49f66de3aa5366d29fdd09f1d04f539bebe53e0f12ff288"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-spider-sense-air-evade.usmauto",
+      "size": 937,
+      "sha256": "d387680fecf27693002e7506554d8d3e3965ab257370f509e6d04b92f4bdc8d9"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-spider-sense-back-counter.usmauto",
+      "size": 776,
+      "sha256": "0bdee2bae3e213a1296ec67b5ff73c5f5383dd34d5d75107fb2f260eb896caea"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-spider-sense-blink-strike.usmauto",
+      "size": 1376,
+      "sha256": "28c4b3b5ba916a22c7dc2db8d8606e0357701f8a2a6f5d18c1eb473fc456a6ec"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-spider-sense-counter.usmauto",
+      "size": 1505,
+      "sha256": "238ef6e979634e5f08d2c80601327304fe996439ffa82e288337af740598a2ce"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-spider-sense-left-counter.usmauto",
+      "size": 775,
+      "sha256": "78bcd41d3ece1ce945305865c1470c853e11e9b5e2c5b186e99e0f20ae4460fa"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-spider-sense-right-counter.usmauto",
+      "size": 777,
+      "sha256": "f64a898eacf8a081b9ad5f584fff233038d29e9fe4e51062eb1d60d23194902a"
+    },
+    {
+      "path": "tests/autoplay/first-encounter-web-pellet-render.usmauto",
+      "size": 889,
+      "sha256": "66d1e66928ae40b7b1fdc25d89be453e9f8bd664cc794c0b99ac6709b2ce5bc4"
+    },
+    {
+      "path": "tests/autoplay/gameover-probe.usmauto",
+      "size": 1130,
+      "sha256": "dda2b66b8d8acb1d5cb8cdee0d1c13a7c18de9f2a9b0f12f15871f90d6a84a18"
+    },
+    {
+      "path": "tests/autoplay/hazard-probe.usmauto",
+      "size": 843,
+      "sha256": "514a8d68bbeaa0baa70952e39091bf2ad338392abdb426513655555dbbc67c63"
+    },
+    {
+      "path": "tests/autoplay/intro-building-audit.usmauto",
+      "size": 475,
+      "sha256": "951bcfcfc1e5914dbf7a1922af4241192c544c33457eb74ac521f211cd4e76bc"
+    },
+    {
+      "path": "tests/autoplay/level-restart-probe.usmauto",
+      "size": 1207,
+      "sha256": "c47d224e26c9a6518a333a6cbc11adafbffd86c3d0031cbacff9fca4366c1b82"
+    },
+    {
+      "path": "tests/autoplay/level2-bank-combat.usmauto",
+      "size": 973,
+      "sha256": "73d8f4e7340980d44dcc57ac282dad1412752d2dbfa5e3c2228a3f3e74f46196"
+    },
+    {
+      "path": "tests/autoplay/level2-molotov-projectile-probe.usmauto",
+      "size": 548,
+      "sha256": "90351c4de751bdbe617aae5a7bdff30fd4f258e721f2db0d3a5992527c70f19c"
+    },
+    {
+      "path": "tests/autoplay/level2-opening.usmauto",
+      "size": 339,
+      "sha256": "bdecf070d1e69dfa544d2d4cfa93b27c0a526f094cb29b5f9ec2b03e7a28c3e3"
+    },
+    {
+      "path": "tests/autoplay/level2-progress-command-probe.usmauto",
+      "size": 611,
+      "sha256": "b875ec98d57d6b3dbcc5c2a72bc6a36d7bd43d3297237a061549de23d2f68e48"
+    },
+    {
+      "path": "tests/autoplay/level2-rhino-phase0-probe.usmauto",
+      "size": 737,
+      "sha256": "8b3d9c9e3d5a46832de556b44342a2e8b789cec03fb38d6ebb245c04ac58e95a"
+    },
+    {
+      "path": "tests/autoplay/level2-rhino-phase1-qte-failure-probe.usmauto",
+      "size": 856,
+      "sha256": "6b6935ea694a035c6822869494ff17de60ee4ce3cfe2dac898a676ffd49c5a7d"
+    },
+    {
+      "path": "tests/autoplay/level2-rhino-phase1-qte-probe.usmauto",
+      "size": 916,
+      "sha256": "444a44b36d9faaa526168b237c523fe16a0dedb7b4c5e84d647de5689eb6e714"
+    },
+    {
+      "path": "tests/autoplay/level2-scripted-restore-probe.usmauto",
+      "size": 606,
+      "sha256": "c3df88e2d6bbff9d1bc240d50cf82f54f272f846ec3d68d5a1bc48a96ca07e2f"
+    },
+    {
+      "path": "tests/autoplay/level3-beam-background-audit.usmauto",
+      "size": 481,
+      "sha256": "39fad09af8b670e44612eba58a9286e0b880ae91a7d333adf9a8dfbef77a6dd2"
+    },
+    {
+      "path": "tests/autoplay/level3-electric-platform-probe.usmauto",
+      "size": 914,
+      "sha256": "0a2ce171835be52bac6a45f62088eaea8a956971e7ec2ba3b80264470276a056"
+    },
+    {
+      "path": "tests/autoplay/level3-electric-release-render-probe.usmauto",
+      "size": 620,
+      "sha256": "1cee99f95b799b7372a2272d0fc34f04e32f607759a0334c9ec6a160708621f3"
+    },
+    {
+      "path": "tests/autoplay/level3-electric-rooftop-render-probe.usmauto",
+      "size": 527,
+      "sha256": "c6ad82290da9b9a4b94075c43f858d27d1cebdac36f349e40cc026cf79c4e5b1"
+    },
+    {
+      "path": "tests/autoplay/level3-electro-cinematic-audit.usmauto",
+      "size": 509,
+      "sha256": "12137b22dc9a7fd40c98d56d5277f314a21ae2f20379fe2f377b6f9533adee8f"
+    },
+    {
+      "path": "tests/autoplay/level3-electro-native-probe.usmauto",
+      "size": 838,
+      "sha256": "9403c7badab966b8a551dd957dc15367ccc6f48cbd8d2ac59a2e1ddf9906b6f8"
+    },
+    {
+      "path": "tests/autoplay/level3-electro-rotate-probe.usmauto",
+      "size": 942,
+      "sha256": "51c955ecd8c82b691c404fbd4d96d6e449d6048d67e6c4671100d3f9cb022e0d"
+    },
+    {
+      "path": "tests/autoplay/level3-first-encounter.usmauto",
+      "size": 688,
+      "sha256": "8d607eb7d650b775574ce3f9fe0cf82df4076798656ca48f61c85374dfa74931"
+    },
+    {
+      "path": "tests/autoplay/level3-full-progression.usmauto",
+      "size": 2817,
+      "sha256": "0b6a4be69a7e5ec5b71665f7ad0460bdefba68c992b20162ee822505023426fe"
+    },
+    {
+      "path": "tests/autoplay/level3-opening.usmauto",
+      "size": 579,
+      "sha256": "3185ca257212db9720889b88a1f8ecc1b91640a6f83fa3669348010e8b42d159"
+    },
+    {
+      "path": "tests/autoplay/level3-player-moveobject-probe.usmauto",
+      "size": 417,
+      "sha256": "462506b06f07f432735617312dbae6dba17ddb93e36ddeaa41f99a6232d4908c"
+    },
+    {
+      "path": "tests/autoplay/level3-restore-gate-probe.usmauto",
+      "size": 563,
+      "sha256": "6db9b76b7da538333f394c15c4e4fbc4e3f9915eeccde4e1dd395537139bd4f9"
+    },
+    {
+      "path": "tests/autoplay/level3-room8-course-render-probe.usmauto",
+      "size": 773,
+      "sha256": "cf90974e5e1ac72ce970be089ab0bf88ef997ff8772dd3f5f9dab43dcef01505"
+    },
+    {
+      "path": "tests/autoplay/level3-room8-northbound-platform-probe.usmauto",
+      "size": 3530,
+      "sha256": "39655d0184ca13fd8286fadaeb26e1a87f1e91119390af6d9c4a2e9b4572d669"
+    },
+    {
+      "path": "tests/autoplay/level3-second-encounter.usmauto",
+      "size": 1196,
+      "sha256": "8bf89ab15b7a7f16f7a12c7d990c74030f1a4528fb4290a87bcee06af6c7d669"
+    },
+    {
+      "path": "tests/autoplay/level3-third-encounter.usmauto",
+      "size": 1592,
+      "sha256": "06763c87feadf5e99e39ae3d4e7b87c356b2ae3cefe206c1c9a38107ce5bde48"
+    },
+    {
+      "path": "tests/autoplay/level3-wave-progression.usmauto",
+      "size": 1790,
+      "sha256": "3ad643a95f1e75a345033be52465f5d5617c36a88bfc34c447272a464b55c7ef"
+    },
+    {
+      "path": "tests/autoplay/level4-first-encounter.usmauto",
+      "size": 1436,
+      "sha256": "adcf160aa62672443802457b9404bd52c7b2bb6125ed460cfae8776873c8c74a"
+    },
+    {
+      "path": "tests/autoplay/level4-opening.usmauto",
+      "size": 374,
+      "sha256": "5b9e6f5546029b67fea569a8a78df1f1298e2340a825edcef4354a0084dd22e8"
+    },
+    {
+      "path": "tests/autoplay/level5-full-progression.usmauto",
+      "size": 8468,
+      "sha256": "73d08882b8551cf7875a225d6895e96423902752685ef10effe90d9ada7a8772"
+    },
+    {
+      "path": "tests/autoplay/level5-slide-unlock.usmauto",
+      "size": 701,
+      "sha256": "a2e167de7fc693c56fae3b76494617af525c8054045b5b67663c64e550e13f39"
+    },
+    {
+      "path": "tests/autoplay/level6-full-progression.usmauto",
+      "size": 9635,
+      "sha256": "6031d627174ed246688b5db924f9bad7f771606747f44c1df54d92fb7bd1f2e9"
+    },
+    {
+      "path": "tests/autoplay/level6-wall-web-failure-probe.usmauto",
+      "size": 5219,
+      "sha256": "486b7e8017c225307e394ee5940b25ed09d61ff2c1e03951d2b39c3a9f69e322"
+    },
+    {
+      "path": "tests/autoplay/level6-wall-web-probe.usmauto",
+      "size": 4890,
+      "sha256": "039caf732100ca41c2fac83d389d44bac6ccc8d7da8373328819114728b10534"
+    },
+    {
+      "path": "tests/autoplay/level7-moving-room-command-probe.usmauto",
+      "size": 509,
+      "sha256": "71f24120dea4ca6c3e491a1fbeb5a0d6fa51abf26d4c9901e1227c7b06dc18bd"
+    },
+    {
+      "path": "tests/autoplay/level7-opening-progression.usmauto",
+      "size": 6943,
+      "sha256": "fa6db499b2872e4c28340f65c4b04c6eb68afc267392fbf3d3bf549cc090002d"
+    },
+    {
+      "path": "tests/autoplay/level8-robot-phantom-probe.usmauto",
+      "size": 1061,
+      "sha256": "3985e1dedbab35181883d08b8224470bbb54e4d8d9b7f9f8e6d2aa3971efba95"
+    },
+    {
+      "path": "tests/autoplay/opening-baseline.usmauto",
+      "size": 1080,
+      "sha256": "b14a05535e658fb7c726081ff5e366dd707edc210ab19280faefb5e8c9b9f812"
+    },
+    {
+      "path": "tests/autoplay/opening-gameplay-handoff.usmauto",
+      "size": 348,
+      "sha256": "4cc230013ab052aa83ad19e86eda4d18988054ab59e431971d2f15cde955514d"
+    },
+    {
+      "path": "tests/autoplay/player-button-combat-probe.usmauto",
+      "size": 2351,
+      "sha256": "5466e56ffe8de005d453d0e7efed26c9d451ee189573ab126dfcf1e4a77a0f22"
+    },
+    {
+      "path": "tests/autoplay/post-crash-route-probe.usmauto",
+      "size": 14161,
+      "sha256": "edcef79b494c7223cb7be90c3ba9fde7839215257648f4312b0ac98923c49498"
+    },
+    {
+      "path": "tests/autoplay/restore-probe.usmauto",
+      "size": 559,
+      "sha256": "6f0b1287b7f25c003c9b45f23c80b3811b020fa9ac98984b16eae18f78834adb"
+    },
+    {
+      "path": "tests/autoplay/room2-web-route-probe.usmauto",
+      "size": 1526,
+      "sha256": "bc4bdb08af1980c33e426236dfee99a714ad5830ea29af57b6f6fa183c509beb"
+    },
+    {
+      "path": "tests/autoplay/room4-to-room5-route-probe.usmauto",
+      "size": 1261,
+      "sha256": "ec38d4808e6520a8226e18cbc563eb9988e36a194f20700ad89d897d2121401c"
+    },
+    {
+      "path": "tests/autoplay/room5-to-room6-route-probe.usmauto",
+      "size": 4024,
+      "sha256": "97d59e786f8d56c5fb4c965d4993288288978b9f7ec2dda209e8e5b50bf23f2f"
+    },
+    {
+      "path": "tests/autoplay/room5-ultimate-normal-flow.usmauto",
+      "size": 1857,
+      "sha256": "e3d8c057f6ea4f8bd856af605f3d378ced92824ac434d569f474381d21f5cd04"
+    },
+    {
+      "path": "tests/autoplay/room6-gunman-native-offense.usmauto",
+      "size": 626,
+      "sha256": "f32d12fb3929e8eb28fa073361e1425283634f9158ca2eceb77b2650f76c622a"
+    },
+    {
+      "path": "tests/autoplay/room6-hammer-native-offense.usmauto",
+      "size": 1189,
+      "sha256": "8bfcca54d80bb851e706bade870928249346df2c6ce1e76d8d71d9e7f8ce5dc8"
+    },
+    {
+      "path": "tests/autoplay/room6-web-route-probe.usmauto",
+      "size": 2115,
+      "sha256": "e6606258983538aad3173d2f483353a1893a2c27e7974e24149797c81219f9fc"
+    },
+    {
+      "path": "tests/autoplay/room7-to-level1-end-route-probe.usmauto",
+      "size": 4179,
+      "sha256": "78b1a1f097a1d8c352413d6a3248000db0fc86e843eff15b318b6ec3d970cdf7"
+    },
+    {
+      "path": "tests/autoplay/room7-web-slide-route-probe.usmauto",
+      "size": 2347,
+      "sha256": "909d42a7fb618057909772d521ecd9bee8149ab70400b21d5f6d19271aa26656"
+    },
+    {
+      "path": "tests/autoplay/room9-heavy-native-melee.usmauto",
+      "size": 868,
+      "sha256": "711ae7a097b65798898808eab931b74c7833722fc24b1506fa869fde368b86ee"
+    },
+    {
+      "path": "tests/autoplay/room9-heavy-native-rocket-sense.usmauto",
+      "size": 916,
+      "sha256": "2b422bacacd1d7c9ca0822467f72d619a0f8c148a5688febb7a531c1b0897a6a"
+    },
+    {
+      "path": "tests/autoplay/room9-heavy-native-rocket.usmauto",
+      "size": 715,
+      "sha256": "b9d90fd9b47f74b492df6341692ea222e03c265535f635d54d3ef93547bfc593"
+    },
+    {
+      "path": "tests/autoplay/second-encounter-probe.usmauto",
+      "size": 1299,
+      "sha256": "bc91e5206aceffe5936680c183b3f432a4640a528f9ee40eb1f6f50576c594d5"
+    },
+    {
+      "path": "tests/autoplay/second-encounter-spider-sense-normal-flow.usmauto",
+      "size": 1131,
+      "sha256": "44b26911c5bfe9efa2c9d3bafcb38c80042005a0f0942e3d43a64d01c90f3f11"
+    },
+    {
+      "path": "tests/autoplay/slide-traversal-probe.usmauto",
+      "size": 1041,
+      "sha256": "2cbfe55443fe8762cfd119703f0995ae98ece948949de4b0906acd75e759ec7b"
+    },
+    {
+      "path": "tests/autoplay/street-route-probe.usmauto",
+      "size": 482,
+      "sha256": "34fb6cf212eeee628361698eae3bec7bfefaa5043ce5a55b1fb781389a8dcf0e"
+    },
+    {
+      "path": "tests/autoplay/trigger-chain-probe.usmauto",
+      "size": 1249,
+      "sha256": "353695851d5f2a52ff4353624fec12ba918b2774333e9e8e9c2c86b06643ed04"
+    },
+    {
+      "path": "tests/autoplay/trigger-sound-probe.usmauto",
+      "size": 619,
+      "sha256": "faa2f06f91937d84bf6be2dbaf181e9a0640e6234b52a6459b1be369accab73a"
+    },
+    {
+      "path": "tests/autoplay/wall-climb-probe.usmauto",
+      "size": 480,
+      "sha256": "c1ab2361b12742936b660ee953998e71dbb8e0dbaa0d56a83b4d1e2bd18b0167"
+    },
+    {
+      "path": "tests/autoplay/wall-edge-probe.usmauto",
+      "size": 1019,
+      "sha256": "1ea539da12836d9592bc43cb3420810f3d8799689cfc6a758a65eac89852e4bb"
+    },
+    {
+      "path": "tests/autoplay/web-swing-probe.usmauto",
+      "size": 717,
+      "sha256": "fa4a43161a581dd0ac4b4f3369abb1dde0400c6d4f8cb537f0fc7cf2691e1a5e"
+    },
+    {
+      "path": "tests/autoplay/web-swing-tutorial-ui.usmauto",
+      "size": 372,
+      "sha256": "d485c093d953e602c1faa4eff4da04fdc5753876679171847a3e6ac14247180d"
+    },
+    {
+      "path": "tools/clean_generated_captures.ps1",
+      "size": 1449,
+      "sha256": "d4b21993f4b8b31a6404943b406e02580ff851211db39bd6e7fcc7f88ea77c5f"
+    },
+    {
+      "path": "tools/compare_autoplay_runs.ps1",
+      "size": 3185,
+      "sha256": "c686a28975941cfd4a8716ba077bdc0c6ac4ca273016c861b073daedb26004b3"
+    },
+    {
+      "path": "tools/ghidra/ExportAddressBytes.java",
+      "size": 1977,
+      "sha256": "62262b27ebfa0bdbf069d182f392afa70d597ff664ac2a64996a466687bd9a9b"
+    },
+    {
+      "path": "tools/ghidra/ExportAddressDecompilation.java",
+      "size": 3206,
+      "sha256": "90ef0a6ceb7256cb46d97c8495784974c80b1fe97b23e8ffb1e74a2ccacb8617"
+    },
+    {
+      "path": "tools/ghidra/ExportAddressReferences.java",
+      "size": 1798,
+      "sha256": "8d4e2f80f1c4320888b83420f8b4b4bd5482d9a82899a31fbcc29045336c484a"
+    },
+    {
+      "path": "tools/ghidra/ExportFloatReferences.java",
+      "size": 3184,
+      "sha256": "327fdbe82e62865e87a6065b9e0ebd6107cfb5ce7b325d470d5f1fb0727d484e"
+    },
+    {
+      "path": "tools/ghidra/ExportFunctionDisassembly.java",
+      "size": 2027,
+      "sha256": "c11b591e35b2c7dca5dd395a79c69f27eadef784bb8fbcbe1ec22bbd0dcdc017"
+    },
+    {
+      "path": "tools/ghidra/ExportFunctionInventory.java",
+      "size": 2343,
+      "sha256": "b53b0cdeb6ffaefa1e431125c202d3c0b607a871d4a464e072011ab354e35ca6"
+    },
+    {
+      "path": "tools/ghidra/ExportInstructionScalarMatches.java",
+      "size": 2347,
+      "sha256": "b252c835bfecade56aab14235f7550fe9e2345bcf9176755605dcc106d09c22c"
+    },
+    {
+      "path": "tools/ghidra/ExportSelectedData.java",
+      "size": 3136,
+      "sha256": "613f29222e40d74334c7586f3a6ae7cff676839ab0833561ef636ca1759c426e"
+    },
+    {
+      "path": "tools/ghidra/ExportSelectedDecompilation.java",
+      "size": 3678,
+      "sha256": "409a4c0e5ae2e68e468bd09637c59ba31b09c918cccb7dc8db59496d47cd7d68"
+    },
+    {
+      "path": "tools/ghidra/ExportSelectedDisassembly.java",
+      "size": 3613,
+      "sha256": "8849d13d1fdb6f0278559d09313eb53826954b192776b184187ce4d03a066002"
+    },
+    {
+      "path": "tools/ghidra/ExportStringReferences.java",
+      "size": 2570,
+      "sha256": "78d0b61308eac9db21d6fc55489056456c6b10ac5c9b8b73d63e54b118ac9de0"
+    },
+    {
+      "path": "tools/ghidra/ExportSymbolReferences.java",
+      "size": 2199,
+      "sha256": "768f6f7dd806aaf77f7e381232eb94b8bcd96573142b013c424b95e4728f2680"
+    },
+    {
+      "path": "tools/ghidra/ExportVtableEntries.java",
+      "size": 2650,
+      "sha256": "db5af3aec728f01bb2e4a9169e414864e4d962602a275b509f59084da0217e62"
+    },
+    {
+      "path": "tools/import_game.ps1",
+      "size": 2179,
+      "sha256": "80e04955b2b7a2d0e4e2530c67edd85edce795179f1b22efc53f48cdc14e9912"
+    },
+    {
+      "path": "tools/run_all_level_census.ps1",
+      "size": 2133,
+      "sha256": "e76f4a3637dfe115ac27e17293da0a1edf0084f44ea222c1bfbe53e779b65523"
+    },
+    {
+      "path": "tools/run_autoplay_suite.ps1",
+      "size": 6529,
+      "sha256": "6eb06e71426c89489c9fa969882a8195783633fe23e15512bf567e687eeb5918"
+    },
+    {
+      "path": "tools/run_ghidra_analysis.ps1",
+      "size": 2103,
+      "sha256": "23d0ab17284f2306a5d9f18e42db92811d4db9ab0d1cb0446f24b88661d3f7ea"
+    },
+    {
+      "path": "tools/verify_re01_reference.py",
+      "size": 5069,
+      "sha256": "25d438845e251be9fd1c05100cf93c8c2d129a4e03185c399c56a7646cc4b7a4"
+    },
+    {
+      "path": "tools/verify_re02_reference.py",
+      "size": 1837,
+      "sha256": "abfca4f5dfafc8a158d8f53bad75a63de724e8bf09c2d12fb2514456c2728b6c"
+    },
+    {
+      "path": "xboxButtons.png",
+      "size": 94716,
+      "sha256": "0c860ba0148ceec183d665d90aba4feaeaf31573c52fdcbe4d464cfbe682f263"
+    }
+  ]
+}

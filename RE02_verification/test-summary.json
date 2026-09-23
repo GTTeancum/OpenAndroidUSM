@@ -1,0 +1,266 @@
+{
+  "date": "2026-09-22",
+  "runs": [
+    {
+      "name": "GCC 14.2 native Linux x86-64 Release",
+      "log": "final-release.log",
+      "log_sha256": "8b31c50ab0e9cbaa83f9257cc7249dec5dfa012f34fd59c7b7aa4b686f8d9ed8",
+      "process_exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "test_seconds": 31.16,
+      "tests": [
+        {
+          "name": "OpenAndroidUSM.CoreTests",
+          "seconds": 13.24
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.clock",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.cinematic",
+          "seconds": 1.89
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.hostage",
+          "seconds": 2.03
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.attributes",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.gesture",
+          "seconds": 1.96
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.sprite",
+          "seconds": 1.95
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.sequence",
+          "seconds": 1.89
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.gamepad",
+          "seconds": 2.03
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.audio",
+          "seconds": 2.05
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.first_level",
+          "seconds": 2.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.buttons",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.routing",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.sticks",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.hostage",
+          "seconds": 2.05
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.autoplay",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.transitions",
+          "seconds": 0.01
+        }
+      ]
+    },
+    {
+      "name": "Clang 17 native Linux x86-64 AddressSanitizer + UndefinedBehaviorSanitizer + leak detection",
+      "log": "final-sanitized.log",
+      "log_sha256": "85b84ee7f7973b845338d542b542c2706531af63099928f18fa09a40763f5b23",
+      "process_exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "test_seconds": 118.62,
+      "tests": [
+        {
+          "name": "OpenAndroidUSM.CoreTests",
+          "seconds": 61.38
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.clock",
+          "seconds": 0.02
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.cinematic",
+          "seconds": 6.07
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.hostage",
+          "seconds": 6.29
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.attributes",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.gesture",
+          "seconds": 6.74
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.sprite",
+          "seconds": 6.31
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.sequence",
+          "seconds": 6.06
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.gamepad",
+          "seconds": 6.89
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.audio",
+          "seconds": 6.6
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.first_level",
+          "seconds": 6.11
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.buttons",
+          "seconds": 0.02
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.routing",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.sticks",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.hostage",
+          "seconds": 6.05
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.autoplay",
+          "seconds": 0.02
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.transitions",
+          "seconds": 0.03
+        }
+      ]
+    },
+    {
+      "name": "Clean-applied RE01 source, fresh GCC Release configure/build/test",
+      "log": "clean-build-tests.log",
+      "log_sha256": "fbdab2ea38367d69c712f74e34eb9f3af6ccfa51ee497353a29e8de5d08922f8",
+      "process_exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "test_seconds": 33.19,
+      "tests": [
+        {
+          "name": "OpenAndroidUSM.CoreTests",
+          "seconds": 13.69
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.clock",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.cinematic",
+          "seconds": 2.11
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.hostage",
+          "seconds": 2.13
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.attributes",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.gesture",
+          "seconds": 2.35
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.sprite",
+          "seconds": 2.33
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.sequence",
+          "seconds": 2.19
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.gamepad",
+          "seconds": 2.02
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.audio",
+          "seconds": 2.29
+        },
+        {
+          "name": "OpenAndroidUSM.QteParity.first_level",
+          "seconds": 2.02
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.buttons",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.routing",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.sticks",
+          "seconds": 0.0
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.hostage",
+          "seconds": 2.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.autoplay",
+          "seconds": 0.01
+        },
+        {
+          "name": "OpenAndroidUSM.InputParity.transitions",
+          "seconds": 0.01
+        }
+      ]
+    }
+  ],
+  "release_qte_check_counts": {
+    "clock": 400033,
+    "cinematic": 54,
+    "hostage": 199,
+    "attributes": 7,
+    "gesture": 262187,
+    "sprite": 500011,
+    "sequence": 28,
+    "gamepad": 48,
+    "audio": 12,
+    "first_level": 125
+  },
+  "input_transition_frames": 100000,
+  "input_transition_checks": 1200000,
+  "original_arm_executed": false,
+  "windows_app_built": false,
+  "windows_app_run": false,
+  "full_normal_gameplay_verified": false,
+  "notes": [
+    "Parity-named tests check reconstructed rules and assets, not side-by-side execution of the original ARM program.",
+    "The sanitizer run covers the entire registered portable suite, not the excluded Windows application/render tests.",
+    "The clean source rebuild used the same source/test/build-script bytes; a separate final patch-application check includes the later documentation.",
+    "The first_level fixture executes actual cinematic scheduling/QTE handoff, but observes other cinematic commands instead of executing the complete game world."
+  ]
+}

@@ -1,4 +1,5 @@
 #include "game/LevelOneBootstrap.hpp"
+#include "game/HostageAttributes.hpp"
 
 #include "filesystem/GbmpArchive.hpp"
 
@@ -1618,12 +1619,7 @@ Result LevelOneBootstrap::load(const std::filesystem::path& gameDataRoot,
                     floatAttribute(node, "HeightAbove", 180.0F);
                 const float buttonHeight =
                     floatAttribute(node, "ButtonHeightAbove", 0.0F);
-                // The native constructor starts at 85. A negative authored
-                // override is shifted down by another 100 before storage;
-                // positive/zero values leave the constructor default intact.
-                if (buttonHeight < 0.0F) {
-                    object.hostageButtonHeight = buttonHeight - 100.0F;
-                }
+                object.hostageButtonHeight = hostageButtonHeight(buttonHeight);
                 object.hostageIsWoman =
                     asciiLower(objectArchetypes_[archetypeIndex].meshFile)
                         .find("woman") !=

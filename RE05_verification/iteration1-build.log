@@ -1,0 +1,18 @@
+[1/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelCinematicRuntime.cpp.o
+[2/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelCollision.cpp.o
+[3/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/GameplayPlayer.cpp.o
+[4/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[5/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[6/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelObjectRuntime.cpp.o
+[7/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/WebGrabPointRuntime.cpp.o
+[8/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/reconstructed/input/XperiaKeyRouter.cpp.o
+[9/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelEnemyRuntime.cpp.o
+[10/19] Building CXX object CMakeFiles/OpenAndroidUSM.QteParityTests.dir/tests/QteParityTests.cpp.o
+[11/19] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+[12/19] Linking CXX static library libOpenAndroidUSM.Core.a
+[13/19] Building CXX object CMakeFiles/OpenAndroidUSM.InputTransitionsTests.dir/tests/InputTransitionsTests.cpp.o
+[14/19] Linking CXX executable OpenAndroidUSM.QteParityTests
+[15/19] Linking CXX executable OpenAndroidUSM.InputTransitionsTests
+[16/19] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[17/19] Linking CXX executable OpenAndroidUSM.InputParityTests
+ninja: build stopped: interrupted by user.

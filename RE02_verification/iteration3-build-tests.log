@@ -1,0 +1,68 @@
+[0/1] Re-running CMake...
+CMake Deprecation Warning at build/windows-msvc/_deps/pugixml-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /mnt/data/work/OpenAndroidUSM/build/re02-linux
+[1/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/audio/LevelMusicBank.cpp.o
+[2/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeActionRuntime.cpp.o
+[3/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelMusicRuntime.cpp.o
+[4/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[5/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[6/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/GameplayPlayer.cpp.o
+[7/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/WallWebRuntime.cpp.o
+[8/18] Building CXX object CMakeFiles/OpenAndroidUSM.QteParityTests.dir/tests/QteParityTests.cpp.o
+[9/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelEnemyRuntime.cpp.o
+[10/18] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[11/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelOneBootstrap.cpp.o
+[12/18] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+[13/18] Linking CXX static library libOpenAndroidUSM.Core.a
+[14/18] Linking CXX executable OpenAndroidUSM.QteParityTests
+[15/18] Linking CXX executable OpenAndroidUSM.InputParityTests
+[16/18] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+[17/18] Linking CXX executable OpenAndroidUSM.CoreTests
+Internal ctest changing into directory: /mnt/data/work/OpenAndroidUSM/build/re02-linux
+Test project /mnt/data/work/OpenAndroidUSM/build/re02-linux
+      Start  1: OpenAndroidUSM.CoreTests
+ 1/11 Test  #1: OpenAndroidUSM.CoreTests .................   Passed   13.02 sec
+      Start  2: OpenAndroidUSM.QteParity.clock
+ 2/11 Test  #2: OpenAndroidUSM.QteParity.clock ...........   Passed    0.01 sec
+      Start  3: OpenAndroidUSM.QteParity.cinematic
+ 3/11 Test  #3: OpenAndroidUSM.QteParity.cinematic .......***Failed    1.90 sec
+FAIL: line 128: level.buttonConfigs().find(6)->interactionType == 0
+
+      Start  4: OpenAndroidUSM.QteParity.hostage
+ 4/11 Test  #4: OpenAndroidUSM.QteParity.hostage .........   Passed    1.93 sec
+      Start  5: OpenAndroidUSM.QteParity.attributes
+ 5/11 Test  #5: OpenAndroidUSM.QteParity.attributes ......   Passed    0.00 sec
+      Start  6: OpenAndroidUSM.InputParity.buttons
+ 6/11 Test  #6: OpenAndroidUSM.InputParity.buttons .......   Passed    0.00 sec
+      Start  7: OpenAndroidUSM.InputParity.routing
+ 7/11 Test  #7: OpenAndroidUSM.InputParity.routing .......   Passed    0.00 sec
+      Start  8: OpenAndroidUSM.InputParity.sticks
+ 8/11 Test  #8: OpenAndroidUSM.InputParity.sticks ........   Passed    0.00 sec
+      Start  9: OpenAndroidUSM.InputParity.hostage
+ 9/11 Test  #9: OpenAndroidUSM.InputParity.hostage .......   Passed    1.95 sec
+      Start 10: OpenAndroidUSM.InputParity.autoplay
+10/11 Test #10: OpenAndroidUSM.InputParity.autoplay ......   Passed    0.01 sec
+      Start 11: OpenAndroidUSM.InputParity.transitions
+11/11 Test #11: OpenAndroidUSM.InputParity.transitions ...   Passed    0.01 sec
+
+91% tests passed, 1 tests failed out of 11
+
+Label Time Summary:
+input-parity    =   1.98 sec*proc (6 tests)
+qte-parity      =   3.84 sec*proc (4 tests)
+
+Total Test time (real) =  18.84 sec
+
+The following tests FAILED:
+	  3 - OpenAndroidUSM.QteParity.cinematic (Failed)       qte-parity
+Errors while running CTest

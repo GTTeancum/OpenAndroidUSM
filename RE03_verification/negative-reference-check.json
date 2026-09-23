@@ -1,0 +1,5 @@
+{
+  "exit_code": 1,
+  "stderr": "Reference verification failed: Reference mismatch in sha256; do not reuse the recorded addresses\n",
+  "note": "Temporary modified copy rejected; original file untouched."
+}

@@ -1,0 +1,54 @@
+[1/9] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/QuickTimeEventRuntime.cpp.o
+[2/9] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/LevelHostageRuntime.cpp.o
+[3/9] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/game/GameplayPlayer.cpp.o
+[4/9] Building CXX object CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o
+FAILED: CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o 
+/usr/bin/c++ -DUSM_TEST_GAME_DATA_ROOT=\"/mnt/data/work/OpenAndroidUSM/game/data/gameloft/games/spiderman\" -I/mnt/data/work/OpenAndroidUSM/src -I/mnt/data/work/OpenAndroidUSM/build/re02-linux/_deps/zlib-build -I/mnt/data/work/OpenAndroidUSM/build/windows-msvc/_deps/zlib-src -O3 -DNDEBUG -std=gnu++20 -UNDEBUG -MD -MT CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o -MF CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o.d -o CMakeFiles/OpenAndroidUSM.CoreTests.dir/tests/SmokeTests.cpp.o -c /mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp
+In file included from /usr/include/c++/14/cassert:44,
+                 from /mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp:62:
+/mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp: In function ‘int main()’:
+/mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp:6082:43: error: cannot convert ‘<brace-enclosed initializer list>’ to ‘usm::game::HostageTimeStep’
+ 6082 |         assert(failedHostageRuntime.update(
+      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+ 6083 |             failedHostagePlayer, failedHostageObjects,
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 6084 |             failedHostageBonuses, {0, 0}, {}));
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /mnt/data/work/OpenAndroidUSM/src/diagnostics/AutoplayHarness.hpp:12,
+                 from /mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp:20:
+/mnt/data/work/OpenAndroidUSM/src/game/LevelHostageRuntime.hpp:89:49: note:   initializing argument 4 of ‘usm::Result usm::game::LevelHostageRuntime::update(usm::game::GameplayPlayer&, usm::game::LevelObjectRuntime&, usm::game::LevelBonusRuntime&, usm::game::HostageTimeStep, usm::game::HostageInput)’
+   89 |                                 HostageTimeStep time,
+      |                                 ~~~~~~~~~~~~~~~~^~~~
+/mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp:6085:43: error: cannot convert ‘<brace-enclosed initializer list>’ to ‘usm::game::HostageTimeStep’
+ 6085 |         assert(failedHostageRuntime.update(
+      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+ 6086 |             failedHostagePlayer, failedHostageObjects,
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 6087 |             failedHostageBonuses, {0, 0}, {true, false}));
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/mnt/data/work/OpenAndroidUSM/src/game/LevelHostageRuntime.hpp:89:49: note:   initializing argument 4 of ‘usm::Result usm::game::LevelHostageRuntime::update(usm::game::GameplayPlayer&, usm::game::LevelObjectRuntime&, usm::game::LevelBonusRuntime&, usm::game::HostageTimeStep, usm::game::HostageInput)’
+   89 |                                 HostageTimeStep time,
+      |                                 ~~~~~~~~~~~~~~~~^~~~
+/mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp:6089:43: error: cannot convert ‘<brace-enclosed initializer list>’ to ‘usm::game::HostageTimeStep’
+ 6089 |         assert(failedHostageRuntime.update(
+      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+ 6090 |             failedHostagePlayer, failedHostageObjects,
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 6091 |             failedHostageBonuses, {0, 0}, {}));
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/mnt/data/work/OpenAndroidUSM/src/game/LevelHostageRuntime.hpp:89:49: note:   initializing argument 4 of ‘usm::Result usm::game::LevelHostageRuntime::update(usm::game::GameplayPlayer&, usm::game::LevelObjectRuntime&, usm::game::LevelBonusRuntime&, usm::game::HostageTimeStep, usm::game::HostageInput)’
+   89 |                                 HostageTimeStep time,
+      |                                 ~~~~~~~~~~~~~~~~^~~~
+/mnt/data/work/OpenAndroidUSM/tests/SmokeTests.cpp:6093:43: error: cannot convert ‘<brace-enclosed initializer list>’ to ‘usm::game::HostageTimeStep’
+ 6093 |         assert(failedHostageRuntime.update(
+      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+ 6094 |             failedHostagePlayer, failedHostageObjects,
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 6095 |             failedHostageBonuses, {4000, 4000}, {}));
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/mnt/data/work/OpenAndroidUSM/src/game/LevelHostageRuntime.hpp:89:49: note:   initializing argument 4 of ‘usm::Result usm::game::LevelHostageRuntime::update(usm::game::GameplayPlayer&, usm::game::LevelObjectRuntime&, usm::game::LevelBonusRuntime&, usm::game::HostageTimeStep, usm::game::HostageInput)’
+   89 |                                 HostageTimeStep time,
+      |                                 ~~~~~~~~~~~~~~~~^~~~
+[5/9] Building CXX object CMakeFiles/OpenAndroidUSM.InputParityTests.dir/tests/InputParityTests.cpp.o
+[6/9] Building CXX object CMakeFiles/OpenAndroidUSM.Core.dir/src/diagnostics/AutoplayHarness.cpp.o
+ninja: build stopped: subcommand failed.
