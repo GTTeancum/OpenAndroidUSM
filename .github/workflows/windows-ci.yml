@@ -25,3 +25,19 @@ jobs:
       - name: Run asset-independent parity tests
         shell: pwsh
         run: ctest --test-dir build/windows-msvc -C Release -R '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch)$' --output-on-failure --no-tests=error
+
+      - name: Run Windows D3D11 startup smoke
+        shell: pwsh
+        run: |
+          $script = Join-Path $env:RUNNER_TEMP 'startup-smoke.usmauto'
+          $output = Join-Path $env:RUNNER_TEMP 'startup-smoke-output'
+          Set-Content -LiteralPath $script -Value 'finish' -Encoding ascii
+          $log = & .\build\windows-msvc\Release\OpenAndroidUSM.exe --autoplay $script --output $output 2>&1
+          $exitCode = $LASTEXITCODE
+          $log | Write-Host
+          if ($exitCode -ne 1) {
+              throw "Expected missing-data exit code 1, got $exitCode"
+          }
+          if (($log -join "`n") -notmatch 'Game data was not found') {
+              throw 'Executable did not reach post-D3D11 game-data lookup'
+          }
