@@ -1,0 +1,27 @@
+name: Windows MSVC build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-msvc-release
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-release --parallel
+
+      - name: Run asset-independent input transition test
+        shell: pwsh
+        run: ctest --test-dir build/windows-msvc -C Release -R "^OpenAndroidUSM\\.InputParity\\.transitions$" --output-on-failure
