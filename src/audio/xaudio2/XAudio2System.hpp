@@ -82,6 +82,7 @@ private:
     void destroyActiveVoices() noexcept;
 
     Microsoft::WRL::ComPtr<IXAudio2> engine_;
+    bool ownsComInitialization_{};
     IXAudio2MasteringVoice* masteringVoice_{};
     std::list<ActiveVoice> activeVoices_;
     assets::Vector3 listenerPosition_{};

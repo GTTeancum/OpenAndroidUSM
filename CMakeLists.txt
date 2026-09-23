@@ -225,6 +225,7 @@ target_link_libraries(OpenAndroidUSM PRIVATE
     d3dcompiler
     xaudio2
     xinput9_1_0
+    ole32
     shell32
 )
 
@@ -328,6 +329,7 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     target_link_libraries(OpenAndroidUSM.AudioBackendTests PRIVATE
         OpenAndroidUSM.Core
         xaudio2
+        ole32
     )
     if(MSVC)
         target_compile_options(OpenAndroidUSM.AudioBackendTests PRIVATE

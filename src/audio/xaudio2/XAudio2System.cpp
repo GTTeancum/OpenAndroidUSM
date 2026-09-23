@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <objbase.h>
 
 namespace usm::audio {
 namespace {
@@ -39,10 +40,35 @@ XAudio2System::~XAudio2System() {
     destroyActiveVoices();
     if (masteringVoice_ != nullptr) {
         masteringVoice_->DestroyVoice();
+        masteringVoice_ = nullptr;
+    }
+    engine_.Reset();
+    if (ownsComInitialization_) {
+        CoUninitialize();
+        ownsComInitialization_ = false;
     }
 }
 
 Result XAudio2System::initialize() {
+    if (engine_ != nullptr && masteringVoice_ != nullptr) {
+        return Result::success();
+    }
+    if (!ownsComInitialization_) {
+        const HRESULT comResult =
+            CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (FAILED(comResult)) {
+            char message[80]{};
+            std::snprintf(message, sizeof(message),
+                          "CoInitializeEx failed (HRESULT 0x%08X)",
+                          static_cast<unsigned int>(comResult));
+            return Result::failure(message);
+        }
+        // S_OK and S_FALSE both require a matching CoUninitialize.
+        ownsComInitialization_ = true;
+    }
+
+    // Permit a clean retry after a prior mastering-voice/device failure.
+    engine_.Reset();
     HRESULT result = XAudio2Create(&engine_);
     if (FAILED(result)) {
         char message[80]{};
