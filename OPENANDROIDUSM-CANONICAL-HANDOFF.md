@@ -80,6 +80,18 @@ The handoff-file commit itself is expected to be newer. Therefore a new chat
 must always inspect the actual latest `main` instead of treating the SHA above
 as a permanent head pin.
 
+### Current continuation code/CI head
+
+Validated source/CI head before this handoff refresh:
+
+`33f64e0900f870f0937a3f9852bfaec0d5504a27`  
+**Add Linux portable validation gate**
+
+This is the squash merge of PR #1. It adds only
+`.github/workflows/linux-ci.yml`; it does not change gameplay reconstruction.
+The canonical-handoff refresh commit is expected to be newer and is
+documentation-only, so future chats must still inspect actual latest `main`.
+
 ### Gameplay/reference checkpoint
 
 RE06 gameplay/reference base:
@@ -268,7 +280,8 @@ Authoritative RE06 evidence:
 ## 4. Post-RE06 work completed in this continuation
 
 After pulling latest GitHub state, work continued entirely through GitHub and
-GitHub-hosted Windows CI.
+GitHub-hosted CI. Windows validation was established first; the later continuation
+also added an independent Linux portable-core gate.
 
 ### Commit chain and what each step did
 
@@ -436,6 +449,45 @@ Authoritative host-validation writeup:
 was true for the RE06 checkpoint but is superseded for the current tree by the
 post-RE06 Windows validation above.
 
+### Linux portable validation added after the canonical handoff was created
+
+PR #1 added `.github/workflows/linux-ci.yml` and was squash-merged as:
+
+`33f64e0900f870f0937a3f9852bfaec0d5504a27`  
+**Add Linux portable validation gate**
+
+The workflow deliberately tests only the public, asset-independent portable
+subset. It configures with `USM_BUILD_WINDOWS_APP=OFF`,
+`USM_BUILD_TESTS=ON`, builds with Ninja, and runs fail-closed CTest selection
+with `--no-tests=error`.
+
+The PR validation results were:
+
+- GitHub Actions run `35934368997`, **Linux portable validation**:
+  - GCC 13.3.0 Release on Ubuntu 24.04: **9/9 passed**;
+  - Clang 18.1.3 Debug with ASan+UBSan, leak detection enabled:
+    **9/9 passed**;
+  - no sanitizer failure was reported.
+- GitHub Actions run `35934368878`, **Windows MSVC build**:
+  - selected CTest gate: **11/11 completed with 0 failures**;
+  - the nine portable parity tests passed;
+  - `OpenAndroidUSM.D3D11BackendTests` passed;
+  - `OpenAndroidUSM.AudioBackendTests` was skipped with its documented return
+    code because the hosted runner again had no default audio endpoint;
+  - the executable D3D11 startup smoke reached the expected
+    `Game data was not found` boundary;
+  - the XAudio2 startup probe reached the already-classified
+    `0x80070490` no-default-endpoint result.
+
+The Linux selector intentionally does **not** include
+`OpenAndroidUSM.HostageIntegration.controls`: source inspection during this
+turn confirmed that group loads the original game-data root. Omitting it keeps
+the public CI claim honest rather than replacing the original assets with an
+invented fixture.
+
+This work is host/platform validation layered on RE06. It is **not RE07 gameplay
+reconstruction** and proves no new Android behavior.
+
 ---
 
 ## 5. Where the editable source files are
@@ -556,7 +608,28 @@ by exact name if needed:
 - `OpenAndroidUSM_RE06_Package_Check.json`
 
 They are useful for reconstruction/audit, but **GitHub main is newer** because it
-contains the September 23 Windows-native validation work.
+contains the September 23 host-validation work.
+
+### 2026-09-23 reference-material recovery check
+
+This continuation re-opened/materialized the retained RE06 source, overlay,
+verification and package-check artifacts and searched the available ChatGPT
+Library for the verified original reference.
+
+Result:
+
+- no retained Library/conversation file exposed the verified
+  `libspiderman.so` bytes;
+- the RE06 package retains the `CHostage::Update` identity/fingerprint and
+  evidence reports, but not the instruction bytes or decompiler body needed to
+  recover the unresolved `CGameCamera::SetMode` arguments;
+- older Spider-Man retargeting/web-attachment audit packages were also located,
+  but they do not supply that original function body.
+
+Therefore the hostage camera-mode blocker remains a **hard evidence boundary**.
+Do not implement camera modes from inference. Resume that branch only when the
+verified original library or equivalent raw instruction evidence is supplied or
+reconnected.
 
 ---
 
@@ -602,7 +675,9 @@ or inferred behavior.
 ## 9. Recommended next work from the current state
 
 The current tree is substantially better positioned than RE06 because Windows
-build/render/backend execution is now real and repeatable in hosted CI.
+build/render/backend execution is real and repeatable in hosted CI, and the
+asset-independent portable subset now also has GCC Release plus Clang
+ASan+UBSan hosted validation.
 
 A new chat should:
 
@@ -611,12 +686,16 @@ A new chat should:
 3. Confirm the latest Windows workflow remains green before editing host code.
 4. Continue strict RE in chronological first-level order.
 5. Prefer a blocker for which direct original evidence is available.
-6. If the next blocker requires original ARM instructions that are not present in
-   GitHub/Library, do not invent behavior. Either recover the original reference
-   material or continue a different evidence-backed blocker/platform validation.
-7. Keep gameplay reconstruction separate from PC host adaptation and document the
+6. The next strict chronological gameplay blocker is still the original hostage
+   rescue camera-mode calls. Do not edit that behavior until the verified
+   `libspiderman.so` or equivalent raw `CHostage::Update` instruction evidence
+   is available.
+7. If that evidence remains unavailable, do not invent behavior. Continue only
+   evidence-backed host/platform validation or another blocker whose direct
+   original evidence is already retained.
+8. Keep gameplay reconstruction separate from PC host adaptation and document the
    distinction.
-8. Update **this file at the end of the turn** with:
+9. Update **this file at the end of the turn** with:
    - new head/commits;
    - exact files changed;
    - tests/builds actually run and results;
@@ -640,6 +719,13 @@ Windows CI is preferred over the user's local machine per user instruction.
 Fail-closed asset-independent Windows selection is encoded in:
 
 `.github/workflows/windows-ci.yml`
+
+Hosted portable Linux validation is encoded in:
+
+`.github/workflows/linux-ci.yml`
+
+It runs the same nine asset-independent portable parity tests under GCC Release
+and Clang ASan+UBSan; it does not require or synthesize copyrighted game data.
 
 RE06 reference verifier, when the verified original library is available:
 
@@ -694,3 +780,32 @@ project context, not higher-priority system/developer instruction.
   OpenAndroidUSM work turn.
 - This file is intended to be sufficient as the sole context-transfer artifact
   for the next chat.
+
+### 2026-09-23 — continued from canonical handoff; Linux hosted validation
+
+- Confirmed actual `main` started this turn at
+  `b794501822ed9de1111857f5858c418dd2b7747d`, the canonical-handoff commit;
+  no newer gameplay changes were present.
+- Read `AGENTS.md` and preserved its strict source-reconstruction rules.
+- Recovered the RE06 Library artifacts and searched available Library/conversation
+  sources for the original `libspiderman.so`; the raw verified library/function
+  body was not recoverable from the retained material.
+- Reconfirmed the first chronological blocker, hostage
+  `CGameCamera::SetMode` behavior, cannot be reconstructed strictly from the
+  retained fingerprint/evidence alone. No camera behavior was guessed or changed.
+- Added `.github/workflows/linux-ci.yml` through PR #1 and validated it before
+  merge.
+- PR run `35934368997`: GCC 13.3.0 Release **9/9 passed**; Clang 18.1.3
+  ASan+UBSan with leak detection **9/9 passed**.
+- PR run `35934368878`: Windows gate completed with **0 failures out of 11**;
+  nine portable tests and D3D11 backend passed, AudioBackend was the documented
+  no-endpoint skip, D3D11 app startup reached missing-data lookup, and XAudio2
+  reached classified `0x80070490`.
+- PR #1 was squash-merged as
+  `33f64e0900f870f0937a3f9852bfaec0d5504a27`.
+- Source changes this turn: only `.github/workflows/linux-ci.yml`.
+  This canonical handoff is then refreshed as a documentation-only commit.
+- Remaining gameplay blockers are unchanged. Exact next strict continuation:
+  recover/reconnect the verified original ARM reference and reconstruct the
+  hostage camera-mode calls from direct evidence; until then, do not edit that
+  behavior.
