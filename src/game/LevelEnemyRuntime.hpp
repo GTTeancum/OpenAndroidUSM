@@ -818,7 +818,8 @@ private:
                       std::uint32_t authoredEventTimeMilliseconds);
     void startMeleeAttack(LevelEnemyState& enemy,
                           const assets::Vector3& playerPosition);
-    void startSandmanGroundAttack(LevelEnemyState& enemy);
+    void startSandmanGroundAttack(LevelEnemyState& enemy,
+                                  const assets::Vector3& playerPosition);
     void startSandmanJump(LevelEnemyState& enemy,
                           const assets::Vector3& playerPosition,
                           const LevelCollision* collision);

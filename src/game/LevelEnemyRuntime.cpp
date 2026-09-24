@@ -4969,7 +4969,8 @@ void LevelEnemyRuntime::startMeleeAttack(
     enemy.selectedMeleeAttackId = selectedAttackId;
 }
 
-void LevelEnemyRuntime::startSandmanGroundAttack(LevelEnemyState& enemy) {
+void LevelEnemyRuntime::startSandmanGroundAttack(
+    LevelEnemyState& enemy, const assets::Vector3& playerPosition) {
     if (level_ == nullptr || enemy.asset == nullptr ||
         enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
         return;
@@ -4978,23 +4979,45 @@ void LevelEnemyRuntime::startSandmanGroundAttack(LevelEnemyState& enemy) {
         sandmanGroundAttackAnimation(enemy.sandmanPhase);
     const EnemyArchetypeAsset& archetype =
         level_->enemyArchetypes()[enemy.asset->archetypeIndex];
-    if (archetype.animationBank.findClip(kGroundAttack) == nullptr) {
+    const assets::ColladaAnimationClip* clip =
+        archetype.animationBank.findClip(kGroundAttack);
+    if (clip == nullptr) {
         return;
     }
+
+    // CBoss task/state 3 is CBehaviorMeleeAttack. StateEnter
+    // (0x003baef8-0x003bb478) retains the selected EnemyAttackInfo, points at
+    // the target when the attack begins, and scales the initial animation by
+    // clipLength / EnemyAttackInfo+8. Do not give Sandman a separate timing
+    // model just because his task graph is boss-specific.
+    enemy.selectedMeleeAttackId = specialAnimationAttackId(
+        level_->enemySpecialActions(), enemy.asset->enemyTypeId,
+        kGroundAttack);
+    const AttackDefinition* selectedAttack =
+        enemy.selectedMeleeAttackId < 0
+            ? nullptr
+            : level_->attackConfigs().find(enemy.selectedMeleeAttackId);
+
+    const float toPlayerX = playerPosition.x - enemy.position.x;
+    const float toPlayerY = playerPosition.y - enemy.position.y;
+    const float playerDistance = std::hypot(toPlayerX, toPlayerY);
+    if (playerDistance > std::numeric_limits<float>::epsilon()) {
+        setFacing(enemy, {toPlayerX / playerDistance,
+                          toPlayerY / playerDistance, 0.0F});
+    }
+
     enemy.sandmanTask = SandmanBossTaskState::GroundAttack;
     enemy.behavior = EnemyBehaviorState::AttackRange;
     enemy.activeAnimation = kGroundAttack;
     enemy.animationTimeMilliseconds = 0;
-    enemy.animationSpeed = 1.0F;
+    enemy.animationSpeed =
+        selectedAttack != nullptr &&
+                selectedAttack->startupMilliseconds > 0.0F
+            ? static_cast<float>(clip->durationMilliseconds()) /
+                  selectedAttack->startupMilliseconds
+            : 1.0F;
     enemy.animationLoops = false;
     enemy.animationReversed = false;
-    // Task/state 3 is owned by CBehaviorMeleeAttack. Preserve the selected
-    // EnemyAttackInfo for the same action-type-2/successor message path used
-    // by ordinary melee attacks; the phase-specific clip still comes from
-    // CBoss::OnEnterState(3) at 0x0032cd58.
-    enemy.selectedMeleeAttackId = specialAnimationAttackId(
-        level_->enemySpecialActions(), enemy.asset->enemyTypeId,
-        kGroundAttack);
     enemy.meleeSenseActive = false;
     enemy.meleeSenseQueueSequence = 0;
     enemy.meleeAttackAnimationSequence.clear();
@@ -5066,18 +5089,30 @@ void LevelEnemyRuntime::updateSandmanBoss(
     const float toPlayerX = playerPosition.x - enemy.position.x;
     const float toPlayerY = playerPosition.y - enemy.position.y;
     const float playerDistance = std::hypot(toPlayerX, toPlayerY);
-    if (playerDistance > std::numeric_limits<float>::epsilon()) {
-        setFacing(enemy, {toPlayerX / playerDistance,
-                          toPlayerY / playerDistance, 0.0F});
-    }
 
     if (enemy.sandmanTask == SandmanBossTaskState::None) {
-        startSandmanGroundAttack(enemy);
+        startSandmanGroundAttack(enemy, playerPosition);
         return;
     }
     if (enemy.sandmanTask == SandmanBossTaskState::GroundAttack) {
         const assets::ColladaAnimationClip* clip =
             archetype.animationBank.findClip(enemy.activeAnimation);
+        const AttackDefinition* selectedAttack =
+            enemy.selectedMeleeAttackId < 0
+                ? nullptr
+                : level_->attackConfigs().find(enemy.selectedMeleeAttackId);
+        // CBehaviorMeleeAttack states 9/10 call NeedTurning only during the
+        // initial EnemyAttackInfo+8 startup window when +0xc is enabled.
+        // The old Sandman loop faced the player every update, including
+        // authored successors, which is not the retained melee behavior.
+        if (selectedAttack != nullptr &&
+            selectedAttack->turnTowardTargetDuringStartup &&
+            selectedAttack->startupMilliseconds > 0.0F &&
+            enemy.meleeAttackAnimationSequenceIndex == 0U &&
+            playerDistance > std::numeric_limits<float>::epsilon()) {
+            setFacing(enemy, {toPlayerX / playerDistance,
+                              toPlayerY / playerDistance, 0.0F});
+        }
         if (clip != nullptr && enemy.animationTimeMilliseconds >=
                                    clip->durationMilliseconds()) {
             // CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack (0x003b9e44)
@@ -5112,6 +5147,7 @@ void LevelEnemyRuntime::updateSandmanBoss(
             enemy.animationSpeed = 1.0F;
             enemy.animationLoops = false;
             enemy.animationReversed = false;
+            ++enemy.meleeAttackAnimationSequenceIndex;
             enemy.meleeAttackActive = true;
         }
         return;
@@ -5130,7 +5166,7 @@ void LevelEnemyRuntime::updateSandmanBoss(
         archetype.animationBank.findClip("idle_to_jump_to_air");
     if (enemy.sandmanJumpDurationMilliseconds == 0 || rise == nullptr) {
         enemy.sandmanTask = SandmanBossTaskState::None;
-        startSandmanGroundAttack(enemy);
+        startSandmanGroundAttack(enemy, playerPosition);
         return;
     }
     enemy.sandmanJumpElapsedMilliseconds =
@@ -5169,7 +5205,7 @@ void LevelEnemyRuntime::updateSandmanBoss(
         enemy.sandmanTask = SandmanBossTaskState::None;
         enemy.sandmanJumpElapsedMilliseconds = 0;
         enemy.sandmanJumpDurationMilliseconds = 0;
-        startSandmanGroundAttack(enemy);
+        startSandmanGroundAttack(enemy, playerPosition);
     }
 }
 
