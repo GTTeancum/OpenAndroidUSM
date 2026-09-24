@@ -4988,6 +4988,17 @@ void LevelEnemyRuntime::startSandmanGroundAttack(LevelEnemyState& enemy) {
     enemy.animationSpeed = 1.0F;
     enemy.animationLoops = false;
     enemy.animationReversed = false;
+    // Task/state 3 is owned by CBehaviorMeleeAttack. Preserve the selected
+    // EnemyAttackInfo for the same action-type-2/successor message path used
+    // by ordinary melee attacks; the phase-specific clip still comes from
+    // CBoss::OnEnterState(3) at 0x0032cd58.
+    enemy.selectedMeleeAttackId = specialAnimationAttackId(
+        level_->enemySpecialActions(), enemy.asset->enemyTypeId,
+        kGroundAttack);
+    enemy.meleeSenseActive = false;
+    enemy.meleeSenseQueueSequence = 0;
+    enemy.meleeAttackAnimationSequence.clear();
+    enemy.meleeAttackAnimationSequenceIndex = 0;
     enemy.meleeAttackActive = true;
 }
 
@@ -5085,6 +5096,9 @@ void LevelEnemyRuntime::updateSandmanBoss(
                 // separate from the still-unresolved jump trajectory.
                 enemy.sandmanTask = SandmanBossTaskState::GroundAttackRecovery;
                 enemy.meleeAttackActive = false;
+                enemy.meleeSenseActive = false;
+                enemy.meleeSenseQueueSequence = 0;
+                enemy.selectedMeleeAttackId = -1;
                 return;
             }
             // SpecialAnimNextActionCheck follows the authored successor based on
