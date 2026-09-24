@@ -62,7 +62,7 @@ private:
 // through boss task state rather than the generic attack selector.
 [[nodiscard]] std::int16_t specialAnimationAttackId(
     const EnemySpecialActionConfigDatabase& specialActions,
-    std::int16_t enemyTypeId, std::string_view animationName) noexcept;
+    std::int16_t enemyTypeId, std::string_view animationName);
 
 [[nodiscard]] std::string_view specialAnimationSuccessor(
     const EnemySpecialActionConfigDatabase& specialActions,
