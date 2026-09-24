@@ -13,6 +13,7 @@
 #include "game/PlayerStateConfig.hpp"
 #include "game/QteClock.hpp"
 #include "game/QuickTimeEventRuntime.hpp"
+#include "game/WallWebTiming.hpp"
 
 #include <array>
 #include <bit>
@@ -122,6 +123,18 @@ void clockTests() {
     CHECK(!progress.updateManager(0, true, 8, false));
     CHECK(!progress.updateManager(10000, false, 8, false));
     CHECK(progress.completed() == 1); // Ordinary tap QTEs have no mash decay.
+
+    // Player::UpdateQTE uses the same manager timer/order for wall-web.
+    CHECK(advanceWallWebPromptClock(2999.0F, 1) == 3000.0F);
+    CHECK(!wallWebPromptExpired(3000.0F, 3000.0F));
+    CHECK(advanceWallWebPromptClock(3000.0F, 1) == 3001.0F);
+    CHECK(wallWebPromptExpired(3001.0F, 3000.0F));
+    CHECK(wallWebPromptOutcome(true, 3000.0F, 3000.0F) ==
+          WallWebPromptOutcome::Success);
+    CHECK(wallWebPromptOutcome(true, 3001.0F, 3000.0F) ==
+          WallWebPromptOutcome::Failure); // late eighth press loses
+    CHECK(wallWebPromptOutcome(false, 3000.0F, 3000.0F) ==
+          WallWebPromptOutcome::Running);
 }
 
 CinematicCommand startCommand(int id) {

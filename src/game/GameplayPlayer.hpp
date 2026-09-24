@@ -302,6 +302,9 @@ public:
     }
     void update(const PlayerMotionInput& input, const CameraPose& camera,
                 std::uint32_t elapsedMilliseconds) noexcept;
+    void update(const PlayerMotionInput& input, const CameraPose& camera,
+                std::uint32_t elapsedMilliseconds,
+                std::uint32_t realMilliseconds) noexcept;
     // Native Player::PreUpdate advances the animated object and
     // UpdateStateFrame (0x00341fa4) snapshots its new frame before
     // UpdateKeyTrigger (0x0034d0a4) examines controller edges. The portable

@@ -1,4 +1,5 @@
 #include "game/WallWebRuntime.hpp"
+#include "game/WallWebTiming.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -81,8 +82,9 @@ void WallWebRuntime::cancel() {
     enter(WallWebPhase::Inactive);
 }
 
-void WallWebRuntime::update(std::uint32_t elapsedMilliseconds, bool actionPressed,
-                            bool targetAlive) {
+void WallWebRuntime::update(std::uint32_t gameMilliseconds,
+                            std::uint32_t realMilliseconds,
+                            bool actionPressed, bool targetAlive) {
     if (!active()) {
         return;
     }
@@ -92,7 +94,8 @@ void WallWebRuntime::update(std::uint32_t elapsedMilliseconds, bool actionPresse
     }
     const auto* clip = clips_[static_cast<std::size_t>(phase_)];
     const auto duration = clip->durationMilliseconds();
-    const auto nextTime = static_cast<std::uint64_t>(animationMilliseconds_) + elapsedMilliseconds;
+    const auto nextTime =
+        static_cast<std::uint64_t>(animationMilliseconds_) + gameMilliseconds;
     animationMilliseconds_ = static_cast<std::uint32_t>(
         phase_ == WallWebPhase::Hold ? nextTime % duration : std::min<std::uint64_t>(nextTime, duration));
     if (phase_ == WallWebPhase::Start) {
@@ -105,14 +108,27 @@ void WallWebRuntime::update(std::uint32_t elapsedMilliseconds, bool actionPresse
             events_.push_back({WallWebEventKind::Hold, targetObjectId_, false});
         }
     } else if (phase_ == WallWebPhase::Hold) {
-        const auto limit = static_cast<std::uint32_t>(std::lround(button_->durationMilliseconds));
-        promptMilliseconds_ = static_cast<std::uint32_t>(std::min<std::uint64_t>(limit,
-            static_cast<std::uint64_t>(promptMilliseconds_) + elapsedMilliseconds));
-        if (buttonProgress_.update(elapsedMilliseconds, actionPressed, button_->requiredActionCount, true)) {
+        // Player::UpdateQTE routes this interaction through CQTEManager.
+        // Character animation remains on game time, while the manager's mash
+        // idle timer and absolute timeout advance in the unscaled real-time
+        // domain. CheckSuccess runs before IsOutTime on the same manager tick.
+        promptMilliseconds_ =
+            advanceWallWebPromptClock(promptMilliseconds_, realMilliseconds);
+        const bool succeeded = buttonProgress_.updateManager(
+            realMilliseconds, actionPressed,
+            button_->requiredActionCount, true);
+        switch (wallWebPromptOutcome(
+            succeeded, promptMilliseconds_,
+            button_->durationMilliseconds)) {
+        case WallWebPromptOutcome::Success:
             enter(WallWebPhase::Success);
-        } else if (promptMilliseconds_ >= limit) {
+            break;
+        case WallWebPromptOutcome::Failure:
             lineActive_ = false;
             enter(WallWebPhase::Failure);
+            break;
+        case WallWebPromptOutcome::Running:
+            break;
         }
     } else {
         if (phase_ == WallWebPhase::Success && animationMilliseconds_ >= releaseMilliseconds_) {

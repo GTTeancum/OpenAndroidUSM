@@ -2226,6 +2226,13 @@ Result GameplayPlayer::applyCinematicCommand(
 void GameplayPlayer::update(const PlayerMotionInput& input,
                             const CameraPose& camera,
                             std::uint32_t elapsedMilliseconds) noexcept {
+    update(input, camera, elapsedMilliseconds, elapsedMilliseconds);
+}
+
+void GameplayPlayer::update(const PlayerMotionInput& input,
+                            const CameraPose& camera,
+                            std::uint32_t elapsedMilliseconds,
+                            std::uint32_t realMilliseconds) noexcept {
     // CGameObject::Update and UpdateStateFrame run before native input
     // predicates, but a state selected by that input starts at frame zero and
     // is not advanced until the next outer update. prepareInputFrame bridges
@@ -2395,8 +2402,10 @@ void GameplayPlayer::update(const PlayerMotionInput& input,
         return;
     }
     if (wallWeb_.active()) {
-        wallWeb_.update(deferNewLocomotionAdvance ? 0U : elapsedMilliseconds,
-                        wallWebActionPressed_, wallWebTargetAlive_);
+        wallWeb_.update(
+            deferNewLocomotionAdvance ? 0U : elapsedMilliseconds,
+            deferNewLocomotionAdvance ? 0U : realMilliseconds,
+            wallWebActionPressed_, wallWebTargetAlive_);
         wallWebActionPressed_ = false;
         if (wallWeb_.active()) {
             setAnimation(wallWeb_.animation());

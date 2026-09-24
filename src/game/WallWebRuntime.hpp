@@ -28,8 +28,14 @@ public:
     [[nodiscard]] bool begin(int angle, std::int32_t targetObjectId,
         const PlayerStateDefinition& state, const assets::ColladaAnimationFile& bank,
         const ButtonConfigDatabase& buttons);
-    void update(std::uint32_t elapsedMilliseconds, bool actionPressed,
+    void update(std::uint32_t gameMilliseconds,
+                std::uint32_t realMilliseconds, bool actionPressed,
                 bool targetAlive = true);
+    void update(std::uint32_t elapsedMilliseconds, bool actionPressed,
+                bool targetAlive = true) {
+        update(elapsedMilliseconds, elapsedMilliseconds, actionPressed,
+               targetAlive);
+    }
     void cancel();
     [[nodiscard]] std::vector<WallWebEvent> consumeEvents();
     [[nodiscard]] static int directionAngle(const assets::Vector3& direction,
@@ -60,7 +66,7 @@ private:
     std::int32_t targetObjectId_{-1};
     int angle_{};
     std::uint32_t animationMilliseconds_{};
-    std::uint32_t promptMilliseconds_{};
+    float promptMilliseconds_{};
     std::uint32_t captureMilliseconds_{};
     std::uint32_t releaseMilliseconds_{};
     ButtonMashProgress buttonProgress_;

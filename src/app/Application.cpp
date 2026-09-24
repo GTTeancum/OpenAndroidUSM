@@ -4043,8 +4043,9 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     }
                 }
             }
-            gameplayPlayer_.update(motion, cameraBeforeMovement,
-                                   gameDeltaMilliseconds);
+            gameplayPlayer_.update(
+                motion, cameraBeforeMovement, gameDeltaMilliseconds,
+                modalTutorialActive ? 0U : realDeltaMilliseconds);
             if (autoplay && attackRelocationPending &&
                 !gameplayPlayer_.queuedAttackNeedsTargetRelocation() &&
                 gameplayPlayer_.activeStateId() !=

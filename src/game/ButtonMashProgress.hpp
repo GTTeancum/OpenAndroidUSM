@@ -42,8 +42,9 @@ public:
     // CQTEManager state 2 does not return early after CheckSuccess: its
     // float idle timer still advances, can restore one action, and is then
     // followed by IsOutTime. Keep that ordering in the manager callers.
-    // Legacy wall-web/QTEAction callers remain on update() until their
-    // complete caller/manager split has been audited.
+    // Wall-web has been audited through Player::UpdateQTE and now uses
+    // this manager ordering. Legacy QTEAction callers remain on update() until
+    // their complete caller/manager split has been audited.
     [[nodiscard]] bool updateManager(std::uint32_t realMilliseconds,
                                      bool actionPressed, std::int16_t required,
                                      bool decays) noexcept {
