@@ -138,6 +138,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/HostageSound.cpp
     src/game/LevelMusicRuntime.cpp
     src/game/NativeRandomizer.cpp
+    src/game/BridgeAttachmentRuntime.cpp
     src/game/LevelObjectRuntime.cpp
     src/game/LevelRestoreRuntime.cpp
     src/game/LevelTriggerRuntime.cpp
@@ -307,6 +308,15 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
         set_tests_properties(OpenAndroidUSM.InputParity.${group} PROPERTIES
             TIMEOUT 120 LABELS "input-parity")
     endforeach()
+
+    add_executable(OpenAndroidUSM.BridgeAttachmentTests
+        tests/BridgeAttachmentTests.cpp)
+    target_compile_features(OpenAndroidUSM.BridgeAttachmentTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.BridgeAttachmentTests PRIVATE OpenAndroidUSM.Core)
+    add_test(NAME OpenAndroidUSM.BridgeAttachmentTests
+        COMMAND OpenAndroidUSM.BridgeAttachmentTests)
+    set_tests_properties(OpenAndroidUSM.BridgeAttachmentTests PROPERTIES
+        TIMEOUT 30 LABELS "bridge-parity")
 
     add_executable(OpenAndroidUSM.SandmanPhaseTests tests/SandmanPhaseTests.cpp)
     target_compile_features(OpenAndroidUSM.SandmanPhaseTests PRIVATE cxx_std_20)
