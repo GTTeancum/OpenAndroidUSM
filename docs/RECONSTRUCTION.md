@@ -1577,9 +1577,18 @@ camera frustum, matching `CGameCamera::IsPointInScreen` (`0x002f22fc`).
 Button config 12 supplies a three-second, eight-press interaction. The shared
 `ButtonMashProgress` follows `CQTEManager::Update` (`0x0038b240`): progress
 loses one completed action after 500 ms without another press. A single press
-is not success. The harness now has `set_auto_qte 0|1` and `qte_tap` commands
-to test incomplete input without changing the earlier route's automatic QTE
-handling. These commands remain entirely within the game process.
+is not success. `Player::UpdateQTE` keeps wall-web character animation on
+scaled game time but now advances this manager progress/timeout on unscaled
+real time, matching the recovered manager clock split. `CQTEManager::IsOutTime`
+(`0x0037a4b8`) uses strict `>`, not `>=`, and the manager executes
+`CheckSuccess` before that timeout test in the same update; a final press at
+the exact duration succeeds, while one arriving after the strict boundary
+fails even if it completes the mash count. Modal tutorials pass zero real QTE
+time because native `CLevel::Update` returns before player/QTE simulation
+while the tutorial owns the frame. The harness now has `set_auto_qte 0|1`
+and `qte_tap` commands to test incomplete input without changing the earlier
+route's automatic QTE handling. These commands remain entirely within the game
+process.
 
 Capture delivers native message `0x130` semantics to the enemy and suspends
 ordinary pursuit/attacks. The keep phase uses `wall_be_drag`. Success releases
