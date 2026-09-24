@@ -5017,13 +5017,10 @@ void LevelEnemyRuntime::startSandmanJump(
             ? assets::Vector3{x / distance, y / distance, 0.0F}
             : enemy.facing;
     enemy.sandmanJumpStart = enemy.position;
-    // CBoss::Jump mode 1 (0x0032935c) deliberately lands beyond the player
-    // on the current boss-to-player line. The original distance comes from
-    // the mean of the authored near/mid attack ranges; 500 cm is the
-    // first-level value recovered from that state path.
-    enemy.sandmanJumpTarget =
-        {playerPosition.x + direction.x * 500.0F,
-         playerPosition.y + direction.y * 500.0F, playerPosition.z};
+    const SandmanJumpLandingTarget landing = sandmanJumpLandingTarget(
+        playerPosition.x, playerPosition.y, playerPosition.z,
+        direction.x, direction.y);
+    enemy.sandmanJumpTarget = {landing.x, landing.y, landing.z};
     if (collision != nullptr) {
         float supportHeight = 0.0F;
         if (collision->groundHeight(enemy.sandmanJumpTarget, 1000.0F,
