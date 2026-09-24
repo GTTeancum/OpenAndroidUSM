@@ -1697,32 +1697,28 @@ phase-change events are logged. Core tests exercise every section's complete
 state lifecycle and its actual collision height. The normal Level 6 route
 crosses the first sections after the bridge presentation.
 
-This is not yet a complete bridge-chase port. `GetSlideCarList`
-(`0x00301da0`) and the linked `CSlideCar`/`CAreaDamage` motion and contact
-propagation remain to be connected. In particular, the factory currently
-loads the previously supported bus but not the other `SlideCar_*` vehicles.
-The later vehicle-bearing sections must not be called verified gameplay.
-The native transmission-body carry contribution to player displacement also
-needs comparison before claiming complete moving-platform behavior.
-The current non-type-2 activation uses the portable capsule-expanded
-authored bounds as a contact approximation. The native test is physics
-context flag `0x100`, including contacts on linked cars and damage areas;
-that distinction remains open and is not covered by the first-crossing pass.
+The bridge-chase port now materializes the complete `SlideCar_*` factory
+family and follows the directly retained `GetSlideCarList` attachment
+relationship. `CBrokenBridge::GetSlideCarList` (`0x00301da0`) performs the
+same room-local inclusive XY footprint test for `CSlideCar` and
+`CAreaDamage`: both body types are placed on the bridge top, participate in
+linked-body contact activation, and follow the live bridge height/rotation
+during state 4. State 5 still launches **cars only** at `CarRunSpeed` along
+rotated +X (reversed for type 3); no launch velocity is invented for
+`CAreaDamage`. Checkpoint reset restores both body families to their authored
+XY/rotation and reset bridge-top placement. Asset-independent bridge tests pin
+the footprint edges and state-4 top-plane/rotation math.
 
-The next vehicle work has a concrete native sequence. `CSlideCar::Init`
-(`0x0031bea0`) records its reset transform, starts state 0, and optionally
-replaces layer zero with `cars_02.tga` in high-quality mode. The bridge's
-`GetSlideCarList` picks cars and damage areas by their original XY positions
-inside its rectangle and moves their bases to the bridge's top. State 4
-updates their height and rotation with the tilting section; state 5 launches
-cars at `CarRunSpeed` along rotated +X, reversing it for type 3. A car enters
-state 2 at that launch. `CheckOnBridge` (`0x0031bdb0`) detects leaving the
-saved rectangle or the bridge becoming invisible, and selects state 3 with
-an additional -100 cm/s vertical impulse. `Update` (`0x0031be48`) then
-uses native contact flags to select state 4 and the Unit removal path.
-`ResetObject` (`0x0031bd7c`) restores state 0 and clears that removal flag.
-These details are RE findings for the next implementation, not claims that
-the vehicle sequence is already active in the portable runtime.
+This is still not a complete bridge-physics claim. The portable non-type-2
+activation represents native physics-context flag `0x100` with
+capsule-expanded authored bounds rather than a real contact manifold.
+`CSlideCar::CheckOnBridge` (`0x0031bdb0`) is represented by the saved
+footprint/bridge-visibility boundary, including the -100 cm/s unsupported
+impulse, while the native `CSlideCar::Update` (`0x0031be48`) ultimately
+uses contact flags to select state 4 and the Unit removal path. The exact
+manifold-driven transition and the native transmission-body support/carry
+relationship therefore remain open. `Unit::UpdateTransmission` and
+`PhysicsEntity::preUpdate` remain the evidence boundary for that work.
 
 The rider path is also identified. `Unit::GetPhysicsContextFlags`
 (`0x00322b20`) reads the physics context bitmask, not a scene-node bounds
