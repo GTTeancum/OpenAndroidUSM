@@ -155,7 +155,7 @@ EnemySpecialActionConfigDatabase::findEvents(
 
 std::int16_t specialAnimationAttackId(
     const EnemySpecialActionConfigDatabase& specialActions,
-    std::int16_t enemyTypeId, std::string_view animationName) noexcept {
+    std::int16_t enemyTypeId, std::string_view animationName) {
     for (const auto* event :
          specialActions.findAttackEvents(enemyTypeId, animationName)) {
         if (event != nullptr && event->attackId >= 0 &&
