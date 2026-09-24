@@ -25,6 +25,26 @@ float distanceSquared(const assets::Vector3& first,
 
 } // namespace
 
+bool hostageUntieSoundEligible(
+    HostageRescuePhase phase, std::uint16_t playerStateId,
+    std::int16_t remainingActions) noexcept {
+    return phase == HostageRescuePhase::QuickTime &&
+           playerStateId == kRescueQuickTimePlayerState &&
+           remainingActions == 7;
+}
+
+HostageQteOutcome hostageQteOutcomeForManagerState(QteState state) noexcept {
+    if (state == QteState::SuccessDisplay ||
+        state == QteState::SuccessHandled) {
+        return HostageQteOutcome::Success;
+    }
+    if (state == QteState::FailureDisplay ||
+        state == QteState::FailureHandled) {
+        return HostageQteOutcome::Failure;
+    }
+    return HostageQteOutcome::Running;
+}
+
 Result LevelHostageRuntime::initialize(const LevelOneBootstrap& level,
                                        QuickTimeEventRuntime& sharedQte,
                                        LevelObjectRuntime* objects) {
@@ -207,7 +227,9 @@ Result LevelHostageRuntime::updateObjects(GameplayPlayer& player,
             } else {
                 // Native repeats EnableControls(false,true) before querying.
                 if (hooks.enableControls) { hooks.enableControls(false, true); }
-                if (sharedQte_->remainingActionCount() == 7) {
+                if (hostageUntieSoundEligible(
+                        hostage.phase, player.activeStateId(),
+                        sharedQte_->remainingActionCount())) {
                     Result soundResult = emitSound({hostage.asset->objectId,
                         kRescueCuttingSound, HostageSoundAction::PlayOnceIfStopped}, hooks);
                     if (!soundResult) { return soundResult; }
@@ -282,15 +304,10 @@ void LevelHostageRuntime::observeQuickTime() noexcept {
         hostage.quickTimeElapsedMilliseconds = sharedQte_->elapsedMilliseconds();
         hostage.quickTimeDurationMilliseconds = sharedQte_->durationMilliseconds();
         hostage.completedActions = sharedQte_->completedActionCount();
-        const auto state = sharedQte_->state();
         // CHostage::Update (ELF 0x3283ba onward) explicitly accepts both
         // displayed and handled result states. No owner/config-ID guard.
         hostage.quickTimeOutcome =
-            state == QteState::SuccessDisplay || state == QteState::SuccessHandled
-                ? HostageQteOutcome::Success
-            : state == QteState::FailureDisplay || state == QteState::FailureHandled
-                ? HostageQteOutcome::Failure
-                : HostageQteOutcome::Running;
+            hostageQteOutcomeForManagerState(sharedQte_->state());
     }
 }
 
