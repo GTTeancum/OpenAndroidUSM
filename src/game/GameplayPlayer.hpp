@@ -22,6 +22,12 @@
 
 namespace usm::game {
 
+// Player::IsUltimate(-1), ELF 0x0033002c: inclusive state IDs 107..113.
+[[nodiscard]] constexpr bool isPlayerUltimateStateId(
+    std::uint16_t stateId) noexcept {
+    return stateId >= 107 && stateId <= 113;
+}
+
 class LevelCollision;
 
 struct PlayerMotionInput {
@@ -409,10 +415,8 @@ public:
         return completedComboHitCount_;
     }
     [[nodiscard]] bool dead() const noexcept { return health_ <= 0.0F; }
-    // Player::IsUltimate(-1), ELF 0x0033002c: inclusive state IDs 107..113.
     [[nodiscard]] bool isUltimateState() const noexcept {
-        const auto state = activeStateId();
-        return state >= 107 && state <= 113;
+        return isPlayerUltimateStateId(activeStateId());
     }
     [[nodiscard]] bool cinematicDriven() const noexcept {
         return cinematicDriven_;

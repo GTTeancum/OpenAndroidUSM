@@ -1449,6 +1449,7 @@ void feedbackTests(const LevelOneBootstrap& level) {
 }
 
 void attributesTests() {
+    // CHostage ctor/ProcessUserAttr retained attribute behavior.
     CHECK(hostageButtonHeight(-1) == 85);
     CHECK(hostageButtonHeight(-100) == 85);
     CHECK(hostageButtonHeight(0) == 85);
@@ -1456,6 +1457,15 @@ void attributesTests() {
     CHECK(hostageButtonHeight(100) == 0);
     CHECK(hostageButtonHeight(50) == -50);
     CHECK(hostageButtonHeight(std::numeric_limits<float>::quiet_NaN()) == 85);
+
+    // Player::IsUltimate(-1), ELF 0x0033002c: inclusive 107..113 only.
+    CHECK(!isPlayerUltimateStateId(106));
+    for (std::uint16_t state = 107; state <= 113; ++state) {
+        CHECK(isPlayerUltimateStateId(state));
+    }
+    CHECK(!isPlayerUltimateStateId(114));
+    CHECK(!isPlayerUltimateStateId(0));
+    CHECK(!isPlayerUltimateStateId(std::numeric_limits<std::uint16_t>::max()));
 }
 } // namespace
 
