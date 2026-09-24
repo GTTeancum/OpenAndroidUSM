@@ -10088,12 +10088,22 @@ int main() {
         sandmanTaskRuntime.updateGameplay(666, sandmanTarget);
         sandmanTaskRuntime.updateGameplay(1, sandmanTarget);
         taskedSandman = sandmanTaskRuntime.find(1199);
+        // The authored +0x38/+0x6c successor remains owned by the melee
+        // behavior while EnemyAttackInfo+0x46 permits it. Recovery is not
+        // inferred from whether this successor contains positive damage.
+        assert(taskedSandman->sandmanTask ==
+               usm::game::SandmanBossTaskState::GroundAttack);
+        assert(taskedSandman->activeAnimation ==
+               "ground_attack1_to_idle");
+        assert(taskedSandman->meleeAttackActive);
+        sandmanTaskRuntime.updateGameplay(766, sandmanTarget);
+        sandmanTaskRuntime.updateGameplay(1, sandmanTarget);
+        taskedSandman = sandmanTaskRuntime.find(1199);
         assert(taskedSandman->sandmanTask ==
                usm::game::SandmanBossTaskState::GroundAttackRecovery);
         assert(taskedSandman->activeAnimation ==
                "ground_attack1_to_idle");
         assert(!taskedSandman->meleeAttackActive);
-        sandmanTaskRuntime.updateGameplay(766, sandmanTarget);
         sandmanTaskRuntime.updateGameplay(1, sandmanTarget);
         taskedSandman = sandmanTaskRuntime.find(1199);
         assert(taskedSandman->sandmanTask ==
