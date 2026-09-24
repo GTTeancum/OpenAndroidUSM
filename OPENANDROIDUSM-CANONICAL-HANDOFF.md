@@ -87,14 +87,14 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`321aaf80a28d8110b4f5755983f3641b915c774d`  
-**Add verified original reference recovery**
+`c25a131062c001d46847bd3701bf621a8aeacf68`  
+**Validate Sandman phase transitions**
 
-This is the squash merge of PR #2. It adds fail-closed recovery tooling for the
-user-supplied original split archive plus synthetic cross-platform tests. It
-does not change gameplay reconstruction or include original game bytes.
-The canonical-handoff refresh commit is expected to be newer and is
-documentation-only, so future chats must still inspect actual latest `main`.
+This is the squash merge of PR #3. It turns retained cold-storage Sandman
+phase RE into directly tested production code without changing the recovered
+semantics or adding original game data. The canonical-handoff refresh commit is
+expected to be newer and documentation-only, so future chats must still inspect
+actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -492,6 +492,53 @@ invented fixture.
 This work is host/platform validation layered on RE06. It is **not RE07 gameplay
 reconstruction** and proves no new Android behavior.
 
+### Sandman cold-storage phase work validated
+
+The older cold-storage commit
+`177c9d952b3828bde2fa8ded910d1824e3121aaf` had preserved exact original
+addresses for two Sandman behaviors but explicitly said the changes had not
+been built or tested:
+
+- `CBoss::ParseLocalAiMessage`, ELF `0x0032dea8`: surviving local hits use
+  integer health percentage, clamp at the 66% / 33% boundaries, and one hit
+  advances at most one phase;
+- `CBoss::OnEnterState(3)`, ELF `0x0032cd58`: phase parameter 1/2/3 selects
+  `ground_attack1`, `ground_attack12`, or `ground_attack13`.
+
+PR #3 extracted the already-present behavior into
+`SandmanPhaseRuntime.cpp/.hpp` and made `LevelEnemyRuntime` use that helper.
+No native constants or conditions were changed.
+
+`tests/SandmanPhaseTests.cpp` now checks, without game assets:
+
+- 67% does not cross the native `< 67` first boundary;
+- the first value below that boundary clamps to 66% / phase 1;
+- a large surviving phase-0 hit advances only to phase 1;
+- exactly 33% crosses the native `<= 33` second boundary;
+- phase 2 does not re-clamp subsequent surviving damage;
+- lethal damage is handled before phase-table advancement;
+- the maximum-health guard remains;
+- phase 0/1/2+ map to the three retained initial ground-attack clips.
+
+PR #3 validation:
+
+- GitHub Actions run `35938338083`, Linux portable validation:
+  - GCC Release: **11/11 passed**;
+  - Clang ASan+UBSan with leak detection: **11/11 passed**;
+  - `OpenAndroidUSM.SandmanPhaseTests` passed in both variants and no
+    sanitizer failure was reported.
+- GitHub Actions run `35938338161`, Windows MSVC:
+  - **13/13 completed with 0 failures**;
+  - `OpenAndroidUSM.SandmanPhaseTests` passed;
+  - `OpenAndroidUSM.D3D11BackendTests` passed;
+  - `OpenAndroidUSM.AudioBackendTests` used the documented no-default-endpoint
+    skip;
+  - the app startup smoke still reached the expected missing-data boundary;
+  - XAudio2 again reached classified `0x80070490`.
+
+This validates retained evidence; it does not complete the Sandman fight. The
+jump/sand-hand sequence and broader Sandman combat parity remain open.
+
 ---
 
 ## 5. Where the editable source files are
@@ -514,6 +561,7 @@ Primary edit locations:
 | Cinematic control host | `src/game/LevelCinematicRuntime.cpp/.hpp` |
 | Player/combat | `src/game/GameplayPlayer.cpp/.hpp` |
 | Enemy/combat/boss logic | `src/game/LevelEnemyRuntime.cpp/.hpp` |
+| Sandman phase parity helper | `src/game/SandmanPhaseRuntime.cpp/.hpp` |
 | Wall-web QTE path | `src/game/WallWebRuntime.cpp/.hpp` |
 | PC input translator | `src/platform/input/XInputStateTranslator.cpp/.hpp` |
 | Windows XInput shim | `src/platform/windows/XInputController.cpp/.hpp` |
@@ -549,6 +597,7 @@ Primary tests:
 | Autoplay runner unit tests | `tests/AutoplaySuiteRunnerTests.ps1` |
 | Autoplay comparison unit tests | `tests/AutoplayComparisonTests.ps1` |
 | Synthetic split-archive/reference recovery | `tests/ReferenceRecoveryTests.py` |
+| Sandman phase boundary parity | `tests/SandmanPhaseTests.cpp` |
 
 RE06 retained verification:
 
@@ -691,9 +740,11 @@ The following are still open:
 
 6. **QTE success explosion and full native visual composition.**
 
-7. **Unfinished Sandman work**, especially the jump/sand-hand sequence and the
-   older untested phase/combo work from commit
-   `177c9d952b3828bde2fa8ded910d1824e3121aaf`.
+7. **Unfinished Sandman work.** The retained 66%/33% phase clamp and
+   phase-dependent initial ground-attack selection from commit
+   `177c9d952b3828bde2fa8ded910d1824e3121aaf` are now directly tested in hosted
+   CI. The jump/sand-hand sequence and broader authored combo/combat parity
+   remain incomplete.
 
 8. **Normal complete first-level playthrough** on the current source.
 
@@ -765,8 +816,8 @@ Hosted portable Linux validation is encoded in:
 `.github/workflows/linux-ci.yml`
 
 It now runs the nine asset-independent portable parity tests plus the synthetic
-reference-recovery test under GCC Release and Clang ASan+UBSan; it does not
-require or synthesize copyrighted game data.
+reference-recovery test and Sandman phase parity test under GCC Release and
+Clang ASan+UBSan; it does not require or synthesize copyrighted game data.
 
 Recover the exact original reference from the retained 17-part project archive,
 when those user-supplied volumes are available:
@@ -912,3 +963,34 @@ project context, not higher-priority system/developer instruction.
   continuation procedure, and new-chat protocol.
 - No gameplay/tooling source changed in this turn; this handoff-rule update is
   documentation-only.
+
+### 2026-09-23 — Sandman phase cold-storage validation
+
+- Confirmed `main` began this turn at
+  `852d752b73f5e419c0d207785570dee8c1b08d18`; no intervening source changes
+  were present.
+- Re-audited cold-storage Sandman commit
+  `177c9d952b3828bde2fa8ded910d1824e3121aaf`.
+- Confirmed current `main` already contained its retained
+  `CBoss::ParseLocalAiMessage` phase clamp at ELF `0x0032dea8` and
+  `CBoss::OnEnterState(3)` phase-dependent ground-attack selection at
+  ELF `0x0032cd58`, but that exact phase logic had no direct asset-independent
+  regression test.
+- Added `src/game/SandmanPhaseRuntime.cpp/.hpp` and refactored
+  `LevelEnemyRuntime` to call the helper with unchanged conditions/constants.
+- Added `tests/SandmanPhaseTests.cpp` covering the 67/66 and 33 boundaries,
+  one-phase-per-hit behavior, lethal-hit ordering, phase-2 behavior,
+  maximum-health guard, and ground-attack animation mapping.
+- Added the test to CMake and both Linux/Windows fail-closed hosted selectors.
+- PR #3 run `35938338083`: GCC Release **11/11 passed** and Clang
+  ASan+UBSan **11/11 passed**; Sandman phase test passed in both.
+- PR #3 run `35938338161`: Windows **13/13 completed with 0 failures**;
+  Sandman phase and D3D11 backend tests passed, AudioBackend used the documented
+  no-endpoint skip, startup smoke reached missing-data lookup, and XAudio2
+  reached classified `0x80070490`.
+- PR #3 was squash-merged as
+  `c25a131062c001d46847bd3701bf621a8aeacf68`.
+- This turn validates already-retained native Sandman evidence; it does not
+  claim the jump/sand-hand sequence or full Sandman combat complete.
+- The strict chronological hostage camera-mode blocker remains unchanged and
+  still requires the verified original ARM bytes before implementation.
