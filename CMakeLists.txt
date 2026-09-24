@@ -309,6 +309,15 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
             TIMEOUT 120 LABELS "input-parity")
     endforeach()
 
+    add_executable(OpenAndroidUSM.AutoplayHarnessTests
+        tests/AutoplayHarnessTests.cpp)
+    target_compile_features(OpenAndroidUSM.AutoplayHarnessTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.AutoplayHarnessTests PRIVATE OpenAndroidUSM.Core)
+    add_test(NAME OpenAndroidUSM.AutoplayHarnessTests
+        COMMAND OpenAndroidUSM.AutoplayHarnessTests)
+    set_tests_properties(OpenAndroidUSM.AutoplayHarnessTests PROPERTIES
+        TIMEOUT 30 LABELS "autoplay-harness")
+
     add_executable(OpenAndroidUSM.BridgeAttachmentTests
         tests/BridgeAttachmentTests.cpp)
     target_compile_features(OpenAndroidUSM.BridgeAttachmentTests PRIVATE cxx_std_20)
