@@ -87,17 +87,19 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`a3b5731510b9c9742fb87cbe9e9eb27137d28f29`  
-**Validate retained hostage QTE state gates**
+`75df3a591abed97f97f997a90956c81667b2adad`  
+**Validate retained ultimate-state boundaries**
 
-This is the squash merge of PR #6. It directly tests two already-retained
-`CHostage::Update` behaviors in the asset-independent hosted suite: the exact
-hostage-state-2 / player-state-28 / remaining-count-7 untie-sound eligibility
-gate at `0x00328444-0x0032847e`, and the display/handled QTE result-state
-mapping from `0x003283ba` onward. Runtime order and behavior are unchanged;
-the unresolved camera-mode calls remain untouched and no original game data is
-added. The canonical-handoff refresh commit is expected to be newer and
-documentation-only, so future chats must still inspect actual latest `main`.
+This is the squash merge of PR #7. It directly tests the retained
+`Player::IsUltimate(-1)` predicate at ELF `0x0033002c` as the inclusive
+state-ID range **107..113**, which is used by hostage rescue eligibility.
+`GameplayPlayer::isUltimateState()` delegates to that pure predicate with no
+behavior change. The existing hosted `QteParity.attributes` group already
+covered the retained hostage `ButtonHeight` default/positive-only adjustment,
+so that behavior was not duplicated or rewritten. The unresolved hostage
+camera-mode calls remain untouched and no original game data is added. The
+canonical-handoff refresh commit is expected to be newer and documentation-only,
+so future chats must still inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -767,9 +769,10 @@ The following are still open:
    `CHostage::Update` makes `CGameCamera::SetMode` calls on several branches.
    RE06 deliberately did not reconstruct them because the exact mode behavior
    was not sufficiently retained in the GitHub evidence. The surrounding
-   state-2/player-28/count-7 untie-sound gate and display/handled QTE outcome
-   mapping are now directly covered by hosted asset-independent tests, but
-   that does **not** recover the missing camera modes.
+   state-2/player-28/count-7 untie-sound gate, display/handled QTE outcome
+   mapping, hostage `ButtonHeight` rule, and Player ultimate-state IDs
+   **107..113** are now directly covered by hosted asset-independent tests, but
+   none of that recovers the missing camera modes.
 
 2. **Full pause/menu and input lifetime parity.**
 
@@ -823,13 +826,14 @@ A new chat should:
    rescue camera-mode calls. Do not edit that behavior until the verified
    `libspiderman.so` or equivalent raw `CHostage::Update` instruction evidence
    is available.
-7. If that evidence remains unavailable, do not invent behavior. Continue only
-   evidence-backed host/platform validation or another blocker whose direct
-   original evidence is already retained. A concrete next fallback candidate is
-   the already-retained hostage rescue-eligibility slice: constructor/default
-   `ButtonHeight=85` at `0x00328c20`, positive-only ProcessUserAttr adjustment
-   at `0x00328724`, and Player ultimate-state IDs 107..113 at `0x0033002c`.
-   Do not extend beyond those exact retained facts without new original evidence.
+7. If that evidence remains unavailable, do not invent behavior. The retained
+   hostage rescue-eligibility fallback identified in the prior handoff is now
+   exhausted: `ButtonHeight` was already covered by hosted tests, and the
+   Player ultimate-state IDs 107..113 are now also directly covered. This turn
+   found no equally strong retained provenance for expanding the grounded/
+   airborne rescue condition. Continue only evidence-backed host/platform
+   validation or another blocker whose direct original evidence is already
+   retained; do not extend hostage behavior without new original evidence.
 8. Keep gameplay reconstruction separate from PC host adaptation and document the
    distinction.
 9. Update **this file at the end of the turn** with:
@@ -1245,3 +1249,65 @@ project context, not higher-priority system/developer instruction.
   - constructor default `ButtonHeight=85` at `0x00328c20`;
   - positive-only `ProcessUserAttr` adjustment at `0x00328724`;
   - Player ultimate-state IDs **107..113** at `0x0033002c`.
+
+### 2026-09-24 — retained Player ultimate-state boundary validation
+
+- Confirmed `main` began this turn at
+  `e53c448be29f94216ce76c3cde29affe1decc63f`, the documentation-only handoff
+  refresh after PR #6. The latest gameplay/tooling source before this turn was
+  `a3b5731510b9c9742fb87cbe9e9eb27137d28f29`.
+- Reconfirmed the strict chronological blocker remains the original
+  `CHostage::Update` camera-mode calls. No camera behavior was guessed or
+  changed.
+- Audited the prior handoff's retained rescue-eligibility fallback and corrected
+  one stale implication: `HostageAttributes.hpp` already contained the exact
+  `hostageButtonHeight` rule, and the hosted asset-independent
+  `OpenAndroidUSM.QteParity.attributes` group already tested negative, zero,
+  positive, and NaN cases before this turn. No duplicate ButtonHeight work was
+  needed.
+- The remaining uncovered retained fact was
+  `Player::IsUltimate(-1)`, ELF `0x0033002c`: inclusive state IDs
+  **107..113**.
+- Added pure constexpr helper `isPlayerUltimateStateId` in
+  `src/game/GameplayPlayer.hpp`; `GameplayPlayer::isUltimateState()` now
+  delegates to it without changing runtime behavior.
+- Extended `tests/QteParityTests.cpp`'s already-hosted `attributes` group to
+  verify:
+  - state 106 is not ultimate;
+  - every state 107 through 113 is ultimate;
+  - state 114 is not ultimate;
+  - state 0 and the maximum uint16 state are not ultimate.
+- No CMake or workflow selector change was required because
+  `OpenAndroidUSM.QteParity.attributes` was already part of both hosted
+  fail-closed selectors.
+- PR #7 validation:
+  - Linux run `35982045064`: GCC Release **12/12 passed** and Clang
+    ASan+UBSan **12/12 passed**; `OpenAndroidUSM.QteParity.attributes`
+    passed in both and no sanitizer diagnostic was reported.
+  - Windows run `35982045284`: **14/14 completed with 0 failures**;
+    `OpenAndroidUSM.QteParity.attributes`,
+    `OpenAndroidUSM.D3D11BackendTests`, and
+    `OpenAndroidUSM.ReferenceRecoveryTests` passed;
+    `OpenAndroidUSM.AudioBackendTests` used the documented no-default-endpoint
+    skip; D3D11 startup reached the expected missing-data boundary; XAudio2
+    reached classified `0x80070490`.
+  - MSVC again emitted the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; this turn did not touch
+    that file.
+- PR #7 was squash-merged as
+  `75df3a591abed97f97f997a90956c81667b2adad`.
+- Post-merge validation for that exact squash commit completed green:
+  - Linux run `35982563131`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+  - Windows run `35982563136`: **14/14 with 0 failures**, with
+    `OpenAndroidUSM.QteParity.attributes` passing plus the same documented
+    AudioBackend skip, missing-data D3D11 startup boundary, and classified
+    XAudio2 `0x80070490`.
+- A broader retained-document audit found no equally strong exact provenance
+  for expanding the currently implemented grounded/airborne rescue exclusion.
+  Do not refactor or extend that condition merely to create more work.
+- The hostage eligibility fallback is therefore exhausted from the retained
+  GitHub evidence currently available. Exact strict continuation returns to
+  recovering the verified `libspiderman.so` / raw `CHostage::Update`
+  instructions for the missing camera-mode calls. If that reference remains
+  unavailable, continue only host/platform validation or another blocker with
+  already-retained direct evidence.
