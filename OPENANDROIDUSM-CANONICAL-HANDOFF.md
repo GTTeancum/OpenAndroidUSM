@@ -105,45 +105,62 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`79e82078ff58dba5787f8fa1a335f183eed27012`  
-**Follow Sandman authored successor chain by native gate**
+`7bdce2e89bec3b208b189e5e3f2ddcdf80cbb89f`  
+**Retain Sandman selected melee attack**
 
-This is the squash merge of PR #11 and is a **gameplay-parity change**.
-The retained native successor path is:
+This is the squash merge of PR #13 and is a **gameplay-parity change**.
+Sandman's phase-selected task-3 ground attack is owned by the native
+`CBehaviorMeleeAttack` path, which retains the selected
+`EnemyAttackInfo` while authored special-action messages are processed.
+The previous Sandman-specific reconstruction set `meleeAttackActive=true`
+but left `selectedMeleeAttackId=-1`, which meant action-type-2 Spider-Sense
+checks and other selected-attack behavior could not use the authored attack
+record.
 
-- `IBehaviorBase::SpecialAnimActionCheck` at `0x003a8c60` resolves
-  `AIAnimSpecialActionInfo+0x38` and stores the authored next animation at
-  `IBehaviorBase+0x6c`;
-- `SpecialAnimNextActionCheck` at `0x003a857c` consumes it;
-- `CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack` at `0x003b9e44`
-  follows it only when `EnemyAttackInfo+0x46` permits continuation.
+PR #13 adds the data-driven `specialAnimationAttackId` helper, initializes
+Sandman's selected melee attack from the phase-selected authored clip, resets
+the melee-sense queue at task entry, and clears selected/sense state only when
+the authored special-animation chain ends. The real-asset smoke pins the
+shipped phase-zero mapping `ground_attack1 -> attack 69`; retained project
+evidence identifies attack 69 as 75 damage with 400 cm reach. No attack ID is
+hard-coded into later phases: their selected attack remains resolved from the
+shipped special-action table.
 
-The older Sandman WIP additionally classified each successor by whether that
-successor contained a positive-damage attack. That damage heuristic was not
-part of the retained native continuation gate and could prematurely terminate
-zero-damage/sound-only authored clips. PR #11 removes that heuristic:
-Sandman's melee/special-action ownership remains active while a valid authored
-successor exists, and the existing post-chain task boundary is reached only
-when no valid successor remains. A synthetic zero-damage permitted-successor
-case now pins that the +0x46 continuation decision is independent of damage.
+PR #12, immediately before it, updated only the existing real-asset Sandman
+smoke for PR #11's native +0x46 successor ownership: the zero-damage
+`ground_attack1_to_idle` successor remains in GroundAttack/melee ownership
+until that authored clip finishes, then crosses the existing post-chain task
+boundary.
 
-PR #11 does **not** change the still-unverified Sandman airborne jump
-interpolation or invent the unfinished sand-hand sequence.
-
-Validation for PR #11 and the exact squash commit is green:
-
-- PR Linux run `36020284531`: GCC Release **12/12**, Clang ASan+UBSan
+PR #12 validation:
+- PR Linux run `36022194081`: GCC Release **12/12**, Clang ASan+UBSan
   **12/12**;
-- PR Windows run `36020284809`: **14/14**;
-- post-merge Linux run `36020954445`: GCC **12/12**, Clang ASan+UBSan
+- PR Windows run `36022194375`: **14/14**;
+- post-merge Linux run `36023506999`: GCC **12/12**, Clang ASan+UBSan
   **12/12**;
-- post-merge Windows run `36020954253`: **14/14**.
+- post-merge Windows run `36023507012`: **14/14**.
+PR #12 squash: `eff13b5624dd3f7f8408b3fc50501c39597307fb`.
 
-The pre-PR #11 source also received a fresh Linux rebuild after PR #10:
-GNU 13.3.0 Release rebuilt all 133 Ninja steps and passed **12/12**, while
-Clang 18.1.3 ASan+UBSan with leak detection and halt-on-UB rebuilt and passed
-**12/12**. Future chats must still inspect actual latest `main`, because the
-canonical-handoff refresh commit is expected to be newer and documentation-only.
+PR #13 validation:
+- PR Linux run `36024382423`: GCC Release **12/12**, Clang ASan+UBSan
+  **12/12**;
+- PR Windows run `36024382691`: **14/14**;
+- post-merge Linux run `36024952034`: GCC **12/12**, Clang ASan+UBSan
+  **12/12**;
+- post-merge Windows run `36024952048`: **14/14**.
+PR #13 squash: `7bdce2e89bec3b208b189e5e3f2ddcdf80cbb89f`.
+
+Both Windows runs reached the expected missing-game-data startup boundary and
+the classified XAudio2 no-default-endpoint `0x80070490` result. The
+pre-existing unrelated C4100 warning in `LevelHostageRuntime.cpp` remains
+visible.
+
+The user's active mandate is **gameplay 1:1 first**. Hostage camera work is
+deferred polish and must not block gameplay progress. Sandman's unverified
+airborne interpolation and unfinished sand-hand behavior remain open; do not
+tune or invent either without direct evidence. Future chats must inspect
+actual latest `main`, because this canonical-handoff refresh is expected to
+be a newer documentation-only commit.
 
 ### Gameplay/reference checkpoint
 
@@ -1694,3 +1711,64 @@ project context, not higher-priority system/developer instruction.
 - Next priority: continue gameplay 1:1, preferably Sandman boss behavior where
   evidence permits. If a Sandman sub-path is not evidenced, move to another
   directly evidenced gameplay gap rather than camera polish.
+
+### 2026-09-24 — gameplay-first Sandman melee ownership continuation
+
+- Continued under the user's explicit priority: **gameplay 1:1 first**; hostage
+  camera behavior is deferred polish and was not investigated further.
+- Found the already-created real-asset regression branch for PR #11's authored
+  successor correction. Its smoke expectation now keeps
+  `ground_attack1_to_idle` in GroundAttack/melee ownership until that
+  zero-damage authored successor completes, then enters the existing recovery /
+  jump boundary.
+- PR #12 changed only `tests/SmokeTests.cpp` and was squash-merged as
+  `eff13b5624dd3f7f8408b3fc50501c39597307fb`.
+- PR #12 validation and exact post-merge validation were fully green:
+  - Linux PR `36022194081`: **12/12 GCC + 12/12 Clang ASan+UBSan**;
+  - Windows PR `36022194375`: **14/14**;
+  - Linux post-merge `36023506999`: **12/12 + 12/12**;
+  - Windows post-merge `36023507012`: **14/14**.
+- Auditing the Sandman task-3 path then exposed a real gameplay-state defect:
+  `startSandmanGroundAttack` entered native melee ownership with
+  `meleeAttackActive=true` but did not retain the selected
+  `EnemyAttackInfo`. Consequently the special-action action-type-2 /
+  Spider-Sense path could not consult the same attack record the native
+  `CBehaviorMeleeAttack` keeps at behavior+0x90.
+- Added `specialAnimationAttackId` in
+  `EnemySpecialActionConfig.cpp/.hpp`. It returns the first valid
+  action-type-zero authored attack ID for an enemy type + animation and does
+  not hard-code Sandman IDs.
+- `startSandmanGroundAttack` now:
+  - resolves and retains the selected attack for the phase-selected initial
+    clip;
+  - resets stale melee-sense state/queue;
+  - clears the generic melee animation-list cursor so boss-task ownership stays
+    distinct;
+  - keeps the existing phase-specific clip from
+    `CBoss::OnEnterState(3)` at `0x0032cd58`.
+- When Sandman's authored successor chain actually terminates, the runtime now
+  clears selected attack + sense state together with melee ownership.
+- Synthetic `EnemySpecialActionTests` pin typed attack-ID resolution.
+  The real-asset smoke additionally pins the shipped phase-zero mapping
+  `ground_attack1 -> attack 69`; retained reconstruction evidence records
+  attack 69 as **75 damage / 400 cm reach**.
+- PR #13 was squash-merged as
+  `7bdce2e89bec3b208b189e5e3f2ddcdf80cbb89f`.
+- PR #13 validation:
+  - Linux `36024382423`: **12/12 GCC + 12/12 Clang ASan+UBSan**;
+  - Windows `36024382691`: **14/14**.
+- Exact PR #13 post-merge validation:
+  - Linux `36024952034`: **12/12 GCC + 12/12 Clang ASan+UBSan**;
+  - Windows `36024952048`: **14/14**.
+- The next Sandman candidate is **not** to tune the jump. A possible native-
+  backed follow-up is task-3 melee timing/turn semantics now that the selected
+  attack is retained, but only if Sandman-specific evidence confirms the boss
+  task uses the same `CBehaviorMeleeAttack::StateEnter` timing path. Do not
+  infer that relationship solely from generic melee behavior.
+- A separate audit identified another concrete gameplay-parity debt elsewhere:
+  `CAreaDamage` random wait selection currently uses a reconstruction-only
+  stable object-ID hash even though retained source comments identify an
+  original `random()` call at `0x003029d6`. This is a real gameplay timing
+  discrepancy and is a good follow-up **once the exact native float/range
+  wrapper semantics are established**; do not replace it with a guessed RNG
+  formula.
