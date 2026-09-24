@@ -121,15 +121,15 @@ void routing() {
         });
     };
     frame(xi::RightShoulder);
-    CHECK(!router.state().rescueRequested && !router.state().switchRequested);
+    CHECK(!router.state().rescueRequested && !router.state().interactiveButtonRequested);
     frame(xi::RightShoulder);
     CHECK(!router.state().rescueRequested);
     frame(0);
-    CHECK(router.state().rescueRequested && router.state().switchRequested);
-    CHECK(router.state().switchRequestValue == 4);
+    CHECK(router.state().rescueRequested && router.state().interactiveButtonRequested);
+    CHECK(router.state().switchCounter == 4);
     CHECK(!router.state().punch.pressed && !router.state().quickTimeEvent.pressed);
     frame(0);
-    CHECK(!router.state().rescueRequested && !router.state().switchRequested);
+    CHECK(!router.state().rescueRequested && !router.state().interactiveButtonRequested);
     frame(xi::X);
     CHECK(router.state().punch.pressed && !router.state().rescueRequested);
     frame(0);
@@ -188,7 +188,7 @@ void routing() {
     // Device cancellation is a PC transport event, never native R1 UP.
     frame(xi::RightShoulder | xi::A | xi::X);
     frame(0, false);
-    CHECK(!router.state().rescueRequested && !router.state().switchRequested);
+    CHECK(!router.state().rescueRequested && !router.state().interactiveButtonRequested);
     CHECK(!router.state().jump.held && !router.state().jump.pressed && !router.state().jump.released);
     CHECK(!router.state().punch.held && !router.state().punch.pressed && !router.state().punch.released);
     CHECK(!router.state().quickTimeEvent.held && !router.state().quickTimeEvent.pressed && !router.state().quickTimeEvent.released);
