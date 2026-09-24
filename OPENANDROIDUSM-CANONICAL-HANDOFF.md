@@ -1062,5 +1062,10 @@ project context, not higher-priority system/developer instruction.
 - The exact Sandman continuation boundary is now explicit: the 500 cm target is
   retained evidence; the current airborne arc and sand-hand behavior are not.
   Do not replace either without direct original executable/data evidence.
+- Rechecked the user's ChatGPT Library on this turn for
+  `libspiderman.so`, the expected SHA-256, and the retained split-archive
+  volumes. No original executable or archive volume surfaced; the results were
+  only existing OpenAndroidUSM handoff/verification documents. The reference
+  availability boundary therefore remains unchanged.
 - The strict chronological hostage camera-mode blocker remains unchanged and
   still requires the verified original ARM bytes before implementation.
