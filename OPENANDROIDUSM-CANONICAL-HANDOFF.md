@@ -100,20 +100,22 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`87150ca95323b9ed81ca74305caa2e9a518990b8`  
-**Pin hosted QTE IGM press-clear boundary**
+`468d4577836936273973321eddfb145e7f06dd3d`  
+**Name retained R1 globals by native consumers**
 
-This is the squash merge of PR #8. It makes **no runtime behavior change**.
-It extends the already-hosted asset-independent
-`OpenAndroidUSM.InputParity.routing` regression to pin the retained
-`CQTEManager::SetState` behavior at ELF `0x0037a7a0-0x0037a7b2`:
-clearing the one-shot direct IGM/Start press flag does not synthesize a
-physical release, does not clear the held Start state, and does not reset
-CKeyPad's separate two-update press history. A later physical Start release
-still produces the normal release. The unresolved hostage camera-mode calls
-remain untouched and no original game data is added. The canonical-handoff
-refresh commit is expected to be newer and documentation-only, so future chats
-must still inspect actual latest `main`.
+This is the squash merge of PR #9. It changes **no runtime behavior**.
+The retained gameplay R1-UP path at ELF `0x003cc2b8-0x003cc2ea` publishes
+three distinct native globals: the hostage rescue request, the boolean consumed
+by `InteractiveButton::Update` at `0x0032f1ac` / global `0x00566518`, and
+the CSwitchObject counter seeded to 4 and consumed at `0x00310828` / global
+`0x0056651c`. The source previously named the latter two
+`switchRequested` and `switchRequestValue`, obscuring that they belong to
+different native systems. They are now named `interactiveButtonRequested`
+and `switchCounter` across the router and parity tests. No object iteration,
+counter consumption, input lifetime, or target selection was invented. The
+unresolved hostage camera-mode calls remain untouched and no original game data
+is added. The canonical-handoff refresh commit is expected to be newer and
+documentation-only, so future chats must still inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -1420,3 +1422,72 @@ project context, not higher-priority system/developer instruction.
   calls. If that material remains unavailable, continue only another
   directly-retained evidence-backed validation slice or host/platform
   validation; do not infer the missing camera modes.
+
+### 2026-09-24 — native R1 global identity correction
+
+- Confirmed `main` began this turn at
+  `9173a4d86a9ee7de8fef9b27d638c1378a64ed92`, the documentation-only
+  handoff refresh after PR #8. The latest validated source/tooling/CI head
+  before this turn was `87150ca95323b9ed81ca74305caa2e9a518990b8`.
+- Reconfirmed the strict chronological gameplay blocker remains the unresolved
+  `CHostage::Update` `CGameCamera::SetMode` calls. A title-only search of
+  current conversation/Library sources for `OpenAndroidUSM.zip.001`, `.002`,
+  `.017`, and `libspiderman.so` returned no original reference material, so
+  no camera behavior was guessed or changed.
+- Audited retained RE02 R1-release evidence. `appKeyReleased`, ELF
+  `0x003cc2b8-0x003cc2ea`, writes three distinct globals:
+  - hostage rescue request;
+  - the boolean at `0x00566518`, consumed/cleared by
+    `InteractiveButton::Update` at `0x0032f1ac`;
+  - the word/counter at `0x0056651c`, seeded to **4** and read/arithmetic-
+    shifted by `CSwitchObject::Update` at `0x00310828`.
+- Confirmed current source already published three values but named the latter
+  two ambiguously as `switchRequested` and `switchRequestValue`. This could
+  encourage a future implementation to conflate two separate native systems.
+- Renamed those fields, with no behavioral change:
+  - `switchRequested` -> `interactiveButtonRequested`;
+  - `switchRequestValue` -> `switchCounter`.
+- Exact files changed in PR #9:
+  - `src/reconstructed/input/GameplayInputState.hpp`;
+  - `src/reconstructed/input/XperiaKeyRouter.cpp`;
+  - `tests/InputParityTests.cpp`;
+  - `tests/InputTransitionsTests.cpp`;
+  - `tests/QteParityTests.cpp`;
+  - `tests/QteControlTests.cpp`.
+- The first PR head exposed one missed test reference: Linux run
+  `36001762380` failed Clang compilation in `tests/QteControlTests.cpp` on
+  stale `switchRequested` / `switchRequestValue` names. No runtime source
+  failure was involved. The stale test references were corrected in
+  `d34f46e155b8526463dc86734116e73d57f58386` and fresh CI was allowed to
+  complete before merge.
+- Corrected PR #9 validation:
+  - Linux run `36001893797`: GCC Release **12/12 passed** and Clang
+    ASan+UBSan **12/12 passed**; `OpenAndroidUSM.InputParity.routing`,
+    `OpenAndroidUSM.InputParity.transitions`, and
+    `OpenAndroidUSM.QteControl.keypad` passed in both, with no sanitizer
+    diagnostic reported.
+  - Windows run `36001893810`: **14/14 passed**, including the same input/QTE
+    groups and `OpenAndroidUSM.D3D11BackendTests`; application startup reached
+    the expected missing-game-data boundary and XAudio2 reached the classified
+    no-default-endpoint `0x80070490` path.
+  - MSVC emitted the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; this turn did not touch
+    that file.
+- PR #9 was squash-merged as
+  `468d4577836936273973321eddfb145e7f06dd3d`.
+- Post-merge validation for that exact squash commit completed green:
+  - Linux run `36002471443`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+  - Windows run `36002471439`: **14/14 passed**, including routing,
+    transitions, QTE keypad and D3D11 backend validation, with the same expected
+    missing-data startup boundary and classified XAudio2 `0x80070490` result.
+- This turn intentionally did **not** wire `InteractiveButton` or
+  `CSwitchObject` consumers. RE02 explicitly warns that native object
+  iteration/order and activation control the boolean clear and repeated
+  arithmetic shift; consuming the counter once per host frame would be wrong.
+  The exact lifetime/consumer integration therefore remains part of broader
+  input/object parity, not a completed feature.
+- Exact strict continuation remains recovery of the verified original
+  `libspiderman.so` / raw `CHostage::Update` instructions for the hostage
+  camera-mode calls. If that material remains unavailable, continue only
+  another directly retained evidence-backed validation/source slice or
+  host-platform validation; do not infer missing native behavior.
