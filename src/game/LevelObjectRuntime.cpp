@@ -1,4 +1,5 @@
 #include "game/LevelObjectRuntime.hpp"
+#include "game/BridgeAttachmentRuntime.hpp"
 
 #include "game/LevelCollision.hpp"
 #include "game/PlayerPhysicsConstants.hpp"
@@ -153,6 +154,9 @@ assets::Quaternion objectRotation(const LevelObjectState& object) noexcept {
     if (object.asset->kind == LevelObjectKind::SlideCar) {
         return object.slideCarRotation;
     }
+    if (object.asset->kind == LevelObjectKind::AreaDamage) {
+        return object.areaDamageRotation;
+    }
     if (object.asset->kind == LevelObjectKind::Train) {
         return object.trainRotation;
     }
@@ -169,7 +173,7 @@ bool areaDamageContainsPlayer(const LevelObjectState& object,
                              player.z +
                                  kPlayerCollisionHalfHeightCentimeters -
                                  object.position.z};
-    const auto rotation = object.asset->rotation;
+    const auto rotation = objectRotation(object);
     relative = rotate({-rotation.x, -rotation.y, -rotation.z, rotation.w},
                       relative);
     const auto scale = object.asset->scale;
@@ -415,7 +419,7 @@ bool electricPlatformContainsPlayer(
         playerPosition.y - object.position.y,
         playerPosition.z + kPlayerCollisionHalfHeightCentimeters -
             object.position.z};
-    local = inverseRotate(local, asset.rotation);
+    local = inverseRotate(local, objectRotation(object));
     const auto localRadius = [](float worldSize, float scale) {
         return std::abs(scale) > 1e-6F
                    ? worldSize / std::abs(scale)
@@ -701,6 +705,8 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
             state.slideCarRotation = object.rotation;
         }
         if (object.kind == LevelObjectKind::AreaDamage) {
+            state.areaDamageInitialRotation = object.rotation;
+            state.areaDamageRotation = object.rotation;
             state.areaDamageState = -1;
             state.areaDamageStateMilliseconds = 0.0F;
             state.areaDamageWaitMilliseconds =
@@ -743,10 +749,11 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
         states_.push_back(std::move(state));
     }
 
-    // CBrokenBridge::GetSlideCarList (0x00301da0) performs this exact
-    // one-time, room-local axis-aligned footprint test. Linked vehicles are
-    // placed on the bridge's top plane and retain that original rectangle
-    // for CSlideCar::CheckOnBridge (0x0031bdb0).
+    // CBrokenBridge::GetSlideCarList (0x00301da0) performs one
+    // room-local XY footprint test over both CSlideCar and CAreaDamage.
+    // Every linked body is placed on the bridge top immediately. Cars retain
+    // the rectangle for CheckOnBridge; damage bodies remain attached to the
+    // bridge tilt/contact path but never enter CSlideCar's launch state.
     for (LevelObjectState& bridge : states_) {
         if (bridge.asset == nullptr ||
             bridge.asset->kind != LevelObjectKind::BrokenBridge) {
@@ -765,21 +772,45 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
                                       bridge.position.y - halfDepth, 0.0F};
         const assets::Vector3 maximum{bridge.position.x + halfWidth,
                                       bridge.position.y + halfDepth, 0.0F};
-        for (LevelObjectState& car : states_) {
-            if (car.asset == nullptr ||
-                car.asset->kind != LevelObjectKind::SlideCar ||
-                car.asset->roomId != bridge.asset->roomId ||
-                car.slideCarBridgeObjectId >= 0 ||
-                car.position.x < minimum.x || car.position.x > maximum.x ||
-                car.position.y < minimum.y || car.position.y > maximum.y) {
+        for (LevelObjectState& attachment : states_) {
+            if (attachment.asset == nullptr ||
+                !bridgeAttachmentInFootprint(
+                    bridge.asset->roomId, attachment.asset->roomId,
+                    bridge.position, halfWidth, halfDepth,
+                    attachment.position)) {
                 continue;
             }
-            car.slideCarBridgeObjectId = bridge.asset->objectId;
-            car.slideCarBridgeMinimum = minimum;
-            car.slideCarBridgeMaximum = maximum;
-            car.position.z = bridge.position.z + halfHeight;
-            car.worldTransform = worldMatrix(
-                car.position, car.slideCarRotation, car.asset->scale);
+
+            if (attachment.asset->kind == LevelObjectKind::SlideCar) {
+                if (attachment.slideCarBridgeObjectId >= 0) {
+                    continue;
+                }
+                attachment.slideCarBridgeObjectId = bridge.asset->objectId;
+                attachment.slideCarBridgeMinimum = minimum;
+                attachment.slideCarBridgeMaximum = maximum;
+                const BridgeAttachmentPose pose = bridgeAttachmentPose(
+                    bridge.position, bridge.bridgeRotation, halfHeight,
+                    attachment.position, attachment.slideCarInitialRotation);
+                attachment.position = pose.position;
+                attachment.slideCarRotation = pose.rotation;
+                attachment.worldTransform = worldMatrix(
+                    attachment.position, attachment.slideCarRotation,
+                    attachment.asset->scale);
+            } else if (attachment.asset->kind ==
+                       LevelObjectKind::AreaDamage) {
+                if (attachment.areaDamageBridgeObjectId >= 0) {
+                    continue;
+                }
+                attachment.areaDamageBridgeObjectId = bridge.asset->objectId;
+                const BridgeAttachmentPose pose = bridgeAttachmentPose(
+                    bridge.position, bridge.bridgeRotation, halfHeight,
+                    attachment.position, attachment.areaDamageInitialRotation);
+                attachment.position = pose.position;
+                attachment.areaDamageRotation = pose.rotation;
+                attachment.worldTransform = worldMatrix(
+                    attachment.position, attachment.areaDamageRotation,
+                    attachment.asset->scale);
+            }
         }
     }
     return Result::success();
@@ -887,7 +918,12 @@ void LevelObjectRuntime::updateBrokenBridges(
                         run.z = -run.z;
                     }
                     for (LevelObjectState& car : states_) {
-                        if (car.slideCarBridgeObjectId != asset.objectId) {
+                        // CBrokenBridge state 5 launches CSlideCar only.
+                        // Linked CAreaDamage bodies were collected by
+                        // GetSlideCarList for carry/contact, not CarRunSpeed.
+                        if (car.asset == nullptr ||
+                            car.asset->kind != LevelObjectKind::SlideCar ||
+                            car.slideCarBridgeObjectId != asset.objectId) {
                             continue;
                         }
                         car.slideCarVelocity = run;
@@ -941,9 +977,17 @@ void LevelObjectRuntime::updateBrokenBridges(
             } else {
                 // Native activation also tests the 0x100 player-contact flag
                 // on every linked CSlideCar and CAreaDamage.
-                for (const LevelObjectState& car : states_) {
-                    if (car.slideCarBridgeObjectId == asset.objectId &&
-                        electricPlatformContainsPlayer(car, playerPosition)) {
+                for (const LevelObjectState& attachment : states_) {
+                    if (attachment.asset == nullptr) {
+                        continue;
+                    }
+                    const bool linked =
+                        (attachment.asset->kind == LevelObjectKind::SlideCar &&
+                         attachment.slideCarBridgeObjectId == asset.objectId) ||
+                        (attachment.asset->kind == LevelObjectKind::AreaDamage &&
+                         attachment.areaDamageBridgeObjectId == asset.objectId);
+                    if (linked && electricPlatformContainsPlayer(
+                                      attachment, playerPosition)) {
                         enter(2);
                         break;
                     }
@@ -983,19 +1027,38 @@ void LevelObjectRuntime::updateBrokenBridges(
             const float halfHeight = std::abs(
                 asset.collisionLocalMaximum.z -
                 asset.collisionLocalMinimum.z) * 0.5F;
-            const assets::Vector3 positiveX =
-                rotate(object.bridgeRotation, {1.0F, 0.0F, 0.0F});
-            for (LevelObjectState& car : states_) {
-                if (car.slideCarBridgeObjectId != asset.objectId ||
-                    car.slideCarState >= 3 || car.asset == nullptr) {
+            for (LevelObjectState& attachment : states_) {
+                if (attachment.asset == nullptr) {
                     continue;
                 }
-                car.position.z = object.position.z + halfHeight -
-                    (object.position.x - car.position.x) * positiveX.z;
-                car.slideCarRotation = multiply(object.bridgeRotation,
-                                                car.slideCarInitialRotation);
-                car.worldTransform = worldMatrix(
-                    car.position, car.slideCarRotation, car.asset->scale);
+                if (attachment.asset->kind == LevelObjectKind::SlideCar) {
+                    if (attachment.slideCarBridgeObjectId != asset.objectId ||
+                        attachment.slideCarState >= 3) {
+                        continue;
+                    }
+                    const BridgeAttachmentPose pose = bridgeAttachmentPose(
+                        object.position, object.bridgeRotation, halfHeight,
+                        attachment.position,
+                        attachment.slideCarInitialRotation);
+                    attachment.position = pose.position;
+                    attachment.slideCarRotation = pose.rotation;
+                    attachment.worldTransform = worldMatrix(
+                        attachment.position, attachment.slideCarRotation,
+                        attachment.asset->scale);
+                } else if (attachment.asset->kind ==
+                               LevelObjectKind::AreaDamage &&
+                           attachment.areaDamageBridgeObjectId ==
+                               asset.objectId) {
+                    const BridgeAttachmentPose pose = bridgeAttachmentPose(
+                        object.position, object.bridgeRotation, halfHeight,
+                        attachment.position,
+                        attachment.areaDamageInitialRotation);
+                    attachment.position = pose.position;
+                    attachment.areaDamageRotation = pose.rotation;
+                    attachment.worldTransform = worldMatrix(
+                        attachment.position, attachment.areaDamageRotation,
+                        attachment.asset->scale);
+                }
             }
         }
     }
@@ -1816,9 +1879,28 @@ void LevelObjectRuntime::resetTransientForCheckPointLoad() noexcept {
                 object.asset->scale);
         } else if (object.asset &&
                    object.asset->kind == LevelObjectKind::AreaDamage) {
-            // CAreaDamage::ResetObject/SetState(-1), 0x003025f4.
+            // CAreaDamage::ResetObject/SetState(-1), 0x003025f4. A body
+            // collected by CBrokenBridge::GetSlideCarList returns to its
+            // authored XY/rotation and is then placed back on the reset bridge
+            // top, matching the one-time native attachment relationship.
             object.position = object.asset->position;
-            object.worldTransform = object.asset->worldTransform;
+            object.areaDamageRotation = object.areaDamageInitialRotation;
+            if (const LevelObjectState* bridge =
+                    find(object.areaDamageBridgeObjectId);
+                bridge != nullptr && bridge->asset != nullptr) {
+                const float halfHeight = std::abs(
+                    bridge->asset->collisionLocalMaximum.z -
+                    bridge->asset->collisionLocalMinimum.z) * 0.5F;
+                const BridgeAttachmentPose pose = bridgeAttachmentPose(
+                    bridge->asset->position, bridge->asset->rotation,
+                    halfHeight, object.position,
+                    object.areaDamageInitialRotation);
+                object.position = pose.position;
+                object.areaDamageRotation = pose.rotation;
+            }
+            object.worldTransform = worldMatrix(
+                object.position, object.areaDamageRotation,
+                object.asset->scale);
             object.areaDamageState = -1;
             object.areaDamageStateMilliseconds = 0.0F;
             object.areaDamageWaitMilliseconds =
