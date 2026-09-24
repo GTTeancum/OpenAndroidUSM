@@ -82,13 +82,14 @@ as a permanent head pin.
 
 ### Current continuation code/CI head
 
-Validated source/CI head before this handoff refresh:
+Validated source/tooling/CI head before this handoff refresh:
 
-`33f64e0900f870f0937a3f9852bfaec0d5504a27`  
-**Add Linux portable validation gate**
+`321aaf80a28d8110b4f5755983f3641b915c774d`  
+**Add verified original reference recovery**
 
-This is the squash merge of PR #1. It adds only
-`.github/workflows/linux-ci.yml`; it does not change gameplay reconstruction.
+This is the squash merge of PR #2. It adds fail-closed recovery tooling for the
+user-supplied original split archive plus synthetic cross-platform tests. It
+does not change gameplay reconstruction or include original game bytes.
 The canonical-handoff refresh commit is expected to be newer and is
 documentation-only, so future chats must still inspect actual latest `main`.
 
@@ -517,8 +518,11 @@ Primary edit locations:
 | XAudio2 backend | `src/audio/xaudio2/XAudio2System.cpp/.hpp` |
 | D3D11 backend | `src/renderer/d3d11/D3D11Renderer.cpp/.hpp` |
 | Autoplay harness | `src/diagnostics/AutoplayHarness.cpp/.hpp` |
+| Verified reference recovery | `tools/recover_original_reference.py` |
+| Reference recovery documentation | `docs/REFERENCE_RECOVERY.md` |
 | Build rules | `CMakeLists.txt`, `CMakePresets.json` |
 | Windows CI | `.github/workflows/windows-ci.yml` |
+| Linux CI | `.github/workflows/linux-ci.yml` |
 | Repository agent rules | `AGENTS.md` |
 
 ---
@@ -541,6 +545,7 @@ Primary tests:
 | Autoplay scenarios | `tests/autoplay/` |
 | Autoplay runner unit tests | `tests/AutoplaySuiteRunnerTests.ps1` |
 | Autoplay comparison unit tests | `tests/AutoplayComparisonTests.ps1` |
+| Synthetic split-archive/reference recovery | `tests/ReferenceRecoveryTests.py` |
 
 RE06 retained verification:
 
@@ -630,6 +635,35 @@ Therefore the hostage camera-mode blocker remains a **hard evidence boundary**.
 Do not implement camera modes from inference. Resume that branch only when the
 verified original library or equivalent raw instruction evidence is supplied or
 reconnected.
+
+### Verified split-archive recovery path added
+
+PR #2 added `tools/recover_original_reference.py`. The retained RE06
+`original-material-final.json` records the exact 17 source volume names/sizes,
+and the RE06 fingerprint manifest records the expected reference identity.
+
+When `OpenAndroidUSM.zip.001` through `OpenAndroidUSM.zip.017` are available
+together again, the tool:
+
+- validates every retained split-volume name and exact size;
+- opens the volumes as one seekable ZIP without extracting the project;
+- reads only `OpenAndroidUSM/game/original/libspiderman.so`;
+- checks the retained member size and ZIP CRC;
+- requires the original-material and fingerprint manifests to agree;
+- checks the recovered 7,713,000-byte file against SHA-256
+  `f35d959d54d43d3d4cce07d1afac4cbe52438997a3bf4d5304c50610cabc2679`;
+- writes only to the ignored `game/original/libspiderman.so` by default;
+- refuses to overwrite a different existing file;
+- supports `--check-only` to verify the archive without writing the binary.
+
+Synthetic tests contain no game data and cover successful/check-only recovery,
+idempotence, overwrite refusal, missing/wrong-sized/corrupted volumes, and
+manifest-identity disagreement.
+
+This turn again searched available Library/conversation sources for the original
+17 volumes and the raw library. None were accessible there, so the new recovery
+path is ready but cannot reconstruct the hostage camera modes until those
+user-supplied volumes or equivalent verified bytes are reconnected.
 
 ---
 
@@ -724,10 +758,24 @@ Hosted portable Linux validation is encoded in:
 
 `.github/workflows/linux-ci.yml`
 
-It runs the same nine asset-independent portable parity tests under GCC Release
-and Clang ASan+UBSan; it does not require or synthesize copyrighted game data.
+It now runs the nine asset-independent portable parity tests plus the synthetic
+reference-recovery test under GCC Release and Clang ASan+UBSan; it does not
+require or synthesize copyrighted game data.
 
-RE06 reference verifier, when the verified original library is available:
+Recover the exact original reference from the retained 17-part project archive,
+when those user-supplied volumes are available:
+
+```text
+python tools/recover_original_reference.py --uploads-dir <directory>
+```
+
+Verify the split archive without writing the binary:
+
+```text
+python tools/recover_original_reference.py --uploads-dir <directory> --check-only
+```
+
+RE06 reference verifier, after the verified original library is available:
 
 ```text
 python tools/verify_re06_reference.py
@@ -811,3 +859,37 @@ project context, not higher-priority system/developer instruction.
   recover/reconnect the verified original ARM reference and reconstruct the
   hostage camera-mode calls from direct evidence; until then, do not edit that
   behavior.
+
+### 2026-09-23 — verified original-reference recovery tooling
+
+- Confirmed `main` began this turn at
+  `adbeae0258e6b8ce6085bd55545868fac3152e5a`; no intervening gameplay changes
+  were present.
+- Searched available Library/conversation sources for
+  `OpenAndroidUSM.zip.001` through `.017` and `libspiderman.so`; none of the
+  original archive volumes/raw library were accessible.
+- Added `tools/recover_original_reference.py`, using the retained RE06
+  split-volume manifest and fingerprint identity to recover only the verified
+  ignored ARM library once the original volumes are available again.
+- Added `tests/ReferenceRecoveryTests.py` with synthetic split ZIP/fake ELF
+  data only. It tests check-only behavior, successful recovery, idempotence,
+  overwrite refusal, missing/wrong-sized/corrupted volumes and manifest
+  disagreement.
+- Added `docs/REFERENCE_RECOVERY.md`, registered the test in `CMakeLists.txt`,
+  and added it to both hosted CI selectors.
+- PR #2 validation run `35936021876`, Linux portable validation:
+  GCC Release **10/10 passed**; Clang ASan+UBSan with leak detection
+  **10/10 passed**; the recovery test passed in both jobs and no sanitizer
+  diagnostic was reported.
+- PR #2 validation run `35936021873`, Windows MSVC:
+  **12/12 completed with 0 failures**; `ReferenceRecoveryTests` passed,
+  `D3D11BackendTests` passed, `AudioBackendTests` used the documented
+  no-default-endpoint skip, the app smoke reached the missing-data boundary,
+  and XAudio2 reached classified `0x80070490`.
+- PR #2 was squash-merged as
+  `321aaf80a28d8110b4f5755983f3641b915c774d`.
+- No gameplay source was modified and no original game material was committed.
+- Exact next strict continuation remains: make the original split archive or
+  equivalent verified ARM bytes available, run the recovery + RE06 verifier,
+  then disassemble `CHostage::Update` around its camera-mode branches and
+  implement only the directly evidenced `CGameCamera::SetMode` calls.
