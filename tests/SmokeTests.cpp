@@ -10084,6 +10084,10 @@ int main() {
                usm::game::SandmanBossTaskState::GroundAttack);
         assert(taskedSandman->activeAnimation == "ground_attack1");
         assert(taskedSandman->meleeAttackActive);
+        // The shipped type-16 special-action row for ground_attack1 selects
+        // attack 69. Keep the native CBehaviorMeleeAttack selected attack
+        // alive while its action/sense/successor messages are processed.
+        assert(taskedSandman->selectedMeleeAttackId == 69);
         assert(!taskedSandman->animationLoops);
         sandmanTaskRuntime.updateGameplay(666, sandmanTarget);
         sandmanTaskRuntime.updateGameplay(1, sandmanTarget);
