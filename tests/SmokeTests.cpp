@@ -10138,7 +10138,16 @@ int main() {
                             initialSandmanFacing.y) < 0.001F);
         }
 
-        sandmanTaskRuntime.updateGameplay(666, sandmanTarget);
+        const std::uint32_t sandmanGroundAttackWallMilliseconds =
+            std::max<std::uint32_t>(
+                1U, static_cast<std::uint32_t>(std::ceil(
+                        static_cast<float>(
+                            sandmanGroundAttackClip->durationMilliseconds()) /
+                        expectedSandmanAttackSpeed)));
+        sandmanTaskRuntime.updateGameplay(
+            sandmanGroundAttackWallMilliseconds - 1U, sandmanTarget);
+        taskedSandman = sandmanTaskRuntime.find(1199);
+        assert(taskedSandman->activeAnimation == "ground_attack1");
         sandmanTaskRuntime.updateGameplay(1, sandmanTarget);
         taskedSandman = sandmanTaskRuntime.find(1199);
         // The authored +0x38/+0x6c successor remains owned by the melee
