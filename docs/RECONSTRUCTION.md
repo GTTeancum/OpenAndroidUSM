@@ -774,6 +774,13 @@ transitions, including termination of the looping ultimate-wheel cue.
 16.84 and 200.43 cm backward. Both states dispatch their authored entry audio,
 and the ground hurt update now commits their physical and render displacement
 instead of showing every contact as the same stationary light reaction.
+Late-frame damage sources use the same queued state-entry boundary: cinematic
+damage, enemy contacts, electric platforms, AreaDamage, CEffectDamage, and
+falling props drain the exact state queued by `Player::OnHit` immediately.
+They no longer guess `k_state_hurt_light/heavy` (which was wrong for wall
+states 50/51) or leave that queued state to replay on the next fixed tick.
+If no reconstructed hurt state is entered, such as the still-unresolved
+airborne 47..49 path, no synthetic hurt-state sound is emitted.
 `PlayerStateSoundBank` predecodes every referenced sound configuration and
 dispatches it from the native gameplay state rather than filename heuristics.
 
