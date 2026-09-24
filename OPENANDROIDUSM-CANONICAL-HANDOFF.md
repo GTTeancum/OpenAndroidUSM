@@ -53,6 +53,11 @@ The user explicitly requires:
   behavior.
 - Stop for user review only when first-level gameplay is verified with no known
   graphical/audio issues; do not call the overall port complete at that point.
+- **2026-09-24 priority correction from the user:** gameplay **1:1** is the
+  active priority. The unresolved hostage camera-mode calls are polish and must
+  **not** block gameplay reconstruction. Prioritize combat, boss behavior,
+  movement/physics, QTE ownership, input lifetime, damage/state transitions,
+  and normal-flow gameplay parity before camera/presentation polish.
 
 ### Explicit PC-control policy mandated by the user
 
@@ -100,27 +105,45 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`9a3189a80fd8b399f6e8e7f297797892227a9f26`  
-**Validate QTE feedback through D3D11 WARP**
+`79e82078ff58dba5787f8fa1a335f183eed27012`  
+**Follow Sandman authored successor chain by native gate**
 
-This is the squash merge of PR #10. It changes **no native QTE gameplay
-behavior**. It exposes the existing production HUD texture uploader as the
-standalone host operation `D3D11Renderer::uploadHud` and expands the Windows
-WARP backend regression with entirely synthetic in-memory sprite/texture
-payloads loaded by the production `SpriteAtlas`, `DdsAtcTexture`, and
-`TgaTexture` decoders. The test renders the already-reconstructed
-`QteFeedbackFrame` path through `updateCinematicUi` / `renderFrame` and
-verifies by GPU readback: atlas UV selection, completed-mash frame ordering
-**85 then 93**, and 128-alpha `SRC_ALPHA/INV_SRC_ALPHA` compositing. No
-original game data is added. The unresolved success-explosion layer and full
-native QTE visual composition remain untouched.
+This is the squash merge of PR #11 and is a **gameplay-parity change**.
+The retained native successor path is:
 
-This exact source commit was also freshly revalidated on Linux after PR #10:
-GNU 13.3.0 Release rebuilt the portable tree and passed the selected suite
-**12/12**, and Clang 18.1.3 Debug with ASan+UBSan, leak detection, and
-halt-on-UB rebuilt it and passed **12/12**. The canonical-handoff refresh commit
-is expected to be newer and documentation-only, so future chats must still
-inspect actual latest `main`.
+- `IBehaviorBase::SpecialAnimActionCheck` at `0x003a8c60` resolves
+  `AIAnimSpecialActionInfo+0x38` and stores the authored next animation at
+  `IBehaviorBase+0x6c`;
+- `SpecialAnimNextActionCheck` at `0x003a857c` consumes it;
+- `CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack` at `0x003b9e44`
+  follows it only when `EnemyAttackInfo+0x46` permits continuation.
+
+The older Sandman WIP additionally classified each successor by whether that
+successor contained a positive-damage attack. That damage heuristic was not
+part of the retained native continuation gate and could prematurely terminate
+zero-damage/sound-only authored clips. PR #11 removes that heuristic:
+Sandman's melee/special-action ownership remains active while a valid authored
+successor exists, and the existing post-chain task boundary is reached only
+when no valid successor remains. A synthetic zero-damage permitted-successor
+case now pins that the +0x46 continuation decision is independent of damage.
+
+PR #11 does **not** change the still-unverified Sandman airborne jump
+interpolation or invent the unfinished sand-hand sequence.
+
+Validation for PR #11 and the exact squash commit is green:
+
+- PR Linux run `36020284531`: GCC Release **12/12**, Clang ASan+UBSan
+  **12/12**;
+- PR Windows run `36020284809`: **14/14**;
+- post-merge Linux run `36020954445`: GCC **12/12**, Clang ASan+UBSan
+  **12/12**;
+- post-merge Windows run `36020954253`: **14/14**.
+
+The pre-PR #11 source also received a fresh Linux rebuild after PR #10:
+GNU 13.3.0 Release rebuilt all 133 Ninja steps and passed **12/12**, while
+Clang 18.1.3 ASan+UBSan with leak detection and halt-on-UB rebuilt and passed
+**12/12**. Future chats must still inspect actual latest `main`, because the
+canonical-handoff refresh commit is expected to be newer and documentation-only.
 
 ### Gameplay/reference checkpoint
 
@@ -782,91 +805,106 @@ user-supplied volumes or equivalent verified bytes are reconnected.
 
 ---
 
-## 8. Current remaining blockers — do not invent solutions
+## 8. Current remaining blockers — gameplay first; do not invent solutions
 
-The following are still open:
+The user explicitly changed priority on **2026-09-24**: gameplay 1:1 comes
+before camera/presentation polish. Do not allow the hostage camera-mode evidence
+gap to block gameplay work.
 
-1. **Original hostage rescue camera-mode calls.**  
-   `CHostage::Update` makes `CGameCamera::SetMode` calls on several branches.
-   RE06 deliberately did not reconstruct them because the exact mode behavior
-   was not sufficiently retained in the GitHub evidence. The surrounding
-   state-2/player-28/count-7 untie-sound gate, display/handled QTE outcome
-   mapping, hostage `ButtonHeight` rule, and Player ultimate-state IDs
-   **107..113** are now directly covered by hosted asset-independent tests, but
-   none of that recovers the missing camera modes.
+Current open items, grouped by priority:
 
-2. **Full pause/menu and input lifetime parity.**
+1. **Level 1 gameplay parity — Sandman boss fight is the clearest remaining
+   first-level gameplay gap.**  
+   The deterministic normal Level 1 route already has a 296/296 uninterrupted
+   no-diagnostic-teleport closure in the retained project evidence, so simple
+   traversal is not the blocker. Sandman's retained 66%/33% phase clamp,
+   phase-dependent initial ground attack, 500 cm jump landing target, and
+   authored special-animation successor mechanism are covered. PR #11 also
+   removed the reconstruction-only successor-damage heuristic so the authored
+   combo chain now follows the native +0x46 gate. The **complete native boss
+   task/combo sequence, airborne jump trajectory, and sand-hand behavior remain
+   incomplete**. The legacy linear-XY + `sin(pi*t)*400` jump interpolation is
+   not verified native behavior and must not be tuned by feel.
 
-3. **Remaining hostage + wall/enemy QTE ownership/integration.**
+2. **Remaining gameplay QTE ownership/integration.**  
+   Shared cinematic/hostage manager behavior is substantially recovered, but
+   broader wall/enemy QTE ownership and lifetime integration are not a blanket
+   1:1 claim. Continue only from direct executable/data evidence.
 
-4. **Persistent Audible emitter behavior** outside the scoped transient hostage
-   path.
+3. **Full pause/menu and gameplay input-lifetime parity.**  
+   The exact Start/IGM one-shot clear boundary and CKeyPad press/release
+   lifetime have direct coverage, but the complete pause/menu lifecycle is not
+   yet a 1:1 gameplay claim.
+
+4. **Persistent Audible emitter/gameplay audio behavior** outside the scoped
+   transient hostage path.
 
 5. **Original QTE failure-cue suppression mode** (manager flag around +0x88 in
    prior evidence).
 
-6. **QTE success explosion and full native visual composition.**
+6. **Original ARM differential execution** remains unperformed and would be
+   useful for hard gameplay cases when the verified reference is available.
 
-7. **Unfinished Sandman work.** The retained 66%/33% phase clamp,
-   phase-dependent initial ground-attack selection, the `CBoss::Jump`
-   mode-1 **500 cm landing target** at ELF `0x0032935c`, and the generic
-   +0x38/+0x6c successor mechanism gated by `EnemyAttackInfo+0x46` are now
-   directly tested in hosted CI. The complete authored Sandman combo chain,
-   airborne jump trajectory, sand-hand sequence, and broader combat parity
-   remain incomplete and must not be inferred.
+Lower-priority polish/host items — keep them open, but do not block gameplay:
 
-8. **Normal complete first-level playthrough** on the current source.
+7. **Hostage rescue camera-mode calls.**  
+   Exact `CGameCamera::SetMode` arguments remain unresolved. The user has
+   explicitly classified this as polish work; leave it unresolved until
+   gameplay parity is substantially farther along.
+
+8. **QTE success explosion and full native visual composition.**  
+   The reconstructed result-sprite path now has real Windows WARP readback
+   coverage, but the native success explosion itself remains unresolved.
 
 9. **Audible Windows XAudio2 verification** on a host with a real/default audio
    endpoint.
 
 10. **Physical XInput verification.**
 
-11. Original ARM differential execution remains unperformed.
-
-Do not turn any of these into “complete” based only on unit tests, compilation,
-or inferred behavior.
+Do not turn any open item into “complete” based only on compilation, unit tests,
+or inferred behavior. Conversely, do not let a presentation-only gap prevent
+progress on directly evidenced gameplay work.
 
 ---
 
 ## 9. Recommended next work from the current state
 
-The current tree is substantially better positioned than RE06 because Windows
-build/render/backend execution is real and repeatable in hosted CI, and the
-asset-independent portable subset now also has GCC Release plus Clang
-ASan+UBSan hosted validation.
+The active mandate is **gameplay 1:1 first**.
 
 A new chat should:
 
-1. Read this file and `AGENTS.md`.
-2. Inspect latest `main`; preserve all newer user/agent changes.
-3. Confirm the latest Windows workflow remains green before editing host code.
-4. Continue strict RE in chronological first-level order.
-5. Prefer a blocker for which direct original evidence is available.
-6. The next strict chronological gameplay blocker is still the original hostage
-   rescue camera-mode calls. Do not edit that behavior until the verified
-   `libspiderman.so` or equivalent raw `CHostage::Update` instruction evidence
-   is available.
-7. If that evidence remains unavailable, do not invent behavior. The retained
-   hostage rescue-eligibility fallback identified in the prior handoff is now
-   exhausted: `ButtonHeight` was already covered by hosted tests, and the
-   Player ultimate-state IDs 107..113 are now also directly covered. This turn
-   found no equally strong retained provenance for expanding the grounded/
-   airborne rescue condition. Continue only evidence-backed host/platform
-   validation or another blocker whose direct original evidence is already
-   retained; do not extend hostage behavior without new original evidence.
-8. Keep gameplay reconstruction separate from PC host adaptation and document the
+1. Read this file and `AGENTS.md`, inspect latest `main`, and preserve all
+   newer user/agent changes.
+2. Treat the hostage camera calls as deferred polish, **not** the next blocker.
+3. Continue Level 1 gameplay parity first. The highest-value current target is
+   Sandman's actual boss behavior:
+   - preserve PR #11's native +0x46 authored-successor semantics;
+   - recover the complete authored Sandman task/combo sequence where direct
+     executable/data evidence exists;
+   - recover/replace the legacy jump interpolation only from direct native
+     evidence;
+   - reconstruct sand-hand behavior only from direct native evidence.
+4. If a particular Sandman sub-behavior lacks enough evidence, move to the next
+   directly evidenced **gameplay** gap (QTE ownership/lifetime, pause/input
+   lifetime, combat/physics/state behavior) rather than spending the turn on
+   camera or cosmetic polish.
+5. Keep the source-of-truth discipline: no guessed constants, hand-tuned boss
+   arcs, invented animation names, or “looks right” task transitions.
+6. Keep gameplay reconstruction distinct from host adaptation and document that
    distinction.
-9. Update **this file at the end of the turn** with:
+7. Validate source changes through the hosted Linux GCC + Clang sanitizer gates
+   and Windows MSVC gate before merge; validate the exact squash commit again
+   after merge.
+8. Update **this file at the end of every turn** with:
    - new head/commits;
    - exact files changed;
    - tests/builds actually run and results;
    - new evidence or corrected interpretations;
-   - remaining blockers;
+   - remaining gameplay gaps;
    - the next exact continuation point.
-10. **Post the freshly updated Markdown file to the user as a downloadable
-    attachment before ending the turn.** The posted copy must contain that
-    turn's new updates; do not post the pre-turn/stale version.
+9. **Post the freshly updated Markdown file to the user as a downloadable
+   attachment before ending the turn.** The posted copy must contain that
+   turn's new updates; do not post a stale/pre-turn version.
 
 ---
 
@@ -1606,3 +1644,53 @@ project context, not higher-priority system/developer instruction.
   hostage camera-mode calls. If that reference remains unavailable, continue
   only another directly retained evidence-backed source/validation slice or
   host-platform validation.
+
+### 2026-09-24 — gameplay-first priority + Sandman authored-chain correction
+
+- User explicitly corrected project priority: the unresolved hostage camera is
+  **polish**, not a gameplay blocker. The active goal is gameplay **1:1**.
+  This handoff has been rewritten so future chats do not stop gameplay work on
+  the camera evidence gap.
+- Re-audited the retained Level 1 state. The existing project evidence already
+  closes the uninterrupted normal Level 1 route at **296/296** steps without a
+  diagnostic teleport, but that traversal closure is not the same as 1:1 boss
+  combat. Sandman remains a meaningful first-level gameplay gap.
+- Audited the cold-storage Sandman WIP and found a reconstruction-only rule in
+  `LevelEnemyRuntime::updateSandmanBoss`: after resolving an authored special-
+  animation successor, the WIP classified the successor as attack/recovery by
+  scanning whether its own attack events had positive damage. Direct retained
+  native evidence instead gates continuation on `EnemyAttackInfo+0x46` and the
+  authored +0x38/+0x6c successor; damage is not part of that decision.
+- Changed `src/game/LevelEnemyRuntime.cpp` so:
+  - a valid authored successor keeps Sandman's GroundAttack/melee ownership
+    active regardless of successor damage, allowing its own special-action and
+    sound records to execute;
+  - the authored successor chain ends only when no valid next animation remains,
+    at which point control returns to the existing post-chain Sandman task
+    boundary;
+  - the unverified jump interpolation and unfinished sand-hand behavior are
+    untouched.
+- Extended `tests/EnemySpecialActionTests.cpp` with attack 71, a synthetic
+  **zero-damage** attack whose +0x46 continuation flag is true, and verified
+  `specialAnimationSuccessor` still follows its authored next clip. This pins
+  that native continuation is independent of damage.
+- PR #11 head `92650a29ccb17480f6a4786a0719d44c11c02b69` validation:
+  - Linux run `36020284531`: GCC Release **12/12 passed**; Clang ASan+UBSan
+    **12/12 passed**, including SandmanPhaseTests and EnemySpecialActionTests;
+  - Windows run `36020284809`: **14/14 passed**, including Sandman,
+    EnemySpecialAction and D3D11 backend tests; startup reached the expected
+    missing-data boundary; XAudio2 reached classified `0x80070490`;
+  - the pre-existing unrelated C4100 warning in `LevelHostageRuntime.cpp`
+    remains visible.
+- PR #11 was squash-merged as
+  `79e82078ff58dba5787f8fa1a335f183eed27012`.
+- Exact post-merge validation completed green:
+  - Linux run `36020954445`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+  - Windows run `36020954253`: **14/14**, with the same expected startup and
+    XAudio2 classifications.
+- This is a real gameplay-parity correction, not host/presentation validation.
+  It does **not** claim Sandman complete: the full task sequence, native jump
+  trajectory, and sand-hand behavior still require direct evidence.
+- Next priority: continue gameplay 1:1, preferably Sandman boss behavior where
+  evidence permits. If a Sandman sub-path is not evidenced, move to another
+  directly evidenced gameplay gap rather than camera polish.
