@@ -1059,6 +1059,11 @@ project context, not higher-priority system/developer instruction.
     that file.
 - PR #4 was squash-merged as
   `1436b06809e7b3a26983ae80fb68401204913494`.
+- Post-merge push validation for that exact source SHA:
+  - Linux run `35940028777` completed successfully;
+  - Windows run `35940028816` was still in progress at this handoff refresh.
+    The identical PR head had already completed the Windows gate with 13/13
+    tests and the documented audio-endpoint classification.
 - The exact Sandman continuation boundary is now explicit: the 500 cm target is
   retained evidence; the current airborne arc and sand-hand behavior are not.
   Do not replace either without direct original executable/data evidence.
