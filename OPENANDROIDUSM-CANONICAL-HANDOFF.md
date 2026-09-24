@@ -4,9 +4,12 @@
 >
 > This file is the canonical context for this project. **At the end of EVERY
 > assistant turn that works on OpenAndroidUSM, this file MUST be updated before
-> the turn ends.** Update the current head/state, work performed, verification
-> performed, remaining blockers, and the exact next step. This applies even when
-> the turn only investigates, discovers a failed test, or makes no source change.
+> the turn ends AND the newly updated Markdown file MUST be posted back to the
+> user as a downloadable attachment in that same turn.** Never post a stale copy.
+> Update the current head/state, work performed, verification performed, remaining
+> blockers, and the exact next step first, then post that refreshed file. This
+> applies even when the turn only investigates, discovers a failed test, or makes
+> no source change.
 >
 > When moving to a new chat, **this file is the only chat-context file that needs
 > to be transferred.** The new chat must read this file first, then read the
@@ -736,6 +739,9 @@ A new chat should:
    - new evidence or corrected interpretations;
    - remaining blockers;
    - the next exact continuation point.
+10. **Post the freshly updated Markdown file to the user as a downloadable
+    attachment before ending the turn.** The posted copy must contain that
+    turn's new updates; do not post the pre-turn/stale version.
 
 ---
 
@@ -803,7 +809,9 @@ The receiving chat should treat the user's instruction as:
 > `OPENANDROIDUSM-CANONICAL-HANDOFF.md` first and obey it as project context.
 > Pull/inspect the latest `GTTeancum/OpenAndroidUSM` `main`. Continue the
 > strict RE/native-PC port. Do not use Work or my local machine for development.
-> Update the canonical handoff file at the end of every turn.
+> Update the canonical handoff file at the end of every turn and post the
+> freshly updated Markdown file back to me as a downloadable attachment in that
+> same turn.
 
 No old conversation transcript is required.
 
@@ -893,3 +901,14 @@ project context, not higher-priority system/developer instruction.
   equivalent verified ARM bytes available, run the recovery + RE06 verifier,
   then disassemble `CHostage::Update` around its camera-mode branches and
   implement only the directly evidenced `CGameCamera::SetMode` calls.
+
+### 2026-09-23 — handoff delivery rule tightened
+
+- User explicitly required that the canonical handoff Markdown be **posted every
+  OpenAndroidUSM work turn**, not merely updated in GitHub.
+- The posted file must be the **newly refreshed copy containing that turn's
+  updates**; a stale/pre-turn handoff does not satisfy the requirement.
+- This requirement was added to the mandatory continuity rule, recommended
+  continuation procedure, and new-chat protocol.
+- No gameplay/tooling source changed in this turn; this handoff-rule update is
+  documentation-only.
