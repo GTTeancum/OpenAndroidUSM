@@ -105,43 +105,60 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`eb63011f2a0d04149ab4d410b3d4484ddd6d8457`  
-**Use authored Level 2 bank-up transition**
+`aa350fa5ba90895bd87d2859b22b44e53ea3149c`  
+**Carry player with moving room support**
 
-This is the squash merge of PR #16 and is a **gameplay-acceptance improvement**,
-not a claim of complete Level 2 traversal.
+This is the squash merge of PR #17 and is a **gameplay/physics parity change**.
 
-The prior `level2-bank-combat.usmauto` route destroyed the lower-bank cohort,
-waited for cinematic 654, then used a raw diagnostic player teleport to reach
-the upper-bank cohort. PR #16 removes that transform mutation. The route now
-requests the shipped cinematic **467**, waits for it to start, and lets its
-authored type-3 Player thread / `MoveObject` path carry Spider-Man to the
-upper bank before normal combat continues.
+Native support behavior retained in the project comes from
+`Unit::UpdateTransmission` (`0x00323388`) and
+`PhysicsEntity::preUpdate` (`0x003d799c`): the player records a supporting
+physics body from ground-like contacts and inherits that body's motion before
+the rider update. The portable runtime already carried riders on dynamic
+objects, including translated/rotated bridge/SlideCar support, but
+`LevelCollision::groundHeight` discarded the `roomId` already stored on
+room triangles. A player standing on an authored moving `CRoom` therefore
+received no room displacement at all.
 
-The autoplay harness gained a narrow `start_cinematic <id>` directive and
-asset-independent parser/unit coverage. The natural **654 -> 467 trigger edge
-is still not recovered**, so the explicit cinematic request remains a
-process-local diagnostic; this is cleaner and more native-faithful than a raw
-coordinate write, but not yet continuous natural Level 2 traversal.
+PR #17 now:
+
+- preserves both supporting object ID and supporting room ID from the selected
+  ground triangle;
+- snapshots direct room support before `CRoom::Move`;
+- advances room motion and updates room collision as before;
+- applies the moving room's exact frame-to-frame translation to the player
+  before the player update;
+- leaves the existing dynamic-object support-transform carry unchanged;
+- logs room support motion separately in autoplay diagnostics;
+- adds `OpenAndroidUSM.RoomSupportTests`, using synthetic room-tagged
+  collision to prove support-room identity and failed-contact clearing;
+- adds that test to both fail-closed hosted selectors.
 
 Validation is green:
 
-- PR Linux run `36043280889`: GCC **14/14**, Clang ASan+UBSan **14/14**;
-- PR Windows run `36043281031`: **16/16**;
-- post-merge Linux run `36046791843`: GCC **14/14**, Clang ASan+UBSan
-  **14/14**;
-- post-merge Windows run `36046791836`: **16/16**.
+- PR Linux run `36055579374`: GCC **15/15**, Clang ASan+UBSan **15/15**;
+- PR Windows run `36055579270`: **17/17**;
+- post-merge Linux run `36056013864`: GCC **15/15**, Clang ASan+UBSan
+  **15/15**;
+- post-merge Windows run `36056013788`: **17/17**.
 
-PR #16 source head: `eb63011f2a0d04149ab4d410b3d4484ddd6d8457`.
-The Level 2 milestone documentation was corrected afterward in
-`808ddb07011d106bf9bf686172c6a9b95b48b582`
-(**Document authored Level 2 bank transition [skip ci]**).
+Windows again reached the expected missing-game-data startup boundary and the
+classified XAudio2 no-default-endpoint `0x80070490` path. The existing
+unrelated C4100 warning in `LevelHostageRuntime.cpp` remains visible.
 
-The user's active mandate remains **gameplay 1:1 first**. The next source
-change must still be directly evidenced; do not infer the missing natural
-654->467 trigger, wall-enemy QTE branch, airborne player hurt mapping, Rhino
-pickup flight, AreaDamage RNG conversion, or bridge contact persistence from
-numbering/patterns alone.
+PR #17 deliberately does **not** guess native support persistence. The exact
+mapping/ownership semantics of the `0x8000` persistence bit remain
+unrecovered, so room/object carry applies only while the portable direct
+support query reports contact at frame start.
+
+Documentation was refreshed afterward in
+`c6ca884d69af4d15e493eafb5da89831093e0146`
+(**Document moving-room support carry [skip ci]**).
+
+The user's active mandate remains **gameplay 1:1 first**. Camera/presentation
+polish must not block gameplay work. Future chats must inspect actual latest
+`main`, because this handoff refresh will be a newer documentation-only
+commit.
 
 ### Gameplay/reference checkpoint
 
@@ -1906,12 +1923,11 @@ project context, not higher-priority system/developer instruction.
   `start_cinematic 467` is still diagnostic because the natural 654-to-467
   trigger edge has not been recovered.
 - Follow-up gameplay audit, with **no speculative source change**:
-  - **Bridge support/carry:** current `supportMotionDelta` already transforms
-    the rider point from the previous support pose into the current pose,
-    which includes angular contribution; Application samples support before
-    object motion and applies that delta after collider updates. Remaining
-    mismatch is support acquisition/persistence from the native contact
-    manifold (`0x80/0x100` flags), not missing angular carry math.
+  - **Bridge/room support carry:** PR #17 now preserves direct room support
+    identity and carries riders by moving-room translation in addition to the
+    existing dynamic-object transform carry. Remaining mismatch is native
+    contact-manifold acquisition/persistence (`0x80` contacts and the
+    unresolved `0x8000` persistence bit), not missing carry displacement.
   - **Level 2 natural bank trigger:** no retained source/history/Library
     evidence identifies the natural 654->467 edge. Do not hard-code it.
   - **Rhino CBehaviorPickUp:** message 0x59/0x5e ownership and related object ID
@@ -1938,3 +1954,67 @@ project context, not higher-priority system/developer instruction.
   next productive source turn should start by recovering one of those missing
   exact mappings from original/reference material or a newly surfaced retained
   artifact, then implement it directly.
+
+### 2026-09-24 — moving-room rider support carry
+
+- Continued under the gameplay-first mandate from the PR #16 Level 2
+  acceptance checkpoint.
+- Audited the outstanding gameplay candidates before changing source:
+  - natural Level 2 cinematic 654->467 edge remains unrecovered;
+  - Rhino pickup retains message/ownership evidence but not cloned throw-body
+    parameters;
+  - wall-enemy QTE states 16..19 still lack the exact native selection branch;
+  - airborne player hurt states 47..49 still lack exact classification;
+  - AreaDamage random wait still lacks the exact native range conversion;
+  - Sandman jump/sand-hand math remains incomplete.
+  None of those were guessed.
+- Rechecked the user's Library. Preserved RE06 source/overlay/verification
+  packages are still available and `OpenAndroidUSM_RE06_Source.zip` was
+  materialized/inspected, but it contains no raw `libspiderman.so` or bulk
+  decompiler body. A paged Library scan again found no
+  `OpenAndroidUSM.zip.001`…`.017` volumes or raw library.
+- Found a separate directly evidenced support gap that did **not** require the
+  missing persistence bit:
+  - room collision triangles already retain `roomId = roomIndex + 1`;
+  - `RoomMotionState` uses the exact same room-ID domain;
+  - the ground-support query previously returned only `triangle.objectId`,
+    discarding room support identity;
+  - moving rooms therefore could move underneath the player without supplying
+    the native support-body displacement.
+- PR #17 extends `LevelCollision::groundHeight` with an optional supporting
+  room ID while preserving all existing callers and object support.
+- Application now snapshots direct support before world motion. If the support
+  is a room rather than a dynamic object, it records that room's old
+  `RoomMotionState.position`, advances `CRoom::Move`, updates room
+  collision, and applies `newPosition-oldPosition` through
+  `GameplayPlayer::applySupportingBodyMotion`.
+- This is intentionally direct-contact-only. Native
+  `Unit::UpdateTransmission` can retain an old supporting body when its
+  physics body has bit `0x8000`; the portable mapping for that bit is not
+  recovered, so PR #17 does not emulate/presume it.
+- Added `tests/RoomSupportTests.cpp` using a synthetic two-triangle ground
+  square tagged with room ID 7. It proves:
+  - room-tagged ground returns room 7 and no dynamic object ID;
+  - failed support clears both IDs;
+  - roomless synthetic collision remains roomless.
+- Added the new test to CMake and both fail-closed hosted selectors. Current
+  counts are Linux **15** and Windows **17**.
+- PR #17 head `72420fed9ca146d4b06233755576fc5f865044fc`:
+  - Linux `36055579374`: GCC **15/15**, Clang ASan+UBSan **15/15**;
+  - Windows `36055579270`: **17/17**.
+- PR #17 was squash-merged as
+  `aa350fa5ba90895bd87d2859b22b44e53ea3149c`.
+- Exact post-merge:
+  - Linux `36056013864`: GCC **15/15**, Clang ASan+UBSan **15/15**;
+  - Windows `36056013788`: **17/17**.
+- `docs/RECONSTRUCTION.md` was refreshed in
+  `c6ca884d69af4d15e493eafb5da89831093e0146`.
+- Remaining support/physics boundary:
+  - exact native manifold ownership and `0x80` contact selection versus the
+    portable ground-support query;
+  - native `0x8000` support persistence mapping;
+  - exact contact-manifold-driven SlideCar removal where still open.
+- Next work should remain gameplay-first and directly evidenced. Do not spend
+  the next turn on camera polish, and do not infer the unresolved Level 2
+  654->467 edge, wall-QTE branch, airborne hurt map, Rhino pickup parameters,
+  AreaDamage RNG wrapper, or support-persistence bit.
