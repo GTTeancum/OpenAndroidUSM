@@ -4128,6 +4128,13 @@ void D3D11Renderer::updateMaterialAnimation(
     }
 }
 
+Result D3D11Renderer::uploadHud(const game::LevelHudAsset& hud) {
+    if (!device_) {
+        return Result::failure("HUD upload has no D3D11 device");
+    }
+    return uploadHudTexture(hud);
+}
+
 Result D3D11Renderer::uploadHudTexture(const game::LevelHudAsset& hud) {
     hudTexture_.Reset();
     hudVertexBuffer_.Reset();

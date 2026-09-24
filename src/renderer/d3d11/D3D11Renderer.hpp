@@ -54,6 +54,9 @@ public:
         std::span<const assets::BtexTexture> textures);
     [[nodiscard]] Result uploadLevelOneScene(
         const game::LevelOneBootstrap& levelOne);
+    // Host-facing UI staging path. This reuses the same production HUD
+    // uploader as uploadLevelOneScene without requiring world geometry.
+    [[nodiscard]] Result uploadHud(const game::LevelHudAsset& hud);
     [[nodiscard]] Result updateLevelOneActors(
         const game::LevelOneBootstrap& levelOne,
         std::uint32_t timestampMilliseconds);
