@@ -1,6 +1,7 @@
 #include "game/LevelEnemyRuntime.hpp"
 
 #include "game/PlayerPhysicsConstants.hpp"
+#include "game/SandmanPhaseRuntime.hpp"
 
 #include "assets/ColladaSkinning.hpp"
 #include "game/LevelCollision.hpp"
@@ -2909,21 +2910,10 @@ void LevelEnemyRuntime::applyCombatDamage(
     if (enemy.asset->gameType == "Boss_Rhino") {
         applyRhinoDamage(enemy, damage);
     } else if (enemy.asset->gameType == "Boss_Sandman") {
-        enemy.health = std::max(0.0F, enemy.health - damage);
-        // CBoss::ParseLocalAiMessage (0x0032dea8): the local-hit path
-        // checks death before advancing the phase table. Surviving hits
-        // clamp at 66/33 percent; one hit advances at most one phase.
-        if (enemy.health > 0.0F && enemy.maximumHealth > 0.0F) {
-            const auto healthPercent = static_cast<std::int32_t>(
-                enemy.health * 100.0F / enemy.maximumHealth);
-            if (healthPercent < 67 && enemy.sandmanPhase < 1U) {
-                enemy.health = enemy.maximumHealth * 0.66F;
-                enemy.sandmanPhase = 1;
-            } else if (healthPercent <= 33 && enemy.sandmanPhase <= 1U) {
-                enemy.health = enemy.maximumHealth * 0.33F;
-                enemy.sandmanPhase = 2;
-            }
-        }
+        const auto update = applySandmanPhaseDamage(
+            enemy.health, enemy.maximumHealth, enemy.sandmanPhase, damage);
+        enemy.health = update.health;
+        enemy.sandmanPhase = update.phase;
     } else if (isElectroBoss(enemy)) {
         enemy.health = std::max(0.0F, enemy.health - damage);
         const std::int32_t healthPercent =
@@ -4983,11 +4973,8 @@ void LevelEnemyRuntime::startSandmanGroundAttack(LevelEnemyState& enemy) {
         enemy.asset->archetypeIndex >= level_->enemyArchetypes().size()) {
         return;
     }
-    // CBoss::OnEnterState(3), 0x0032cd58, selects the initial clip from
-    // the phase table's float parameter (1/2/3), not a repeat count.
     const std::string_view kGroundAttack =
-        enemy.sandmanPhase == 0U ? "ground_attack1" :
-        enemy.sandmanPhase == 1U ? "ground_attack12" : "ground_attack13";
+        sandmanGroundAttackAnimation(enemy.sandmanPhase);
     const EnemyArchetypeAsset& archetype =
         level_->enemyArchetypes()[enemy.asset->archetypeIndex];
     if (archetype.animationBank.findClip(kGroundAttack) == nullptr) {
