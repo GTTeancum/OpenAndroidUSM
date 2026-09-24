@@ -56,6 +56,14 @@ private:
 // AIAnimSpecialActionInfo+0x38 into IBehaviorBase+0x6c.
 // CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack (0x003b9e44) consumes
 // that authored successor only when EnemyAttackInfo+0x46 permits it.
+// CBehaviorMeleeAttack retains its selected EnemyAttackInfo while authored
+// special-action messages for the current clip are processed. Return the first
+// valid action-type-zero attack row for callers that enter that behavior
+// through boss task state rather than the generic attack selector.
+[[nodiscard]] std::int16_t specialAnimationAttackId(
+    const EnemySpecialActionConfigDatabase& specialActions,
+    std::int16_t enemyTypeId, std::string_view animationName) noexcept;
+
 [[nodiscard]] std::string_view specialAnimationSuccessor(
     const EnemySpecialActionConfigDatabase& specialActions,
     const AttackConfigDatabase& attacks,
