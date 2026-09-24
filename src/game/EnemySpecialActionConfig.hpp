@@ -12,6 +12,8 @@
 
 namespace usm::game {
 
+class AttackConfigDatabase;
+
 struct EnemyAnimationSpecialAction {
     std::int16_t recordId{};
     std::string name;
@@ -49,5 +51,14 @@ public:
 private:
     std::vector<EnemyAnimationSpecialAction> actions_;
 };
+
+// IBehaviorBase::SpecialAnimActionCheck (0x003a8c60) resolves
+// AIAnimSpecialActionInfo+0x38 into IBehaviorBase+0x6c.
+// CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack (0x003b9e44) consumes
+// that authored successor only when EnemyAttackInfo+0x46 permits it.
+[[nodiscard]] std::string_view specialAnimationSuccessor(
+    const EnemySpecialActionConfigDatabase& specialActions,
+    const AttackConfigDatabase& attacks,
+    std::int16_t enemyTypeId, std::string_view animationName);
 
 } // namespace usm::game

@@ -1,5 +1,6 @@
 #include "game/LevelEnemyRuntime.hpp"
 
+#include "game/EnemySpecialActionConfig.hpp"
 #include "game/PlayerPhysicsConstants.hpp"
 #include "game/SandmanPhaseRuntime.hpp"
 
@@ -5072,19 +5073,9 @@ void LevelEnemyRuntime::updateSandmanBoss(
             // follows +0x6c only when EnemyAttackInfo+0x46 permits it.
             // The shipped special-action string supplies the successor;
             // it is not an effect asset or a name to synthesize.
-            std::string nextAnimation;
-            for (const auto* event :
-                 level_->enemySpecialActions().findAttackEvents(
-                     enemy.asset->enemyTypeId, enemy.activeAnimation)) {
-                if (event->attackId > std::numeric_limits<std::int16_t>::max()) {
-                    continue;
-                }
-                const auto* attack = level_->attackConfigs().find(
-                    static_cast<std::int16_t>(event->attackId));
-                if (attack != nullptr && attack->permitsSpecialAnimationSuccessor) {
-                    nextAnimation = event->nextAnimationName;
-                }
-            }
+            const std::string_view nextAnimation = specialAnimationSuccessor(
+                level_->enemySpecialActions(), level_->attackConfigs(),
+                enemy.asset->enemyTypeId, enemy.activeAnimation);
             if (nextAnimation.empty() ||
                 archetype.animationBank.findClip(nextAnimation) == nullptr) {
                 return;
@@ -5103,7 +5094,7 @@ void LevelEnemyRuntime::updateSandmanBoss(
             enemy.sandmanTask = successorDealsDamage
                 ? SandmanBossTaskState::GroundAttack
                 : SandmanBossTaskState::GroundAttackRecovery;
-            enemy.activeAnimation = std::move(nextAnimation);
+            enemy.activeAnimation = nextAnimation;
             enemy.animationTimeMilliseconds = 0;
             enemy.animationSpeed = 1.0F;
             enemy.animationLoops = false;
