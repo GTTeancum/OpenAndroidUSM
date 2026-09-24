@@ -316,6 +316,15 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     set_tests_properties(OpenAndroidUSM.SandmanPhaseTests PROPERTIES
         TIMEOUT 30 LABELS "sandman-parity")
 
+    add_executable(OpenAndroidUSM.EnemySpecialActionTests
+        tests/EnemySpecialActionTests.cpp)
+    target_compile_features(OpenAndroidUSM.EnemySpecialActionTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.EnemySpecialActionTests PRIVATE OpenAndroidUSM.Core)
+    add_test(NAME OpenAndroidUSM.EnemySpecialActionTests
+        COMMAND OpenAndroidUSM.EnemySpecialActionTests)
+    set_tests_properties(OpenAndroidUSM.EnemySpecialActionTests PROPERTIES
+        TIMEOUT 30 LABELS "enemy-special-action-parity")
+
     add_executable(OpenAndroidUSM.InputTransitionsTests tests/InputTransitionsTests.cpp)
     target_compile_features(OpenAndroidUSM.InputTransitionsTests PRIVATE cxx_std_20)
     target_link_libraries(OpenAndroidUSM.InputTransitionsTests PRIVATE OpenAndroidUSM.Core)
