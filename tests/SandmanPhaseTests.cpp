@@ -27,6 +27,7 @@ int main() {
     try {
         using usm::game::applySandmanPhaseDamage;
         using usm::game::sandmanGroundAttackAnimation;
+        using usm::game::sandmanJumpLandingTarget;
 
         constexpr float maximumHealth = 2500.0F;
 
@@ -75,6 +76,26 @@ int main() {
         CHECK(sandmanGroundAttackAnimation(1) == "ground_attack12");
         CHECK(sandmanGroundAttackAnimation(2) == "ground_attack13");
         CHECK(sandmanGroundAttackAnimation(99) == "ground_attack13");
+
+        // CBoss::Jump mode 1 (0x0032935c) retains the 500 cm landing
+        // overshoot independently of the still-unresolved airborne arc.
+        auto landing = sandmanJumpLandingTarget(
+            100.0F, -20.0F, 30.0F, 1.0F, 0.0F);
+        CHECK(close(landing.x, 600.0F));
+        CHECK(close(landing.y, -20.0F));
+        CHECK(close(landing.z, 30.0F));
+
+        landing = sandmanJumpLandingTarget(
+            10.0F, 20.0F, -5.0F, 0.6F, 0.8F);
+        CHECK(close(landing.x, 310.0F));
+        CHECK(close(landing.y, 420.0F));
+        CHECK(close(landing.z, -5.0F));
+
+        landing = sandmanJumpLandingTarget(
+            -40.0F, 15.0F, 9.0F, -1.0F, 0.0F);
+        CHECK(close(landing.x, -540.0F));
+        CHECK(close(landing.y, 15.0F));
+        CHECK(close(landing.z, 9.0F));
 
         std::cout << checks << " Sandman phase checks passed\n";
         return 0;
