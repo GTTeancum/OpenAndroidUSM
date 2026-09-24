@@ -405,8 +405,8 @@ void same(const GameplayInputState& a, const GameplayInputState& b) {
     CHECK(a.quickTimeEvent.held==b.quickTimeEvent.held &&
           a.quickTimeEvent.pressed==b.quickTimeEvent.pressed &&
           a.quickTimeEvent.released==b.quickTimeEvent.released);
-    CHECK(a.rescueRequested==b.rescueRequested && a.switchRequested==b.switchRequested &&
-          a.switchRequestValue==b.switchRequestValue);
+    CHECK(a.rescueRequested==b.rescueRequested && a.interactiveButtonRequested==b.interactiveButtonRequested &&
+          a.switchCounter==b.switchCounter);
 }
 void keypad() {
     // Exhaust all wButtons bit patterns, including unused/reserved bits. This
@@ -440,9 +440,9 @@ void keypad() {
         // The earlier R1-up payload remains in the direct native-event view
         // after its request flag is consumed. A reset keypad does not own that
         // dormant payload; only a later genuine R1-up publishes one there.
-        CHECK(!expectedKeypad.rescueRequested && !expectedKeypad.switchRequested);
-        CHECK(expectedKeypad.switchRequestValue==4);
-        expectedKeypad.switchRequestValue=(mask & xi::RightShoulder)?4:0;
+        CHECK(!expectedKeypad.rescueRequested && !expectedKeypad.interactiveButtonRequested);
+        CHECK(expectedKeypad.switchCounter==4);
+        expectedKeypad.switchCounter=(mask & xi::RightShoulder)?4:0;
         same(router.gameplayKeypad(),expectedKeypad);
         router.beginFrame();
         raw.update(false,0,0,0,route);
