@@ -1157,7 +1157,7 @@ void consumptionTests(const LevelOneBootstrap& level) {
         CHECK(after.punch.pressed==before.punch.pressed && after.web.pressed==before.web.pressed);
         CHECK(after.spiderSense.pressed==before.spiderSense.pressed && after.superAttack.pressed==before.superAttack.pressed);
         CHECK(after.pause.pressed==before.pause.pressed);
-        CHECK(after.switchRequested==before.switchRequested && after.switchRequestValue==before.switchRequestValue);
+        CHECK(after.interactiveButtonRequested==before.interactiveButtonRequested && after.switchCounter==before.switchCounter);
         CHECK(after.moveUp.pressed==before.moveUp.pressed && after.moveDown.pressed==before.moveDown.pressed);
         CHECK(after.moveLeft.pressed==before.moveLeft.pressed && after.moveRight.pressed==before.moveRight.pressed);
         router.beginFrame();
