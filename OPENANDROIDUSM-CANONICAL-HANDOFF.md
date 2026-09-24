@@ -113,9 +113,14 @@ payloads loaded by the production `SpriteAtlas`, `DdsAtcTexture`, and
 verifies by GPU readback: atlas UV selection, completed-mash frame ordering
 **85 then 93**, and 128-alpha `SRC_ALPHA/INV_SRC_ALPHA` compositing. No
 original game data is added. The unresolved success-explosion layer and full
-native QTE visual composition remain untouched. The canonical-handoff refresh
-commit is expected to be newer and documentation-only, so future chats must
-still inspect actual latest `main`.
+native QTE visual composition remain untouched.
+
+This exact source commit was also freshly revalidated on Linux after PR #10:
+GNU 13.3.0 Release rebuilt the portable tree and passed the selected suite
+**12/12**, and Clang 18.1.3 Debug with ASan+UBSan, leak detection, and
+halt-on-UB rebuilt it and passed **12/12**. The canonical-handoff refresh commit
+is expected to be newer and documentation-only, so future chats must still
+inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -1558,3 +1563,46 @@ project context, not higher-priority system/developer instruction.
   hostage camera-mode calls. If that material remains unavailable, continue
   only another directly retained evidence-backed source/validation slice or
   host-platform validation; do not infer missing native behavior.
+
+### 2026-09-24 — fresh Linux rebuild after PR #10
+
+- User explicitly requested a Linux build before continuing further.
+- Confirmed `main` at the start of this turn was the documentation-only
+  handoff commit `586789ccd6a41c0013b1efd0e6154012ee7d6308`; its source
+  parent remains PR #10's validated squash commit
+  `9a3189a80fd8b399f6e8e7f297797892227a9f26`.
+- Attempted to obtain a scratch checkout for a container-local build, but this
+  runtime cannot clone/download the GitHub repository directly because outbound
+  GitHub/DNS access is blocked and the repository's workflows publish no source
+  or build artifact. Per the project rule, the user's local machine was not
+  used.
+- Re-ran the actual GitHub-hosted Ubuntu Linux build jobs for the exact current
+  source commit `9a3189a80fd8b399f6e8e7f297797892227a9f26` instead. The
+  workflow run is `36010512831`, final run attempt **3**.
+- Fresh GNU Release build/job `107691489569`:
+  - compiler: **GNU C/C++ 13.3.0**;
+  - configure: Ninja, `CMAKE_BUILD_TYPE=Release`,
+    `USM_BUILD_WINDOWS_APP=OFF`, `USM_BUILD_TESTS=ON`;
+  - build completed all **133 Ninja steps** successfully;
+  - fail-closed asset-independent CTest selection passed **12/12** in 0.72 s.
+- Fresh Clang sanitizer build/job `107692721661`:
+  - compiler: **Clang C/C++ 18.1.3**;
+  - configure: Debug + `-fsanitize=address,undefined` and
+    `-fno-omit-frame-pointer`;
+  - `ASAN_OPTIONS=detect_leaks=1`;
+  - `UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1`;
+  - build completed successfully;
+  - fail-closed asset-independent CTest selection passed **12/12** in 1.82 s;
+  - no sanitizer, UB, or leak failure was reported.
+- No gameplay, renderer, host, test, build-rule, or workflow source changed in
+  this turn. This was a fresh build/validation checkpoint only.
+- A follow-up audit again found that wall/enemy QTE ownership and the remaining
+  hostage details are not safe to change from the retained evidence alone.
+  `WallWebRuntime` is a separate recovered Player wall-web QTE path, and the
+  existing RE04/RE05 documents explicitly leave broader ownership/lifetime
+  integration open. No shared-manager behavior was guessed.
+- The strict chronological blocker remains recovery of the verified original
+  `libspiderman.so` / raw `CHostage::Update` instructions for the missing
+  hostage camera-mode calls. If that reference remains unavailable, continue
+  only another directly retained evidence-backed source/validation slice or
+  host-platform validation.
