@@ -105,60 +105,51 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`aa350fa5ba90895bd87d2859b22b44e53ea3149c`  
-**Carry player with moving room support**
+`c90a745c8fc7075a886f29054c3b4f20123b10ed`  
+**Use native QTE manager timing for wall web**
 
-This is the squash merge of PR #17 and is a **gameplay/physics parity change**.
+This is the squash merge of PR #18 and is a **gameplay/QTE timing parity
+change**.
 
-Native support behavior retained in the project comes from
-`Unit::UpdateTransmission` (`0x00323388`) and
-`PhysicsEntity::preUpdate` (`0x003d799c`): the player records a supporting
-physics body from ground-like contacts and inherits that body's motion before
-the rider update. The portable runtime already carried riders on dynamic
-objects, including translated/rotated bridge/SlideCar support, but
-`LevelCollision::groundHeight` discarded the `roomId` already stored on
-room triangles. A player standing on an authored moving `CRoom` therefore
-received no room displacement at all.
+The retained wall-web path is `Player::BeginQTE / UpdateQTE / DoQTEAction /
+ExitQTE` plus the shared `CQTEManager`. PR #18 corrects the remaining clock
+split in that path:
 
-PR #17 now:
+- wall-web character animation advances on scaled **game time**;
+- mash decay and the absolute button timeout advance on unscaled **real time**;
+- `CQTEManager::IsOutTime` at `0x0037a4b8` retains its strict `>`
+  boundary;
+- manager ordering remains `CheckSuccess` followed by `IsOutTime` in the
+  same update, so completion exactly at the duration succeeds while completion
+  after the strict boundary fails;
+- `ButtonMashProgress::updateManager` supplies the same 500 ms decay/order
+  already used by the shared cinematic/hostage manager;
+- modal tutorials pass zero wall-web real time because native
+  `CLevel::Update` returns before player/QTE simulation while the modal owns
+  the frame.
 
-- preserves both supporting object ID and supporting room ID from the selected
-  ground triangle;
-- snapshots direct room support before `CRoom::Move`;
-- advances room motion and updates room collision as before;
-- applies the moving room's exact frame-to-frame translation to the player
-  before the player update;
-- leaves the existing dynamic-object support-transform carry unchanged;
-- logs room support motion separately in autoplay diagnostics;
-- adds `OpenAndroidUSM.RoomSupportTests`, using synthetic room-tagged
-  collision to prove support-room identity and failed-contact clearing;
-- adds that test to both fail-closed hosted selectors.
+PR #18 validation:
 
-Validation is green:
-
-- PR Linux run `36055579374`: GCC **15/15**, Clang ASan+UBSan **15/15**;
-- PR Windows run `36055579270`: **17/17**;
-- post-merge Linux run `36056013864`: GCC **15/15**, Clang ASan+UBSan
+- PR Linux run `36067316217`: GCC Release **15/15**, Clang ASan+UBSan
   **15/15**;
-- post-merge Windows run `36056013788`: **17/17**.
+- PR Windows run `36067316213`: **17/17**;
+- post-merge Linux run `36068916459`: GCC **15/15**, Clang ASan+UBSan
+  **15/15**;
+- post-merge Windows run `36068916437`: **17/17**.
 
-Windows again reached the expected missing-game-data startup boundary and the
-classified XAudio2 no-default-endpoint `0x80070490` path. The existing
-unrelated C4100 warning in `LevelHostageRuntime.cpp` remains visible.
+The exact post-merge Windows lane also reached the expected
+`Game data was not found` startup boundary and the classified XAudio2
+no-default-endpoint result `0x80070490`.
 
-PR #17 deliberately does **not** guess native support persistence. The exact
-mapping/ownership semantics of the `0x8000` persistence bit remain
-unrecovered, so room/object carry applies only while the portable direct
-support query reports contact at frame start.
-
-Documentation was refreshed afterward in
-`c6ca884d69af4d15e493eafb5da89831093e0146`
-(**Document moving-room support carry [skip ci]**).
+PR #18 source head: `c90a745c8fc7075a886f29054c3b4f20123b10ed`.
+Documentation-only follow-up:
+`bf58ce97a5a899e4e8d90d9f6ed1d49f82437c4d`
+(**Document wall-web native QTE clock [skip ci]**).
 
 The user's active mandate remains **gameplay 1:1 first**. Camera/presentation
 polish must not block gameplay work. Future chats must inspect actual latest
-`main`, because this handoff refresh will be a newer documentation-only
-commit.
+`main` because documentation/handoff commits may be newer than this validated
+source SHA.
 
 ### Gameplay/reference checkpoint
 
@@ -901,9 +892,11 @@ A new chat should:
      evidence;
    - reconstruct sand-hand behavior only from direct native evidence.
 4. If a particular Sandman sub-behavior lacks enough evidence, move to the next
-   directly evidenced **gameplay** gap (QTE ownership/lifetime, pause/input
-   lifetime, combat/physics/state behavior) rather than spending the turn on
-   camera or cosmetic polish.
+   directly evidenced **gameplay** gap (enemy-QTE ownership/lifetime,
+   pause/input lifetime, combat/physics/state behavior) rather than spending
+   the turn on camera or cosmetic polish. Preserve PR #18's wall-web game-time
+   vs real-time clock split; do not apply it to QTEActionManager by analogy
+   unless that manager's own clock source is directly recovered.
 5. Keep the source-of-truth discipline: no guessed constants, hand-tuned boss
    arcs, invented animation names, or “looks right” task transitions.
 6. Keep gameplay reconstruction distinct from host adaptation and document that
@@ -2018,3 +2011,65 @@ project context, not higher-priority system/developer instruction.
   the next turn on camera polish, and do not infer the unresolved Level 2
   654->467 edge, wall-QTE branch, airborne hurt map, Rhino pickup parameters,
   AreaDamage RNG wrapper, or support-persistence bit.
+
+### 2026-09-24 — wall-web native QTE manager timing
+
+- Continued from the PR #17 moving-room support checkpoint under the
+  gameplay-first mandate.
+- Found PR #18 already open on `chatgpt/wall-web-native-qte-clock` and
+  audited its diff/evidence before merging instead of creating competing work.
+- PR #18 corrects wall-web timing through the retained
+  `Player::UpdateQTE` / `CQTEManager` contract:
+  - player/enemy wall-web animations remain on scaled game time;
+  - button mash decay and absolute timeout use unscaled real time;
+  - `CQTEManager::IsOutTime` keeps strict `>`;
+  - same-tick success is evaluated before timeout, but a completed press after
+    the strict boundary still loses;
+  - modal tutorial frames advance neither the player nor wall-web manager.
+- Exact files in PR #18:
+  - `src/app/Application.cpp`;
+  - `src/game/ButtonMashProgress.hpp`;
+  - `src/game/GameplayPlayer.cpp/.hpp`;
+  - `src/game/WallWebRuntime.cpp/.hpp`;
+  - new `src/game/WallWebTiming.hpp`;
+  - `tests/QteParityTests.cpp`.
+- PR #18 head `64e06f9d005bb0bdcfc404bed2b25193f9729ecd`:
+  - Linux `36067316217`: **15/15 GCC + 15/15 Clang ASan+UBSan**;
+  - Windows `36067316213`: **17/17**.
+- PR #18 was squash-merged as
+  `c90a745c8fc7075a886f29054c3b4f20123b10ed`.
+- Exact post-merge validation:
+  - Linux `36068916459`: **15/15 GCC + 15/15 Clang ASan+UBSan**;
+  - Windows `36068916437`: **17/17**.
+- The post-merge Windows lane reached the expected missing-game-data boundary
+  and classified XAudio2 `0x80070490` no-endpoint result.
+- `docs/RECONSTRUCTION.md` was refreshed in documentation-only commit
+  `bf58ce97a5a899e4e8d90d9f6ed1d49f82437c4d`.
+
+#### Evidence recovery audit after PR #18
+
+- Materialized the preserved Library artifact
+  `OpenAndroidUSM_RE06_Source.zip` and searched all 598 retained files.
+  It is an older source/evidence snapshot, **not** the original ARM library or
+  decompiler database.
+- No additional exact mapping was recovered for:
+  - enemy wall-jump QTE variants 16..19;
+  - Player airborne hurt states 47..49;
+  - `CAreaDamage`'s native random-wait range conversion;
+  - support-body `0x8000` persistence ownership/mapping.
+- A separate Library filename search found no retained `configs.pack`,
+  `MC_STATE.bin`, or `levelnew_01.pack` that could resolve the missing
+  airborne hurt/state or wall-attack rows.
+- `QuickTimeActionRuntime` (Rhino throw QTE) was audited next. Its current
+  implementation uses a single elapsed clock, but the retained evidence only
+  states that it follows `QTEActionManager::DoAction/Update`
+  (`0x00389e1c/0x0038a0e0`). The exact QTEActionManager button-clock source
+  is **not** retained in accessible material. PR #18's CQTEManager timing model
+  was therefore **not** copied into the Rhino path by analogy.
+- Native `Unit::UpdateTransmission` support-change messages `0xd2/0xd1`
+  are retained, but accessible evidence does not identify portable consumers
+  or side effects beyond the support transition itself. No no-op message
+  plumbing was added merely to mirror IDs.
+- Next source work should continue only when one of the remaining gameplay
+  mappings has direct native branch/data evidence. Gameplay 1:1 remains the
+  priority; do not fall back to camera polish.
