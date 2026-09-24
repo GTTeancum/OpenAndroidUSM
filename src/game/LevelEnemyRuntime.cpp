@@ -1,5 +1,6 @@
 #include "game/LevelEnemyRuntime.hpp"
 
+#include "game/EnemySpecialActionConfig.hpp"
 #include "game/PlayerPhysicsConstants.hpp"
 #include "game/SandmanPhaseRuntime.hpp"
 
