@@ -132,23 +132,28 @@ void appendSpecialAction(std::vector<std::byte>& bytes,
 int main() {
     try {
         std::vector<std::byte> attackBytes;
-        appendS16(attackBytes, 2);
+        appendS16(attackBytes, 3);
         appendAttack(attackBytes, 69, "SANDMAN_GROUND", 75.0F, true);
         appendAttack(attackBytes, 70, "SANDMAN_BLOCKED", 25.0F, false);
+        appendAttack(attackBytes, 71, "SANDMAN_ZERO_DAMAGE", 0.0F, true);
 
         usm::game::AttackConfigDatabase attacks;
         CHECK(attacks.load(attackBytes));
         const auto* permittedAttack = attacks.find(69);
         const auto* blockedAttack = attacks.find(70);
+        const auto* zeroDamageAttack = attacks.find(71);
         CHECK(permittedAttack != nullptr);
         CHECK(permittedAttack->permitsSpecialAnimationSuccessor);
         CHECK(permittedAttack->damage == 75.0F);
         CHECK(permittedAttack->maximumReach() == 400.0F);
         CHECK(blockedAttack != nullptr);
         CHECK(!blockedAttack->permitsSpecialAnimationSuccessor);
+        CHECK(zeroDamageAttack != nullptr);
+        CHECK(zeroDamageAttack->damage == 0.0F);
+        CHECK(zeroDamageAttack->permitsSpecialAnimationSuccessor);
 
         std::vector<std::byte> actionBytes;
-        appendS16(actionBytes, 5);
+        appendS16(actionBytes, 6);
         appendSpecialAction(
             actionBytes, 1, "sandman-contact", 16, "ground_attack1",
             0, 50, 69, {42}, "ground_attack1_to_idle");
@@ -164,10 +169,14 @@ int main() {
         appendSpecialAction(
             actionBytes, 5, "blocked-only", 16, "ground_attack_blocked",
             0, 50, 70, {}, "blocked_only_successor");
+        appendSpecialAction(
+            actionBytes, 6, "zero-damage-successor", 16,
+            "ground_attack_recovery", 0, 50, 71, {},
+            "ground_attack_recovery_done");
 
         usm::game::EnemySpecialActionConfigDatabase specialActions;
         CHECK(specialActions.load(actionBytes));
-        CHECK(specialActions.actions().size() == 5U);
+        CHECK(specialActions.actions().size() == 6U);
 
         const auto events =
             specialActions.findEvents(16, "ground_attack1");
@@ -193,6 +202,12 @@ int main() {
         CHECK(usm::game::specialAnimationSuccessor(
                   specialActions, attacks, 16, "ground_attack_blocked")
               .empty());
+        // The native +0x46 continuation gate is independent of damage.
+        // A zero-damage/sound-only authored clip can still own the next
+        // animation in the chain.
+        CHECK(usm::game::specialAnimationSuccessor(
+                  specialActions, attacks, 16, "ground_attack_recovery") ==
+              "ground_attack_recovery_done");
         CHECK(usm::game::specialAnimationSuccessor(
                   specialActions, attacks, 15, "ground_attack1")
               .empty());

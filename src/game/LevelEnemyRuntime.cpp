@@ -5078,28 +5078,27 @@ void LevelEnemyRuntime::updateSandmanBoss(
                 enemy.asset->enemyTypeId, enemy.activeAnimation);
             if (nextAnimation.empty() ||
                 archetype.animationBank.findClip(nextAnimation) == nullptr) {
+                // UpdateAttackMelee_DoAttack ends the authored special-animation
+                // chain when +0x6c supplies no valid successor. Whether the
+                // completed clip dealt damage is not part of that native
+                // decision. Keep the existing Sandman post-chain task boundary
+                // separate from the still-unresolved jump trajectory.
+                enemy.sandmanTask = SandmanBossTaskState::GroundAttackRecovery;
+                enemy.meleeAttackActive = false;
                 return;
             }
-            bool successorDealsDamage = false;
-            for (const auto* event :
-                 level_->enemySpecialActions().findAttackEvents(
-                     enemy.asset->enemyTypeId, nextAnimation)) {
-                if (event->attackId > std::numeric_limits<std::int16_t>::max()) {
-                    continue;
-                }
-                const auto* attack = level_->attackConfigs().find(
-                    static_cast<std::int16_t>(event->attackId));
-                successorDealsDamage |= attack != nullptr && attack->damage > 0.0F;
-            }
-            enemy.sandmanTask = successorDealsDamage
-                ? SandmanBossTaskState::GroundAttack
-                : SandmanBossTaskState::GroundAttackRecovery;
+            // SpecialAnimNextActionCheck follows the authored successor based on
+            // EnemyAttackInfo+0x46, not on the successor's damage. Keep the
+            // melee behavior active so every authored successor can process its
+            // own special-action records, including sound-only/zero-damage
+            // clips, until the chain actually terminates.
+            enemy.sandmanTask = SandmanBossTaskState::GroundAttack;
             enemy.activeAnimation = nextAnimation;
             enemy.animationTimeMilliseconds = 0;
             enemy.animationSpeed = 1.0F;
             enemy.animationLoops = false;
             enemy.animationReversed = false;
-            enemy.meleeAttackActive = successorDealsDamage;
+            enemy.meleeAttackActive = true;
         }
         return;
     }
