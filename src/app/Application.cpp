@@ -4198,15 +4198,27 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                               event.restorePoint->facing);
                 }
             }
-            for (std::string_view enteredState =
-                     gameplayPlayer_.consumeEnteredState();
-                 !enteredState.empty();
-                 enteredState = gameplayPlayer_.consumeEnteredState()) {
-                result = playerSounds_.dispatchStateEnter(
-                    enteredState, playGameplaySound, stopPlayerStateSound);
-                if (!result) {
-                    return fail(result.message());
-                }
+            const auto dispatchPlayerEnteredStates =
+                [this, &playGameplaySound,
+                 &stopPlayerStateSound]() -> Result {
+                    for (std::string_view enteredState =
+                             gameplayPlayer_.consumeEnteredState();
+                         !enteredState.empty();
+                         enteredState =
+                             gameplayPlayer_.consumeEnteredState()) {
+                        Result stateResult =
+                            playerSounds_.dispatchStateEnter(
+                                enteredState, playGameplaySound,
+                                stopPlayerStateSound);
+                        if (!stateResult) {
+                            return stateResult;
+                        }
+                    }
+                    return Result::success();
+                };
+            result = dispatchPlayerEnteredStates();
+            if (!result) {
+                return fail(result.message());
             }
             for (std::optional<game::PlayerAttackSoundTrigger> trigger =
                      gameplayPlayer_.consumeAttackSoundTrigger();
@@ -4875,6 +4887,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  &playNamedAudio, &stopNamedAudio, &saveCinematicCheckPoint,
                  &nativeTimerMilliseconds, &realDeltaMilliseconds,
                  &playGameplaySound, &stopPlayerStateSound,
+                 &dispatchPlayerEnteredStates,
                  &releaseGameplayCollada, &exitAfterPresent,
                  &startGameplayCinematic](std::uint32_t cinematicDeltaMilliseconds) -> Result {
                 Result stepResult = Result::success();
@@ -5087,9 +5100,10 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                     stepResult = commandResult;
                 }
                 if (stepResult && cinematicDamageApplied) {
-                    stepResult = playerSounds_.dispatchStateEnter(
-                        "k_state_hurt_light", playGameplaySound,
-                        stopPlayerStateSound);
+                    // Player::OnHit owns the actual entered state. Drain that
+                    // exact queued state now so cinematic damage does not
+                    // guess "hurt_light" and replay the real state next tick.
+                    stepResult = dispatchPlayerEnteredStates();
                 }
                 for (const game::LevelCinematicAsset* completedCinematic :
                      gameplayCinematics_.consumeCompletions()) {
@@ -5465,16 +5479,13 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                     std::to_string(hurtStateId));
                         }
                     }
-                    // QTE action 8 supplies grab_to_knockbackflying itself;
-                    // CBehaviorThrow/QTEActionManager must not be replaced by
-                    // the generic player hurt reaction or sound dispatch.
-                    if (!gameplayPlayer_.quickTimeActionDriven()) {
-                        result = playerSounds_.dispatchStateEnter(
-                            gameplayPlayer_.activeStateName(), playGameplaySound,
-                             stopPlayerStateSound);
-                        if (!result) {
-                            return fail(result.message());
-                        }
+                    // Player::OnHit already queued the exact native state.
+                    // Drain it in this tick so state entry audio follows that
+                    // state exactly once. QTE action 8 queues no generic hurt
+                    // state while its authored grab pose owns the player.
+                    result = dispatchPlayerEnteredStates();
+                    if (!result) {
+                        return fail(result.message());
                     }
                 }
             }
@@ -5500,9 +5511,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 }
                 if (gameplayPlayer_.applyDamage(event.damage,
                                                 event.damageType)) {
-                    result = playerSounds_.dispatchStateEnter(
-                        "k_state_hurt_light", playGameplaySound,
-                        stopPlayerStateSound);
+                    result = dispatchPlayerEnteredStates();
                     if (!result) {
                         return fail(result.message());
                     }
@@ -5530,10 +5539,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                 if (gameplayPlayer_.applyDamage(
                         event.damage, event.damageType,
                         event.hitType)) {
-                    result = playerSounds_.dispatchStateEnter(
-                        event.damageType == 1 ? "k_state_hurt_heavy"
-                                              : "k_state_hurt_light",
-                        playGameplaySound, stopPlayerStateSound);
+                    result = dispatchPlayerEnteredStates();
                     if (!result) {
                         return fail(result.message());
                     }
@@ -5552,10 +5558,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                                                 event.damageType,
                                                 event.damageType == 1
                                                     ? 0x86 : 0x85)) {
-                    result = playerSounds_.dispatchStateEnter(
-                        event.damageType == 1 ? "k_state_hurt_heavy"
-                                              : "k_state_hurt_light",
-                        playGameplaySound, stopPlayerStateSound);
+                    result = dispatchPlayerEnteredStates();
                     if (!result) {
                         return fail(result.message());
                     }
@@ -5609,9 +5612,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                            game::LevelDropEventKind::HitPlayer) {
                     if (!restoreRuntime_.active() &&
                         gameplayPlayer_.applyDamage(event.damage)) {
-                        result = playerSounds_.dispatchStateEnter(
-                            "k_state_hurt_light", playGameplaySound,
-                            stopPlayerStateSound);
+                        result = dispatchPlayerEnteredStates();
                         if (!result) {
                             return fail(result.message());
                         }
