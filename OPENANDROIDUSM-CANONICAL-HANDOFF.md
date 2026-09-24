@@ -105,65 +105,50 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`babe0e60d77e7dbf008da5fb96c28b0a2b51b538`  
-**Use authored player hurt animation lifetime**
+`ff289e67453c478ba658cc05d761e02317293efe`  
+**Dispatch native player hurt state audio once**
 
-This is the squash merge of PR #19 and is a **gameplay/state-timing parity
+This is the squash merge of PR #20 and is a **gameplay/audio-state parity
 change**.
 
-The portable player previously accepted a reconstruction-only
-`minimumReactionMilliseconds` argument in `GameplayPlayer::applyDamage`.
-Hazard callers passed their own repeat-contact windows through that argument:
-2000 ms for electric platforms and 1000 ms for AreaDamage/CEffectDamage. That
-incorrectly coupled two independent native responsibilities and could keep a
-finished ground hurt animation locked until the hazard cooldown expired.
+`GameplayPlayer::applyDamage` already queues the exact Player state selected
+by `Player::OnHit`. The application normally drains those entered states
+once per fixed tick and dispatches the corresponding `PlayerStateSoundBank`
+entry audio. Damage sources that run later in the same tick were bypassing
+that ownership:
 
-Direct retained evidence separates them:
+- cinematic GetDamage forced `k_state_hurt_light`;
+- electric platforms and falling props forced `k_state_hurt_light`;
+- AreaDamage and CEffectDamage guessed light/heavy from damage type;
+- enemy hits dispatched `activeStateName()` directly.
 
-- `Player::UpdateHurt` at `0x0035062c` leaves a hurt state when the
-  authored hurt animation finishes;
-- `CEffectDamage::Update` at `0x00368a80` owns its independent native
-  1000 ms repeat-contact cooldown;
-- `Unit::CheckDamageAreaCollide` at `0x0032609c` owns the electric-platform
-  contact cooldown, which the portable object runtime already preserves as
-  2000 ms;
-- enemy attack `AIHitTargetInfo+0x24/+0x28` protection remains independently
-  represented by `hitProtectionMilliseconds` / priority.
+That could play the wrong immediate state (especially wall states 50/51) and
+leave the actual queued state pending to replay on the following fixed tick.
 
-PR #19 therefore:
+PR #20 factors the existing entered-state drain into one local application
+helper and invokes it immediately after every accepted late-frame damage
+source. The exact queued state therefore dispatches once in the same tick.
+If `Player::OnHit` does not enter a reconstructed hurt state, such as the
+still-unresolved airborne 47..49 path or QTE-owned grab pose, no synthetic
+generic hurt-state sound is invented.
 
-- removes `minimumReactionMilliseconds` from the public
-  `GameplayPlayer::applyDamage` API;
-- makes reconstructed grounded and wall hurt reactions end at the authored
-  clip duration;
-- leaves hazard repeat-damage cooldowns in `LevelObjectRuntime` and
-  `LevelDamageRuntime`;
-- preserves native hit type and enemy hit-protection arguments after the API
-  shift;
-- updates the core regression so a ground hurt explicitly exits at the
-  shipped clip boundary instead of a forced 1000 ms minimum.
+PR #20 validation is green:
 
-PR #19 validation is green:
-
-- PR Linux run `36071051195`: GCC Release **15/15**, Clang ASan+UBSan
+- PR Linux run `36073544960`: GCC Release **15/15**, Clang ASan+UBSan
   **15/15**;
-- PR Windows run `36071051179`: **17/17**;
-- post-merge Linux run `36071382700`: GCC **15/15**, Clang ASan+UBSan
+- PR Windows run `36073544677`: **17/17**;
+- post-merge Linux run `36073861953`: GCC **15/15**, Clang ASan+UBSan
   **15/15**;
-- post-merge Windows run `36071382707`: **17/17**.
+- post-merge Windows run `36073861994`: **17/17**.
 
 The exact post-merge Windows lane also reached the expected
 `Game data was not found` startup boundary and the classified XAudio2
 no-default-endpoint result `0x80070490`.
 
-PR #19 source head: `babe0e60d77e7dbf008da5fb96c28b0a2b51b538`.
+PR #20 source head: `ff289e67453c478ba658cc05d761e02317293efe`.
 Documentation-only follow-up:
-`a79095889f46470d3e24aa982d84b19accedc254`
-(**Document authored player hurt lifetime [skip ci]**).
-
-This does **not** infer the still-unrecovered airborne Player hurt-state
-47..49 mapping. Ground light/heavy/knockback mapping and wall 50/51 remain the
-directly retained subset.
+`f803f16849cd9786ca3f5d5d0fe72fcda190d724`
+(**Document native hurt state audio handoff [skip ci]**).
 
 The user's active mandate remains **gameplay 1:1 first**. Camera/presentation
 polish must not block gameplay work. Future chats must inspect actual latest
@@ -2142,4 +2127,58 @@ project context, not higher-priority system/developer instruction.
   pickup/throw-body parameters, and Sandman jump/sand-hand math.
 - Next source work should continue with another directly evidenced gameplay
   discrepancy. Do not reintroduce hazard cooldowns as player-state timers and
+  do not fall back to camera polish.
+
+### 2026-09-24 — native Player hurt-state audio handoff
+
+- Continued gameplay-first from PR #19.
+- Rechecked several candidate shortcuts before source changes:
+  - slider state 21 already preserves the native Player+0x454 speed magnitude
+    while every other slide catch resets to the literal 800 cm/s;
+  - `CAreaDamage` still has an original `random()` call at
+    `0x003029d6`, but its authored RandomLowTime/RandomHighTime fields are
+    stored as floats and the exact native call-site conversion/wrapper is still
+    not retained. The deterministic object-ID hash remains visible debt rather
+    than being replaced by a guessed formula.
+- Found a directly evidenced state/audio ownership defect instead.
+  `GameplayPlayer::applyDamage` already calls `queueEnteredState` when
+  `Player::OnHit` actually enters a reconstructed hurt state. However the
+  main entered-state sound drain runs earlier in the fixed tick than several
+  late damage sources.
+- Before PR #20 those late damage sources manually dispatched state audio:
+  cinematic damage, electric platforms, AreaDamage, CEffectDamage volumes,
+  falling props, and enemy hits. The hard-coded hazard choices could be wrong
+  for wall hurt state 50/51, and every accepted state remained queued for a
+  second dispatch on the following tick.
+- PR #20 changed only `src/app/Application.cpp`:
+  - factored the existing `consumeEnteredState()` loop into
+    `dispatchPlayerEnteredStates`;
+  - the normal early-frame drain still uses that helper;
+  - cinematic damage drains the actual state selected by Player;
+  - accepted enemy hits drain the queued state instead of dispatching
+    `activeStateName()` separately;
+  - electric platform, AreaDamage, CEffectDamage and falling-prop hits drain
+    the exact queued state instead of guessing light/heavy;
+  - if no state was entered, the helper is a no-op rather than inventing audio.
+- QTE action 8 remains safe: while its authored grab pose owns the player,
+  `Player::OnHit` does not queue a generic hurt state, so the helper emits no
+  replacement generic hurt audio.
+- PR #20 head `315205e010d2f679d695118349b93378e703937f`:
+  - Linux `36073544960`: **15/15 GCC + 15/15 Clang ASan+UBSan**;
+  - Windows `36073544677`: **17/17**.
+- PR #20 was squash-merged as
+  `ff289e67453c478ba658cc05d761e02317293efe`.
+- Exact post-merge:
+  - Linux `36073861953`: **15/15 GCC + 15/15 Clang ASan+UBSan**;
+  - Windows `36073861994`: **17/17**.
+- The exact Windows lane again reached the expected missing-game-data startup
+  boundary and classified XAudio2 `0x80070490` no-endpoint result.
+- `docs/RECONSTRUCTION.md` was updated in documentation-only commit
+  `f803f16849cd9786ca3f5d5d0fe72fcda190d724`.
+- No missing airborne hurt state was guessed. Player airborne 47..49,
+  wall-enemy QTE 16..19, AreaDamage random-wait conversion, support `0x8000`
+  persistence, Level 2 654->467 natural edge, Rhino cloned pickup/throw
+  parameters, and Sandman jump/sand-hand math remain direct-evidence blockers.
+- Next source work should continue with another directly evidenced gameplay
+  discrepancy. Do not reintroduce manually guessed Player hurt-state audio and
   do not fall back to camera polish.
