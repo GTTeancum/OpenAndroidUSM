@@ -1,26 +1,21 @@
 #pragma once
 
 #include <cstdint>
-#include <limits>
 
 namespace usm::game {
 
-// CQTEManager::IsOutTime (0x0037a4b8) compares its accumulated absolute
-// timer with a strict > duration check. Wall-web Player::UpdateQTE routes the
-// same manager semantics while its character animation remains on game time.
-[[nodiscard]] constexpr std::uint32_t advanceWallWebPromptClock(
-    std::uint32_t elapsedMilliseconds,
-    std::uint32_t realMilliseconds) noexcept {
-    return elapsedMilliseconds >
-                   std::numeric_limits<std::uint32_t>::max() - realMilliseconds
-               ? std::numeric_limits<std::uint32_t>::max()
-               : elapsedMilliseconds + realMilliseconds;
+// CQTEManager stores its elapsed/idle timing in floating-point milliseconds.
+// Wall-web Player::UpdateQTE routes the same manager semantics while its
+// character animation remains on game time.
+[[nodiscard]] constexpr float advanceWallWebPromptClock(
+    float elapsedMilliseconds, std::uint32_t realMilliseconds) noexcept {
+    return elapsedMilliseconds + static_cast<float>(realMilliseconds);
 }
 
+// CQTEManager::IsOutTime (0x0037a4b8) uses a strict > comparison.
 [[nodiscard]] constexpr bool wallWebPromptExpired(
-    std::uint32_t elapsedMilliseconds,
-    float durationMilliseconds) noexcept {
-    return static_cast<float>(elapsedMilliseconds) > durationMilliseconds;
+    float elapsedMilliseconds, float durationMilliseconds) noexcept {
+    return elapsedMilliseconds > durationMilliseconds;
 }
 
 enum class WallWebPromptOutcome {
@@ -33,7 +28,7 @@ enum class WallWebPromptOutcome {
 // IsOutTime in the same update. Therefore a final action arriving after the
 // strict timeout boundary loses even when CheckSuccess briefly succeeds.
 [[nodiscard]] constexpr WallWebPromptOutcome wallWebPromptOutcome(
-    bool succeeded, std::uint32_t elapsedMilliseconds,
+    bool succeeded, float elapsedMilliseconds,
     float durationMilliseconds) noexcept {
     if (wallWebPromptExpired(elapsedMilliseconds, durationMilliseconds)) {
         return WallWebPromptOutcome::Failure;
