@@ -278,13 +278,18 @@ message flag alone is the complete throw behavior.
 `level2-opening.usmauto` verifies the direct gameplay bootstrap and native
 readback. `level2-bank-combat.usmauto` exercises the first two authored enemy
 gates: it destroys the four lower-floor actors and observes cinematic 654,
-then uses an explicit diagnostic teleport to isolate the upper-floor cohort
-and observes cinematic 20042. `level2-progress-command-probe.usmauto` proves
-the shipped `Throwing -> StopAction -> StartProgress` order and HUD state;
+then requests shipped cinematic 467 and waits for its authored `MoveObject`
+to carry Spider-Man onto the upper bank before fighting that cohort and
+observing cinematic 20042. The earlier raw coordinate teleport has been
+removed; `start_cinematic 467` is still an explicit process-local diagnostic
+request because the natural 654-to-467 trigger edge has not yet been recovered.
+`level2-progress-command-probe.usmauto` proves the shipped
+`Throwing -> StopAction -> StartProgress` order and HUD state;
 `level2-scripted-restore-probe.usmauto` proves the authored health/death path.
-The probes keep room rendering, enemy animation,
-combat state, baked-lightmap materials, and cinematic dispatch live, but it is
-not a claim of continuous traversal or complete Level 2 playability.
+The probes keep room rendering, enemy animation, combat state,
+baked-lightmap materials, and cinematic dispatch live, but the explicit
+cinematic request means this is still not a claim of continuous traversal or
+complete Level 2 playability.
 
 ## Level 3 rooftop progression milestone
 
