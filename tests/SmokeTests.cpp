@@ -10089,6 +10089,55 @@ int main() {
         // alive while its action/sense/successor messages are processed.
         assert(taskedSandman->selectedMeleeAttackId == 69);
         assert(!taskedSandman->animationLoops);
+        const auto& sandmanArchetype =
+            bootstrap.enemyArchetypes()[taskedSandman->asset->archetypeIndex];
+        const auto* sandmanGroundAttackClip =
+            sandmanArchetype.animationBank.findClip("ground_attack1");
+        assert(sandmanGroundAttackClip != nullptr);
+        const float expectedSandmanAttackSpeed =
+            sandmanAttack->startupMilliseconds > 0.0F
+                ? static_cast<float>(
+                      sandmanGroundAttackClip->durationMilliseconds()) /
+                      sandmanAttack->startupMilliseconds
+                : 1.0F;
+        assert(std::abs(taskedSandman->animationSpeed -
+                        expectedSandmanAttackSpeed) < 0.001F);
+
+        // Task 3 owns the same CBehaviorMeleeAttack startup-turn rule as the
+        // ordinary melee path. Prove the boss-specific loop no longer homes
+        // continuously when the shipped +0xc/startup fields do not request it.
+        usm::game::LevelEnemyRuntime sandmanTurnRuntime;
+        assert(sandmanTurnRuntime.initialize(bootstrap));
+        assert(sandmanTurnRuntime.applyCinematicCommand(
+            bootstrap, sandmanThread, showSandman));
+        assert(sandmanTurnRuntime.applyCinematicCommand(
+            bootstrap, sandmanThread,
+            usm::game::CinematicCommand{0, -1, "EnableAI", {}}));
+        const auto* turningSandman = sandmanTurnRuntime.find(1199);
+        assert(turningSandman != nullptr);
+        const usm::assets::Vector3 initialTurnTarget{
+            turningSandman->position.x + 100.0F,
+            turningSandman->position.y,
+            turningSandman->position.z};
+        sandmanTurnRuntime.updateGameplay(1, initialTurnTarget);
+        turningSandman = sandmanTurnRuntime.find(1199);
+        const auto initialSandmanFacing = turningSandman->facing;
+        const usm::assets::Vector3 movedTurnTarget{
+            turningSandman->position.x,
+            turningSandman->position.y + 100.0F,
+            turningSandman->position.z};
+        sandmanTurnRuntime.updateGameplay(1, movedTurnTarget);
+        turningSandman = sandmanTurnRuntime.find(1199);
+        if (sandmanAttack->turnTowardTargetDuringStartup &&
+            sandmanAttack->startupMilliseconds > 0.0F) {
+            assert(turningSandman->facing.y > 0.99F);
+        } else {
+            assert(std::abs(turningSandman->facing.x -
+                            initialSandmanFacing.x) < 0.001F);
+            assert(std::abs(turningSandman->facing.y -
+                            initialSandmanFacing.y) < 0.001F);
+        }
+
         sandmanTaskRuntime.updateGameplay(666, sandmanTarget);
         sandmanTaskRuntime.updateGameplay(1, sandmanTarget);
         taskedSandman = sandmanTaskRuntime.find(1199);
