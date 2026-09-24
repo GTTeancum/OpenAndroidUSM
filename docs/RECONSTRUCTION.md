@@ -577,9 +577,15 @@ key at 4% deals 85 damage and plays `SFX_SLEDGER_ATTACK_2`. Root displacement
 comes from the two shipped hammer clips, and facing is updated at the queue
 transition as `UpdateAttackMelee_DoAttack` does rather than continuously
 homing during the charge. Sandman type 16 selects `ground_attack1` and attack
-69 (75 damage, 400 cm). Their key percentages, sectors, damage, reach, ordered
-clips, and sound maps come from the same typed binary tables as the knife/bat
-attacks.
+69 (75 damage, 400 cm). CBoss task 3 is the same
+`CBehaviorMeleeAttack` owner: its phase-selected opening clip now retains the
+selected `EnemyAttackInfo`, uses `EnemyAttackInfo+8` for the startup
+wall-clock via `SetAnimWithSpeed`, and honors the `+0xc` turning flag only
+during that initial startup window. The former boss-specific loop that faced
+Spider-Man every update, including authored successor clips, was not part of
+that retained behavior and has been removed. Their key percentages, sectors,
+damage, reach, ordered clips, and sound maps come from the same typed binary
+tables as the knife/bat attacks.
 
 `EnemyRangeAttackConfigDatabase` follows
 `EnemyAttributeFile::ReadEnemyRangeAttackInfo` at `0x0033b820` and decodes all
