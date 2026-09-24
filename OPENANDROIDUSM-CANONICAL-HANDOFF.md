@@ -100,19 +100,20 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`75df3a591abed97f97f997a90956c81667b2adad`  
-**Validate retained ultimate-state boundaries**
+`87150ca95323b9ed81ca74305caa2e9a518990b8`  
+**Pin hosted QTE IGM press-clear boundary**
 
-This is the squash merge of PR #7. It directly tests the retained
-`Player::IsUltimate(-1)` predicate at ELF `0x0033002c` as the inclusive
-state-ID range **107..113**, which is used by hostage rescue eligibility.
-`GameplayPlayer::isUltimateState()` delegates to that pure predicate with no
-behavior change. The existing hosted `QteParity.attributes` group already
-covered the retained hostage `ButtonHeight` default/positive-only adjustment,
-so that behavior was not duplicated or rewritten. The unresolved hostage
-camera-mode calls remain untouched and no original game data is added. The
-canonical-handoff refresh commit is expected to be newer and documentation-only,
-so future chats must still inspect actual latest `main`.
+This is the squash merge of PR #8. It makes **no runtime behavior change**.
+It extends the already-hosted asset-independent
+`OpenAndroidUSM.InputParity.routing` regression to pin the retained
+`CQTEManager::SetState` behavior at ELF `0x0037a7a0-0x0037a7b2`:
+clearing the one-shot direct IGM/Start press flag does not synthesize a
+physical release, does not clear the held Start state, and does not reset
+CKeyPad's separate two-update press history. A later physical Start release
+still produces the normal release. The unresolved hostage camera-mode calls
+remain untouched and no original game data is added. The canonical-handoff
+refresh commit is expected to be newer and documentation-only, so future chats
+must still inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -1356,4 +1357,66 @@ project context, not higher-priority system/developer instruction.
   instruction evidence, then reconstruct only the directly evidenced
   `CGameCamera::SetMode` calls. Until that evidence is available, continue only
   another directly retained evidence-backed validation slice or host/platform
+  validation; do not infer the missing camera modes.
+
+### 2026-09-24 — hosted QTE IGM press-clear boundary validation
+
+- Confirmed `main` began this turn at
+  `2a23a9ba22558f137050418902850ebf56521a7c`, the documentation-only
+  takeover handoff refresh. The latest validated source/tooling/CI head before
+  this turn was PR #7's `75df3a591abed97f97f997a90956c81667b2adad`.
+- Reconfirmed the strict chronological gameplay blocker remains the original
+  `CHostage::Update` `CGameCamera::SetMode` calls. The verified
+  `libspiderman.so` / raw function body is still unavailable in current
+  conversation/Library sources, so no camera behavior was guessed or changed.
+- Audited two nearby unresolved areas before editing:
+  - native `CLevel::PauseTimer/ResumeTimer` evidence proves QTE-clock pause
+    calls, but the complete Start/pause-menu lifecycle is not retained strongly
+    enough to wire the PC pause menu without inference;
+  - RE03 explicitly records the success explosion as a scaled/material-flagged
+    draw whose exact rendering remains unresolved, so no explosion visual was
+    approximated.
+- Found one exact retained input fact that was implemented but not directly
+  pinned by the hosted asset-independent suite:
+  `CQTEManager::SetState`, ELF `0x0037a7a0-0x0037a7b2`, clears the direct
+  IGM/Start **press flag** before result handoff without turning the held
+  physical Start button into a release or resetting CKeyPad history.
+- Changed only `tests/InputParityTests.cpp`:
+  - press Start through the production XInput translator/router;
+  - verify both direct and keypad publications observe the press/hold;
+  - call `consumePausePress()` and verify only the direct one-shot press clears;
+  - verify held/release state and `pressedFramesRemaining` are preserved;
+  - verify the separate gameplay-keypad press/hold/release/history is unchanged;
+  - release physical Start and verify the real release still arrives.
+- No CMake/workflow selector change was required because
+  `OpenAndroidUSM.InputParity.routing` was already in both fail-closed hosted
+  selectors.
+- PR #8 head `bbf7b112dde5d248124eb4d2805fa90eac5ae6ed` validation:
+  - Linux run `35998455233`: GCC Release **12/12 passed** and Clang
+    ASan+UBSan **12/12 passed**; `OpenAndroidUSM.InputParity.routing` passed in
+    both and no sanitizer diagnostic was reported.
+  - Windows run `35998455221`: **14/14 passed**;
+    `OpenAndroidUSM.InputParity.routing` and
+    `OpenAndroidUSM.D3D11BackendTests` passed; startup reached the expected
+    missing-game-data boundary; XAudio2 reached the classified no-default-
+    endpoint `0x80070490` path.
+  - MSVC emitted the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; this turn did not touch
+    that file.
+- PR #8 was squash-merged as
+  `87150ca95323b9ed81ca74305caa2e9a518990b8`.
+- Post-merge validation for that exact squash commit completed green:
+  - Linux run `35999083591`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+    `OpenAndroidUSM.InputParity.routing` passed in both;
+  - Windows run `35999083606`: **14/14 passed**, including
+    `OpenAndroidUSM.InputParity.routing` and D3D11 backend validation, with the
+    same expected missing-data startup boundary and classified XAudio2
+    `0x80070490` no-endpoint result.
+- This turn strengthens hosted proof of an already-reconstructed input boundary;
+  it does **not** complete the native pause menu, QTE success explosion, or
+  hostage camera behavior.
+- Exact strict continuation remains recovery of the verified original
+  `libspiderman.so` / raw `CHostage::Update` instructions for the camera-mode
+  calls. If that material remains unavailable, continue only another
+  directly-retained evidence-backed validation slice or host/platform
   validation; do not infer the missing camera modes.
