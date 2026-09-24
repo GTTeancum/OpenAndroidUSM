@@ -50,8 +50,8 @@ int main() {
             !check(state.jump.pressed == (jumpHeld && (jumpEdge || previousJumpEdge)), frame, "two-update jump window") ||
             !check(state.punch.pressed == (punchHeld && (punchEdge || previousPunchEdge)), frame, "two-update punch window") ||
             !check(state.rescueRequested == (connected && ((up & xi::RightShoulder) != 0)), frame, "R1 release") ||
-            !check(state.switchRequested == state.rescueRequested, frame, "switch event") ||
-            !check(!state.switchRequested || state.switchRequestValue == 4, frame, "switch value") ||
+            !check(state.interactiveButtonRequested == state.rescueRequested, frame, "interactive button event") ||
+            !check(!state.interactiveButtonRequested || state.switchCounter == 4, frame, "switch counter seed") ||
             !check(state.web.held == ((current & xi::B) != 0), frame, "web held") ||
             !check(state.spiderSense.held == ((current & xi::LeftShoulder) != 0), frame, "sense held")) {
             return 1;
