@@ -788,11 +788,10 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
                 attachment.slideCarBridgeObjectId = bridge.asset->objectId;
                 attachment.slideCarBridgeMinimum = minimum;
                 attachment.slideCarBridgeMaximum = maximum;
-                const BridgeAttachmentPose pose = bridgeAttachmentPose(
-                    bridge.position, bridge.bridgeRotation, halfHeight,
-                    attachment.position, attachment.slideCarInitialRotation);
-                attachment.position = pose.position;
-                attachment.slideCarRotation = pose.rotation;
+                attachment.position.z =
+                    bridge.position.z + halfHeight;
+                attachment.slideCarRotation =
+                    attachment.slideCarInitialRotation;
                 attachment.worldTransform = worldMatrix(
                     attachment.position, attachment.slideCarRotation,
                     attachment.asset->scale);
@@ -802,11 +801,10 @@ Result LevelObjectRuntime::initialize(const LevelOneBootstrap& level) {
                     continue;
                 }
                 attachment.areaDamageBridgeObjectId = bridge.asset->objectId;
-                const BridgeAttachmentPose pose = bridgeAttachmentPose(
-                    bridge.position, bridge.bridgeRotation, halfHeight,
-                    attachment.position, attachment.areaDamageInitialRotation);
-                attachment.position = pose.position;
-                attachment.areaDamageRotation = pose.rotation;
+                attachment.position.z =
+                    bridge.position.z + halfHeight;
+                attachment.areaDamageRotation =
+                    attachment.areaDamageInitialRotation;
                 attachment.worldTransform = worldMatrix(
                     attachment.position, attachment.areaDamageRotation,
                     attachment.asset->scale);
@@ -1891,12 +1889,8 @@ void LevelObjectRuntime::resetTransientForCheckPointLoad() noexcept {
                 const float halfHeight = std::abs(
                     bridge->asset->collisionLocalMaximum.z -
                     bridge->asset->collisionLocalMinimum.z) * 0.5F;
-                const BridgeAttachmentPose pose = bridgeAttachmentPose(
-                    bridge->asset->position, bridge->asset->rotation,
-                    halfHeight, object.position,
-                    object.areaDamageInitialRotation);
-                object.position = pose.position;
-                object.areaDamageRotation = pose.rotation;
+                object.position.z =
+                    bridge->asset->position.z + halfHeight;
             }
             object.worldTransform = worldMatrix(
                 object.position, object.areaDamageRotation,
