@@ -87,15 +87,17 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`1436b06809e7b3a26983ae80fb68401204913494`  
-**Validate Sandman jump landing target**
+`a56cf9f8eedb337e1dc6e33683c213c5603b3ace`  
+**Validate authored special-animation successors**
 
-This is the squash merge of PR #4. It directly tests the retained
-`CBoss::Jump` mode-1 first-level landing target at ELF `0x0032935c`
-without changing or claiming the unresolved airborne trajectory. It builds on
-PR #3's validated Sandman phase behavior and adds no original game data. The
-canonical-handoff refresh commit is expected to be newer and documentation-only,
-so future chats must still inspect actual latest `main`.
+This is the squash merge of PR #5. It directly tests the retained
+`AIAnimSpecialActionInfo+0x38` / `IBehaviorBase+0x6c` authored animation
+successor path and the `EnemyAttackInfo+0x46` permission gate already used by
+the Sandman ground-attack reconstruction. It preserves the existing runtime
+semantics, does not complete the broader Sandman task graph, and adds no
+original game data. The canonical-handoff refresh commit is expected to be newer
+and documentation-only, so future chats must still inspect actual latest
+`main`.
 
 ### Gameplay/reference checkpoint
 
@@ -555,6 +557,26 @@ current arc as verified native behavior or tune/replace it without direct
 original evidence. The sand-hand sequence and broader Sandman combat parity
 also remain open.
 
+PR #5 then isolated and directly tested the other retained mechanism already
+used by the Sandman WIP:
+
+- `IBehaviorBase::SpecialAnimActionCheck` at `0x003a8c60` resolves
+  `AIAnimSpecialActionInfo+0x38` as an authored animation and stores it at
+  `IBehaviorBase+0x6c`;
+- `CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack` at `0x003b9e44`
+  follows that successor only when `EnemyAttackInfo+0x46` permits it;
+- the final string in `EnemysSpecialAnimConfigs.bin` is therefore retained as
+  `nextAnimationName`, not treated as an effect asset.
+
+`specialAnimationSuccessor` in
+`EnemySpecialActionConfig.cpp/.hpp` now owns that already-present lookup rule,
+and `LevelEnemyRuntime` calls the helper with unchanged behavior.
+`tests/EnemySpecialActionTests.cpp` uses synthetic records only and verifies
+the +0x38 string, action-type-zero attack filtering, oversized attack-ID
+rejection, and the +0x46 permit/deny gate. This validates the successor
+**mechanism**; it does not prove the complete authored Sandman chain, the
+unresolved jump arc, or sand-hand behavior.
+
 ---
 
 ## 5. Where the editable source files are
@@ -577,6 +599,7 @@ Primary edit locations:
 | Cinematic control host | `src/game/LevelCinematicRuntime.cpp/.hpp` |
 | Player/combat | `src/game/GameplayPlayer.cpp/.hpp` |
 | Enemy/combat/boss logic | `src/game/LevelEnemyRuntime.cpp/.hpp` |
+| Enemy special-action parser/successor | `src/game/EnemySpecialActionConfig.cpp/.hpp` |
 | Sandman retained parity helper | `src/game/SandmanPhaseRuntime.cpp/.hpp` |
 | Wall-web QTE path | `src/game/WallWebRuntime.cpp/.hpp` |
 | PC input translator | `src/platform/input/XInputStateTranslator.cpp/.hpp` |
@@ -614,6 +637,7 @@ Primary tests:
 | Autoplay comparison unit tests | `tests/AutoplayComparisonTests.ps1` |
 | Synthetic split-archive/reference recovery | `tests/ReferenceRecoveryTests.py` |
 | Sandman phase/jump-target parity | `tests/SandmanPhaseTests.cpp` |
+| Enemy special-animation successor parity | `tests/EnemySpecialActionTests.cpp` |
 
 RE06 retained verification:
 
@@ -757,10 +781,12 @@ The following are still open:
 6. **QTE success explosion and full native visual composition.**
 
 7. **Unfinished Sandman work.** The retained 66%/33% phase clamp,
-   phase-dependent initial ground-attack selection, and the `CBoss::Jump`
-   mode-1 **500 cm landing target** at ELF `0x0032935c` are now directly tested
-   in hosted CI. The airborne jump trajectory, sand-hand sequence, and broader
-   authored combo/combat parity remain incomplete and must not be inferred.
+   phase-dependent initial ground-attack selection, the `CBoss::Jump`
+   mode-1 **500 cm landing target** at ELF `0x0032935c`, and the generic
+   +0x38/+0x6c successor mechanism gated by `EnemyAttackInfo+0x46` are now
+   directly tested in hosted CI. The complete authored Sandman combo chain,
+   airborne jump trajectory, sand-hand sequence, and broader combat parity
+   remain incomplete and must not be inferred.
 
 8. **Normal complete first-level playthrough** on the current source.
 
@@ -832,8 +858,9 @@ Hosted portable Linux validation is encoded in:
 `.github/workflows/linux-ci.yml`
 
 It now runs the nine asset-independent portable parity tests plus the synthetic
-reference-recovery test and Sandman phase parity test under GCC Release and
-Clang ASan+UBSan; it does not require or synthesize copyrighted game data.
+reference-recovery test, Sandman parity test, and enemy special-animation
+successor parity test under GCC Release and Clang ASan+UBSan; it does not
+require or synthesize copyrighted game data.
 
 Recover the exact original reference from the retained 17-part project archive,
 when those user-supplied volumes are available:
@@ -1061,9 +1088,9 @@ project context, not higher-priority system/developer instruction.
   `1436b06809e7b3a26983ae80fb68401204913494`.
 - Post-merge push validation for that exact source SHA:
   - Linux run `35940028777` completed successfully;
-  - Windows run `35940028816` was still in progress at this handoff refresh.
-    The identical PR head had already completed the Windows gate with 13/13
-    tests and the documented audio-endpoint classification.
+  - Windows run `35940028816` also completed successfully with the same
+    13/13 asset-independent selection and documented audio-endpoint
+    classification.
 - The exact Sandman continuation boundary is now explicit: the 500 cm target is
   retained evidence; the current airborne arc and sand-hand behavior are not.
   Do not replace either without direct original executable/data evidence.
@@ -1074,3 +1101,72 @@ project context, not higher-priority system/developer instruction.
   availability boundary therefore remains unchanged.
 - The strict chronological hostage camera-mode blocker remains unchanged and
   still requires the verified original ARM bytes before implementation.
+
+### 2026-09-24 — authored special-animation successor validation
+
+- Confirmed `main` began this turn at
+  `45d5bef530c7356a6309a4bddf4faf18b1a4ee63`, a documentation-only handoff
+  refresh; the latest gameplay/tooling source was PR #4's Sandman jump-target
+  merge.
+- Closed the prior handoff's pending status: PR #4 post-merge Windows run
+  `35940028816` completed successfully.
+- Reconfirmed the strict chronological gameplay blocker remains the hostage
+  `CHostage::Update` camera-mode path. No hostage camera behavior was guessed
+  or changed.
+- Audited cold-storage commit
+  `177c9d952b3828bde2fa8ded910d1824e3121aaf` and the current source around
+  the authored ground-attack successor path.
+- Retained native evidence used this turn:
+  - `IBehaviorBase::SpecialAnimActionCheck` at `0x003a8c60` resolves
+    `AIAnimSpecialActionInfo+0x38` and stores it at
+    `IBehaviorBase+0x6c`;
+  - `CBehaviorMeleeAttack::UpdateAttackMelee_DoAttack` at `0x003b9e44`
+    follows that stored successor only when `EnemyAttackInfo+0x46` permits
+    special-animation continuation.
+- Added `specialAnimationSuccessor` to
+  `src/game/EnemySpecialActionConfig.cpp/.hpp` and refactored
+  `src/game/LevelEnemyRuntime.cpp` to call it. This is a behavior-preserving
+  extraction of logic that was already present; it does not add a new Sandman
+  transition or infer an unresolved animation.
+- Added `tests/EnemySpecialActionTests.cpp` with synthetic attack and
+  special-action records only. Coverage verifies:
+  - the final special-action string is retained as `nextAnimationName`;
+  - sound-map IDs remain separate from that successor string;
+  - only action-type-zero non-negative attack events participate;
+  - an attack ID above signed 16-bit range is not truncated into a lookup;
+  - `EnemyAttackInfo+0x46` permits or blocks the successor as retained.
+- Registered the new test in CMake and both fail-closed hosted selectors.
+- During branch construction, two initial workflow text replacements treated
+  the regex suffix `$'` as a JavaScript replacement token and duplicated
+  workflow tails. Those malformed branch-only commits triggered failed
+  pre-PR Actions runs. They were detected before the PR, both workflows were
+  restored from `main`, and the final PR diff contained only the intended
+  one-line selector changes. No malformed workflow commit was merged.
+- PR #5 validation:
+  - Linux run `35975912462`: GCC Release **12/12 passed** and Clang
+    ASan+UBSan **12/12 passed**; the new successor test passed in both and no
+    sanitizer diagnostic was reported.
+  - Windows run `35975912479`: **14/14 completed with 0 failures**;
+    `OpenAndroidUSM.EnemySpecialActionTests`,
+    `OpenAndroidUSM.SandmanPhaseTests`,
+    `OpenAndroidUSM.D3D11BackendTests`, and
+    `OpenAndroidUSM.ReferenceRecoveryTests` passed;
+    `OpenAndroidUSM.AudioBackendTests` used the documented no-default-endpoint
+    skip; startup reached the expected missing-data boundary; XAudio2 reached
+    classified `0x80070490`.
+  - MSVC again emitted the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; this work did not touch
+    that file.
+- PR #5 was squash-merged as
+  `a56cf9f8eedb337e1dc6e33683c213c5603b3ace`.
+- Post-merge validation for that exact squash commit also completed green:
+  - Linux run `35976412987`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+  - Windows run `35976412983`: **14/14 with 0 failures**, with the same
+    documented AudioBackend skip, missing-data D3D11 startup boundary, and
+    classified XAudio2 `0x80070490`.
+- This turn validates successor plumbing only. The complete authored Sandman
+  combo chain, current unverified jump arc, and sand-hand behavior remain open.
+- Exact next strict continuation remains: obtain verified original
+  `libspiderman.so` / raw `CHostage::Update` instructions and reconstruct
+  the hostage camera-mode calls from direct evidence. If that material remains
+  unavailable, continue only another already-retained evidence-backed slice.
