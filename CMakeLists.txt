@@ -153,6 +153,7 @@ add_library(OpenAndroidUSM.Core STATIC
     src/game/QteFeedbackGeometry.cpp
     src/game/QuickTimeEventRuntime.cpp
     src/game/QteCinematicHandoff.cpp
+    src/game/SandmanPhaseRuntime.cpp
     src/game/WallWebRuntime.cpp
     src/game/WebGrabPointRuntime.cpp
     src/game/WebLineGeometry.cpp
@@ -306,6 +307,14 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
         set_tests_properties(OpenAndroidUSM.InputParity.${group} PROPERTIES
             TIMEOUT 120 LABELS "input-parity")
     endforeach()
+
+    add_executable(OpenAndroidUSM.SandmanPhaseTests tests/SandmanPhaseTests.cpp)
+    target_compile_features(OpenAndroidUSM.SandmanPhaseTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.SandmanPhaseTests PRIVATE OpenAndroidUSM.Core)
+    add_test(NAME OpenAndroidUSM.SandmanPhaseTests
+        COMMAND OpenAndroidUSM.SandmanPhaseTests)
+    set_tests_properties(OpenAndroidUSM.SandmanPhaseTests PROPERTIES
+        TIMEOUT 30 LABELS "sandman-parity")
 
     add_executable(OpenAndroidUSM.InputTransitionsTests tests/InputTransitionsTests.cpp)
     target_compile_features(OpenAndroidUSM.InputTransitionsTests PRIVATE cxx_std_20)
