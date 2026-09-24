@@ -50,13 +50,14 @@ void routeState(GameplayInputState& state_, const XperiaKeyEvent& event,
         break;
     case XperiaKeyCode::R1:
         // appKeyReleased, ELF 0x003cc2b8-0x003cc2ea:
-        // key 0x67 + scan 0x137 in gameplay writes rescue=1, switch=1,
-        // switch payload=4. appKeyPressed has no corresponding R1 action.
+        // key 0x67 + scan 0x137 in gameplay writes rescue=1, the
+        // InteractiveButton boolean=1, and the CSwitchObject counter=4.
+        // appKeyPressed has no corresponding R1 action.
         if (event.scanCode == XperiaScanCode::R1 && gameplay &&
             !event.pressed) {
             state_.rescueRequested = true;
-            state_.switchRequested = true;
-            state_.switchRequestValue = 4;
+            state_.interactiveButtonRequested = true;
+            state_.switchCounter = 4;
         }
         break;
     case XperiaKeyCode::DpadUp:
