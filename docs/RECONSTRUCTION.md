@@ -1725,20 +1725,32 @@ manifold-driven transition and the native transmission-body support/carry
 relationship therefore remain open. `Unit::UpdateTransmission` and
 `PhysicsEntity::preUpdate` remain the evidence boundary for that work.
 
-The rider path is also identified. `Unit::GetPhysicsContextFlags`
-(`0x00322b20`) reads the physics context bitmask, not a scene-node bounds
-test. `Unit::UpdateTransmission` (`0x00323388`) examines `0x80` manifold
-contacts, tests both oriented contact normals against the native ground
-threshold `0.70710677`, and records the supporting physics body. It sends
-messages `0xd2`/`0xd1` when changing support and clears a previous support
-without its `0x8000` persistence bit. `PhysicsEntity::preUpdate`
-(`0x003d799c`) adds that body's linear/displacement velocity and its angular
-contribution at the rider's relative position before updating the rider's
-physics position. `Unit::UpdatePhysicsPosition` (`0x003243cc`) then copies
-the result back to the render unit. This is distinct from snapping feet to
-the current road height; the portable ground-height query currently does
-not preserve this supporting-body/contact information. These functions are
-the starting point for the remaining carry/contact reconstruction.
+The rider path follows `Unit::GetPhysicsContextFlags`
+(`0x00322b20`) and `Unit::UpdateTransmission` (`0x00323388`): native
+code examines `0x80` manifold contacts, tests both oriented contact normals
+against the ground threshold `0.70710677`, records the supporting physics
+body, sends messages `0xd2`/`0xd1` on support changes, and clears a
+previous support without its unresolved `0x8000` persistence bit.
+`PhysicsEntity::preUpdate` (`0x003d799c`) then adds support-body motion
+before the rider update, and `Unit::UpdatePhysicsPosition` (`0x003243cc`)
+copies the result back to the render unit.
+
+The portable runtime now preserves direct support identity for both dynamic
+objects **and room collision**. `LevelCollision::groundHeight` returns the
+object ID for dynamic transmission bodies or the loader's `roomIndex+1`
+identity for static room triangles. Application snapshots direct support
+before bridge/room motion, advances the world, rebuilds collision, then applies
+the support displacement before the player update. Dynamic objects retain the
+existing full transform-at-rider-point carry (translation/rotation/scale);
+moving `CRoom` support contributes its exact frame-to-frame translation,
+matching the retained translation-only `RoomMotionState`/CRoom::Move path.
+Synthetic hosted tests pin room support identity and failed-contact clearing.
+
+This is still not a blanket native contact-manifold claim. Direct contact is
+sampled through the portable ground-support query rather than Bullet's exact
+`0x80` manifold set, and the mapping/ownership semantics of native
+`0x8000` persistence remain unrecovered. The portable runtime therefore
+drops support when direct support is absent instead of guessing persistence.
 
 Comic-cover notices follow `CComicCover::RenderTip` at `0x00304228`,
 `CTutorial::AddCoverInfo` at `0x0038c77c`, and
