@@ -49,6 +49,19 @@ struct HostageInput {
 
 enum class HostageQteOutcome { Inactive, Running, Success, Failure };
 
+// CHostage::Update (ELF 0x00328068, 0x00328444-0x0032847e) requests the
+// transient untie sound only in hostage state 2 while Player remains in rescue
+// state 28 and CQTEManager reports exactly seven remaining actions.
+[[nodiscard]] bool hostageUntieSoundEligible(
+    HostageRescuePhase phase, std::uint16_t playerStateId,
+    std::int16_t remainingActions) noexcept;
+
+// CHostage::Update (ELF 0x003283ba onward) accepts both manager display and
+// handled states for the terminal outcome. All other manager states remain
+// running while the hostage owns rescue state 2.
+[[nodiscard]] HostageQteOutcome hostageQteOutcomeForManagerState(
+    QteState state) noexcept;
+
 struct LevelHostageState {
     const LevelObjectAsset* asset{};
     HostageRescuePhase phase{HostageRescuePhase::Tied};
