@@ -1,8 +1,10 @@
 # Level 2 starts in the bank lobby with four molotov thugs on the ground floor
 # and four melee/hammer/molotov enemies on the upper floor. Exercise both
-# authored death-watcher chains. The lower floor uses ordinary combat; the
-# upper cohort uses the process-local damage hook so accumulated lower-floor
-# damage cannot turn this script-chain probe into a player-survival test.
+# authored death-watcher chains. The lower floor uses ordinary combat. After
+# that gate, invoke the shipped bank-up cinematic 467 instead of teleporting:
+# its native type-3 player thread moves the active player to the upper floor.
+# The upper cohort still uses the process-local damage hook so accumulated
+# lower-floor damage cannot turn this script-chain probe into a survival test.
 fixed_step_ms 50
 sample_interval_ms 50
 capture_interval_ms 0
@@ -16,7 +18,9 @@ capture level2-bank-lower-before
 attack 70000 150 502 503 504 10345
 wait_controls 20000
 capture level2-bank-lower-after
-teleport -20350 10000 962 0 1 0
+start_cinematic 467
+wait_cinematic_started 1000 467
+wait_controls 20000
 wait_enemies_active 5000 640 641 642 1141
 wait 500
 capture level2-bank-upper-before
