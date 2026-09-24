@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  ASSET_INDEPENDENT_TEST_REGEX: '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch|OpenAndroidUSM\.ReferenceRecoveryTests|OpenAndroidUSM\.AutoplayHarnessTests|OpenAndroidUSM\.BridgeAttachmentTests|OpenAndroidUSM\.SandmanPhaseTests|OpenAndroidUSM\.EnemySpecialActionTests)$'
+  ASSET_INDEPENDENT_TEST_REGEX: '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch|OpenAndroidUSM\.ReferenceRecoveryTests|OpenAndroidUSM\.AutoplayHarnessTests|OpenAndroidUSM\.RoomSupportTests|OpenAndroidUSM\.BridgeAttachmentTests|OpenAndroidUSM\.SandmanPhaseTests|OpenAndroidUSM\.EnemySpecialActionTests)$'
 
 jobs:
   gcc-release:
