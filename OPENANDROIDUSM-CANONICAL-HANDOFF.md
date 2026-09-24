@@ -105,57 +105,43 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`613600c2ece6b40c76a4856451e186702ea3dbf7`  
-**Attach native AreaDamage bodies to broken bridges**
+`eb63011f2a0d04149ab4d410b3d4484ddd6d8457`  
+**Use authored Level 2 bank-up transition**
 
-This is the squash merge of PR #15 and is a **gameplay/physics parity change**.
+This is the squash merge of PR #16 and is a **gameplay-acceptance improvement**,
+not a claim of complete Level 2 traversal.
 
-Direct retained evidence at `CBrokenBridge::GetSlideCarList`
-(`0x00301da0`) says the bridge collects both `CSlideCar` and
-`CAreaDamage` bodies using the same room-local inclusive XY footprint.
-Both body types are moved to the bridge top; state 4 updates their height and
-rotation with the tilting bridge. Native bridge activation also considers
-player contact on linked cars **and damage bodies**. State 5's
-`CarRunSpeed` path remains specifically `CSlideCar`; PR #15 does not
-invent launch velocity or the car-removal state machine for `CAreaDamage`.
+The prior `level2-bank-combat.usmauto` route destroyed the lower-bank cohort,
+waited for cinematic 654, then used a raw diagnostic player teleport to reach
+the upper-bank cohort. PR #16 removes that transform mutation. The route now
+requests the shipped cinematic **467**, waits for it to start, and lets its
+authored type-3 Player thread / `MoveObject` path carry Spider-Man to the
+upper bank before normal combat continues.
 
-PR #15 therefore:
+The autoplay harness gained a narrow `start_cinematic <id>` directive and
+asset-independent parser/unit coverage. The natural **654 -> 467 trigger edge
+is still not recovered**, so the explicit cinematic request remains a
+process-local diagnostic; this is cleaner and more native-faithful than a raw
+coordinate write, but not yet continuous natural Level 2 traversal.
 
-- adds portable `BridgeAttachmentRuntime` helpers for the exact retained
-  room/footprint and state-4 top-plane/rotation math;
-- links `CAreaDamage` objects to their bridge during
-  `LevelObjectRuntime::initialize`;
-- preserves authored rotation at initial/reset bridge-top placement and applies
-  bridge rotation only during state 4;
-- includes linked damage bodies in non-type-2 bridge contact activation;
-- makes area-damage collision tests use the live attached rotation;
-- restores bridge-linked damage bodies to their reset bridge-top pose;
-- explicitly keeps state-5 `CarRunSpeed` launch restricted to
-  `CSlideCar`;
-- adds `OpenAndroidUSM.BridgeAttachmentTests` to the fail-closed Linux and
-  Windows hosted selectors.
+Validation is green:
 
-Validation for PR #15 and the exact squash commit is green:
+- PR Linux run `36043280889`: GCC **14/14**, Clang ASan+UBSan **14/14**;
+- PR Windows run `36043281031`: **16/16**;
+- post-merge Linux run `36046791843`: GCC **14/14**, Clang ASan+UBSan
+  **14/14**;
+- post-merge Windows run `36046791836`: **16/16**.
 
-- PR Linux run `36030779347`: GCC Release **13/13**, Clang ASan+UBSan
-  **13/13**;
-- PR Windows run `36030779466`: **15/15**;
-- post-merge Linux run `36031216769`: GCC **13/13**, Clang ASan+UBSan
-  **13/13**;
-- post-merge Windows run `36031216815`: **15/15**.
+PR #16 source head: `eb63011f2a0d04149ab4d410b3d4484ddd6d8457`.
+The Level 2 milestone documentation was corrected afterward in
+`808ddb07011d106bf9bf686172c6a9b95b48b582`
+(**Document authored Level 2 bank transition [skip ci]**).
 
-The Windows lanes again reached the expected missing-game-data startup
-boundary and the classified XAudio2 no-default-endpoint `0x80070490` result.
-
-Documentation was refreshed afterward in
-`e9a6a673d65af6bec6c87489dce01aac04284ede`
-(**Document native bridge damage-body attachment [skip ci]**).
-
-This does **not** claim full bridge-physics parity. Native physics-context
-flag `0x100`, contact-manifold-driven CSlideCar removal, and the exact
-transmission-body support/carry relationship remain open. The user's active
-mandate remains **gameplay 1:1 first**; camera/presentation polish must not
-block gameplay work.
+The user's active mandate remains **gameplay 1:1 first**. The next source
+change must still be directly evidenced; do not infer the missing natural
+654->467 trigger, wall-enemy QTE branch, airborne player hurt mapping, Rhino
+pickup flight, AreaDamage RNG conversion, or bridge contact persistence from
+numbering/patterns alone.
 
 ### Gameplay/reference checkpoint
 
@@ -1889,3 +1875,66 @@ project context, not higher-priority system/developer instruction.
 - Next work should remain gameplay-first. Prefer another directly evidenced
   physics/combat/QTE/input discrepancy; do not spend the next turn on camera
   polish and do not invent the unresolved CAreaDamage RNG conversion.
+
+### 2026-09-24 — Level 2 authored bank-up acceptance and gameplay evidence audit
+
+- Continued under the gameplay-first mandate.
+- Found concurrent PR #16 already open on top of the PR #15 checkpoint and
+  inspected it before creating any competing work.
+- PR #16 replaces the raw Level 2 upper-bank teleport in
+  `tests/autoplay/level2-bank-combat.usmauto` with the shipped cinematic 467:
+  - new harness step `start_cinematic 467`;
+  - wait for cinematic 467;
+  - wait for its authored control/MoveObject sequence to finish;
+  - continue ordinary upper-bank combat.
+- Added `start_cinematic` parsing/execution in
+  `AutoplayHarness.cpp/.hpp`, plus `AutoplayHarnessTests.cpp` coverage and
+  fail-closed selector registration.
+- PR #16 head `05e43db8f7a46ded69da5a2d6906a02f93780304` validation:
+  - Linux `36043280889`: GCC **14/14**, Clang ASan+UBSan **14/14**;
+  - Windows `36043281031`: **16/16**.
+- PR #16 was squash-merged as
+  `eb63011f2a0d04149ab4d410b3d4484ddd6d8457`.
+- Exact post-merge validation:
+  - Linux `36046791843`: GCC **14/14**, Clang ASan+UBSan **14/14**;
+  - Windows `36046791836`: **16/16**.
+- The exact-squash Windows lane again reached the expected missing-game-data
+  startup boundary and classified XAudio2 no-endpoint `0x80070490` path.
+- Updated `docs/RECONSTRUCTION.md` in documentation-only commit
+  `808ddb07011d106bf9bf686172c6a9b95b48b582` so it no longer claims the
+  route uses a raw teleport. It now explicitly states that
+  `start_cinematic 467` is still diagnostic because the natural 654-to-467
+  trigger edge has not been recovered.
+- Follow-up gameplay audit, with **no speculative source change**:
+  - **Bridge support/carry:** current `supportMotionDelta` already transforms
+    the rider point from the previous support pose into the current pose,
+    which includes angular contribution; Application samples support before
+    object motion and applies that delta after collider updates. Remaining
+    mismatch is support acquisition/persistence from the native contact
+    manifold (`0x80/0x100` flags), not missing angular carry math.
+  - **Level 2 natural bank trigger:** no retained source/history/Library
+    evidence identifies the natural 654->467 edge. Do not hard-code it.
+  - **Rhino CBehaviorPickUp:** message 0x59/0x5e ownership and related object ID
+    are retained, but cloned CThrowObject attachment/flight parameters are not.
+    Do not fabricate the thrown prop.
+  - **Level 6 wall-enemy QTE variants 16..19:** retained RE proves
+    `MeleeAttack::StateEnter` selects ordinary directional states 12..15
+    with optional 16..19 variants, and `EnemyAttackInfo+0xd/+0x10` gate and
+    identify the paired QTE action. The current wall runtime ignores those QTE
+    fields. However the exact native condition/state transition and shipped
+    wall attack QTE row values are not retained in accessible source/data.
+    Do not implement a guessed `state += 4` branch.
+  - **Player airborne hurt:** current `GameplayPlayer::applyDamage` accepts
+    airborne health damage but enters hurt state only when grounded or on-wall.
+    Ground mapping 44/45/46 and wall mapping 50/51 are retained exactly; the
+    precise airborne 47..49 mapping/names are not retained. Do not infer solely
+    from contiguous numbering.
+  - **CAreaDamage random wait:** original `random()` call at `0x003029d6`
+    is retained, but its exact float/range wrapper arguments/conversion are
+    still absent. Keep the known deterministic hash debt visible rather than
+    substitute a guessed RNG formula.
+- This audit intentionally stopped without another source PR because every
+  remaining candidate above was missing a required native branch/value. The
+  next productive source turn should start by recovering one of those missing
+  exact mappings from original/reference material or a newly surfaced retained
+  artifact, then implement it directly.
