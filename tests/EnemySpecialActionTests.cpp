@@ -193,6 +193,13 @@ int main() {
         CHECK(attackEvents[1]->recordId == 3);
         CHECK(attackEvents[2]->recordId == 4);
 
+        CHECK(usm::game::specialAnimationAttackId(
+                  specialActions, 16, "ground_attack1") == 69);
+        CHECK(usm::game::specialAnimationAttackId(
+                  specialActions, 16, "ground_attack_blocked") == 70);
+        CHECK(usm::game::specialAnimationAttackId(
+                  specialActions, 15, "ground_attack1") == -1);
+
         // SpecialAnimActionCheck (0x003a8c60) puts the authored +0x38
         // animation into IBehaviorBase+0x6c. UpdateAttackMelee_DoAttack
         // (0x003b9e44) may follow it only when EnemyAttackInfo+0x46 permits.
