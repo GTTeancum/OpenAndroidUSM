@@ -129,6 +129,12 @@ void clockTests() {
     CHECK(!wallWebPromptExpired(3000, 3000.0F));
     CHECK(advanceWallWebPromptClock(3000, 1) == 3001);
     CHECK(wallWebPromptExpired(3001, 3000.0F));
+    CHECK(wallWebPromptOutcome(true, 3000, 3000.0F) ==
+          WallWebPromptOutcome::Success);
+    CHECK(wallWebPromptOutcome(true, 3001, 3000.0F) ==
+          WallWebPromptOutcome::Failure); // late eighth press loses
+    CHECK(wallWebPromptOutcome(false, 3000, 3000.0F) ==
+          WallWebPromptOutcome::Running);
     CHECK(advanceWallWebPromptClock(
               std::numeric_limits<std::uint32_t>::max() - 10U, 50U) ==
           std::numeric_limits<std::uint32_t>::max());
