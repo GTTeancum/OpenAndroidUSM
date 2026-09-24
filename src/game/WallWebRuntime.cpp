@@ -114,15 +114,21 @@ void WallWebRuntime::update(std::uint32_t gameMilliseconds,
         // domain. CheckSuccess runs before IsOutTime on the same manager tick.
         promptMilliseconds_ =
             advanceWallWebPromptClock(promptMilliseconds_, realMilliseconds);
-        if (buttonProgress_.updateManager(
-                realMilliseconds, actionPressed,
-                button_->requiredActionCount, true)) {
+        const bool succeeded = buttonProgress_.updateManager(
+            realMilliseconds, actionPressed,
+            button_->requiredActionCount, true);
+        switch (wallWebPromptOutcome(
+            succeeded, promptMilliseconds_,
+            button_->durationMilliseconds)) {
+        case WallWebPromptOutcome::Success:
             enter(WallWebPhase::Success);
-        } else if (wallWebPromptExpired(
-                       promptMilliseconds_,
-                       button_->durationMilliseconds)) {
+            break;
+        case WallWebPromptOutcome::Failure:
             lineActive_ = false;
             enter(WallWebPhase::Failure);
+            break;
+        case WallWebPromptOutcome::Running:
+            break;
         }
     } else {
         if (phase_ == WallWebPhase::Success && animationMilliseconds_ >= releaseMilliseconds_) {
