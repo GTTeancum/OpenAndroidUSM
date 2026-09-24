@@ -105,53 +105,57 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`b4a692f7f081a0a626dd8c85148a20290f4cf648`  
-**Use native Sandman melee startup timing**
+`613600c2ece6b40c76a4856451e186702ea3dbf7`  
+**Attach native AreaDamage bodies to broken bridges**
 
-This is the squash merge of PR #14 and is a **gameplay-parity change**.
+This is the squash merge of PR #15 and is a **gameplay/physics parity change**.
 
-The retained native path now applied to Sandman's task-3 ground attack is:
+Direct retained evidence at `CBrokenBridge::GetSlideCarList`
+(`0x00301da0`) says the bridge collects both `CSlideCar` and
+`CAreaDamage` bodies using the same room-local inclusive XY footprint.
+Both body types are moved to the bridge top; state 4 updates their height and
+rotation with the tilting bridge. Native bridge activation also considers
+player contact on linked cars **and damage bodies**. State 5's
+`CarRunSpeed` path remains specifically `CSlideCar`; PR #15 does not
+invent launch velocity or the car-removal state machine for `CAreaDamage`.
 
-- CBoss task/state 3 is owned by `CBehaviorMeleeAttack`;
-- `CBehaviorMeleeAttack::StateEnter` at
-  `0x003baef8-0x003bb478` retains the selected `EnemyAttackInfo`,
-  points at the target on entry, and passes
-  `clipLength / EnemyAttackInfo+8` to `SetAnimWithSpeed`;
-- states 9/10 call `NeedTurning` only while that startup timer is active and
-  `EnemyAttackInfo+0xc` requests turning;
-- authored successor clips remain governed by the +0x38/+0x6c and +0x46
-  continuation path fixed in PR #11.
+PR #15 therefore:
 
-Before PR #14, the Sandman-specific loop retained the selected attack after
-PR #13 but still ran the phase-selected opening clip at raw speed 1.0 and
-forced Sandman to face Spider-Man on **every** boss update, including authored
-successor/recovery clips. PR #14 now uses the loaded selected attack's startup
-duration and turn flag directly, faces the target on melee entry, limits
-continuous turning to the native startup window, and leaves successor clips at
-their existing authored speed. No timing constants or later-phase attack IDs
-were guessed.
+- adds portable `BridgeAttachmentRuntime` helpers for the exact retained
+  room/footprint and state-4 top-plane/rotation math;
+- links `CAreaDamage` objects to their bridge during
+  `LevelObjectRuntime::initialize`;
+- preserves authored rotation at initial/reset bridge-top placement and applies
+  bridge rotation only during state 4;
+- includes linked damage bodies in non-type-2 bridge contact activation;
+- makes area-damage collision tests use the live attached rotation;
+- restores bridge-linked damage bodies to their reset bridge-top pose;
+- explicitly keeps state-5 `CarRunSpeed` launch restricted to
+  `CSlideCar`;
+- adds `OpenAndroidUSM.BridgeAttachmentTests` to the fail-closed Linux and
+  Windows hosted selectors.
 
-The real-asset smoke now derives the phase-zero attack wall-clock boundary from
-the loaded `EnemyAttackInfo` instead of assuming raw Collada duration and
-checks the configured startup-turn behavior.
+Validation for PR #15 and the exact squash commit is green:
 
-Validation is green:
+- PR Linux run `36030779347`: GCC Release **13/13**, Clang ASan+UBSan
+  **13/13**;
+- PR Windows run `36030779466`: **15/15**;
+- post-merge Linux run `36031216769`: GCC **13/13**, Clang ASan+UBSan
+  **13/13**;
+- post-merge Windows run `36031216815`: **15/15**.
 
-- PR Linux run `36026983859`: GCC Release **12/12**, Clang ASan+UBSan
-  **12/12**;
-- PR Windows run `36026983852`: **14/14**;
-- post-merge Linux run `36027569749`: GCC **12/12**, Clang ASan+UBSan
-  **12/12**;
-- post-merge Windows run `36027569748`: **14/14**.
+The Windows lanes again reached the expected missing-game-data startup
+boundary and the classified XAudio2 no-default-endpoint `0x80070490` result.
 
-Both Windows runs reached the expected missing-game-data startup boundary and
-the classified no-default-endpoint XAudio2 result `0x80070490`.
+Documentation was refreshed afterward in
+`e9a6a673d65af6bec6c87489dce01aac04284ede`
+(**Document native bridge damage-body attachment [skip ci]**).
 
-The unresolved Sandman **jump interpolation and sand-hand behavior remain
-open** and were not changed. The user's active mandate remains gameplay 1:1
-first; hostage camera behavior is deferred polish and must not block gameplay
-work. Future chats must inspect actual latest `main`, because documentation
-commits after this source SHA may be newer.
+This does **not** claim full bridge-physics parity. Native physics-context
+flag `0x100`, contact-manifold-driven CSlideCar removal, and the exact
+transmission-body support/carry relationship remain open. The user's active
+mandate remains **gameplay 1:1 first**; camera/presentation polish must not
+block gameplay work.
 
 ### Gameplay/reference checkpoint
 
@@ -1820,3 +1824,68 @@ project context, not higher-priority system/developer instruction.
     conversion for that call is established.
 - Next work should continue directly evidenced gameplay behavior. Do not spend
   the next turn on hostage-camera polish.
+
+### 2026-09-24 — native broken-bridge AreaDamage attachment
+
+- Continued under the gameplay-first mandate. Hostage camera/presentation
+  polish was not investigated.
+- Sandman phase/hit task reset was audited first. Current portable code resets
+  Sandman's task on every accepted hit, but retained evidence only proves the
+  66/33 health clamp, one-phase-per-hit rule, and phase-selected next task-3
+  clip. That was not enough to change the exact hurt/task-queue handoff, so no
+  speculative Sandman reset change was made.
+- The known `CAreaDamage` wait RNG shortcut was also audited. Current runtime
+  uses a stable object-ID hash even though an original `random()` call is
+  retained at `0x003029d6`. The exact numeric/range conversion for that call
+  is not retained, so it was deliberately left unchanged rather than replaced
+  with a guessed wrapper.
+- Moved to a directly evidenced moving-hazard gap documented in
+  `docs/RECONSTRUCTION.md`: `CBrokenBridge::GetSlideCarList`
+  (`0x00301da0`) includes both `CSlideCar` and `CAreaDamage`, but current
+  runtime linked only cars.
+- Added `src/game/BridgeAttachmentRuntime.cpp/.hpp`:
+  - `bridgeAttachmentInFootprint` pins the same-room inclusive XY rectangle;
+  - `bridgeAttachmentPose` pins state-4 top-plane height and bridge-rotation
+    premultiplication.
+- Extended `LevelObjectState` with separate AreaDamage bridge ownership and
+  mutable rotation. This intentionally does **not** reuse CSlideCar launch
+  state.
+- `LevelObjectRuntime` now:
+  - links AreaDamage objects by the same native room/XY footprint;
+  - moves their base to bridge-top Z on initialization/reset while preserving
+    authored rotation;
+  - applies live state-4 bridge height/rotation to linked cars and AreaDamage;
+  - uses live AreaDamage rotation for its collision bounds;
+  - includes linked AreaDamage in the non-type-2 bridge contact-activation
+    approximation;
+  - restricts state-5 CarRunSpeed launch explicitly to CSlideCar.
+- During review, an initial implementation attempted to apply bridge rotation
+  at initial attachment. The retained notes assign rotation updates to state 4,
+  so that overreach was corrected **before PR validation**: initial/reset
+  attachment now changes top-plane Z only and preserves authored rotation.
+- Added `tests/BridgeAttachmentTests.cpp` with asset-independent coverage for
+  room separation, inclusive footprint edges, outside rejection, flat bridge
+  top placement, and a nontrivial 90-degree bridge tilt/rotation composition.
+- Added the new regression to CMake and both fail-closed hosted selectors.
+  Test counts therefore rise to Linux **13** and Windows **15**.
+- PR #15 head `bab1d5e46305f955d26144d58662f7bf0b3ee58c` validation:
+  - Linux `36030779347`: GCC **13/13**, Clang ASan+UBSan **13/13**;
+  - Windows `36030779466`: **15/15**, including
+    `OpenAndroidUSM.BridgeAttachmentTests`.
+- PR #15 was squash-merged as
+  `613600c2ece6b40c76a4856451e186702ea3dbf7`.
+- Exact post-merge validation:
+  - Linux `36031216769`: GCC **13/13**, Clang ASan+UBSan **13/13**;
+  - Windows `36031216815`: **15/15**.
+- `docs/RECONSTRUCTION.md` was refreshed in documentation-only commit
+  `e9a6a673d65af6bec6c87489dce01aac04284ede`.
+- Remaining bridge-physics boundary:
+  - native `Unit::GetPhysicsContextFlags(0x100)` contact manifold is still
+    represented by portable expanded-bounds contact for activation;
+  - `CSlideCar::Update` native contact-driven state-4/removal transition is
+    not yet exact;
+  - `Unit::UpdateTransmission` / `PhysicsEntity::preUpdate` support/carry
+    semantics are not yet a blanket 1:1 claim.
+- Next work should remain gameplay-first. Prefer another directly evidenced
+  physics/combat/QTE/input discrepancy; do not spend the next turn on camera
+  polish and do not invent the unresolved CAreaDamage RNG conversion.
