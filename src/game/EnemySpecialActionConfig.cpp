@@ -1,8 +1,10 @@
 #include "game/EnemySpecialActionConfig.hpp"
 
+#include "game/AttackConfig.hpp"
 #include "filesystem/GbmpArchive.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace usm::game {
@@ -149,6 +151,26 @@ EnemySpecialActionConfigDatabase::findEvents(
         }
     }
     return matches;
+}
+
+std::string_view specialAnimationSuccessor(
+    const EnemySpecialActionConfigDatabase& specialActions,
+    const AttackConfigDatabase& attacks,
+    std::int16_t enemyTypeId, std::string_view animationName) {
+    std::string_view successor;
+    for (const auto* event :
+         specialActions.findAttackEvents(enemyTypeId, animationName)) {
+        if (event == nullptr ||
+            event->attackId > std::numeric_limits<std::int16_t>::max()) {
+            continue;
+        }
+        const auto* attack =
+            attacks.find(static_cast<std::int16_t>(event->attackId));
+        if (attack != nullptr && attack->permitsSpecialAnimationSuccessor) {
+            successor = event->nextAnimationName;
+        }
+    }
+    return successor;
 }
 
 } // namespace usm::game
