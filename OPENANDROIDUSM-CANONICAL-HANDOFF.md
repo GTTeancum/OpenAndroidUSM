@@ -100,22 +100,22 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`468d4577836936273973321eddfb145e7f06dd3d`  
-**Name retained R1 globals by native consumers**
+`9a3189a80fd8b399f6e8e7f297797892227a9f26`  
+**Validate QTE feedback through D3D11 WARP**
 
-This is the squash merge of PR #9. It changes **no runtime behavior**.
-The retained gameplay R1-UP path at ELF `0x003cc2b8-0x003cc2ea` publishes
-three distinct native globals: the hostage rescue request, the boolean consumed
-by `InteractiveButton::Update` at `0x0032f1ac` / global `0x00566518`, and
-the CSwitchObject counter seeded to 4 and consumed at `0x00310828` / global
-`0x0056651c`. The source previously named the latter two
-`switchRequested` and `switchRequestValue`, obscuring that they belong to
-different native systems. They are now named `interactiveButtonRequested`
-and `switchCounter` across the router and parity tests. No object iteration,
-counter consumption, input lifetime, or target selection was invented. The
-unresolved hostage camera-mode calls remain untouched and no original game data
-is added. The canonical-handoff refresh commit is expected to be newer and
-documentation-only, so future chats must still inspect actual latest `main`.
+This is the squash merge of PR #10. It changes **no native QTE gameplay
+behavior**. It exposes the existing production HUD texture uploader as the
+standalone host operation `D3D11Renderer::uploadHud` and expands the Windows
+WARP backend regression with entirely synthetic in-memory sprite/texture
+payloads loaded by the production `SpriteAtlas`, `DdsAtcTexture`, and
+`TgaTexture` decoders. The test renders the already-reconstructed
+`QteFeedbackFrame` path through `updateCinematicUi` / `renderFrame` and
+verifies by GPU readback: atlas UV selection, completed-mash frame ordering
+**85 then 93**, and 128-alpha `SRC_ALPHA/INV_SRC_ALPHA` compositing. No
+original game data is added. The unresolved success-explosion layer and full
+native QTE visual composition remain untouched. The canonical-handoff refresh
+commit is expected to be newer and documentation-only, so future chats must
+still inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -1490,4 +1490,71 @@ project context, not higher-priority system/developer instruction.
   `libspiderman.so` / raw `CHostage::Update` instructions for the hostage
   camera-mode calls. If that material remains unavailable, continue only
   another directly retained evidence-backed validation/source slice or
+  host-platform validation; do not infer missing native behavior.
+
+### 2026-09-24 — D3D11 WARP QTE feedback validation
+
+- Confirmed `main` began this turn at
+  `4059dd19a06f2b963d6953fdd1cc8973c4ac7901`, the documentation-only
+  handoff refresh after PR #9. The latest validated source/tooling/CI head
+  before this turn was `468d4577836936273973321eddfb145e7f06dd3d`.
+- Reconfirmed the strict chronological gameplay blocker remains the unresolved
+  hostage `CHostage::Update` `CGameCamera::SetMode` calls. The verified
+  original ARM reference/raw instruction body is still unavailable, so no
+  camera behavior was guessed or changed.
+- Audited other first-level gaps before editing. Hostage ambient-help/random
+  cadence still lacks enough retained instruction detail to implement strictly;
+  the RE03 success-explosion sprite is also explicitly unresolved because its
+  scaled/material-flagged draw has not been recovered completely. Neither was
+  approximated.
+- Chose an explicit RE03 host-validation gap instead: RE03 already proved the
+  portable `QteFeedbackGeometry` XY/UV/alpha/order rules but stated that the
+  D3D11 integration/compositing had not been compiled or visually verified.
+- Added public `D3D11Renderer::uploadHud(const LevelHudAsset&)`, which is only
+  a standalone entry to the pre-existing production `uploadHudTexture` path.
+  It does not add a test-only renderer friend/hook or alter the full-level
+  uploader.
+- Expanded `tests/D3D11BackendTests.cpp` using **synthetic data only**:
+  - constructs a minimal real-format `.bsprite` binary and loads it through
+    `SpriteAtlas::load`;
+  - constructs ATCA DDS payloads and loads them through
+    `DdsAtcTexture::load`;
+  - constructs the unrelated required TGA slot through `TgaTexture::load`;
+  - stages the HUD independently on a 480x320 offscreen WARP device;
+  - renders frame 85 from a red atlas block and frame 93 from a green block and
+    verifies those pixels by readback;
+  - overlaps frames 85 then 93 and verifies green wins, proving the retained
+    completed-mash draw order reaches the GPU;
+  - renders frame 85 with alpha 128 and verifies the production native-like
+    `SRC_ALPHA/INV_SRC_ALPHA` blend result over the existing clear color.
+- Exact files changed in PR #10:
+  - `src/renderer/d3d11/D3D11Renderer.hpp`;
+  - `src/renderer/d3d11/D3D11Renderer.cpp`;
+  - `tests/D3D11BackendTests.cpp`.
+- PR #10 head `06d03c13efb09d18108adc986a3f41c6399bf62c` validation:
+  - Linux run `36009995451`: GCC Release **12/12 passed** and Clang
+    ASan+UBSan **12/12 passed**; no sanitizer failure was reported.
+  - Windows run `36009995687`: **14/14 passed**;
+    `OpenAndroidUSM.D3D11BackendTests` passed the new WARP QTE feedback
+    readback checks; the application startup smoke reached the expected
+    missing-game-data boundary; XAudio2 reached the classified no-default-
+    endpoint `0x80070490` path.
+  - MSVC again emitted the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; this work did not touch
+    that file.
+- PR #10 was squash-merged as
+  `9a3189a80fd8b399f6e8e7f297797892227a9f26`.
+- Post-merge validation for that exact squash commit completed green:
+  - Linux run `36010512831`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+  - Windows run `36010512787`: **14/14 passed** with
+    `OpenAndroidUSM.D3D11BackendTests` passing again, plus the same expected
+    missing-data startup boundary and classified XAudio2 `0x80070490` result.
+- This closes the specific RE03 statement that the already-reconstructed QTE
+  feedback geometry had no tested Windows D3D11 integration/compositing path.
+  It is **not** an original-game screenshot comparison and does not prove the
+  unresolved success explosion or full native QTE UI composition.
+- Exact strict continuation remains recovery of the verified original
+  `libspiderman.so` / raw `CHostage::Update` instructions for the missing
+  hostage camera-mode calls. If that material remains unavailable, continue
+  only another directly retained evidence-backed source/validation slice or
   host-platform validation; do not infer missing native behavior.
