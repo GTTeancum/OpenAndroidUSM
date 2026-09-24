@@ -10203,12 +10203,14 @@ int main() {
             bootstrap.player(), &levelCollision, &playerStateConfigs));
         const auto& hurtClip = bootstrap.player().animationBank.clips()[
             static_cast<std::size_t>(hurtState->primaryAnimationId)];
-        assert(hurtReactionPlayer.applyDamage(30.0F, 0, 1000));
+        assert(hurtReactionPlayer.applyDamage(30.0F));
         assert(hurtReactionPlayer.activeAnimation() == hurtClip.name);
         assert(hurtReactionPlayer.activeStateId() == 44);
         assert(!hurtReactionPlayer.requestPunch());
         const std::uint32_t hurtDuration =
-            std::max<std::uint32_t>(1000, hurtClip.durationMilliseconds());
+            hurtClip.durationMilliseconds();
+        assert(hurtReactionPlayer.hurtReactionRemainingMilliseconds() ==
+               hurtDuration);
         hurtReactionPlayer.update({}, {}, hurtDuration - 1);
         assert(hurtReactionPlayer.activeAnimation() == hurtClip.name);
         hurtReactionPlayer.update({}, {}, 1);
@@ -10218,7 +10220,7 @@ int main() {
             bootstrap.player(), nullptr, &playerStateConfigs));
         heavyHurtPlayer.restoreAt({0.0F, 0.0F, 0.0F},
                                   {1.0F, 0.0F, 0.0F});
-        assert(heavyHurtPlayer.applyDamage(35.0F, 0, 0, 101));
+        assert(heavyHurtPlayer.applyDamage(35.0F, 0, 101));
         assert(heavyHurtPlayer.activeStateId() == 45);
         assert(heavyHurtPlayer.activeStateName() == "k_state_hurt_heavy");
         assert(heavyHurtPlayer.activeAnimation() ==
@@ -10234,7 +10236,7 @@ int main() {
                                            {1.0F, 0.0F, 0.0F});
         const float protectedStartHealth = protectedKnockbackPlayer.health();
         assert(protectedKnockbackPlayer.applyDamage(
-            70.0F, 0, 0, 104, 500.0F, 0));
+            70.0F, 0, 104, 500.0F, 0));
         assert(protectedKnockbackPlayer.health() == protectedStartHealth - 70.0F);
         assert(protectedKnockbackPlayer.activeStateId() == 46);
         assert(protectedKnockbackPlayer.activeStateName() ==
@@ -10246,17 +10248,17 @@ int main() {
         // Equal-priority contacts cannot pass Player::IsCanBeHit while +0x708
         // remains positive.
         assert(!protectedKnockbackPlayer.applyDamage(
-            70.0F, 0, 0, 104, 500.0F, 0));
+            70.0F, 0, 104, 500.0F, 0));
         protectedKnockbackPlayer.update({}, {}, 499);
         assert(!protectedKnockbackPlayer.applyDamage(
-            70.0F, 0, 0, 104, 500.0F, 0));
+            70.0F, 0, 104, 500.0F, 0));
         protectedKnockbackPlayer.update({}, {}, 1);
         assert(protectedKnockbackPlayer.applyDamage(
-            70.0F, 0, 0, 104, 500.0F, 0));
+            70.0F, 0, 104, 500.0F, 0));
         // A strictly greater incoming priority bypasses the live window and
         // replaces the stored native priority.
         assert(protectedKnockbackPlayer.applyDamage(
-            10.0F, 0, 0, 100, 500.0F, 1));
+            10.0F, 0, 100, 500.0F, 1));
         assert(protectedKnockbackPlayer.health() ==
                protectedStartHealth - 150.0F);
         assert(protectedKnockbackPlayer.hitProtectionPriority() == 1);
@@ -11716,7 +11718,7 @@ int main() {
         assert(ultimatePlayer.lastActionRejectionReason() ==
                "sense_transition_locked");
         const float ultimateStartingHealth = ultimatePlayer.health();
-        assert(!ultimatePlayer.applyDamage(25.0F, 0, 0, 100));
+        assert(!ultimatePlayer.applyDamage(25.0F, 0, 100));
         assert(ultimatePlayer.health() == ultimateStartingHealth);
         assert(ultimatePlayer.hitEffects().size() == 1);
         assert(ultimatePlayer.hitEffects().front().effectId == 24);
@@ -12934,7 +12936,7 @@ int main() {
             const auto start = hurtWallPlayer.position();
             const auto facing = hurtWallPlayer.facing();
             assert(hurtWallPlayer.requestPunch());
-            assert(hurtWallPlayer.applyDamage(50.0F, 0, 0, hitType));
+            assert(hurtWallPlayer.applyDamage(50.0F, 0, hitType));
             assert(hurtWallPlayer.onWall());
             assert(hurtWallPlayer.activeStateId() == (hitType > 103 ? 50 : 51));
             assert(!hurtWallPlayer.requestPunch());
@@ -12961,7 +12963,7 @@ int main() {
         }
         {
             auto hazardWallPlayer = wallPlayer;
-            assert(hazardWallPlayer.applyDamage(30.0F, 0, 1000, 0x85));
+            assert(hazardWallPlayer.applyDamage(30.0F, 0, 0x85));
             assert(hazardWallPlayer.activeStateId() == 50);
             const auto* clip = bootstrap.player().animationBank.findClip(
                 hazardWallPlayer.activeAnimation());
