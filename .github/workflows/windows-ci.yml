@@ -24,7 +24,7 @@ jobs:
 
       - name: Run asset-independent parity tests
         shell: pwsh
-        run: ctest --test-dir build/windows-msvc -C Release -R '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch|OpenAndroidUSM\.ReferenceRecoveryTests|OpenAndroidUSM\.AutoplayHarnessTests|OpenAndroidUSM\.BridgeAttachmentTests|OpenAndroidUSM\.SandmanPhaseTests|OpenAndroidUSM\.EnemySpecialActionTests|OpenAndroidUSM\.AudioBackendTests|OpenAndroidUSM\.D3D11BackendTests)$' --output-on-failure --no-tests=error
+        run: ctest --test-dir build/windows-msvc -C Release -R '^(OpenAndroidUSM\.InputParity\.(buttons|routing|sticks|autoplay|transitions)|OpenAndroidUSM\.QteParity\.(clock|attributes)|OpenAndroidUSM\.QteControl\.keypad|OpenAndroidUSM\.HostageIntegration\.dispatch|OpenAndroidUSM\.ReferenceRecoveryTests|OpenAndroidUSM\.AutoplayHarnessTests|OpenAndroidUSM\.RoomSupportTests|OpenAndroidUSM\.BridgeAttachmentTests|OpenAndroidUSM\.SandmanPhaseTests|OpenAndroidUSM\.EnemySpecialActionTests|OpenAndroidUSM\.AudioBackendTests|OpenAndroidUSM\.D3D11BackendTests)$' --output-on-failure --no-tests=error
 
       - name: Run Windows D3D11 startup smoke
         shell: pwsh

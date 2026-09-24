@@ -64,7 +64,8 @@ class LevelCollision final {
 public:
     [[nodiscard]] Result build(std::span<const LevelRoomAsset> rooms);
     [[nodiscard]] Result build(
-        std::span<const assets::ColladaGeometry> geometries);
+        std::span<const assets::ColladaGeometry> geometries,
+        std::int32_t roomId = -1);
     // CRoom::SetPosition (0x0036d6e4) translates the room's static physics
     // body by the same delta applied to its scene node. Keep the portable
     // triangle mesh synchronized with CRoom::Move/RevertPosition.
@@ -77,12 +78,12 @@ public:
     [[nodiscard]] Result updateObjectColliders(
         std::span<const LevelObjectState> objects);
 
-    [[nodiscard]] bool groundHeight(const assets::Vector3& reference,
-                                    float maximumStepUp, float maximumDrop,
-                                    float& height,
-                                    std::uint32_t ignoredPhysicsFlags = 0U,
-                                    std::int32_t* supportingObjectId = nullptr)
-        const noexcept;
+    [[nodiscard]] bool groundHeight(
+        const assets::Vector3& reference, float maximumStepUp,
+        float maximumDrop, float& height,
+        std::uint32_t ignoredPhysicsFlags = 0U,
+        std::int32_t* supportingObjectId = nullptr,
+        std::int32_t* supportingRoomId = nullptr) const noexcept;
     [[nodiscard]] bool resolveGroundMotion(
         const assets::Vector3& start, const assets::Vector3& desired,
         assets::Vector3& resolved, float maximumStepUp = 75.0F,

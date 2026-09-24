@@ -318,6 +318,15 @@ if(BUILD_TESTING AND USM_BUILD_TESTS)
     set_tests_properties(OpenAndroidUSM.AutoplayHarnessTests PROPERTIES
         TIMEOUT 30 LABELS "autoplay-harness")
 
+    add_executable(OpenAndroidUSM.RoomSupportTests
+        tests/RoomSupportTests.cpp)
+    target_compile_features(OpenAndroidUSM.RoomSupportTests PRIVATE cxx_std_20)
+    target_link_libraries(OpenAndroidUSM.RoomSupportTests PRIVATE OpenAndroidUSM.Core)
+    add_test(NAME OpenAndroidUSM.RoomSupportTests
+        COMMAND OpenAndroidUSM.RoomSupportTests)
+    set_tests_properties(OpenAndroidUSM.RoomSupportTests PROPERTIES
+        TIMEOUT 30 LABELS "room-support-parity")
+
     add_executable(OpenAndroidUSM.BridgeAttachmentTests
         tests/BridgeAttachmentTests.cpp)
     target_compile_features(OpenAndroidUSM.BridgeAttachmentTests PRIVATE cxx_std_20)

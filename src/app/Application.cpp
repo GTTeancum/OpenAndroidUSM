@@ -2729,13 +2729,30 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
         // is therefore paced by real 50 ms ticks, not the scaled game delta.
         levelCinematicRuntime_.advanceCameraShake(realDeltaMilliseconds);
         std::int32_t supportingObjectId = -1;
+        std::int32_t supportingRoomId = -1;
         float supportingHeight = 0.0F;
         std::optional<game::LevelObjectSupportPose> supportingPose;
+        assets::Vector3 supportingRoomPosition;
+        bool hasSupportingRoom = false;
         if (levelCollision_.groundHeight(
                 gameplayPlayer_.position(), 10.0F, 10.0F,
-                supportingHeight, 0U, &supportingObjectId) &&
-            supportingObjectId >= 0) {
-            supportingPose = objectRuntime_.supportPose(supportingObjectId);
+                supportingHeight, 0U, &supportingObjectId,
+                &supportingRoomId)) {
+            if (supportingObjectId >= 0) {
+                supportingPose =
+                    objectRuntime_.supportPose(supportingObjectId);
+            } else if (supportingRoomId >= 1) {
+                const auto rooms = levelCinematicRuntime_.roomMotionStates();
+                const auto support = std::find_if(
+                    rooms.begin(), rooms.end(),
+                    [supportingRoomId](const game::RoomMotionState& room) {
+                        return room.roomId == supportingRoomId;
+                    });
+                if (support != rooms.end()) {
+                    supportingRoomPosition = support->position;
+                    hasSupportingRoom = true;
+                }
+            }
         }
         objectRuntime_.advanceAnimations(gameDeltaMilliseconds);
         objectRuntime_.updateBrokenBridges(gameplayPlayer_.position(),
@@ -2765,6 +2782,38 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ";dx=" + std::to_string(carry.x) +
                             ";dy=" + std::to_string(carry.y) +
                             ";dz=" + std::to_string(carry.z));
+                }
+            }
+        } else if (hasSupportingRoom) {
+            // Unit::UpdateTransmission (0x00323388) records the supporting
+            // physics body and PhysicsEntity::preUpdate (0x003d799c) adds
+            // that body's displacement before the rider update. CRoom::Move
+            // is translation-only in the retained room-motion state, so the
+            // room's frame-to-frame position delta is the exact portable
+            // support contribution while direct ground contact remains.
+            const auto rooms = levelCinematicRuntime_.roomMotionStates();
+            const auto support = std::find_if(
+                rooms.begin(), rooms.end(),
+                [supportingRoomId](const game::RoomMotionState& room) {
+                    return room.roomId == supportingRoomId;
+                });
+            if (support != rooms.end()) {
+                const assets::Vector3 carry{
+                    support->position.x - supportingRoomPosition.x,
+                    support->position.y - supportingRoomPosition.y,
+                    support->position.z - supportingRoomPosition.z};
+                if (carry.x != 0.0F || carry.y != 0.0F ||
+                    carry.z != 0.0F) {
+                    gameplayPlayer_.applySupportingBodyMotion(carry);
+                    if (autoplay) {
+                        autoplay->recordEvent(
+                            syntheticElapsedMilliseconds,
+                            "support_motion",
+                            "room=" + std::to_string(supportingRoomId) +
+                                ";dx=" + std::to_string(carry.x) +
+                                ";dy=" + std::to_string(carry.y) +
+                                ";dz=" + std::to_string(carry.z));
+                    }
                 }
             }
         }
