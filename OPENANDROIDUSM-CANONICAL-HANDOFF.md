@@ -20,7 +20,7 @@
 > state, this file plus the latest GitHub history are authoritative. Historical
 > RE reports remain authoritative for the exact checkpoint/evidence they record.
 
-Last handoff refresh: **2026-09-23**
+Last handoff refresh: **2026-09-24**
 
 ---
 
