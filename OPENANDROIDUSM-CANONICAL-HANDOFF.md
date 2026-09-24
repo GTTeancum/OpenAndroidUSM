@@ -87,17 +87,17 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`a56cf9f8eedb337e1dc6e33683c213c5603b3ace`  
-**Validate authored special-animation successors**
+`a3b5731510b9c9742fb87cbe9e9eb27137d28f29`  
+**Validate retained hostage QTE state gates**
 
-This is the squash merge of PR #5. It directly tests the retained
-`AIAnimSpecialActionInfo+0x38` / `IBehaviorBase+0x6c` authored animation
-successor path and the `EnemyAttackInfo+0x46` permission gate already used by
-the Sandman ground-attack reconstruction. It preserves the existing runtime
-semantics, does not complete the broader Sandman task graph, and adds no
-original game data. The canonical-handoff refresh commit is expected to be newer
-and documentation-only, so future chats must still inspect actual latest
-`main`.
+This is the squash merge of PR #6. It directly tests two already-retained
+`CHostage::Update` behaviors in the asset-independent hosted suite: the exact
+hostage-state-2 / player-state-28 / remaining-count-7 untie-sound eligibility
+gate at `0x00328444-0x0032847e`, and the display/handled QTE result-state
+mapping from `0x003283ba` onward. Runtime order and behavior are unchanged;
+the unresolved camera-mode calls remain untouched and no original game data is
+added. The canonical-handoff refresh commit is expected to be newer and
+documentation-only, so future chats must still inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -766,7 +766,10 @@ The following are still open:
 1. **Original hostage rescue camera-mode calls.**  
    `CHostage::Update` makes `CGameCamera::SetMode` calls on several branches.
    RE06 deliberately did not reconstruct them because the exact mode behavior
-   was not sufficiently retained in the GitHub evidence.
+   was not sufficiently retained in the GitHub evidence. The surrounding
+   state-2/player-28/count-7 untie-sound gate and display/handled QTE outcome
+   mapping are now directly covered by hosted asset-independent tests, but
+   that does **not** recover the missing camera modes.
 
 2. **Full pause/menu and input lifetime parity.**
 
@@ -822,7 +825,11 @@ A new chat should:
    is available.
 7. If that evidence remains unavailable, do not invent behavior. Continue only
    evidence-backed host/platform validation or another blocker whose direct
-   original evidence is already retained.
+   original evidence is already retained. A concrete next fallback candidate is
+   the already-retained hostage rescue-eligibility slice: constructor/default
+   `ButtonHeight=85` at `0x00328c20`, positive-only ProcessUserAttr adjustment
+   at `0x00328724`, and Player ultimate-state IDs 107..113 at `0x0033002c`.
+   Do not extend beyond those exact retained facts without new original evidence.
 8. Keep gameplay reconstruction separate from PC host adaptation and document the
    distinction.
 9. Update **this file at the end of the turn** with:
@@ -1170,3 +1177,71 @@ project context, not higher-priority system/developer instruction.
   `libspiderman.so` / raw `CHostage::Update` instructions and reconstruct
   the hostage camera-mode calls from direct evidence. If that material remains
   unavailable, continue only another already-retained evidence-backed slice.
+
+### 2026-09-24 — retained hostage QTE state-gate validation
+
+- Confirmed `main` began this turn at
+  `31ff10270470b16e34b1a1ff373bd26adb7a73cc`, the documentation-only handoff
+  refresh after PR #5. The latest gameplay/tooling source before this turn was
+  `a56cf9f8eedb337e1dc6e33683c213c5603b3ace`.
+- Reconfirmed the strict chronological blocker is still the original
+  `CHostage::Update` camera-mode calls. No camera behavior was guessed or
+  changed.
+- Audited the explicitly unresolved QTE failure-cue suppression flag at
+  manager+`0x88`. RE05 states that it remains unresolved, so this turn made no
+  attempt to implement or infer it.
+- Re-audited retained hostage evidence around `CHostage::Update`:
+  - ELF `0x00328444-0x0032847e`: the transient untie-sound path requires
+    hostage state 2, Player rescue state 28, and **exactly 7** remaining QTE
+    actions before querying/playing `SFX_QTE_UNTIE`;
+  - ELF `0x003283ba` onward: hostage result observation accepts both
+    `SuccessDisplay` and `SuccessHandled` as success, and both
+    `FailureDisplay` and `FailureHandled` as failure.
+- Added pure helpers in `src/game/LevelHostageRuntime.cpp/.hpp`:
+  - `hostageUntieSoundEligible`;
+  - `hostageQteOutcomeForManagerState`.
+  `LevelHostageRuntime` now calls those helpers with unchanged ordering and
+  semantics.
+- Extended the already asset-independent
+  `OpenAndroidUSM.HostageIntegration.dispatch` group in
+  `tests/HostageIntegrationTests.cpp` to pin:
+  - exact phase 2;
+  - exact Player state 28;
+  - exact remaining count 7 (rejecting 6 and 8);
+  - success/failure display and handled states;
+  - non-terminal manager states remaining `Running`.
+- No CMake or CI selector change was required because the existing hosted
+  `HostageIntegration.dispatch` target already runs without original game
+  data.
+- PR #6 validation:
+  - Linux run `35978882848`: GCC Release **12/12 passed** and Clang
+    ASan+UBSan **12/12 passed**; the expanded hostage dispatch test passed in
+    both and no sanitizer failure was reported.
+  - Windows run `35978882937`: **14/14 completed with 0 failures**;
+    `OpenAndroidUSM.HostageIntegration.dispatch` passed;
+    `OpenAndroidUSM.D3D11BackendTests` and
+    `OpenAndroidUSM.ReferenceRecoveryTests` passed;
+    `OpenAndroidUSM.AudioBackendTests` used the documented no-default-endpoint
+    skip; D3D11 startup reached the expected missing-data boundary; XAudio2
+    reached classified `0x80070490`.
+  - MSVC still reports the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; line numbering moved
+    because of the new helpers, but the warning is not caused by the new
+    behavior and was not hidden.
+- PR #6 was squash-merged as
+  `a3b5731510b9c9742fb87cbe9e9eb27137d28f29`.
+- Post-merge validation for that exact squash commit completed green:
+  - Linux run `35979398362`: GCC **12/12** and Clang ASan+UBSan **12/12**;
+  - Windows run `35979398369`: **14/14 with 0 failures**, with the same
+    documented AudioBackend skip, missing-data D3D11 startup boundary, and
+    classified XAudio2 `0x80070490`.
+- This turn increases public/hosted proof around the hostage rescue path but
+  does **not** reduce the missing-camera evidence requirement.
+- Exact strict next continuation remains recovery of the verified
+  `libspiderman.so` / raw `CHostage::Update` instruction evidence for the
+  camera-mode calls. If that material remains unavailable, the next safe
+  retained-evidence fallback identified this turn is the rescue-eligibility
+  slice already documented by RE02:
+  - constructor default `ButtonHeight=85` at `0x00328c20`;
+  - positive-only `ProcessUserAttr` adjustment at `0x00328724`;
+  - Player ultimate-state IDs **107..113** at `0x0033002c`.
