@@ -33,4 +33,14 @@ std::string_view sandmanGroundAttackAnimation(
     return "ground_attack13";
 }
 
+SandmanJumpLandingTarget sandmanJumpLandingTarget(
+    float playerX, float playerY, float playerZ,
+    float normalizedDirectionX, float normalizedDirectionY) noexcept {
+    constexpr float kLandingOvershootCentimeters = 500.0F;
+    return {
+        playerX + normalizedDirectionX * kLandingOvershootCentimeters,
+        playerY + normalizedDirectionY * kLandingOvershootCentimeters,
+        playerZ};
+}
+
 } // namespace usm::game
