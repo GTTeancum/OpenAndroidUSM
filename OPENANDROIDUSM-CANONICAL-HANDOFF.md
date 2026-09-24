@@ -72,6 +72,19 @@ The RE03 adaptation remains binding:
 
 ## 2. Current authoritative Git state
 
+### Latest `main` observed at this takeover
+
+Repository head inspected in the new chat before this refresh:
+
+`00fc5f4bff15015a2799f86c1e9cb59c1aa31da7`  
+**Record ultimate-state boundary validation [skip ci]**
+
+That commit is documentation-only. Its parent,
+`75df3a591abed97f97f997a90956c81667b2adad`, remains the latest validated
+source/tooling/CI change. This handoff-refresh commit is expected to become the
+newer `main` head without changing runtime source.
+
+
 ### Current source state before this handoff file was added
 
 Latest code/documentation head inspected before creating this handoff:
@@ -1311,3 +1324,36 @@ project context, not higher-priority system/developer instruction.
   instructions for the missing camera-mode calls. If that reference remains
   unavailable, continue only host/platform validation or another blocker with
   already-retained direct evidence.
+
+### 2026-09-24 — new-chat takeover audit
+
+- Took over from the user-supplied canonical handoff, then inspected actual
+  GitHub `main` and found it one continuation newer than that uploaded copy.
+- Read `AGENTS.md` and preserved the project's strict source-reconstruction,
+  chronological-flow, no-guessing, and no-Work/local-machine rules.
+- Confirmed repository head before this refresh was
+  `00fc5f4bff15015a2799f86c1e9cb59c1aa31da7`, a documentation-only handoff
+  commit. The latest validated source/tooling/CI head is PR #7's squash merge
+  `75df3a591abed97f97f997a90956c81667b2adad`.
+- Confirmed PR #7 already exhausted the previously identified hostage
+  rescue-eligibility fallback: the existing hosted suite already covered the
+  retained `ButtonHeight` rule, and PR #7 added direct hosted coverage for the
+  inclusive Player ultimate-state IDs **107..113**.
+- Searched current conversation and ChatGPT Library sources again for the exact
+  verified `libspiderman.so` identity and for
+  `OpenAndroidUSM.zip.001` through `.017`. Results contained only handoff/
+  verification documents; the original binary/split volumes still were not
+  accessible.
+- Re-audited the retained first-hostage RE06 evidence against
+  `LevelHostageRuntime` and `HostageIntegrationTests`. The exact repeated
+  control calls, untie-sound ordering, success/failure/interruption handling,
+  and repeated rescue-end stop behavior are already represented in the current
+  runtime/tests. No speculative camera behavior was added.
+- No gameplay, host, build, test, or workflow source was changed in this turn;
+  no CI run was required for this documentation-only takeover refresh.
+- The strict chronological blocker therefore remains unchanged: obtain the
+  verified original ARM reference or equivalent raw `CHostage::Update`
+  instruction evidence, then reconstruct only the directly evidenced
+  `CGameCamera::SetMode` calls. Until that evidence is available, continue only
+  another directly retained evidence-backed validation slice or host/platform
+  validation; do not infer the missing camera modes.
