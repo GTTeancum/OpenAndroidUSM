@@ -66,7 +66,7 @@ private:
     std::int32_t targetObjectId_{-1};
     int angle_{};
     std::uint32_t animationMilliseconds_{};
-    std::uint32_t promptMilliseconds_{};
+    float promptMilliseconds_{};
     std::uint32_t captureMilliseconds_{};
     std::uint32_t releaseMilliseconds_{};
     ButtonMashProgress buttonProgress_;
