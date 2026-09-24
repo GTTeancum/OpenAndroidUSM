@@ -105,46 +105,65 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`c90a745c8fc7075a886f29054c3b4f20123b10ed`  
-**Use native QTE manager timing for wall web**
+`babe0e60d77e7dbf008da5fb96c28b0a2b51b538`  
+**Use authored player hurt animation lifetime**
 
-This is the squash merge of PR #18 and is a **gameplay/QTE timing parity
+This is the squash merge of PR #19 and is a **gameplay/state-timing parity
 change**.
 
-The retained wall-web path is `Player::BeginQTE / UpdateQTE / DoQTEAction /
-ExitQTE` plus the shared `CQTEManager`. PR #18 corrects the remaining clock
-split in that path:
+The portable player previously accepted a reconstruction-only
+`minimumReactionMilliseconds` argument in `GameplayPlayer::applyDamage`.
+Hazard callers passed their own repeat-contact windows through that argument:
+2000 ms for electric platforms and 1000 ms for AreaDamage/CEffectDamage. That
+incorrectly coupled two independent native responsibilities and could keep a
+finished ground hurt animation locked until the hazard cooldown expired.
 
-- wall-web character animation advances on scaled **game time**;
-- mash decay and the absolute button timeout advance on unscaled **real time**;
-- `CQTEManager::IsOutTime` at `0x0037a4b8` retains its strict `>`
-  boundary;
-- manager ordering remains `CheckSuccess` followed by `IsOutTime` in the
-  same update, so completion exactly at the duration succeeds while completion
-  after the strict boundary fails;
-- `ButtonMashProgress::updateManager` supplies the same 500 ms decay/order
-  already used by the shared cinematic/hostage manager;
-- modal tutorials pass zero wall-web real time because native
-  `CLevel::Update` returns before player/QTE simulation while the modal owns
-  the frame.
+Direct retained evidence separates them:
 
-PR #18 validation:
+- `Player::UpdateHurt` at `0x0035062c` leaves a hurt state when the
+  authored hurt animation finishes;
+- `CEffectDamage::Update` at `0x00368a80` owns its independent native
+  1000 ms repeat-contact cooldown;
+- `Unit::CheckDamageAreaCollide` at `0x0032609c` owns the electric-platform
+  contact cooldown, which the portable object runtime already preserves as
+  2000 ms;
+- enemy attack `AIHitTargetInfo+0x24/+0x28` protection remains independently
+  represented by `hitProtectionMilliseconds` / priority.
 
-- PR Linux run `36067316217`: GCC Release **15/15**, Clang ASan+UBSan
+PR #19 therefore:
+
+- removes `minimumReactionMilliseconds` from the public
+  `GameplayPlayer::applyDamage` API;
+- makes reconstructed grounded and wall hurt reactions end at the authored
+  clip duration;
+- leaves hazard repeat-damage cooldowns in `LevelObjectRuntime` and
+  `LevelDamageRuntime`;
+- preserves native hit type and enemy hit-protection arguments after the API
+  shift;
+- updates the core regression so a ground hurt explicitly exits at the
+  shipped clip boundary instead of a forced 1000 ms minimum.
+
+PR #19 validation is green:
+
+- PR Linux run `36071051195`: GCC Release **15/15**, Clang ASan+UBSan
   **15/15**;
-- PR Windows run `36067316213`: **17/17**;
-- post-merge Linux run `36068916459`: GCC **15/15**, Clang ASan+UBSan
+- PR Windows run `36071051179`: **17/17**;
+- post-merge Linux run `36071382700`: GCC **15/15**, Clang ASan+UBSan
   **15/15**;
-- post-merge Windows run `36068916437`: **17/17**.
+- post-merge Windows run `36071382707`: **17/17**.
 
 The exact post-merge Windows lane also reached the expected
 `Game data was not found` startup boundary and the classified XAudio2
 no-default-endpoint result `0x80070490`.
 
-PR #18 source head: `c90a745c8fc7075a886f29054c3b4f20123b10ed`.
+PR #19 source head: `babe0e60d77e7dbf008da5fb96c28b0a2b51b538`.
 Documentation-only follow-up:
-`bf58ce97a5a899e4e8d90d9f6ed1d49f82437c4d`
-(**Document wall-web native QTE clock [skip ci]**).
+`a79095889f46470d3e24aa982d84b19accedc254`
+(**Document authored player hurt lifetime [skip ci]**).
+
+This does **not** infer the still-unrecovered airborne Player hurt-state
+47..49 mapping. Ground light/heavy/knockback mapping and wall 50/51 remain the
+directly retained subset.
 
 The user's active mandate remains **gameplay 1:1 first**. Camera/presentation
 polish must not block gameplay work. Future chats must inspect actual latest
@@ -1933,11 +1952,13 @@ project context, not higher-priority system/developer instruction.
     fields. However the exact native condition/state transition and shipped
     wall attack QTE row values are not retained in accessible source/data.
     Do not implement a guessed `state += 4` branch.
-  - **Player airborne hurt:** current `GameplayPlayer::applyDamage` accepts
-    airborne health damage but enters hurt state only when grounded or on-wall.
-    Ground mapping 44/45/46 and wall mapping 50/51 are retained exactly; the
-    precise airborne 47..49 mapping/names are not retained. Do not infer solely
-    from contiguous numbering.
+  - **Player airborne hurt:** PR #19 removed the unrelated portable minimum
+    hurt-duration hold, so grounded/wall reactions now end at authored clip
+    boundaries while hazard cooldowns remain independent. Airborne health
+    damage is still accepted without entering a reconstructed airborne hurt
+    state. Ground mapping 44/45/46 and wall mapping 50/51 are retained exactly;
+    the precise airborne 47..49 mapping/names are not retained. Do not infer
+    solely from contiguous numbering.
   - **CAreaDamage random wait:** original `random()` call at `0x003029d6`
     is retained, but its exact float/range wrapper arguments/conversion are
     still absent. Keep the known deterministic hash debt visible rather than
@@ -2073,3 +2094,52 @@ project context, not higher-priority system/developer instruction.
 - Next source work should continue only when one of the remaining gameplay
   mappings has direct native branch/data evidence. Gameplay 1:1 remains the
   priority; do not fall back to camera polish.
+
+### 2026-09-24 — authored player hurt-state lifetime
+
+- Continued gameplay-first from the PR #18 wall-web timing checkpoint.
+- Audited core gameplay source for remaining explicit portable shortcuts whose
+  native ownership/timing was already retained.
+- Found a direct mismatch in `GameplayPlayer::applyDamage`:
+  `minimumReactionMilliseconds` was a reconstruction-only parameter used to
+  stretch the hurt state to hazard repeat-contact windows.
+- Retained evidence already separates those clocks:
+  - `Player::UpdateHurt` (`0x0035062c`) ends the reaction with the authored
+    hurt animation;
+  - `CEffectDamage::Update` (`0x00368a80`) owns the 1000 ms volume cooldown;
+  - `Unit::CheckDamageAreaCollide` (`0x0032609c`) owns the electric-platform
+    cooldown, already modeled as 2000 ms by `LevelObjectRuntime`.
+- PR #19 changed exactly:
+  - `src/game/GameplayPlayer.hpp`: removed the non-native
+    `minimumReactionMilliseconds` API argument;
+  - `src/game/GameplayPlayer.cpp`: all reconstructed ground/wall hurt states
+    now set `hurtReactionRemainingMilliseconds_` to the authored clip length;
+  - `src/app/Application.cpp`: hazard callers no longer pass their cooldowns
+    into the player's state lifetime, while native hit type/protection arguments
+    retain their meaning;
+  - `tests/SmokeTests.cpp`: updated argument positions and replaced the old
+    forced-1000-ms expectation with an explicit authored-clip boundary check.
+- Enemy hit protection remains separate and unchanged:
+  `hitProtectionMilliseconds` and priority still mirror
+  `AIHitTargetInfo+0x24/+0x28`.
+- PR #19 head `76fb7143e8ebf0ea274e49583fb8684fca7652cf`:
+  - Linux `36071051195`: **15/15 GCC + 15/15 Clang ASan+UBSan**;
+  - Windows `36071051179`: **17/17**.
+- PR #19 was squash-merged as
+  `babe0e60d77e7dbf008da5fb96c28b0a2b51b538`.
+- Exact post-merge:
+  - Linux `36071382700`: **15/15 GCC + 15/15 Clang ASan+UBSan**;
+  - Windows `36071382707`: **17/17**.
+- The exact Windows lane again reached the expected missing-game-data startup
+  boundary and classified XAudio2 `0x80070490` no-endpoint result.
+- `docs/RECONSTRUCTION.md` was corrected in documentation-only commit
+  `a79095889f46470d3e24aa982d84b19accedc254`.
+- This fix intentionally does **not** guess the missing airborne player hurt
+  mapping (states 47..49). That remains a direct-evidence blocker.
+- Other blocked mappings from the prior audit remain blocked:
+  enemy wall-jump QTE 16..19 selection, AreaDamage RNG range conversion,
+  support `0x8000` persistence, natural Level 2 654->467 edge, Rhino cloned
+  pickup/throw-body parameters, and Sandman jump/sand-hand math.
+- Next source work should continue with another directly evidenced gameplay
+  discrepancy. Do not reintroduce hazard cooldowns as player-state timers and
+  do not fall back to camera polish.
