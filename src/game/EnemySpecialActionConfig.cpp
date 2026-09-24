@@ -153,6 +153,19 @@ EnemySpecialActionConfigDatabase::findEvents(
     return matches;
 }
 
+std::int16_t specialAnimationAttackId(
+    const EnemySpecialActionConfigDatabase& specialActions,
+    std::int16_t enemyTypeId, std::string_view animationName) noexcept {
+    for (const auto* event :
+         specialActions.findAttackEvents(enemyTypeId, animationName)) {
+        if (event != nullptr && event->attackId >= 0 &&
+            event->attackId <= std::numeric_limits<std::int16_t>::max()) {
+            return static_cast<std::int16_t>(event->attackId);
+        }
+    }
+    return -1;
+}
+
 std::string_view specialAnimationSuccessor(
     const EnemySpecialActionConfigDatabase& specialActions,
     const AttackConfigDatabase& attacks,
