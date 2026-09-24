@@ -2697,14 +2697,19 @@ is the player's recovered hurt response.
 renderer-independent oriented containment and the native 1000 ms contact
 cooldown, preventing a player who remains inside a volume from taking
 damage every display frame. Native hit types are 133 for damage type 0 and
-134 for type 1; both select heavy wall state 50 when attached. The wall hurt
-animation finishes independently of that cooldown. The existing ground
-response still uses the portable light/heavy mapping and minimum reaction
-duration; its exact native classification remains a separate reconstruction
-gap. A hit subtracts the authored 30 health and dispatches recovered audio.
-Core tests
-cover all four real records, containment, cooldown, health, and animation
-timing; WARP verifies that the hurt pose changes the rendered player frame.
+134 for type 1; both select heavy wall state 50 when attached. That hazard
+cooldown is independent of the player's hurt-state lifetime:
+`Player::UpdateHurt` (`0x0035062c`) leaves the reaction when its authored
+animation finishes. The earlier portable `minimumReactionMilliseconds`
+hold has therefore been removed from `GameplayPlayer::applyDamage`; the
+electric-platform 2000 ms and CEffectDamage/AreaDamage repeat timers remain
+owned by their hazard runtimes instead of stretching Spider-Man's state.
+Ground hit **classification** still uses the recovered light/heavy/knockback
+subset; the exact missing airborne 47..49 mapping remains a separate
+reconstruction gap. A hit subtracts the authored health and dispatches
+recovered audio. Core tests cover the real records, containment, independent
+cooldowns, health, and authored hurt-animation timing; WARP verifies that the
+hurt pose changes the rendered player frame.
 
 ## Fall restore and black-screen transition
 
