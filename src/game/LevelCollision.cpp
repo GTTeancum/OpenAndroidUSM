@@ -161,14 +161,15 @@ Result LevelCollision::build(std::span<const LevelRoomAsset> rooms) {
 }
 
 Result LevelCollision::build(
-    std::span<const assets::ColladaGeometry> geometries) {
+    std::span<const assets::ColladaGeometry> geometries,
+    std::int32_t roomId) {
     triangles_.clear();
     staticTriangleCount_ = 0;
     roomPositions_.clear();
     grid_.clear();
     broadTriangles_.clear();
     dynamicObjectSnapshots_.clear();
-    append(geometries);
+    append(geometries, roomId);
     if (triangles_.empty()) {
         return Result::failure("Collision geometry contains no triangles");
     }
@@ -626,15 +627,15 @@ std::int64_t LevelCollision::cellKey(std::int32_t x,
         static_cast<std::uint32_t>(y));
 }
 
-bool LevelCollision::groundHeight(const Vector3& reference,
-                                  float maximumStepUp, float maximumDrop,
-                                  float& height,
-                                  std::uint32_t ignoredPhysicsFlags,
-                                  std::int32_t* supportingObjectId)
-    const noexcept {
+bool LevelCollision::groundHeight(
+    const Vector3& reference, float maximumStepUp, float maximumDrop,
+    float& height, std::uint32_t ignoredPhysicsFlags,
+    std::int32_t* supportingObjectId,
+    std::int32_t* supportingRoomId) const noexcept {
     bool found = false;
     float best = -std::numeric_limits<float>::infinity();
     std::int32_t bestObjectId = -1;
+    std::int32_t bestRoomId = -1;
     const auto considerTriangle = [&](std::uint32_t triangleIndex) {
         const Triangle& triangle = triangles_[triangleIndex];
         const float supportNormal =
@@ -695,6 +696,7 @@ bool LevelCollision::groundHeight(const Vector3& reference,
         }
         best = candidate;
         bestObjectId = triangle.objectId;
+        bestRoomId = triangle.roomId;
         found = true;
     };
     const std::int32_t centerCellX = cellCoordinate(reference.x);
@@ -719,8 +721,16 @@ bool LevelCollision::groundHeight(const Vector3& reference,
         if (supportingObjectId != nullptr) {
             *supportingObjectId = bestObjectId;
         }
-    } else if (supportingObjectId != nullptr) {
-        *supportingObjectId = -1;
+        if (supportingRoomId != nullptr) {
+            *supportingRoomId = bestRoomId;
+        }
+    } else {
+        if (supportingObjectId != nullptr) {
+            *supportingObjectId = -1;
+        }
+        if (supportingRoomId != nullptr) {
+            *supportingRoomId = -1;
+        }
     }
     return found;
 }
