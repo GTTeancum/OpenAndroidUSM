@@ -75,12 +75,13 @@ struct GameplayInputState {
     ActionButtonState upgradeProceed;
     ActionButtonState pause;
     ActionButtonState menuSelected;
-    // R1 UP sets these separate native globals; it is neither a punch nor
-    // a QTE tap. The switch payload is retained without inventing a switch
-    // target or assigning meaning to the native literal 4.
+    // appKeyReleased (ELF 0x003cc2b8-0x003cc2ea) sets three separate
+    // native globals on gameplay R1 UP: rescue, InteractiveButton request,
+    // and the CSwitchObject counter seed 4. Keep those identities distinct;
+    // the counter is not a target index or a one-frame boolean.
     bool rescueRequested{};
-    bool switchRequested{};
-    std::int32_t switchRequestValue{};
+    bool interactiveButtonRequested{};
+    std::int32_t switchCounter{};
 
     void beginFrame() noexcept {
         web.beginFrame();
@@ -98,7 +99,7 @@ struct GameplayInputState {
         pause.beginFrame();
         menuSelected.beginFrame();
         rescueRequested = false;
-        switchRequested = false;
+        interactiveButtonRequested = false;
     }
 };
 
