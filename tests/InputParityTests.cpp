@@ -163,6 +163,28 @@ void routing() {
         CHECK(!router.state().rescueRequested);
     }
 
+    // CQTEManager::SetState (ELF 0x0037a7a0-0x0037a7b2) clears only
+    // the direct IGM/Start press flag before the result handoff. It is not a
+    // physical release and does not reset CKeyPad's separate press history.
+    frame(xi::Start);
+    CHECK(router.state().pause.pressed && router.state().pause.held);
+    CHECK(router.gameplayKeypad().pause.pressed &&
+          router.gameplayKeypad().pause.held);
+    const auto directPauseFrames =
+        router.state().pause.pressedFramesRemaining;
+    const auto keypadPause = router.gameplayKeypad().pause;
+    router.consumePausePress();
+    CHECK(!router.state().pause.pressed);
+    CHECK(router.state().pause.held && !router.state().pause.released);
+    CHECK(router.state().pause.pressedFramesRemaining == directPauseFrames);
+    CHECK(router.gameplayKeypad().pause.held == keypadPause.held);
+    CHECK(router.gameplayKeypad().pause.pressed == keypadPause.pressed);
+    CHECK(router.gameplayKeypad().pause.released == keypadPause.released);
+    CHECK(router.gameplayKeypad().pause.pressedFramesRemaining ==
+          keypadPause.pressedFramesRemaining);
+    frame(0);
+    CHECK(!router.state().pause.held && router.state().pause.released);
+
     // Device cancellation is a PC transport event, never native R1 UP.
     frame(xi::RightShoulder | xi::A | xi::X);
     frame(0, false);
