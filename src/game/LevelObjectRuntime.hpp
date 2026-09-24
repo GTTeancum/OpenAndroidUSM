@@ -93,6 +93,12 @@ struct LevelObjectState {
     assets::Quaternion slideCarRotation;
     assets::Vector3 slideCarBridgeMinimum;
     assets::Vector3 slideCarBridgeMaximum;
+    // CBrokenBridge::GetSlideCarList (0x00301da0) keeps CAreaDamage bodies
+    // in the same linked-body set as CSlideCar. They follow the bridge top
+    // and tilt but do not enter CSlideCar's launch/removal state machine.
+    std::int32_t areaDamageBridgeObjectId{-1};
+    assets::Quaternion areaDamageInitialRotation;
+    assets::Quaternion areaDamageRotation;
     std::int32_t areaDamageState{-1};
     float areaDamageStateMilliseconds{};
     float areaDamageWaitMilliseconds{};
