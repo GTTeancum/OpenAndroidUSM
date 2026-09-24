@@ -48,6 +48,36 @@ struct Sink {
     };
 };
 void dispatchTests() {
+    // CHostage::Update 0x00328444-0x0032847e: state 2, player state 28,
+    // and exactly seven remaining actions are all required before querying
+    // SFX_QTE_UNTIE playback.
+    CHECK(hostageUntieSoundEligible(HostageRescuePhase::QuickTime, 28, 7));
+    CHECK(!hostageUntieSoundEligible(HostageRescuePhase::Tied, 28, 7));
+    CHECK(!hostageUntieSoundEligible(HostageRescuePhase::RescueEnd, 28, 7));
+    CHECK(!hostageUntieSoundEligible(HostageRescuePhase::QuickTime, 27, 7));
+    CHECK(!hostageUntieSoundEligible(HostageRescuePhase::QuickTime, 29, 7));
+    CHECK(!hostageUntieSoundEligible(HostageRescuePhase::QuickTime, 28, 6));
+    CHECK(!hostageUntieSoundEligible(HostageRescuePhase::QuickTime, 28, 8));
+
+    // CHostage::Update 0x003283ba onward accepts both result display and
+    // handled manager states. Non-terminal manager states remain Running.
+    CHECK(hostageQteOutcomeForManagerState(QteState::SuccessDisplay) ==
+          HostageQteOutcome::Success);
+    CHECK(hostageQteOutcomeForManagerState(QteState::SuccessHandled) ==
+          HostageQteOutcome::Success);
+    CHECK(hostageQteOutcomeForManagerState(QteState::FailureDisplay) ==
+          HostageQteOutcome::Failure);
+    CHECK(hostageQteOutcomeForManagerState(QteState::FailureHandled) ==
+          HostageQteOutcome::Failure);
+    CHECK(hostageQteOutcomeForManagerState(QteState::Inactive) ==
+          HostageQteOutcome::Running);
+    CHECK(hostageQteOutcomeForManagerState(QteState::Tap) ==
+          HostageQteOutcome::Running);
+    CHECK(hostageQteOutcomeForManagerState(QteState::Drag) ==
+          HostageQteOutcome::Running);
+    CHECK(hostageQteOutcomeForManagerState(QteState::Mash) ==
+          HostageQteOutcome::Running);
+
     const HostageSoundCue query{30018,0x18b,HostageSoundAction::PlayOnceIfStopped};
     const HostageSoundCue stop{30018,0x18b,HostageSoundAction::Stop};
     Sink sink;
