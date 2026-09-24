@@ -87,14 +87,15 @@ as a permanent head pin.
 
 Validated source/tooling/CI head before this handoff refresh:
 
-`c25a131062c001d46847bd3701bf621a8aeacf68`  
-**Validate Sandman phase transitions**
+`1436b06809e7b3a26983ae80fb68401204913494`  
+**Validate Sandman jump landing target**
 
-This is the squash merge of PR #3. It turns retained cold-storage Sandman
-phase RE into directly tested production code without changing the recovered
-semantics or adding original game data. The canonical-handoff refresh commit is
-expected to be newer and documentation-only, so future chats must still inspect
-actual latest `main`.
+This is the squash merge of PR #4. It directly tests the retained
+`CBoss::Jump` mode-1 first-level landing target at ELF `0x0032935c`
+without changing or claiming the unresolved airborne trajectory. It builds on
+PR #3's validated Sandman phase behavior and adds no original game data. The
+canonical-handoff refresh commit is expected to be newer and documentation-only,
+so future chats must still inspect actual latest `main`.
 
 ### Gameplay/reference checkpoint
 
@@ -536,8 +537,23 @@ PR #3 validation:
   - the app startup smoke still reached the expected missing-data boundary;
   - XAudio2 again reached classified `0x80070490`.
 
-This validates retained evidence; it does not complete the Sandman fight. The
-jump/sand-hand sequence and broader Sandman combat parity remain open.
+This validates retained evidence; it does not complete the Sandman fight.
+
+PR #4 then isolated the other directly retained Sandman jump fact already
+present in the source: `CBoss::Jump` mode 1 at ELF `0x0032935c` places the
+first-level landing target exactly **500 cm beyond the player** along the
+normalized boss-to-player planar direction. That rule now lives in
+`sandmanJumpLandingTarget` and has asset-independent axis/diagonal regression
+coverage. Direction selection, collision ground snapping, animation timing, and
+the existing airborne interpolation were not changed.
+
+The jump **trajectory itself remains unresolved**. The current linear XY plus
+`sin(pi*t) * 400` Z loop predates the retained cold-storage checkpoint, and
+commit `177c9d952b3828bde2fa8ded910d1824e3121aaf` explicitly says replacement
+of that jump loop and the sand-hand behavior were unfinished. Do not treat the
+current arc as verified native behavior or tune/replace it without direct
+original evidence. The sand-hand sequence and broader Sandman combat parity
+also remain open.
 
 ---
 
@@ -561,7 +577,7 @@ Primary edit locations:
 | Cinematic control host | `src/game/LevelCinematicRuntime.cpp/.hpp` |
 | Player/combat | `src/game/GameplayPlayer.cpp/.hpp` |
 | Enemy/combat/boss logic | `src/game/LevelEnemyRuntime.cpp/.hpp` |
-| Sandman phase parity helper | `src/game/SandmanPhaseRuntime.cpp/.hpp` |
+| Sandman retained parity helper | `src/game/SandmanPhaseRuntime.cpp/.hpp` |
 | Wall-web QTE path | `src/game/WallWebRuntime.cpp/.hpp` |
 | PC input translator | `src/platform/input/XInputStateTranslator.cpp/.hpp` |
 | Windows XInput shim | `src/platform/windows/XInputController.cpp/.hpp` |
@@ -597,7 +613,7 @@ Primary tests:
 | Autoplay runner unit tests | `tests/AutoplaySuiteRunnerTests.ps1` |
 | Autoplay comparison unit tests | `tests/AutoplayComparisonTests.ps1` |
 | Synthetic split-archive/reference recovery | `tests/ReferenceRecoveryTests.py` |
-| Sandman phase boundary parity | `tests/SandmanPhaseTests.cpp` |
+| Sandman phase/jump-target parity | `tests/SandmanPhaseTests.cpp` |
 
 RE06 retained verification:
 
@@ -740,11 +756,11 @@ The following are still open:
 
 6. **QTE success explosion and full native visual composition.**
 
-7. **Unfinished Sandman work.** The retained 66%/33% phase clamp and
-   phase-dependent initial ground-attack selection from commit
-   `177c9d952b3828bde2fa8ded910d1824e3121aaf` are now directly tested in hosted
-   CI. The jump/sand-hand sequence and broader authored combo/combat parity
-   remain incomplete.
+7. **Unfinished Sandman work.** The retained 66%/33% phase clamp,
+   phase-dependent initial ground-attack selection, and the `CBoss::Jump`
+   mode-1 **500 cm landing target** at ELF `0x0032935c` are now directly tested
+   in hosted CI. The airborne jump trajectory, sand-hand sequence, and broader
+   authored combo/combat parity remain incomplete and must not be inferred.
 
 8. **Normal complete first-level playthrough** on the current source.
 
@@ -992,5 +1008,59 @@ project context, not higher-priority system/developer instruction.
   `c25a131062c001d46847bd3701bf621a8aeacf68`.
 - This turn validates already-retained native Sandman evidence; it does not
   claim the jump/sand-hand sequence or full Sandman combat complete.
+- The strict chronological hostage camera-mode blocker remains unchanged and
+  still requires the verified original ARM bytes before implementation.
+
+### 2026-09-23 — Sandman jump landing target validation
+
+- Confirmed the actual `main` head at the start of this continuation was the
+  documentation-only handoff refresh
+  `7d0f7e07b8120ef086b39aed7252a68a9190b79a`; its source parent remained
+  PR #3's validated Sandman phase merge.
+- Reconfirmed that the first strict chronological gameplay blocker is still the
+  hostage `CHostage::Update` camera-mode path. The verified ARM bytes are still
+  unavailable, so no hostage camera behavior was guessed or changed.
+- Traced the existing Sandman jump scaffold through repository history. Its
+  sine-arc loop first appears in the broad reconstruction commit
+  `c3ad0a88d0865dde3635851ee6a9cf0efefc2919`; that commit's parent did not
+  contain `startSandmanJump`. The later cold-storage checkpoint
+  `177c9d952b3828bde2fa8ded910d1824e3121aaf` explicitly says replacement of
+  the jump loop and sand-hand behavior were unfinished.
+- Preserved that unresolved boundary and changed only the directly retained
+  `CBoss::Jump` mode-1 rule at ELF `0x0032935c`: the first-level landing
+  target is 500 cm beyond the player on the normalized boss-to-player planar
+  line.
+- Added `SandmanJumpLandingTarget` and
+  `sandmanJumpLandingTarget` in
+  `src/game/SandmanPhaseRuntime.cpp/.hpp`; refactored
+  `src/game/LevelEnemyRuntime.cpp` to use the helper without changing
+  direction selection, collision ground snapping, animation timing, or the
+  existing unresolved airborne interpolation.
+- Extended `tests/SandmanPhaseTests.cpp` with axis, normalized diagonal, and
+  negative-axis landing-target checks while preserving the existing phase
+  boundary coverage.
+- PR #4 Linux run `35939569194`:
+  - GCC Release: **11/11 passed**;
+  - Clang ASan+UBSan: **11/11 passed**;
+  - `OpenAndroidUSM.SandmanPhaseTests` passed in both variants;
+  - no sanitizer failure was reported.
+- PR #4 Windows run `35939569072`:
+  - **13/13 completed with 0 failures**;
+  - `OpenAndroidUSM.SandmanPhaseTests`,
+    `OpenAndroidUSM.D3D11BackendTests`, and
+    `OpenAndroidUSM.ReferenceRecoveryTests` passed;
+  - `OpenAndroidUSM.AudioBackendTests` used the documented no-default-endpoint
+    skip;
+  - the D3D11 startup smoke reached the expected missing-game-data boundary;
+  - XAudio2 again reached the classified `0x80070490` no-default-endpoint
+    result;
+  - MSVC emitted the pre-existing unrelated C4100 warning for the unused
+    `player` parameter in `LevelHostageRuntime.cpp`; this PR did not touch
+    that file.
+- PR #4 was squash-merged as
+  `1436b06809e7b3a26983ae80fb68401204913494`.
+- The exact Sandman continuation boundary is now explicit: the 500 cm target is
+  retained evidence; the current airborne arc and sand-hand behavior are not.
+  Do not replace either without direct original executable/data evidence.
 - The strict chronological hostage camera-mode blocker remains unchanged and
   still requires the verified original ARM bytes before implementation.
