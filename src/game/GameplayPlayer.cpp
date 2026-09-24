@@ -1778,7 +1778,6 @@ bool GameplayPlayer::releaseWeb() noexcept {
 
 bool GameplayPlayer::applyDamage(
     float damage, std::int32_t damageType,
-    std::uint32_t minimumReactionMilliseconds,
     std::int32_t nativeHitType, float hitProtectionMilliseconds,
     std::int32_t hitPriority) noexcept {
     // Player::IsCanBeHit (0x003413dc) first compares the incoming
@@ -1859,14 +1858,12 @@ bool GameplayPlayer::applyDamage(
         setAnimation(hurtClip->name);
         applyAttackRootMotion(animationPhysicalDisplacement(hurtState, 0),
                               animationRenderOffset(hurtState, 0));
-        // UpdateHurt (0x0035062c) leaves the wall reaction when its clip
-        // finishes. CEffectDamage's 1000 ms Player+0x708 immunity is not
-        // a minimum animation length; LevelDamageRuntime tracks that
-        // contact cooldown separately.
-        hurtReactionRemainingMilliseconds_ = wallHit
-            ? hurtClip->durationMilliseconds()
-            : std::max(minimumReactionMilliseconds,
-                       hurtClip->durationMilliseconds());
+        // Player::UpdateHurt (0x0035062c) leaves the reaction when the
+        // authored hurt clip finishes. Hazard repeat suppression is owned by
+        // the hazard runtime itself (for example CEffectDamage's native
+        // 1000 ms contact cooldown), not by stretching the player state.
+        hurtReactionRemainingMilliseconds_ =
+            hurtClip->durationMilliseconds();
     }
     return true;
 }

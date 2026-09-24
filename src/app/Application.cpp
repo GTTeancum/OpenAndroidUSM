@@ -5432,7 +5432,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                  enemyRuntime_.consumePlayerHits()) {
                 const bool accepted = !restoreRuntime_.active() &&
                     gameplayPlayer_.applyDamage(
-                        hit.damage, 0, 0, hit.hitType,
+                        hit.damage, 0, hit.hitType,
                         hit.hitProtectionMilliseconds, hit.hitPriority);
                 if (autoplay) {
                     autoplay->recordEvent(
@@ -5499,7 +5499,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ";effect=" + std::to_string(event.effectId));
                 }
                 if (gameplayPlayer_.applyDamage(event.damage,
-                                                event.damageType, 2000)) {
+                                                event.damageType)) {
                     result = playerSounds_.dispatchStateEnter(
                         "k_state_hurt_light", playGameplaySound,
                         stopPlayerStateSound);
@@ -5528,7 +5528,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             std::to_string(event.hitType));
                 }
                 if (gameplayPlayer_.applyDamage(
-                        event.damage, event.damageType, 1000,
+                        event.damage, event.damageType,
                         event.hitType)) {
                     result = playerSounds_.dispatchStateEnter(
                         event.damageType == 1 ? "k_state_hurt_heavy"
@@ -5549,7 +5549,7 @@ int Application::run(HINSTANCE instance, const ApplicationOptions& options) {
                             ";type=" + std::to_string(event.damageType));
                 }
                 if (gameplayPlayer_.applyDamage(event.damage,
-                                                event.damageType, 1000,
+                                                event.damageType,
                                                 event.damageType == 1
                                                     ? 0x86 : 0x85)) {
                     result = playerSounds_.dispatchStateEnter(

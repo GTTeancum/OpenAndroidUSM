@@ -271,7 +271,6 @@ public:
     [[nodiscard]] bool releaseWeb() noexcept;
     [[nodiscard]] bool applyDamage(
         float damage, std::int32_t damageType = 0,
-        std::uint32_t minimumReactionMilliseconds = 0,
         std::int32_t nativeHitType = 100,
         float hitProtectionMilliseconds = 0.0F,
         std::int32_t hitPriority = 0) noexcept;
